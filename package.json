@@ -25,7 +25,7 @@
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
     "tsx": "^4.19.4",
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   },
   "ignoreScripts": [
     "sharp",
