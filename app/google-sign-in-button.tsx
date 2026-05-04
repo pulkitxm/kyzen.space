@@ -19,7 +19,7 @@ export function GoogleSignInButton({ googleOAuthReady }: Props) {
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/",
+        callbackURL: "/profile",
       });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Sign-in failed");

@@ -5,20 +5,9 @@ import { RevokeOthersForm } from "@/app/revoke-others-form";
 import { SessionEndForm } from "@/app/session-end-form";
 import { SignOutForm } from "@/app/sign-out-form";
 import { getAccountSessions } from "@/lib/get-account-sessions";
+import { formatTs, shortenId } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-function formatTs(value: Date | string) {
-  const d = typeof value === "string" ? new Date(value) : value;
-  return d.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-function shortenId(id: string) {
-  return id.slice(0, 8);
-}
 
 export default async function AccountPage() {
   const { current, list } = await getAccountSessions();
