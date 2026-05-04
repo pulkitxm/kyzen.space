@@ -4,10 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "tsx server.ts",
-    "dev:custom": "tsx server.ts",
-    "dev:next": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production tsx server.ts",
     "lint": "eslint",
     "db:start": "docker compose -f scripts/docker-compose.yml up -d mongo",
     "db:stop": "docker compose -f scripts/docker-compose.yml down",
@@ -21,7 +19,10 @@
     "mongoose": "^9.6.1",
     "next": "16.2.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "tsx": "^4.19.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -31,7 +32,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
-    "tsx": "^4.19.4",
     "typescript": "^5"
   },
   "ignoreScripts": [

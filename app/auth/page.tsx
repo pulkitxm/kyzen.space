@@ -13,7 +13,7 @@ export default async function AuthPage() {
   );
 
   const session = await getServerSession();
-  if (session?.user) redirect("/account");
+  if (session?.user) redirect("/profile");
 
   return (
     <div className="min-h-full flex flex-col items-center justify-center px-4 py-14">

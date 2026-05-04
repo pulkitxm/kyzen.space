@@ -2,18 +2,9 @@ import Link from "next/link";
 
 import { SignOutForm } from "@/app/sign-out-form";
 import { getServerSession } from "@/lib/get-server-session";
+import { displayName } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-function displayName(user: {
-  name?: string | null;
-  email?: string | null;
-}): string | null {
-  if (typeof user.name === "string" && user.name.trim()) return user.name.trim();
-  if (typeof user.email === "string" && user.email.trim())
-    return user.email.trim();
-  return null;
-}
 
 export default async function Home() {
   const session = await getServerSession();
@@ -35,12 +26,20 @@ export default async function Home() {
             <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
               Sign in to continue.
             </p>
-            <Link
-              href="/auth"
-              className="mt-8 inline-flex rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-medium text-white shadow-md shadow-violet-950/25 transition hover:bg-violet-500 active:scale-[0.98]"
-            >
-              Sign in
-            </Link>
+            <div className="mt-8 flex flex-col items-center gap-3">
+              <Link
+                href="/games"
+                className="inline-flex rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-medium text-white shadow-md shadow-violet-950/25 transition hover:bg-violet-500 active:scale-[0.98]"
+              >
+                Browse games
+              </Link>
+              <Link
+                href="/auth"
+                className="text-sm text-neutral-600 underline-offset-4 hover:underline dark:text-neutral-400"
+              >
+                Sign in
+              </Link>
+            </div>
           </>
         ) : (
           <>
@@ -61,6 +60,18 @@ export default async function Home() {
             ) : null}
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/games"
+                className="inline-flex rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-medium text-white shadow-md shadow-violet-950/25 transition hover:bg-violet-500 active:scale-[0.98]"
+              >
+                Play
+              </Link>
+              <Link
+                href="/profile"
+                className="text-sm text-neutral-600 underline-offset-4 hover:underline dark:text-neutral-400"
+              >
+                Profile
+              </Link>
               <SignOutForm />
               <Link
                 href="/account"
