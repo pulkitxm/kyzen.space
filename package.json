@@ -16,6 +16,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "better-auth": "^1.6.9",
     "hono": "^4.12.16",
+    "jotai": "^2.19.1",
     "mongodb": "^7.2.0",
     "mongoose": "^9.6.1",
     "next": "16.2.4",

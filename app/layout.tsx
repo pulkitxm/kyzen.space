@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import Script from "next/script";
+import { cookies } from "next/headers";
+
 import { AppShellClient } from "@/app/app-shell";
 import { Providers } from "@/app/providers";
 import { connectMongoose } from "@/database/mongoose";
 import { UserProfile } from "@/database/models";
 import { getServerSession } from "@/lib/get-server-session";
+import {
+  SIDEBAR_LS_BOOT_SCRIPT,
+  SIDEBAR_PREFS_COOKIE,
+  parseSidebarPrefsCookieValue,
+} from "@/lib/sidebar-prefs";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -46,6 +54,12 @@ export default async function RootLayout({
 
   const profileHref = signedIn ? (username ? `/${username}` : "/profile") : "/auth";
 
+  const cookieStore = await cookies();
+  const prefCookieRaw = cookieStore.get(SIDEBAR_PREFS_COOKIE)?.value;
+  const sidebarPrefsTrusted =
+    typeof prefCookieRaw === "string" && prefCookieRaw.length > 0;
+  const sidebarPrefs = parseSidebarPrefsCookieValue(prefCookieRaw);
+
   return (
     <html
       lang="en"
@@ -53,11 +67,16 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground">
+        <Script id="gl-sidebar-cookie-bootstrap" strategy="beforeInteractive">
+          {SIDEBAR_LS_BOOT_SCRIPT}
+        </Script>
         <Providers>
           <AppShellClient
             username={username}
             signedIn={signedIn}
             profileHref={profileHref}
+            sidebarPrefsTrusted={sidebarPrefsTrusted}
+            sidebarPrefs={sidebarPrefs}
           >
             {children}
           </AppShellClient>

@@ -2,24 +2,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useAtom } from "jotai";
+import { useHydrateAtoms } from "jotai/utils";
+import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { FaChevronLeft, FaChevronRight, FaGamepad, FaUser } from "react-icons/fa";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { ThemeToggle } from "@/app/theme-toggle";
 import { getCategoryGroups } from "@/lib/games";
-
-const SIDEBAR_COLLAPSED_KEY = "gl-sidebar-collapsed";
-const SIDEBAR_WIDTH_KEY = "gl-sidebar-width";
-const DEFAULT_SIDEBAR_WIDTH = 224;
-const MIN_SIDEBAR_WIDTH = 192;
-const MAX_SIDEBAR_WIDTH = 384;
+import type { SidebarPrefs } from "@/lib/sidebar-prefs";
+import { persistSidebarPrefsToCookie } from "@/lib/sidebar-prefs";
+import {
+  clampWidthSafe,
+  DEFAULT_SIDEBAR_WIDTH,
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  sidebarCollapsedAtom,
+  sidebarWidthAtom,
+} from "@/lib/sidebar-atoms";
 
 function cn(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
 }
 
 export interface SidebarProps {
+  /** Pref came from Cookie header → matches SSR markup; skips local-storage flash gate. */
+  sidebarPrefsTrusted: boolean;
+  sidebarPrefs: SidebarPrefs;
   mobileOpen: boolean;
   onCloseMobile: () => void;
   username: string | null;
@@ -28,6 +37,8 @@ export interface SidebarProps {
 }
 
 export function Sidebar({
+  sidebarPrefsTrusted,
+  sidebarPrefs,
   mobileOpen,
   onCloseMobile,
   username,
@@ -35,21 +46,29 @@ export function Sidebar({
   profileHref,
 }: SidebarProps) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
-  });
-  const [width, setWidth] = useState<number>(() => {
-    if (typeof window === "undefined") return DEFAULT_SIDEBAR_WIDTH;
-    const stored = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    if (stored !== null) {
-      const w = Number.parseInt(stored, 10);
-      if (!Number.isNaN(w) && w >= MIN_SIDEBAR_WIDTH && w <= MAX_SIDEBAR_WIDTH)
-        return w;
-    }
-    return DEFAULT_SIDEBAR_WIDTH;
-  });
+  const atomsToHydrate = sidebarPrefsTrusted
+    ? new Map<typeof sidebarCollapsedAtom | typeof sidebarWidthAtom, boolean | number>([
+        [sidebarCollapsedAtom, sidebarPrefs.collapsed],
+        [sidebarWidthAtom, clampWidthSafe(sidebarPrefs.width)],
+      ])
+    : new Map();
+  useHydrateAtoms(atomsToHydrate);
+  const [collapsed, setCollapsed] = useAtom(sidebarCollapsedAtom);
+  const [width, setWidth] = useAtom(sidebarWidthAtom);
+  const clientReady = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  /** Without a cookie SSR uses defaults but localStorage may differ → gate one frame until after hydrate. */
+  const layoutKnown = sidebarPrefsTrusted || clientReady;
+  const displayCollapsed = layoutKnown ? collapsed : false;
+  const displayWidth = layoutKnown ? width : DEFAULT_SIDEBAR_WIDTH;
   const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    persistSidebarPrefsToCookie({ collapsed, width });
+  }, [collapsed, width]);
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resizeStartXRef = useRef<number>(0);
   const hasResizedThisGestureRef = useRef(false);
@@ -57,23 +76,13 @@ export function Sidebar({
 
   const groups = getCategoryGroups();
 
-  useEffect(() => {
-    if (collapsed) return;
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
-  }, [collapsed, width]);
-
   const toggleCollapsed = useCallback(() => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
-      return next;
-    });
-  }, []);
+    setCollapsed((prev) => !prev);
+  }, [setCollapsed]);
 
   const resetToDefaultWidth = useCallback(() => {
     setWidth(DEFAULT_SIDEBAR_WIDTH);
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(DEFAULT_SIDEBAR_WIDTH));
-  }, []);
+  }, [setWidth]);
 
   const handleResizeHandleClick = useCallback(() => {
     if (!collapsed && hasResizedThisGestureRef.current) return;
@@ -141,8 +150,6 @@ export function Sidebar({
           setWidth(newWidth);
           setCollapsed(false);
           resizeStartedFromCollapsedRef.current = false;
-          localStorage.setItem(SIDEBAR_COLLAPSED_KEY, "false");
-          localStorage.setItem(SIDEBAR_WIDTH_KEY, String(newWidth));
         }
         return;
       }
@@ -171,7 +178,7 @@ export function Sidebar({
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isResizing, toggleCollapsed]);
+  }, [isResizing, setCollapsed, setWidth, toggleCollapsed]);
 
   const collapsedWidth = 68;
   const navPx = 8;
@@ -181,7 +188,7 @@ export function Sidebar({
 
   const textClasses = cn(
     "overflow-hidden whitespace-nowrap transition-[opacity,max-width,filter] duration-250 ease-in-out",
-    collapsed ? "max-w-0 opacity-0 blur-[2px]" : "max-w-48 opacity-100 blur-0",
+    displayCollapsed ? "max-w-0 opacity-0 blur-[2px]" : "max-w-48 opacity-100 blur-0",
   );
 
   const avatarLetter =
@@ -196,7 +203,7 @@ export function Sidebar({
       )}
       style={
         {
-          "--sidebar-width": `${collapsed ? collapsedWidth : width}px`,
+          "--sidebar-width": `${displayCollapsed ? collapsedWidth : displayWidth}px`,
           transition: isResizing ? "none" : "width 0.25s ease-in-out",
         } as React.CSSProperties
       }
@@ -219,9 +226,9 @@ export function Sidebar({
           type="button"
           onClick={toggleCollapsed}
           className="absolute top-1/2 right-0 flex -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-sidebar-border bg-sidebar p-1 text-sidebar-foreground/70 opacity-0 shadow-sm transition-opacity hover:bg-sidebar-accent hover:text-sidebar-foreground group-hover:opacity-100"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={displayCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {collapsed ? (
+          {displayCollapsed ? (
             <FaChevronRight className="size-2" />
           ) : (
             <FaChevronLeft className="size-2" />
@@ -235,7 +242,7 @@ export function Sidebar({
           href="/"
           onClick={onCloseMobile}
           className="flex min-w-0 items-center rounded-lg transition-[gap,padding,opacity] duration-250 ease-in-out hover:opacity-90"
-          style={{ gap: collapsed ? 0 : 10, paddingLeft: collapsed ? 8 : 0 }}
+          style={{ gap: displayCollapsed ? 0 : 10, paddingLeft: displayCollapsed ? 8 : 0 }}
         >
           <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-sm font-bold select-none">
             GL
@@ -276,16 +283,16 @@ export function Sidebar({
                       isActive
                         ? "bg-sidebar-accent text-sidebar-foreground"
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-                      !collapsed && isActive && "border-l-2 border-sidebar-primary",
-                      !(collapsed || isActive) && "border-l-2 border-transparent",
+                      !displayCollapsed && isActive && "border-l-2 border-sidebar-primary",
+                      !(displayCollapsed || isActive) && "border-l-2 border-transparent",
                     )}
                     style={{
-                      paddingLeft: collapsed
+                      paddingLeft: displayCollapsed
                         ? `${centeredPad}px`
                         : isActive
                           ? "8px"
                           : "10px",
-                      paddingRight: collapsed ? `${centeredPad}px` : "10px",
+                      paddingRight: displayCollapsed ? `${centeredPad}px` : "10px",
                     }}
                   >
                     <span className={cn("flex shrink-0", isActive && "text-sidebar-primary")}>
@@ -294,7 +301,7 @@ export function Sidebar({
                     <span className={cn("font-medium", textClasses)}>{game.name}</span>
                   </Link>
                 );
-                return collapsed ? (
+                return displayCollapsed ? (
                   <Tooltip key={game.href}>
                     <TooltipTrigger asChild>{link}</TooltipTrigger>
                     <TooltipContent side="right">{game.name}</TooltipContent>
@@ -311,7 +318,7 @@ export function Sidebar({
       {/* Appearance + profile */}
       <div className="border-t border-sidebar-border px-2 py-3">
         <div className="mb-2">
-          <ThemeToggle collapsed={collapsed} />
+          <ThemeToggle collapsed={displayCollapsed} />
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -320,9 +327,9 @@ export function Sidebar({
               onClick={onCloseMobile}
               className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg outline-none transition-[gap,padding] duration-250 ease-in-out hover:bg-sidebar-accent"
               style={{
-                gap: collapsed ? 0 : 10,
-                paddingLeft: collapsed ? 12 : 10,
-                paddingRight: collapsed ? 12 : 10,
+                gap: displayCollapsed ? 0 : 10,
+                paddingLeft: displayCollapsed ? 12 : 10,
+                paddingRight: displayCollapsed ? 12 : 10,
               }}
               aria-label={signedIn ? "View profile" : "Sign in"}
             >
@@ -339,14 +346,14 @@ export function Sidebar({
               <span
                 className={cn(
                   "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sidebar-foreground/80 text-sm transition-[opacity,max-width,filter] duration-250 ease-in-out",
-                  collapsed ? "max-w-0 opacity-0 blur-[2px]" : "max-w-48 opacity-100 blur-0",
+                  displayCollapsed ? "max-w-0 opacity-0 blur-[2px]" : "max-w-48 opacity-100 blur-0",
                 )}
               >
                 {signedIn ? (username ?? "Profile") : "Sign in"}
               </span>
             </Link>
           </TooltipTrigger>
-          {collapsed ? (
+          {displayCollapsed ? (
             <TooltipContent side="right">
               {signedIn ? (username ?? "Profile") : "Sign in"}
             </TooltipContent>
