@@ -1,12 +1,10 @@
-import { revokeSessionAction } from "./actions/auth";
-
 type Props = {
   token: string;
 };
 
 export function SessionEndForm({ token }: Props) {
   return (
-    <form action={revokeSessionAction} className="shrink-0">
+    <form action="/api/account/revoke-session" method="post" className="shrink-0">
       <input type="hidden" name="token" value={token} />
       <button
         type="submit"
