@@ -4,17 +4,23 @@
   "private": true,
   "scripts": {
     "dev": "tsx server.ts",
+    "dev:custom": "tsx server.ts",
     "dev:next": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:start": "docker compose -f scripts/docker-compose.yml up -d mongo",
+    "db:stop": "docker compose -f scripts/docker-compose.yml down",
+    "db:reset": "docker compose -f scripts/docker-compose.yml down -v",
+    "db:studio": "docker compose -f scripts/docker-compose.yml --profile studio up -d mongo mongo-express && echo Mongo Express → http://127.0.0.1:18081"
   },
   "dependencies": {
+    "better-auth": "^1.6.9",
+    "mongodb": "^7.2.0",
+    "mongoose": "^9.6.1",
     "next": "16.2.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3"
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
