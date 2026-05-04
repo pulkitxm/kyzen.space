@@ -6,6 +6,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { FaChevronLeft, FaChevronRight, FaGamepad, FaUser } from "react-icons/fa";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
+import { ThemeToggle } from "@/app/theme-toggle";
 import { getCategoryGroups } from "@/lib/games";
 
 const SIDEBAR_COLLAPSED_KEY = "gl-sidebar-collapsed";
@@ -307,8 +308,11 @@ export function Sidebar({
         ))}
       </nav>
 
-      {/* Profile footer */}
+      {/* Appearance + profile */}
       <div className="border-t border-sidebar-border px-2 py-3">
+        <div className="mb-2">
+          <ThemeToggle collapsed={collapsed} />
+        </div>
         <Tooltip>
           <TooltipTrigger asChild>
             <Link

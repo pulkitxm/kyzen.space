@@ -66,7 +66,7 @@ export default async function TicTacToeLobbyPage() {
         <form action={createGame} className="mt-8">
           <button
             type="submit"
-            className="w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white shadow transition hover:bg-violet-500"
+            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow transition hover:bg-primary-dark"
           >
             Create game
           </button>

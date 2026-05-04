@@ -21,7 +21,7 @@ export default async function AccountPage() {
   return (
     <div className="min-h-full flex flex-col items-center justify-start px-4 py-14 md:py-16">
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-32 left-1/2 size-[520px] -translate-x-1/2 rounded-full bg-violet-500/14 blur-[100px]" />
+        <div className="absolute -top-32 left-1/2 size-[520px] -translate-x-1/2 rounded-full bg-page-ambient blur-[100px]" />
       </div>
 
       <main className="w-full max-w-xl">
@@ -68,7 +68,7 @@ export default async function AccountPage() {
                       className={
                         "rounded-xl border px-4 py-3 text-left text-sm shadow-sm " +
                         (isCurrent
-                          ? "border-emerald-500/40 bg-emerald-500/8 dark:border-emerald-500/35"
+                          ? "border-success-border bg-success-bg"
                           : "border-neutral-200/90 bg-white/60 dark:border-neutral-800/90 dark:bg-neutral-950/40")
                       }
                     >
@@ -78,7 +78,7 @@ export default async function AccountPage() {
                             {shortenId(session.id)}…
                           </span>
                           {isCurrent ? (
-                            <span className="rounded-full bg-emerald-600/15 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">
+                            <span className="rounded-full bg-success-label-bg px-2.5 py-0.5 text-[11px] font-medium text-success-label-text">
                               Current session
                             </span>
                           ) : (

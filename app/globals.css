@@ -1,21 +1,137 @@
 @import "tailwindcss";
 
+/* ═══ Raw palette from the brand board ═══ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --sidebar: #fafafa;
-  --sidebar-foreground: #404040;
-  --sidebar-primary: #7c3aed;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e5e7eb;
-  --sidebar-accent-foreground: #171717;
-  --sidebar-border: #e5e5e5;
-  --sidebar-ring: #8b5cf6;
+  --palette-pine: #122417;
+  --palette-mezzo: #1a4a24;
+  --palette-lucky: #dbedcc;
+  --palette-gold: #a38554;
+  --palette-nemo: #ff5524;
+
+  /* ─── Semantic tokens (light) ─── */
+  --primary: var(--palette-mezzo);
+  --primary-dark: var(--palette-pine);
+  --primary-foreground: var(--palette-lucky);
+
+  --background: color-mix(in srgb, var(--palette-lucky) 86%, white);
+  --foreground: var(--palette-pine);
+
+  --surface: var(--palette-lucky);
+  --surface-raised: #ffffff;
+  --surface-overlay: color-mix(in srgb, var(--palette-lucky) 76%, white);
+  --surface-hover: color-mix(in srgb, var(--palette-lucky) 80%, var(--palette-gold));
+
+  --card: #ffffff;
+  --card-foreground: var(--palette-pine);
+
+  --muted-foreground: color-mix(in srgb, var(--palette-pine) 70%, var(--palette-gold));
+
+  --border: color-mix(in srgb, var(--palette-gold) 30%, var(--palette-lucky));
+  --ring: var(--palette-nemo);
+
+  --banner-from: var(--palette-lucky);
+  --banner-via: var(--palette-gold);
+  --banner-to: var(--palette-mezzo);
+  --banner-fade: rgb(219 237 204 / 0.92); /* lucky */
+  --banner-curve: var(--surface);
+
+  --sidebar: var(--palette-pine);
+  --sidebar-foreground: var(--palette-lucky);
+  --sidebar-primary: var(--palette-nemo);
+  --sidebar-primary-foreground: var(--palette-pine);
+  --sidebar-accent: var(--palette-mezzo);
+  --sidebar-accent-foreground: var(--palette-lucky);
+  --sidebar-border: color-mix(in srgb, var(--palette-lucky) 12%, transparent);
+  --sidebar-ring: var(--palette-nemo);
+
+  /* UI accents */
+  --accent-warm: var(--palette-nemo);
+  --page-ambient: color-mix(in srgb, var(--primary) 14%, transparent);
+  --success-border: color-mix(in srgb, var(--palette-mezzo) 42%, transparent);
+  --success-bg: color-mix(in srgb, var(--palette-mezzo) 10%, transparent);
+  --success-label-bg: color-mix(in srgb, var(--palette-gold) 22%, transparent);
+  --success-label-text: var(--palette-pine);
+
+  color-scheme: light;
 }
 
+/* Dark: `next-themes` sets `class="dark"` on `<html>` (default can follow system preference). */
+html.dark {
+  --primary: var(--palette-gold);
+  --primary-dark: var(--palette-nemo);
+  --primary-foreground: var(--palette-pine);
+
+  --background: var(--palette-pine);
+  --foreground: var(--palette-lucky);
+
+  --surface: color-mix(in srgb, var(--palette-pine) 88%, var(--palette-mezzo));
+  --surface-raised: color-mix(in srgb, var(--palette-pine) 70%, var(--palette-mezzo));
+  --surface-overlay: var(--palette-mezzo);
+  --surface-hover: color-mix(in srgb, var(--palette-mezzo) 84%, var(--palette-gold));
+
+  --card: color-mix(in srgb, var(--palette-pine) 64%, var(--palette-mezzo));
+  --card-foreground: var(--palette-lucky);
+
+  --muted-foreground: color-mix(in srgb, var(--palette-lucky) 58%, var(--palette-gold));
+
+  --border: color-mix(in srgb, var(--palette-lucky) 13%, transparent);
+  --ring: var(--palette-nemo);
+
+  --banner-from: var(--palette-pine);
+  --banner-via: var(--palette-mezzo);
+  --banner-to: var(--palette-gold);
+  --banner-fade: rgb(18 36 23 / 0.92); /* pine */
+  --banner-curve: var(--surface);
+
+  --sidebar: color-mix(in srgb, var(--palette-pine) 94%, black);
+  --sidebar-foreground: var(--palette-lucky);
+  --sidebar-primary: var(--palette-nemo);
+  --sidebar-primary-foreground: var(--palette-pine);
+  --sidebar-accent: var(--palette-mezzo);
+  --sidebar-accent-foreground: var(--palette-lucky);
+  --sidebar-border: color-mix(in srgb, var(--palette-lucky) 12%, transparent);
+  --sidebar-ring: var(--palette-nemo);
+
+  --accent-warm: var(--palette-nemo);
+  --page-ambient: color-mix(in srgb, var(--primary) 14%, transparent);
+  --success-border: color-mix(in srgb, var(--palette-gold) 42%, transparent);
+  --success-bg: color-mix(in srgb, var(--palette-gold) 12%, transparent);
+  --success-label-bg: color-mix(in srgb, var(--palette-gold) 20%, transparent);
+  --success-label-text: var(--palette-lucky);
+
+  color-scheme: dark;
+}
+
+/* ─── Tailwind: bridge semantic CSS variables to utilities ─── */
 @theme inline {
+  --color-accent-warm: var(--accent-warm);
+  --color-page-ambient: var(--page-ambient);
+  --color-success-border: var(--success-border);
+  --color-success-bg: var(--success-bg);
+  --color-success-label-bg: var(--success-label-bg);
+  --color-success-label-text: var(--success-label-text);
+
+  /* Semantic tokens (palette composition lives only above in :root) */
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-foreground: var(--primary-foreground);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-hover: var(--surface-hover);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -24,23 +140,9 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --sidebar: #0a0a0a;
-    --sidebar-foreground: #a3a3a3;
-    --sidebar-primary: #a78bfa;
-    --sidebar-primary-foreground: #0a0a0a;
-    --sidebar-accent: #262626;
-    --sidebar-accent-foreground: #fafafa;
-    --sidebar-border: #262626;
-    --sidebar-ring: #a78bfa;
-  }
 }
 
 body {

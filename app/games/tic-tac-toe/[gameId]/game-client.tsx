@@ -452,7 +452,7 @@ export function TicTacToeGameClient({
       ) : null}
 
       {winnerLabel ? (
-        <p className="mb-4 text-sm font-medium text-violet-600 dark:text-violet-400">
+        <p className="mb-4 text-sm font-medium text-primary">
           {winnerLabel}
         </p>
       ) : null}

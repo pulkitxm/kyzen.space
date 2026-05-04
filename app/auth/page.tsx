@@ -18,42 +18,42 @@ export default async function AuthPage() {
   return (
     <div className="min-h-full flex flex-col items-center justify-center px-4 py-14">
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-32 left-1/2 size-[520px] -translate-x-1/2 rounded-full bg-violet-500/14 blur-[100px]" />
+        <div className="absolute -top-32 left-1/2 size-[520px] -translate-x-1/2 rounded-full bg-primary/10 blur-[100px]" />
       </div>
 
       <main className="w-full max-w-[360px]">
         <Link
           href="/"
-          className="mb-10 inline-block text-xs text-neutral-500 underline-offset-4 hover:text-neutral-700 hover:underline dark:text-neutral-500 dark:hover:text-neutral-300"
+          className="mb-10 inline-block text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
           ← Back home
         </Link>
 
-        <div className="rounded-2xl border border-neutral-200/90 bg-white/70 p-8 shadow-xl shadow-neutral-950/5 backdrop-blur-md dark:border-neutral-800/90 dark:bg-neutral-950/50">
-          <h1 className="text-center text-xl font-semibold tracking-tight text-neutral-950 dark:text-neutral-50">
+        <div className="rounded-2xl border border-border bg-card p-8 shadow-xl shadow-black/5">
+          <h1 className="text-center text-xl font-semibold tracking-tight text-card-foreground">
             Sign in
           </h1>
 
-          <p className="mt-2 text-center text-sm text-neutral-600 dark:text-neutral-400">
+          <p className="mt-2 text-center text-sm text-muted-foreground">
             Use your Google account to continue.
           </p>
 
           <GoogleSignInButton googleOAuthReady={googleOAuthReady} />
 
           {!googleOAuthReady ? (
-            <p className="mt-4 text-center text-xs text-neutral-500 dark:text-neutral-500">
+            <p className="mt-4 text-center text-xs text-muted-foreground">
               Add <span className="font-mono">GOOGLE_CLIENT_ID</span> and{" "}
               <span className="font-mono">GOOGLE_CLIENT_SECRET</span> to{" "}
               <span className="font-mono">.env.local</span>, set the redirect URI
               to{" "}
-              <span className="break-all font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
+              <span className="break-all font-mono text-[11px] text-muted-foreground">
                 [your app URL]/api/auth/callback/google
               </span>
               , then restart the dev server.
             </p>
           ) : null}
 
-          <p className="mt-8 text-center text-xs text-neutral-400 dark:text-neutral-600">
+          <p className="mt-8 text-center text-xs text-muted-foreground/60">
             Email &amp; password: coming soon
           </p>
         </div>
