@@ -39,7 +39,7 @@ const Lobby: React.FC = () => {
       </div>
 
       {/* Player slots */}
-      <div className="grid w-full max-w-[340px] grid-cols-2 gap-4">
+      <div className="grid w-full max-w-85 grid-cols-2 gap-4">
         <AnimatePresence>
           {players.map((player, idx) => (
             <motion.div
@@ -76,7 +76,7 @@ const Lobby: React.FC = () => {
         {Array.from({ length: 4 - players.length }).map((_, idx) => (
           <div
             key={`empty-${idx}`}
-            className="flex min-h-[110px] flex-col items-center justify-center rounded-[10px] border border-dashed border-white/10 p-4"
+            className="flex min-h-27.5 flex-col items-center justify-center rounded-[10px] border border-dashed border-white/10 p-4"
           >
             <div className="text-2xl opacity-20">＋</div>
             <div className="mt-1 text-[0.75rem] text-white/25">Waiting…</div>

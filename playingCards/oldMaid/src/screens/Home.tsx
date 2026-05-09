@@ -46,7 +46,7 @@ const Home: React.FC<HomeProps> = ({ prefilledCode }) => {
       </div>
 
       {/* Card decoration */}
-      <div className="relative h-20 w-[180px]">
+      <div className="relative h-20 w-45">
         {['rotate(-20deg) translateX(-50px)', 'rotate(-8deg) translateX(-15px)', 'rotate(4deg) translateX(20px)', 'rotate(16deg) translateX(55px)'].map((t, i) => (
           <div key={i} style={{
             position: 'absolute', left: '50%', top: 0,

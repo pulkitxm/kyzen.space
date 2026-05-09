@@ -119,7 +119,7 @@ const App: React.FC<AppProps> = ({ roomCode }) => {
   ]);
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[radial-gradient(ellipse_at_center,_#224b38_0%,_#1b3a2d_60%,_#122a1f_100%)] text-white">
+    <div className="relative h-screen w-screen overflow-hidden bg-[radial-gradient(ellipse_at_center,#224b38_0%,#1b3a2d_60%,#122a1f_100%)] text-white">
       <div className="pointer-events-none absolute inset-0 z-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_3px,rgba(255,255,255,0.012)_3px,rgba(255,255,255,0.012)_4px)]" />
       <AnimatePresence mode="wait">
         {phase === 'home' && <Home key="home" prefilledCode={roomCode} />}

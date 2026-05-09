@@ -2,7 +2,6 @@
 
 import OldMaidApp from "@/playingCards/oldMaid/src/App";
 import { useParams } from "next/navigation";
-import "@/playingCards/oldMaid/src/styles/cards.css";
 
 export default function OldMaidPage() {
   const params = useParams();

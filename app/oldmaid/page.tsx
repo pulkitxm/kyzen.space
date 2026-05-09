@@ -1,7 +1,6 @@
 "use client";
 
 import OldMaidApp from "@/playingCards/oldMaid/src/App";
-import "@/playingCards/oldMaid/src/styles/cards.css";
 
 export default function OldMaidHomePage() {
   return (
