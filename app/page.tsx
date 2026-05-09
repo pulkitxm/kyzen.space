@@ -1,220 +1,195 @@
-"use client";
+import Link from "next/link";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { socket } from "./socket";
+const featuredGames = [
+  {
+    name: "Old Maid",
+    description:
+      "A multiplayer card game with room codes, smooth lobby flow, and a polished in-game experience.",
+    href: "/oldmaid",
+    status: "Live",
+    meta: ["2-4 players", "Room-based", "Turn-driven"],
+  },
+  {
+    name: "Playing Cards Hub",
+    description:
+      "Shared card-game foundations for future titles, built to stay consistent across the library.",
+    href: "/oldmaid",
+    status: "Foundation",
+    meta: ["Reusable UI", "Shared assets", "Scalable routes"],
+  },
+];
 
-type ChatPayload = {
-  id: string;
-  socketId: string;
-  text: string;
-  at: number;
-};
-
-function shortenId(id: string) {
-  return id.slice(0, 6);
-}
+const roadmap = [
+  {
+    title: "Library-first structure",
+    text: "Each game gets its own route, so the main page stays clean and easy to expand.",
+  },
+  {
+    title: "Polished game shells",
+    text: "Games can keep their own visual identity without leaking implementation details into the hub.",
+  },
+  {
+    title: "Room-friendly routing",
+    text: "Room codes and multiplayer states stay inside the game route, not in a static index file.",
+  },
+];
 
 export default function Home() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [transport, setTransport] = useState("N/A");
-  const [messages, setMessages] = useState<ChatPayload[]>([]);
-  const [draft, setDraft] = useState("");
-  const [myId, setMyId] = useState<string | null>(null);
-  const scrollAnchorRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
-
-  useEffect(() => {
-    function syncTransportFromEngine() {
-      const name = socket.io.engine?.transport?.name;
-      setTransport(typeof name === "string" ? name : "N/A");
-    }
-
-    function onUpgrade() {
-      syncTransportFromEngine();
-    }
-
-    function onConnect() {
-      setIsConnected(true);
-      setMyId(socket.id ?? null);
-      syncTransportFromEngine();
-      socket.io.engine?.on("upgrade", onUpgrade);
-    }
-
-    function onDisconnect() {
-      setIsConnected(false);
-      setTransport("N/A");
-      socket.io.engine?.off("upgrade", onUpgrade);
-    }
-
-    function onChatMessage(msg: ChatPayload) {
-      if (
-        typeof msg?.id === "string" &&
-        typeof msg?.socketId === "string" &&
-        typeof msg?.text === "string" &&
-        typeof msg?.at === "number"
-      ) {
-        setMessages((prev) => [...prev, msg]);
-      }
-    }
-
-    if (socket.connected) {
-      onConnect();
-    }
-
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    socket.on("chat:message", onChatMessage);
-
-    return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-      socket.off("chat:message", onChatMessage);
-      socket.io.engine?.off("upgrade", onUpgrade);
-    };
-  }, []);
-
-  const sendMessage = useCallback(() => {
-    const text = draft.trim();
-    if (!text || !socket.connected) return;
-    socket.emit("chat:send", { text });
-    setDraft("");
-  }, [draft]);
-
-  const connectionLabel = useMemo(
-    () => (isConnected ? "Connected" : "Disconnected"),
-    [isConnected],
-  );
-
   return (
-    <div className="min-h-full flex flex-col items-center justify-center px-4 py-10 md:py-14">
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-32 left-1/2 size-[520px] -translate-x-1/2 rounded-full bg-violet-500/18 blur-[100px]" />
-        <div className="absolute -bottom-40 right-[-10%] size-[420px] rounded-full bg-cyan-500/12 blur-[90px]" />
+    <main className="relative isolate overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute left-1/2 top-[-10rem] h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-emerald-400/15 blur-3xl" />
+        <div className="absolute right-[-8rem] top-[18rem] h-[20rem] w-[20rem] rounded-full bg-amber-400/10 blur-3xl" />
+        <div className="absolute bottom-[-10rem] left-[-6rem] h-[18rem] w-[18rem] rounded-full bg-cyan-400/10 blur-3xl" />
       </div>
 
-      <main className="w-full max-w-md">
-        <header className="mb-6 text-center">
-          <h1 className="font-semibold tracking-tight text-2xl text-foreground md:text-[1.65rem]">
-            Live relay
-          </h1>
-          <p className="mt-1.5 text-sm text-neutral-600 dark:text-neutral-400">
-            Open this page in two tabs or browsers — messages broadcast to everyone
-            on the socket.
-          </p>
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs font-medium font-mono">
-            <span
-              className={
-                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 " +
-                (isConnected
-                  ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                  : "border-neutral-400/35 bg-neutral-500/10 text-neutral-600 dark:text-neutral-400")
-              }
-              aria-live="polite"
-            >
-              <span
-                className={
-                  "inline-block size-1.5 rounded-full " +
-                  (isConnected ? "bg-emerald-500 brightness-105" : "bg-neutral-400")
-                }
-              />
-              {connectionLabel}
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-7xl flex-col">
+        <header className="flex flex-col gap-4 border-b border-white/10 pb-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/45">
+              Game Library
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              Multiple games, one clean home.
+            </h1>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-white/70">
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+              App Router
             </span>
-            <span className="rounded-full border border-neutral-300/70 bg-neutral-950/[0.03] px-2.5 py-1 text-neutral-700 dark:border-neutral-600/70 dark:bg-white/[0.04] dark:text-neutral-300">
-              transport: <span className="text-neutral-900 dark:text-neutral-100">{transport}</span>
+            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-emerald-100">
+              Old Maid ready
             </span>
-            {myId ? (
-              <span className="rounded-full border border-neutral-300/70 bg-neutral-950/[0.03] px-2.5 py-1 text-neutral-600 dark:border-neutral-600/70 dark:text-neutral-400">
-                you · <span className="font-mono text-neutral-800 dark:text-neutral-200">{shortenId(myId)}</span>
-              </span>
-            ) : null}
           </div>
         </header>
 
-        <section
-          className="overflow-hidden rounded-2xl border border-neutral-200/80 bg-white/55 shadow-xl shadow-neutral-950/5 backdrop-blur-md dark:border-neutral-800/90 dark:bg-neutral-950/45 dark:shadow-neutral-950/40"
-          aria-label="Shared messages"
-        >
-          <div className="max-h-[min(52vh,360px)] min-h-[200px] space-y-2 overflow-y-auto px-4 py-3">
-            {messages.length === 0 ? (
-              <p className="py-16 text-center text-sm text-neutral-500 dark:text-neutral-500">
-                {isConnected
-                  ? "No messages yet — say hello from another window."
-                  : "Connecting… you can type once connected."}
-              </p>
-            ) : (
-              messages.map((m) => {
-                const mine = m.socketId === myId;
-                return (
-                  <article
-                    key={m.id}
-                    className={
-                      "flex max-w-[90%] flex-col gap-0.5 " + (mine ? "ml-auto items-end" : "mr-auto items-start")
-                    }
-                  >
-                    <div
-                      className={
-                        mine
-                          ? "rounded-2xl rounded-br-md bg-violet-600 px-3.5 py-2 text-[15px] leading-snug text-white shadow-md shadow-violet-950/20"
-                          : "rounded-2xl rounded-bl-md border border-neutral-200/90 bg-neutral-50 px-3.5 py-2 text-[15px] leading-snug text-neutral-900 shadow-sm dark:border-neutral-700/90 dark:bg-neutral-900 dark:text-neutral-100"
-                      }
-                    >
-                      {m.text}
-                    </div>
-                    <span className="px-1 text-[11px] text-neutral-500 dark:text-neutral-500">
-                      {mine ? "You" : shortenId(m.socketId)} ·{" "}
-                      {new Date(m.at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })}
-                    </span>
-                  </article>
-                );
-              })
-            )}
-            <div ref={scrollAnchorRef} aria-hidden />
+        <section className="grid flex-1 gap-6 py-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:py-12">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium uppercase tracking-[0.28em] text-white/60">
+              Playing cards section
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            </div>
+
+            <h2 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
+              A professional hub for the Old Maid game and future card titles.
+            </h2>
+
+            <p className="mt-5 max-w-xl text-base leading-7 text-white/70 sm:text-lg">
+              The root page now acts as a proper game library instead of a raw index file.
+              Each game gets its own route, and Old Maid keeps its multiplayer flow intact.
+            </p>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/oldmaid"
+                className="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3.5 text-sm font-semibold text-[#07100d] transition hover:-translate-y-0.5 hover:bg-amber-100"
+              >
+                Open Old Maid
+              </Link>
+              <a
+                href="#featured-games"
+                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3.5 text-sm font-semibold text-white/90 transition hover:border-white/20 hover:bg-white/10"
+              >
+                Explore the library
+              </a>
+            </div>
           </div>
 
-          <div className="border-t border-neutral-200/80 p-3 dark:border-neutral-800/90">
-            <form
-              className="flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                sendMessage();
-              }}
-            >
-              <input
-                type="text"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={
-                  isConnected ? "Broadcast a message…" : "Waiting for socket…"
-                }
-                disabled={!isConnected}
-                maxLength={2000}
-                className={
-                  "min-w-0 flex-1 rounded-xl border px-3.5 py-2.5 text-sm outline-none transition " +
-                  "border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-400 " +
-                  "focus:border-violet-500 focus:ring-2 focus:ring-violet-500/25 dark:border-neutral-700 " +
-                  "dark:bg-neutral-950 dark:text-neutral-100 dark:placeholder:text-neutral-600 " +
-                  "disabled:cursor-not-allowed disabled:opacity-55"
-                }
-                aria-label="Message text"
-              />
-              <button
-                type="submit"
-                disabled={!isConnected || draft.trim().length === 0}
-                className="shrink-0 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white shadow-md shadow-violet-950/25 transition hover:bg-violet-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-4 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <div className="rounded-[1.5rem] border border-white/10 bg-[#0d1b16] p-5">
+              <div className="flex items-center justify-between text-sm text-white/55">
+                <span>Featured game</span>
+                <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-100">
+                  Live
+                </span>
+              </div>
+
+              <h3 className="mt-4 text-3xl font-semibold tracking-tight text-white">
+                Old Maid
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-white/65">
+                Create or join a room, share a code with friends, and play through the full lobby-to-game flow.
+              </p>
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                {featuredGames[0].meta.map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-center text-xs font-medium text-white/75"
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
+
+              <Link
+                href={featuredGames[0].href}
+                className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-[#08120f] transition hover:bg-emerald-300"
               >
-                Send
-              </button>
-            </form>
+                Launch game
+              </Link>
+            </div>
           </div>
         </section>
-      </main>
-    </div>
+
+        <section id="featured-games" className="pb-10">
+          <div className="grid gap-4 md:grid-cols-2">
+            {featuredGames.map((game) => (
+              <article
+                key={game.name}
+                className="rounded-[1.75rem] border border-white/10 bg-white/6 p-5 shadow-lg shadow-black/10 backdrop-blur"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/40">
+                      {game.status}
+                    </p>
+                    <h3 className="mt-2 text-xl font-semibold text-white">{game.name}</h3>
+                  </div>
+                  <div className="h-10 w-10 rounded-2xl border border-white/10 bg-white/5" />
+                </div>
+
+                <p className="mt-3 text-sm leading-6 text-white/70">{game.description}</p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {game.meta.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/70"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="mt-5 flex items-center gap-3">
+                  <Link
+                    href={game.href}
+                    className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-[#07100d] transition hover:bg-amber-100"
+                  >
+                    Open
+                  </Link>
+                  <span className="text-sm text-white/45">
+                    Dedicated route, no static index file.
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid gap-4 border-t border-white/10 py-8 md:grid-cols-3">
+          {roadmap.map((item) => (
+            <article
+              key={item.title}
+              className="rounded-[1.5rem] border border-white/10 bg-black/10 p-5 backdrop-blur"
+            >
+              <h3 className="text-base font-semibold text-white">{item.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-white/60">{item.text}</p>
+            </article>
+          ))}
+        </section>
+      </div>
+    </main>
   );
 }
