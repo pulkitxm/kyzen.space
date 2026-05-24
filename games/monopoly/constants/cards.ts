@@ -1,5 +1,10 @@
 import type { Card } from '../types';
 
+// Card MOVE_TO positions mapped to new 32-tile board:
+//   GO = 0, Jail = 8, Free Parking = 16, Go To Jail = 24
+//   Reading RR = 5, St. Charles = 9, Illinois/Indiana = 19 (closest equivalent),
+//   Boardwalk = 31, Park Place = 29
+
 export const CHANCE_CARDS: ReadonlyArray<Card> = [
   {
     id: 'chance_advance_go',
@@ -7,14 +12,14 @@ export const CHANCE_CARDS: ReadonlyArray<Card> = [
     effect: { kind: 'MOVE_TO', position: 0, collectGo: true },
   },
   {
-    id: 'chance_advance_illinois',
-    text: 'Advance to Illinois Ave. If you pass Go, collect $200.',
-    effect: { kind: 'MOVE_TO', position: 24, collectGo: true },
+    id: 'chance_advance_indiana',
+    text: 'Advance to Indiana Avenue. If you pass Go, collect $200.',
+    effect: { kind: 'MOVE_TO', position: 19, collectGo: true },
   },
   {
     id: 'chance_advance_st_charles',
     text: 'Advance to St. Charles Place. If you pass Go, collect $200.',
-    effect: { kind: 'MOVE_TO', position: 11, collectGo: true },
+    effect: { kind: 'MOVE_TO', position: 9, collectGo: true },
   },
   {
     id: 'chance_advance_railroad',
@@ -28,7 +33,7 @@ export const CHANCE_CARDS: ReadonlyArray<Card> = [
   },
   {
     id: 'chance_advance_utility',
-    text: 'Advance to the nearest Utility. If unowned, you may buy it; if owned, pay ten times the amount shown on the dice.',
+    text: 'Advance to the nearest Utility. If unowned, you may buy it; if owned, pay ten times the dice.',
     effect: { kind: 'MOVE_NEAREST', tileType: 'Utility' },
   },
   {
@@ -69,7 +74,7 @@ export const CHANCE_CARDS: ReadonlyArray<Card> = [
   {
     id: 'chance_advance_boardwalk',
     text: 'Take a walk on the Boardwalk. Advance token to Boardwalk.',
-    effect: { kind: 'MOVE_TO', position: 39, collectGo: false },
+    effect: { kind: 'MOVE_TO', position: 31, collectGo: false },
   },
   {
     id: 'chance_elected_chairman',

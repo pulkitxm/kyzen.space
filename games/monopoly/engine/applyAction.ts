@@ -6,6 +6,7 @@ import {
   JAIL_POSITION, GO_POSITION, GO_SALARY, JAIL_FINE,
   MAX_JAIL_TURNS, TILE_BY_ID, BOARD,
   HOTEL_HOUSES, MAX_HOUSES, MORTGAGE_RATE, UNMORTGAGE_RATE,
+  BOARD_SIZE,
 } from '../constants/board';
 
 // ─── Immutable helpers ────────────────────────────────────────────────────────
@@ -186,7 +187,7 @@ function drawCard(state: GameState, player: Player, deckKey: 'chanceDeck' | 'com
     }
 
     case 'MOVE_STEPS': {
-      const newPos = (player.position + effect.steps + 40) % 40;
+      const newPos = (player.position + effect.steps + BOARD_SIZE) % BOARD_SIZE;
       next = movePlayerTo(next, player, newPos, false);
       const movedPlayer = next.players.find((p) => p.id === player.id)!;
       return handleLanding(next, movedPlayer);
@@ -197,8 +198,8 @@ function drawCard(state: GameState, player: Player, deckKey: 'chanceDeck' | 'com
         .filter((t) => t.type === effect.tileType)
         .map((t) => t.position);
       const nearest = positions.reduce((best, pos) => {
-        const dist = (pos - player.position + 40) % 40;
-        const bestDist = (best - player.position + 40) % 40;
+        const dist = (pos - player.position + BOARD_SIZE) % BOARD_SIZE;
+        const bestDist = (best - player.position + BOARD_SIZE) % BOARD_SIZE;
         return dist < bestDist ? pos : best;
       }, positions[0]);
       next = movePlayerTo(next, player, nearest, true);
@@ -299,14 +300,14 @@ export function applyAction(state: GameState, action: Action): GameState {
 
       // Move player
       const movedPlayer = next.players.find((p) => p.id === player.id)!;
-      const newPos = (movedPlayer.position + diceTotal) % 40;
+      const newPos = (movedPlayer.position + diceTotal) % BOARD_SIZE;
       const passedGo = newPos < movedPlayer.position;
       next = updatePlayer(next, player.id, {
         position: newPos,
         balance: passedGo ? movedPlayer.balance + GO_SALARY : movedPlayer.balance,
       });
       if (passedGo) next = addLog(next, `${player.name} passed GO and collected $${GO_SALARY}.`);
-      next = addLog(next, `${player.name} rolled ${die1}+${die2}=${diceTotal} and moved to ${state.board[newPos].name}.`);
+      next = addLog(next, `${player.name} moved to ${state.board[newPos].name}.`);
 
       // Three doubles → jail
       const newDoublesCount = isDoubles ? state.doublesCount + 1 : 0;
@@ -491,19 +492,22 @@ export function applyAction(state: GameState, action: Action): GameState {
       const deckKey = tile.type === 'Chance' ? 'chanceDeck' : 'communityDeck';
       next = drawCard(next, player, deckKey);
 
-      // After drawing, if still LANDED (card moved player to unowned property), keep LANDED.
-      // Otherwise advance to WAITING_FOR_END_TURN so the player can end their turn.
-      if (next.turnPhase === 'LANDED') {
-        // The card moved us to a buyable tile — keep LANDED so buy/decline buttons appear.
-        return next;
-      }
-      // Card effect already set phase (e.g. GO_TO_JAIL → WAITING_FOR_END_TURN),
-      // or we need to set it ourselves.
-      if (next.turnPhase === 'WAITING_FOR_ROLL') {
-        // No special phase override happened; advance to end-turn.
+      const updatedPlayer = next.players.find((p) => p.id === player.id)!;
+      const newTile = next.board[updatedPlayer.position];
+
+      const isUnownedProperty =
+        (newTile.type === 'Property' || newTile.type === 'Railroad' || newTile.type === 'Utility') &&
+        !ownerOf(next, newTile.id);
+
+      const isNewCardSpace =
+        (newTile.type === 'Chance' || newTile.type === 'CommunityChest') &&
+        updatedPlayer.position !== player.position;
+
+      if (isUnownedProperty || isNewCardSpace) {
+        return { ...next, turnPhase: 'LANDED' };
+      } else {
         return { ...next, turnPhase: 'WAITING_FOR_END_TURN' };
       }
-      return next;
     }
 
     default:
