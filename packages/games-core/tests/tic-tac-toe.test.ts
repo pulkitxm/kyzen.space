@@ -169,10 +169,10 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
   test("O can also win", () => {
     const state = playSequence([
       ["X", 0, 0],
-      ["O", 1, 0], // 3
-      ["X", 0, 1], // 1
-      ["O", 1, 1], // 4
-      ["X", 2, 2], // 8
+      ["O", 1, 0],
+      ["X", 0, 1],
+      ["O", 1, 1],
+      ["X", 2, 2],
     ]);
     const res = ticTacToeEngine.reduce!(
       state,
@@ -255,7 +255,7 @@ describe("tic-tac-toe — full playthroughs", () => {
   test("X-win playthrough tracks state at every step", () => {
     let state = initial();
     const seq: [Mark, number, number][] = [
-      ["X", 1, 1], // center
+      ["X", 1, 1],
       ["O", 0, 0],
       ["X", 2, 2],
       ["O", 0, 1],
@@ -282,7 +282,7 @@ describe("tic-tac-toe — full playthroughs", () => {
       ["O", 1, 0],
       ["X", 0, 1],
       ["O", 1, 1],
-      ["X", 0, 2], // top row complete
+      ["X", 0, 2],
     ];
     let outcome: import("../src/engine").Outcome | undefined;
     for (const [role, row, col] of seq) {
