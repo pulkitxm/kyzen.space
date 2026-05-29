@@ -1,20 +1,19 @@
 import { Hono } from "hono";
-import { ensureMongoConnected } from "@/database";
-import { getAuth } from "@/lib/auth";
-import { accountRouter } from "@/apis/routes/account";
-import { gamesRouter } from "@/apis/routes/games";
-import { profilesRouter } from "@/apis/routes/profiles";
+import { getAuth } from "../auth";
+import { accountRouter } from "./routes/account";
+import { gamesRouter } from "./routes/games";
+import { matchmakingRouter } from "./routes/matchmaking";
+import { profilesRouter } from "./routes/profiles";
 
-const authApp = new Hono().all("*", async (c) => {
-  await ensureMongoConnected();
-  return getAuth().handler(c.req.raw);
-});
+// Better Auth owns everything under /api/auth/* (OAuth, session, sign-in/out).
+const authApp = new Hono().all("*", (c) => getAuth().handler(c.req.raw));
 
 export const app = new Hono()
   .basePath("/api")
   .route("/auth", authApp)
   .route("/account", accountRouter)
   .route("/games", gamesRouter)
+  .route("/matchmaking", matchmakingRouter)
   .route("/profiles", profilesRouter);
 
 export type AppRouter = typeof app;

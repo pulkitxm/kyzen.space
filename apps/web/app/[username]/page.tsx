@@ -15,7 +15,7 @@ import {
   type ProfileStats,
 } from "@/lib/profile-stats";
 import { getServerSession } from "@/lib/get-server-session";
-import { formatElapsedAsLargestUnit } from "@/lib/utils";
+import { memberForLabel } from "@/lib/utils";
 
 const RESERVED = new Set([
   "api",
@@ -73,9 +73,7 @@ export default async function PublicProfilePage({ params }: Props) {
   const stats = profile.stats ?? {};
   const statGames = buildStatGames(stats);
 
-  const memberForLabel = formatElapsedAsLargestUnit(
-    Date.now() - new Date(profile.createdAt).getTime(),
-  );
+  const memberLabel = memberForLabel(profile.createdAt);
 
   const activity = mapApiRowsToActivity(games);
   const activityRecentHasMore = activity.length > PROFILE_ACTIVITY_PAGE_SIZE;
@@ -85,7 +83,7 @@ export default async function PublicProfilePage({ params }: Props) {
       username={profile.username}
       displayName={profile.displayName}
       isOwnProfile={session?.user?.id === profile.userId}
-      memberForLabel={memberForLabel}
+      memberForLabel={memberLabel}
       totalGamesPlayed={totalGamesPlayed(stats)}
       activityMostPlayed={pickMostPlayed(statGames)}
       activityRecentGamesInitial={activity.slice(0, PROFILE_ACTIVITY_PAGE_SIZE)}

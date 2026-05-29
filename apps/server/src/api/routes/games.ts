@@ -1,67 +1,55 @@
 import { Hono } from "hono";
-import { headers } from "next/headers";
-import mongoose from "mongoose";
-import { ensureMongoConnected } from "@/database";
-import { connectMongoose } from "@/database/mongoose";
-import { Game, Move, UserProfile } from "@/database/models";
-import { getAuth } from "@/lib/auth";
-import { initialTicTacToeState } from "@/ws/handlers/tic-tac-toe";
+import { getEngine, hasEngine, TIC_TAC_TOE } from "@gamelobby/games-core";
+import { games, profiles, type GameStatus } from "../../db";
+import { getAuth } from "../../auth";
+import { serializeGame, serializeMove } from "../serialize";
 
-const TIC_TAC_TOE = "tic-tac-toe";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const gamesRouter = new Hono()
   .get("/", async (c) => {
-    await connectMongoose();
-    const gameType = c.req.query("gameType");
-    const status = c.req.query("status");
-    const q: Record<string, unknown> = {};
-    if (gameType) q.gameType = gameType;
-    if (status) q.status = status;
-    const list = await Game.find(q).sort({ createdAt: -1 }).limit(50).lean();
-    return c.json({ games: list });
+    const gameType = c.req.query("gameType") ?? undefined;
+    const status = (c.req.query("status") as GameStatus | undefined) ?? undefined;
+    const list = await games.listGames({ gameType, status, limit: 50 });
+    return c.json({ games: list.map(serializeGame) });
   })
   .post("/", async (c) => {
-    await ensureMongoConnected();
-    await connectMongoose();
-    const h = await headers();
-    const session = await getAuth().api.getSession({ headers: h });
-    if (!session?.user?.id)
-      return c.json({ error: "Unauthorized" }, 401);
+    const session = await getAuth().api.getSession({ headers: c.req.raw.headers });
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
 
     const body = await c.req.json().catch(() => null);
     const gameType =
       body && typeof body.gameType === "string" ? body.gameType : TIC_TAC_TOE;
-
-    if (gameType !== TIC_TAC_TOE)
+    if (!hasEngine(gameType))
       return c.json({ error: "Unsupported game type" }, 400);
 
-    const profile = await UserProfile.findOne({ userId: session.user.id });
+    const profile = await profiles.getProfileByUserId(session.user.id);
     if (!profile) return c.json({ error: "Profile not found" }, 400);
 
-    const game = await Game.create({
-      gameType: TIC_TAC_TOE,
+    const engine = getEngine(gameType);
+    const created = await games.createGame({
+      gameType,
       status: "waiting",
       players: [
         {
           userId: session.user.id,
           username: profile.username,
-          role: "X",
+          role: engine.roles[0]!,
         },
       ],
-      winner: null,
-      gameState: initialTicTacToeState(),
+      gameState: engine.createInitialState([{ role: engine.roles[0]! }]),
     });
-
-    return c.json({ game: game.toJSON() }, 201);
+    return c.json({ game: serializeGame(created) }, 201);
   })
   .get("/:gameId", async (c) => {
-    await connectMongoose();
     const id = c.req.param("gameId");
-    if (!mongoose.isValidObjectId(id)) return c.json({ error: "Not found" }, 404);
-    const game = await Game.findById(id).lean();
-    if (!game) return c.json({ error: "Not found" }, 404);
-    const moves = await Move.find({ gameId: game._id })
-      .sort({ moveNumber: 1 })
-      .lean();
-    return c.json({ game, moves });
+    if (!UUID_RE.test(id)) return c.json({ error: "Not found" }, 404);
+    const found = await games.getGameById(id);
+    if (!found) return c.json({ error: "Not found" }, 404);
+    const moves = await games.listMoves(id);
+    return c.json({
+      game: serializeGame(found),
+      moves: moves.map(serializeMove),
+    });
   });

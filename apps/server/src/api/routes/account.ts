@@ -1,54 +1,55 @@
-import { type Context, Hono } from "hono";
-import { headers } from "next/headers";
-import { NextResponse } from "next/server";
-import { ensureMongoConnected } from "@/database";
-import { getAuth } from "@/lib/auth";
+import { Hono } from "hono";
+import { getAuth } from "../../auth";
 
-function redirectRelative(c: Context, pathname: string) {
-  return NextResponse.redirect(new URL(pathname, c.req.url));
-}
-
+/**
+ * Session/account management. These mirror the old Next form-action endpoints
+ * but live entirely on the backend now. They return JSON; the web client
+ * navigates after a successful call.
+ */
 export const accountRouter = new Hono()
-  .post("/sign-out", async (c) => {
-    await ensureMongoConnected();
-    await getAuth().api.signOut({
-      headers: await headers(),
+  .get("/sessions", async (c) => {
+    const auth = getAuth();
+    const headers = c.req.raw.headers;
+    const current = await auth.api.getSession({ headers });
+    if (!current?.session || !current.user)
+      return c.json({ error: "Unauthorized" }, 401);
+
+    const list = await auth.api.listSessions({ headers });
+    const sorted = [...list].sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+    return c.json({
+      current: { session: current.session, user: current.user },
+      sessions: sorted,
     });
-    return redirectRelative(c, "/");
+  })
+  .post("/sign-out", async (c) => {
+    await getAuth().api.signOut({ headers: c.req.raw.headers });
+    return c.json({ ok: true });
   })
   .post("/revoke-others", async (c) => {
-    await ensureMongoConnected();
-    const h = await headers();
     const auth = getAuth();
-    const session = await auth.api.getSession({ headers: h });
-    if (!session?.session) return redirectRelative(c, "/auth");
-    await auth.api.revokeOtherSessions({ headers: h });
-    return redirectRelative(c, "/account");
+    const headers = c.req.raw.headers;
+    const session = await auth.api.getSession({ headers });
+    if (!session?.session) return c.json({ error: "Unauthorized" }, 401);
+    await auth.api.revokeOtherSessions({ headers });
+    return c.json({ ok: true });
   })
   .post("/revoke-session", async (c) => {
-    await ensureMongoConnected();
-    const h = await headers();
     const auth = getAuth();
-    const current = await auth.api.getSession({ headers: h });
-    if (!current?.session) return redirectRelative(c, "/auth");
+    const headers = c.req.raw.headers;
+    const current = await auth.api.getSession({ headers });
+    if (!current?.session) return c.json({ error: "Unauthorized" }, 401);
 
-    const body = await c.req.parseBody({ all: false });
-    const raw = body.token;
-    if (typeof raw !== "string" || raw.length === 0) {
-      return redirectRelative(c, "/account");
+    const body = await c.req.json().catch(() => null);
+    const token = body && typeof body.token === "string" ? body.token : "";
+    if (!token) return c.json({ error: "Missing token" }, 400);
+
+    if (current.session.token === token) {
+      await auth.api.signOut({ headers });
+      return c.json({ ok: true, signedOut: true });
     }
-
-    const isCurrent = current.session.token === raw;
-
-    if (isCurrent) {
-      await auth.api.signOut({ headers: h });
-      return redirectRelative(c, "/auth");
-    }
-
-    await auth.api.revokeSession({
-      headers: h,
-      body: { token: raw },
-    });
-
-    return redirectRelative(c, "/account");
+    await auth.api.revokeSession({ headers, body: { token } });
+    return c.json({ ok: true });
   });

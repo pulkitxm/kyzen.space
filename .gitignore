@@ -1,28 +1,28 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
 # testing
 /coverage
 
-# next.js
-/.next/
+# next.js (any workspace)
+.next/
 /out/
 
 # production
 /build
+dist/
+
+# turborepo
+.turbo
 
 # misc
 .DS_Store
 *.pem
+*.tsbuildinfo
 
 # debug
 npm-debug.log*
@@ -30,15 +30,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (single root .env is gitignored; .env.example is committed)
 .env*
+!.env.example
+# apps/web/.env is a committed symlink → ../../.env so Next loads the single
+# root env natively (Next only reads .env from its own cwd).
+!apps/web/.env
 
 # vercel
 .vercel
-
-# cursor (local IDE metadata and plans)
-.cursor/
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts

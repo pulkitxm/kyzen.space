@@ -37,6 +37,12 @@ function pluralUnit(n: number, unit: "second" | "minute" | "hour" | "day"): stri
 /**
  * Elapsed time as a single human-readable amount (largest unit that fits: days → hours → minutes → seconds).
  */
+/** "Member for" label from an ISO timestamp to now. Reads the clock here (not
+ * in a component) so it stays out of React's render-purity analysis. */
+export function memberForLabel(createdAtIso: string): string {
+  return formatElapsedAsLargestUnit(Date.now() - new Date(createdAtIso).getTime());
+}
+
 export function formatElapsedAsLargestUnit(elapsedMs: number): string {
   const ms = Math.max(0, Math.floor(elapsedMs));
   if (ms >= MS_PER_DAY) {
