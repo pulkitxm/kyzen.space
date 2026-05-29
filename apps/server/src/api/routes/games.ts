@@ -2,12 +2,13 @@ import { getEngine, hasEngine, TIC_TAC_TOE } from "@gamelobby/games-core";
 import { Hono } from "hono";
 import { getAuth } from "../../auth";
 import { type GameStatus, games, profiles } from "../../db";
+import type { LoggerEnv } from "../middleware/logger";
 import { serializeGame, serializeMove } from "../serialize";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const gamesRouter = new Hono()
+export const gamesRouter = new Hono<LoggerEnv>()
   .get("/", async (c) => {
     const gameType = c.req.query("gameType") ?? undefined;
     const status =

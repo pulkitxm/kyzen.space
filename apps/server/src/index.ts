@@ -4,6 +4,7 @@ import cors from "cors";
 import express from "express";
 import { app as honoApp } from "./api";
 import { env } from "./env";
+import { logger } from "./logger";
 import { attachRealtime } from "./realtime";
 
 const server = express();
