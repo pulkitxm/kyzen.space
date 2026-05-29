@@ -33,9 +33,7 @@ export async function ensureUsernameForUser(
       try {
         const profile = await createProfile({ userId, username: candidate });
         return profile.username;
-      } catch {
-        // unique race — fall through and retry with a new suffix
-      }
+      } catch {}
     }
     candidate = `${base}_${randomSuffix()}`;
   }
