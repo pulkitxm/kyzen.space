@@ -1,28 +1,43 @@
 services:
-  mongo:
-    image: mongo:7
-    container_name: samaan-mongo
+  postgres:
+    image: postgres:16
+    container_name: gamelobby-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gamelobby
     ports:
-      - "27027:27017"
+      - "5432:5432"
     volumes:
-      - mongo_data:/data/db
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gamelobby"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
-  mongo-express:
-    image: mongo-express:latest
-    container_name: samaan-mongo-express
+  # Optional: enables the Socket.IO redis-adapter for multi-instance scale-out.
+  redis:
+    image: redis:7
+    container_name: gamelobby-redis
+    profiles:
+      - redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # Lightweight DB UI: `bun run db:studio`
+  adminer:
+    image: adminer:latest
+    container_name: gamelobby-adminer
     profiles:
       - studio
     depends_on:
-      - mongo
+      - postgres
     ports:
-      - "127.0.0.1:18081:8081"
-    environment:
-      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/samaan
-      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
-      ME_CONFIG_BASICAUTH: "false"
+      - "127.0.0.1:18081:8080"
     restart: unless-stopped
 
 volumes:
-  mongo_data:
-
+  pg_data:
