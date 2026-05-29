@@ -43,6 +43,10 @@ export const gamesRouter = new Hono()
       ],
       gameState: engine.createInitialState([{ role: engine.roles[0]! }]),
     });
+    c.var.log.info(
+      { gameId: created.id, gameType, userId: session.user.id },
+      "game created",
+    );
     return c.json({ game: serializeGame(created) }, 201);
   })
   .get("/:gameId", async (c) => {

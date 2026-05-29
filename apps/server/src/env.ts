@@ -30,6 +30,11 @@ export const env = {
   port: number("PORT", 4000),
   host: optional("HOST", "0.0.0.0"),
 
+  /** pino level: fatal|error|warn|info|debug|trace. Default: debug (dev), info (prod). */
+  logLevel:
+    optional("LOG_LEVEL") ||
+    (optional("NODE_ENV") === "production" ? "info" : "debug"),
+
   databaseUrl: required("DATABASE_URL"),
 
   betterAuthSecret: required("BETTER_AUTH_SECRET"),

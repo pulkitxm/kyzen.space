@@ -2,7 +2,10 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db, schema } from "./db/client";
 import { env, googleConfigured } from "./env";
+import { childLogger } from "./logger";
 import { ensureUsernameForUser } from "./username";
+
+const log = childLogger({ mod: "auth" });
 
 /**
  * Better Auth, backed by the Drizzle/Postgres adapter.
@@ -32,12 +35,18 @@ export const auth = betterAuth({
       create: {
         after: async (createdUser) => {
           try {
-            await ensureUsernameForUser(createdUser.id, createdUser.name);
-          } catch (err) {
-            console.error(
-              "Failed to provision profile for",
+            const username = await ensureUsernameForUser(
               createdUser.id,
-              err,
+              createdUser.name,
+            );
+            log.info(
+              { userId: createdUser.id, username },
+              "provisioned profile on first sign-in",
+            );
+          } catch (err) {
+            log.error(
+              { err, userId: createdUser.id },
+              "failed to provision profile",
             );
           }
         },

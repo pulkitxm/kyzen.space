@@ -9,6 +9,7 @@ import { Hono } from "hono";
 import { getAuth } from "../../auth";
 import { games, profiles } from "../../db";
 import { env } from "../../env";
+import type { LoggerEnv } from "../middleware/logger";
 
 /**
  * Match-allocation seam (plan decision #11). Returns a connection descriptor
@@ -16,7 +17,7 @@ import { env } from "../../env";
  * is hosted on this same Socket.IO origin; a future real-time fleet only
  * changes `serverUrl` (and issues a real join token).
  */
-export const matchmakingRouter = new Hono().post("/", async (c) => {
+export const matchmakingRouter = new Hono<LoggerEnv>().post("/", async (c) => {
   const session = await getAuth().api.getSession({
     headers: c.req.raw.headers,
   });
@@ -33,6 +34,7 @@ export const matchmakingRouter = new Hono().post("/", async (c) => {
 
   // Join an existing waiting table, else open a new one.
   let match = await games.findWaitingGameToJoin(gameType, session.user.id);
+  const joined = Boolean(match);
   if (!match) {
     const engine = getEngine(gameType);
     match = await games.createGame({
@@ -48,6 +50,10 @@ export const matchmakingRouter = new Hono().post("/", async (c) => {
       gameState: engine.createInitialState([{ role: engine.roles[0]! }]),
     });
   }
+  c.var.log.info(
+    { matchId: match.id, gameType, userId: session.user.id, joined },
+    joined ? "matchmaking joined waiting game" : "matchmaking created game",
+  );
 
   const descriptor: MatchDescriptor = {
     matchId: match.id,

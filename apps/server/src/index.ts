@@ -32,9 +32,21 @@ attachRealtime(httpServer);
 
 httpServer
   .once("error", (err) => {
-    console.error(err);
+    logger.fatal({ err }, "http server failed to start");
     process.exit(1);
   })
   .listen(env.port, env.host, () => {
-    console.log(`> GameLobby server ready on http://${env.host}:${env.port}`);
+    logger.info(
+      { host: env.host, port: env.port, env: env.nodeEnv },
+      "GameLobby server ready",
+    );
   });
+
+// Surface anything that would otherwise crash silently.
+process.on("unhandledRejection", (reason) => {
+  logger.error({ err: reason }, "unhandledRejection");
+});
+process.on("uncaughtException", (err) => {
+  logger.fatal({ err }, "uncaughtException");
+  process.exit(1);
+});
