@@ -6,7 +6,16 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/drizzle/**", "!**/bun.lock"]
+    "includes": [
+      "**",
+      "!**/drizzle/**",
+      "!**/bun.lock",
+      "!**/*.css"
+    ]
+  },
+  "css": {
+    "formatter": { "enabled": false },
+    "parser": { "cssModules": false }
   },
   "formatter": {
     "enabled": true,
