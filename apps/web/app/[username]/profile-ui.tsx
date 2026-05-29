@@ -2,16 +2,17 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { PaginatedRecentGames } from "@/app/[username]/profile-activity-client";
-import type { GameEntry } from "@/lib/games";
 import type { ProfileActivityGameRow } from "@/lib/profile-activity-games";
 
-export type ProfileStatGame = Pick<GameEntry, "id" | "name" | "href" | "coverImage"> & {
+export type ProfileStatGame = {
+  id: string;
+  name: string;
+  href: string;
+  coverImage?: string;
   played: number;
 };
 
-export type ProfileActivityMost = Pick<GameEntry, "id" | "name" | "href" | "coverImage"> & {
-  played: number;
-};
+export type ProfileActivityMost = ProfileStatGame;
 
 export function ProfilePageView({
   username,
@@ -62,7 +63,7 @@ export function ProfilePageView({
               <div className="flex shrink-0 items-center gap-2 sm:mb-2">
                 <Link
                   href="/account"
-                  className="inline-flex items-center rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition hover:opacity-90"
+                  className="inline-flex items-center rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary-hover"
                 >
                   Account
                 </Link>
@@ -267,7 +268,7 @@ function ActivitySection({
               <ActivityThumb cover={mostPlayed.coverImage} name={mostPlayed.name} />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <IconHeart className="text-powder-blush-400 dark:text-powder-blush-500" />
+                  <IconHeart className="text-primary" />
                   Most played
                 </p>
                 <p className="mt-1 truncate font-medium text-card-foreground">

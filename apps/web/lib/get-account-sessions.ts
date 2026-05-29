@@ -1,32 +1,29 @@
 import { cache } from "react";
-import { headers } from "next/headers";
-import { ensureMongoConnected } from "@/database";
-import { getAuth } from "@/lib/auth";
+import { serverFetchJson } from "@/lib/api-server";
 
+export type AccountSession = {
+  id: string;
+  token?: string;
+  createdAt: string;
+  expiresAt: string;
+  updatedAt: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+};
+
+type AccountSessionsResponse = {
+  current: {
+    session: { id: string; token?: string };
+    user: { id: string; email?: string | null; name?: string | null };
+  };
+  sessions: AccountSession[];
+};
+
+/** Current session + all active sessions, from the backend account API. */
 export const getAccountSessions = cache(async () => {
-  await ensureMongoConnected();
-  const h = await headers();
-  const auth = getAuth();
-
-  const current = await auth.api.getSession({
-    headers: h,
-  });
-
-  if (!current?.session || !current.user) {
-    return {
-      current: current,
-      list: [],
-    };
-  }
-
-  const list = await auth.api.listSessions({
-    headers: h,
-  });
-
-  const sorted = [...list].sort(
-    (a, b) =>
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  const data = await serverFetchJson<AccountSessionsResponse>(
+    "/api/account/sessions",
   );
-
-  return { current, list: sorted };
+  if (!data) return { current: null, list: [] as AccountSession[] };
+  return { current: data.current, list: data.sessions };
 });

@@ -1,3 +1,8 @@
+/** Join conditional class names (filters falsy). Shared by all UI primitives. */
+export function cn(...classes: (string | false | null | undefined)[]): string {
+  return classes.filter(Boolean).join(" ");
+}
+
 export function formatTs(value: Date | string) {
   const d = typeof value === "string" ? new Date(value) : value;
   return d.toLocaleString(undefined, {

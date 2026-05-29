@@ -4,8 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
-import type { ProfileActivityGameRow } from "@/lib/profile-activity-games";
-import { PROFILE_ACTIVITY_PAGE_SIZE } from "@/lib/profile-activity-games";
+import { clientFetch } from "@/lib/api-client";
+import {
+  mapApiRowsToActivity,
+  PROFILE_ACTIVITY_PAGE_SIZE,
+  type ProfileActivityApiRow,
+  type ProfileActivityGameRow,
+} from "@/lib/profile-activity-games";
 import { formatRelativeTime } from "@/lib/profile-helpers";
 
 function statusLabel(status: string): string {
@@ -35,7 +40,7 @@ function RecentGameThumb({
       {cover ? (
         <Image src={cover} alt="" fill className="object-cover" sizes="56px" />
       ) : (
-          <div className="flex h-full items-center justify-center text-xs font-semibold uppercase text-muted-foreground">
+        <div className="flex h-full items-center justify-center text-xs font-semibold uppercase text-muted-foreground">
           {name.slice(0, 2)}
         </div>
       )}
@@ -61,15 +66,16 @@ export function PaginatedRecentGames({
     setLoading(true);
     try {
       const offset = games.length;
-      const url = `/api/profiles/${encodeURIComponent(profileUsername)}/recent-games?offset=${offset}&limit=${PROFILE_ACTIVITY_PAGE_SIZE}`;
-      const res = await fetch(url);
+      const res = await clientFetch(
+        `/api/profiles/${encodeURIComponent(profileUsername)}/recent-games?offset=${offset}&limit=${PROFILE_ACTIVITY_PAGE_SIZE}`,
+      );
       if (!res.ok) return;
       const data = (await res.json()) as {
-        games: ProfileActivityGameRow[];
-        hasMore: boolean;
+        games?: ProfileActivityApiRow[];
+        hasMore?: boolean;
       };
-      setGames((prev) => [...prev, ...data.games]);
-      setHasMore(data.hasMore);
+      setGames((prev) => [...prev, ...mapApiRowsToActivity(data.games ?? [])]);
+      setHasMore(Boolean(data.hasMore));
     } finally {
       setLoading(false);
     }

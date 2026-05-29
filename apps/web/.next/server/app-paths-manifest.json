@@ -1,0 +1,13 @@
+{
+  "/[username]/page": "app/[username]/page.js",
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/account/page": "app/account/page.js",
+  "/auth/page": "app/auth/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/games/page": "app/games/page.js",
+  "/games/tic-tac-toe/[gameId]/page": "app/games/tic-tac-toe/[gameId]/page.js",
+  "/games/tic-tac-toe/page": "app/games/tic-tac-toe/page.js",
+  "/page": "app/page.js",
+  "/profile/page": "app/profile/page.js"
+}

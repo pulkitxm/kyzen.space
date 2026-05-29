@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { clientFetch } from "@/lib/api-client";
 
 export function SessionEndForm({ token }: { token: string }) {
@@ -28,13 +29,8 @@ export function SessionEndForm({ token }: { token: string }) {
   };
 
   return (
-    <button
-      type="button"
-      onClick={onEnd}
-      disabled={pending}
-      className="inline-flex items-center justify-center rounded-lg border border-danger/40 bg-danger/10 px-4 py-2 text-sm font-medium text-danger transition hover:bg-danger/20 disabled:cursor-not-allowed disabled:opacity-60"
-    >
+    <Button variant="danger" size="sm" loading={pending} onClick={onEnd}>
       {pending ? "Ending…" : "End session"}
-    </button>
+    </Button>
   );
 }

@@ -20,10 +20,7 @@ import {
   sidebarCollapsedAtom,
   sidebarWidthAtom,
 } from "@/lib/sidebar-atoms";
-
-function cn(...classes: (string | false | null | undefined)[]): string {
-  return classes.filter(Boolean).join(" ");
-}
+import { cn } from "@/lib/utils";
 
 export interface SidebarProps {
   /** Pref came from Cookie header → matches SSR markup; skips local-storage flash gate. */
@@ -248,7 +245,7 @@ export function Sidebar({
             GL
           </span>
           <span className={cn("font-semibold text-sidebar-foreground text-sm", textClasses)}>
-            Game lib
+            GameLobby
           </span>
         </Link>
         <div className="flex-1" />

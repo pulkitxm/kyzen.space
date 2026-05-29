@@ -1,19 +1,18 @@
 import { redirect } from "next/navigation";
 
-import { connectMongoose } from "@/database/mongoose";
-import { ensureUsernameForUser } from "@/lib/ensure-username";
-import { getServerSession } from "@/lib/get-server-session";
+import { serverFetchJson } from "@/lib/api-server";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Resolve the signed-in user's profile and redirect to their public page.
+ * The backend provisions a username on first sign-in, so /api/profiles/me
+ * always has one for an authenticated user.
+ */
 export default async function ProfileRedirectPage() {
-  const session = await getServerSession();
-  if (!session?.user) redirect("/auth");
-
-  await connectMongoose();
-  const username = await ensureUsernameForUser(
-    session.user.id,
-    session.user.name,
+  const me = await serverFetchJson<{ profile: { username: string } }>(
+    "/api/profiles/me",
   );
-  redirect(`/${username}`);
+  if (!me?.profile?.username) redirect("/auth");
+  redirect(`/${me.profile.username}`);
 }

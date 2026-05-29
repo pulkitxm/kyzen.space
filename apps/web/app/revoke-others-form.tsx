@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { clientFetch } from "@/lib/api-client";
 
 export function RevokeOthersForm({
@@ -12,6 +13,8 @@ export function RevokeOthersForm({
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+
+  if (otherSessionCount === 0) return null;
 
   const onRevoke = async () => {
     setPending(true);
@@ -24,15 +27,14 @@ export function RevokeOthersForm({
   };
 
   return (
-    <button
-      type="button"
-      onClick={onRevoke}
-      disabled={otherSessionCount === 0 || pending}
-      className="mt-3 inline-flex items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-card-foreground transition hover:bg-surface-overlay disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {pending
-        ? "Revoking…"
-        : `Revoke other sessions (${otherSessionCount})`}
-    </button>
+    <div className="mt-6">
+      <Button variant="danger" loading={pending} onClick={onRevoke}>
+        Sign out all other sessions
+      </Button>
+      <p className="mt-2 max-w-xl text-xs text-muted-foreground">
+        Ends {otherSessionCount} other active session
+        {otherSessionCount === 1 ? "" : "s"}. This device stays signed in.
+      </p>
+    </div>
   );
 }

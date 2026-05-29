@@ -1,55 +1,50 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import mongoose from "mongoose";
-
-import { connectMongoose } from "@/database/mongoose";
-import { Game, Move } from "@/database/models";
+import { serverFetchJson } from "@/lib/api-server";
 import { getServerSession } from "@/lib/get-server-session";
+import { BackLink, PageContainer } from "@/components/ui/page";
+import { notFound } from "next/navigation";
 
-import { TicTacToeGameClient } from "./game-client";
+import {
+  TicTacToeGameClient,
+  type TicTacToeClientProps,
+} from "./game-client";
+
+type GamePayload = {
+  game: TicTacToeClientProps["initialGame"];
+  moves: TicTacToeClientProps["initialMoves"];
+};
 
 export const dynamic = "force-dynamic";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Props = { params: Promise<{ gameId: string }> };
 
 export default async function TicTacToeGamePage({ params }: Props) {
   const { gameId } = await params;
-  if (!mongoose.isValidObjectId(gameId)) notFound();
+  if (!UUID_RE.test(gameId)) notFound();
 
-  await connectMongoose();
-  const game = await Game.findById(gameId).lean();
-  if (!game) notFound();
-
-  const moves = await Move.find({ gameId: game._id })
-    .sort({ moveNumber: 1 })
-    .lean();
-
-  const session = await getServerSession();
+  const [data, session] = await Promise.all([
+    serverFetchJson<GamePayload>(`/api/games/${gameId}`),
+    getServerSession(),
+  ]);
+  if (!data) notFound();
 
   return (
-    <div className="min-h-full px-4 py-10">
-      <div className="mx-auto max-w-md">
-        <Link
-          href="/games/tic-tac-toe"
-          className="text-sm text-neutral-500 underline-offset-4 hover:underline dark:text-neutral-400"
-        >
-          ← Lobby
-        </Link>
-        <h1 className="mt-6 text-xl font-semibold">Tic-tac-toe</h1>
-        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-          Status:{" "}
-          <span className="font-medium text-neutral-800 dark:text-neutral-200">
-            {game.status}
-          </span>
-        </p>
+    <PageContainer size="sm">
+      <BackLink href="/games/tic-tac-toe">← Lobby</BackLink>
+      <h1 className="mt-6 text-xl font-semibold text-foreground">Tic-tac-toe</h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Status:{" "}
+        <span className="font-medium text-foreground">{data.game.status}</span>
+      </p>
 
-        <TicTacToeGameClient
-          gameId={gameId}
-          userId={session?.user?.id ?? null}
-          initialGame={JSON.parse(JSON.stringify(game))}
-          initialMoves={JSON.parse(JSON.stringify(moves))}
-        />
-      </div>
-    </div>
+      <TicTacToeGameClient
+        gameId={gameId}
+        userId={session?.user?.id ?? null}
+        initialGame={data.game}
+        initialMoves={data.moves}
+      />
+    </PageContainer>
   );
 }

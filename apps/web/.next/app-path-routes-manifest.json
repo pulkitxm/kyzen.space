@@ -1,0 +1,13 @@
+{
+  "/[username]/page": "/[username]",
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/account/page": "/account",
+  "/auth/page": "/auth",
+  "/favicon.ico/route": "/favicon.ico",
+  "/games/page": "/games",
+  "/games/tic-tac-toe/[gameId]/page": "/games/tic-tac-toe/[gameId]",
+  "/games/tic-tac-toe/page": "/games/tic-tac-toe",
+  "/page": "/",
+  "/profile/page": "/profile"
+}

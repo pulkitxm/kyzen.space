@@ -11,7 +11,16 @@
   /* ─── Semantic tokens (light) ─── */
   --primary: var(--palette-mezzo);
   --primary-dark: var(--palette-pine);
+  --primary-hover: color-mix(in srgb, var(--palette-mezzo) 88%, black);
   --primary-foreground: var(--palette-lucky);
+
+  /* Status (semantic) — paired with -foreground for text on a solid fill */
+  --success: var(--palette-mezzo);
+  --success-foreground: var(--palette-lucky);
+  --warning: var(--palette-gold);
+  --warning-foreground: var(--palette-pine);
+  --danger: #c0392b;
+  --danger-foreground: #ffffff;
 
   --background: color-mix(in srgb, var(--palette-lucky) 86%, white);
   --foreground: var(--palette-pine);
@@ -59,7 +68,15 @@
 html.dark {
   --primary: var(--palette-gold);
   --primary-dark: var(--palette-nemo);
+  --primary-hover: color-mix(in srgb, var(--palette-gold) 85%, white);
   --primary-foreground: var(--palette-pine);
+
+  --success: color-mix(in srgb, var(--palette-mezzo) 64%, var(--palette-lucky));
+  --success-foreground: var(--palette-pine);
+  --warning: var(--palette-gold);
+  --warning-foreground: var(--palette-pine);
+  --danger: #e06a5b;
+  --danger-foreground: #1a0f0d;
 
   --background: var(--palette-pine);
   --foreground: var(--palette-lucky);
@@ -114,7 +131,15 @@ html.dark {
   /* Semantic tokens (palette composition lives only above in :root) */
   --color-primary: var(--primary);
   --color-primary-dark: var(--primary-dark);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

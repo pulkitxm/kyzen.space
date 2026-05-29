@@ -6,8 +6,7 @@ import { cookies } from "next/headers";
 
 import { AppShellClient } from "@/app/app-shell";
 import { Providers } from "@/app/providers";
-import { connectMongoose } from "@/database/mongoose";
-import { UserProfile } from "@/database/models";
+import { serverFetchJson } from "@/lib/api-server";
 import { getServerSession } from "@/lib/get-server-session";
 import {
   SIDEBAR_LS_BOOT_SCRIPT,
@@ -27,7 +26,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Game lib",
+  title: "GameLobby",
   description: "Play live multiplayer games",
 };
 
@@ -41,15 +40,10 @@ export default async function RootLayout({
 
   let username: string | null = null;
   if (session?.user?.id) {
-    try {
-      await connectMongoose();
-      const profile = await UserProfile.findOne({ userId: session.user.id })
-        .select({ username: 1 })
-        .lean();
-      username = profile?.username ?? null;
-    } catch {
-      // non-fatal — sidebar shows "Sign in" fallback
-    }
+    const me = await serverFetchJson<{ profile: { username: string } }>(
+      "/api/profiles/me",
+    );
+    username = me?.profile.username ?? null;
   }
 
   const profileHref = signedIn ? (username ? `/${username}` : "/profile") : "/auth";

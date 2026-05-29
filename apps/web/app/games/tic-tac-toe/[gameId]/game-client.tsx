@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-
-type Cell = "X" | "O" | null;
-type TicState = { board: Cell[]; currentTurn: "X" | "O" };
+import type { Cell, TicTacToeState as TicState } from "@gamelobby/games-core";
 
 type GameJson = {
-  _id: string;
+  id: string;
   status: string;
   winner: string | null;
   players: { userId: string; username: string; role: string }[];
@@ -16,11 +14,18 @@ type GameJson = {
 
 type MoveJson = Record<string, unknown>;
 
-type Props = {
+export type TicTacToeClientProps = {
   gameId: string;
   userId: string | null;
-  initialGame: GameJson;
-  initialMoves: MoveJson[];
+  /** Server-fetched game/moves — `gameState`/`moveData` are `unknown` on the wire. */
+  initialGame: {
+    id: string;
+    status: string;
+    winner: string | null;
+    players: { userId: string; username: string; role: string }[];
+    gameState: unknown;
+  };
+  initialMoves: Record<string, unknown>[];
 };
 
 const CELL_INDICES = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
@@ -94,11 +99,11 @@ function ReplayToolbar({
   onLast: () => void;
 }) {
   const glass =
-    "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/35 px-3 text-neutral-100 shadow-[0_4px_24px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:border-white/25 hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-35";
+    "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card px-3 text-card-foreground shadow-sm outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35";
 
   return (
     <div
-      className="mt-6 flex max-w-[320px] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-neutral-950/40 p-2 backdrop-blur-xl dark:bg-black/50"
+      className="mt-6 flex max-w-[320px] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-border bg-surface-overlay/60 p-2"
       role="toolbar"
       aria-label="Replay controls"
     >
@@ -203,9 +208,9 @@ export function TicTacToeGameClient({
   userId,
   initialGame,
   initialMoves,
-}: Props) {
+}: TicTacToeClientProps) {
   const socketRef = useRef<Socket | null>(null);
-  const [game, setGame] = useState<GameJson>(initialGame);
+  const [game, setGame] = useState<GameJson>(initialGame as GameJson);
   const [moves, setMoves] = useState<MoveJson[]>(initialMoves);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -219,9 +224,9 @@ export function TicTacToeGameClient({
 
   const socketUrl = useMemo(
     () =>
-      typeof window !== "undefined"
-        ? (process.env.NEXT_PUBLIC_SOCKET_URL ?? window.location.origin)
-        : "",
+      process.env.NEXT_PUBLIC_SOCKET_URL ??
+      process.env.NEXT_PUBLIC_API_URL ??
+      (typeof window !== "undefined" ? window.location.origin : ""),
     [],
   );
 
@@ -277,7 +282,7 @@ export function TicTacToeGameClient({
     const socket: Socket = io(socketUrl, {
       path: "/socket.io",
       withCredentials: true,
-      transports: ["websocket", "polling"],
+      transports: ["websocket"],
     });
     socketRef.current = socket;
 
@@ -427,18 +432,18 @@ export function TicTacToeGameClient({
   return (
     <div className="mt-8">
       {isPast ? (
-        <p className="mb-4 text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="mb-4 text-xs text-muted-foreground">
           Finished game — ← → previous/next move · Space play/pause (resumes
           from the current move, or from the start if you&apos;re already at the
           end). Stops at the final move. No live connection.
         </p>
       ) : !userId ? (
-        <p className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+        <p className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
           Sign in to join this table and play. Open the same link while signed
           in as the second player to fill the match.
         </p>
       ) : (
-        <p className="mb-4 text-xs text-neutral-500">
+        <p className="mb-4 text-xs text-muted-foreground">
           {liveSocketKey
             ? connected
               ? "Live · connected"
@@ -448,13 +453,11 @@ export function TicTacToeGameClient({
       )}
 
       {error ? (
-        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="mb-4 text-sm text-danger">{error}</p>
       ) : null}
 
       {winnerLabel ? (
-        <p className="mb-4 text-sm font-medium text-primary">
-          {winnerLabel}
-        </p>
+        <p className="mb-4 text-sm font-medium text-primary">{winnerLabel}</p>
       ) : null}
 
       <div className="grid max-w-[220px] grid-cols-3 gap-2">
@@ -468,7 +471,7 @@ export function TicTacToeGameClient({
               type="button"
               disabled={isPast || !canMove || mark !== null || game.status !== "active"}
               onClick={() => makeMove(row, col)}
-              className="flex size-16 items-center justify-center rounded-lg border border-neutral-300 bg-white text-2xl font-semibold text-neutral-900 transition hover:bg-neutral-50 disabled:cursor-default disabled:opacity-60 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-50 dark:hover:bg-neutral-800"
+              className="flex size-16 items-center justify-center rounded-lg border border-border bg-surface-raised text-2xl font-semibold text-card-foreground outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60"
             >
               {mark ?? ""}
             </button>
@@ -488,12 +491,12 @@ export function TicTacToeGameClient({
             onNext={goNext}
             onLast={goLast}
           />
-          <p className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="mt-3 text-xs text-muted-foreground">
             Position after {Math.min(replayStep, sortedLen)} of {sortedLen} moves
           </p>
         </>
       ) : (
-        <p className="mt-6 text-xs text-neutral-500">
+        <p className="mt-6 text-xs text-muted-foreground">
           Moves logged: {moves.length}
         </p>
       )}

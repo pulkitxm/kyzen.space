@@ -19,7 +19,7 @@ export function GoogleSignInButton({ googleOAuthReady }: Props) {
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/profile",
+        callbackURL: `${window.location.origin}/profile`,
       });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Sign-in failed");
@@ -33,16 +33,14 @@ export function GoogleSignInButton({ googleOAuthReady }: Props) {
         type="button"
         disabled={busy || !googleOAuthReady}
         onClick={continueWithGoogle}
-        className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm font-medium text-neutral-900 shadow-sm transition hover:bg-neutral-50 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-50 dark:hover:bg-neutral-800"
+        className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm font-medium text-card-foreground shadow-sm outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
       >
         <GoogleGlyph />
         {busy ? "Redirecting…" : "Continue with Google"}
       </button>
 
       {error ? (
-        <p className="mt-4 text-center text-xs text-red-600 dark:text-red-400">
-          {error}
-        </p>
+        <p className="mt-4 text-center text-xs text-danger">{error}</p>
       ) : null}
     </>
   );

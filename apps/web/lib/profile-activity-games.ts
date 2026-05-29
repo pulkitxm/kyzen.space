@@ -1,8 +1,17 @@
 import { GAMES } from "@/lib/games";
 
-/** Recent-games pagination size on public profiles */
+/** Recent-games pagination size on public profiles. */
 export const PROFILE_ACTIVITY_PAGE_SIZE = 5;
 
+/** Raw activity row as returned by the backend (catalog-agnostic). */
+export type ProfileActivityApiRow = {
+  id: string;
+  gameType: string;
+  status: string;
+  updatedAt: string;
+};
+
+/** Display row after joining with the frontend games catalog. */
 export type ProfileActivityGameRow = {
   id: string;
   href: string;
@@ -12,27 +21,22 @@ export type ProfileActivityGameRow = {
   updatedAt: string;
 };
 
-type GameLean = {
-  _id: unknown;
-  gameType: string;
-  status: string;
-  updatedAt?: Date | null;
-  createdAt?: Date | null;
-};
+export function mapApiRowToActivity(
+  row: ProfileActivityApiRow,
+): ProfileActivityGameRow {
+  const entry = GAMES.find((g) => g.id === row.gameType);
+  return {
+    id: row.id,
+    href: `/games/${row.gameType}/${row.id}`,
+    name: entry?.name ?? row.gameType.replace(/-/g, " "),
+    coverImage: entry?.coverImage,
+    status: row.status,
+    updatedAt: row.updatedAt,
+  };
+}
 
-export function mapGamesToProfileActivityRows(
-  games: GameLean[],
+export function mapApiRowsToActivity(
+  rows: ProfileActivityApiRow[],
 ): ProfileActivityGameRow[] {
-  return games.map((g) => {
-    const entry = GAMES.find((x) => x.id === g.gameType);
-    const ts = g.updatedAt ?? g.createdAt ?? new Date();
-    return {
-      id: String(g._id),
-      href: `/games/${g.gameType}/${String(g._id)}`,
-      name: entry?.name ?? g.gameType.replace(/-/g, " "),
-      coverImage: entry?.coverImage,
-      status: g.status,
-      updatedAt: new Date(ts).toISOString(),
-    };
-  });
+  return rows.map(mapApiRowToActivity);
 }
