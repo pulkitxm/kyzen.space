@@ -6,12 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": [
-      "**",
-      "!**/drizzle/**",
-      "!**/bun.lock",
-      "!**/*.css"
-    ]
+    "includes": ["**", "!**/drizzle/**", "!**/bun.lock", "!**/*.css"]
   },
   "css": {
     "formatter": { "enabled": false },
