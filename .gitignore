@@ -39,3 +39,6 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# Next.js generated
+next-env.d.ts
