@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { Hono } from "hono";
 import {
   getEngine,
   hasEngine,
-  TIC_TAC_TOE,
   type MatchDescriptor,
+  TIC_TAC_TOE,
 } from "@gamelobby/games-core";
-import { games, profiles } from "../../db";
+import { Hono } from "hono";
 import { getAuth } from "../../auth";
+import { games, profiles } from "../../db";
 import { env } from "../../env";
 
 /**
@@ -17,7 +17,9 @@ import { env } from "../../env";
  * changes `serverUrl` (and issues a real join token).
  */
 export const matchmakingRouter = new Hono().post("/", async (c) => {
-  const session = await getAuth().api.getSession({ headers: c.req.raw.headers });
+  const session = await getAuth().api.getSession({
+    headers: c.req.raw.headers,
+  });
   if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
 
   const body = await c.req.json().catch(() => null);

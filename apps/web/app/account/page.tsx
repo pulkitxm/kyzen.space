@@ -29,7 +29,9 @@ export default async function AccountPage() {
         <h1 className="text-xl font-semibold tracking-tight text-card-foreground">
           Account
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{current.user.email}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {current.user.email}
+        </p>
 
         <section className="mt-8" aria-labelledby="sessions-heading">
           <h2
@@ -82,16 +84,22 @@ export default async function AccountPage() {
                     <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
                       <div>
                         <dt className="inline">Started </dt>
-                        <dd className="inline">{formatTs(session.createdAt)}</dd>
+                        <dd className="inline">
+                          {formatTs(session.createdAt)}
+                        </dd>
                       </div>
                       <div>
                         <dt className="inline">Expires </dt>
-                        <dd className="inline">{formatTs(session.expiresAt)}</dd>
+                        <dd className="inline">
+                          {formatTs(session.expiresAt)}
+                        </dd>
                       </div>
                       {session.ipAddress ? (
                         <div>
                           <dt className="inline">IP </dt>
-                          <dd className="inline font-mono">{session.ipAddress}</dd>
+                          <dd className="inline font-mono">
+                            {session.ipAddress}
+                          </dd>
                         </div>
                       ) : null}
                       {session.userAgent ? (

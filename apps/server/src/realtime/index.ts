@@ -3,8 +3,8 @@ import { Server as IOServer } from "socket.io";
 import { getAuth } from "../auth";
 import { games } from "../db";
 import { env } from "../env";
-import { attachRedisAdapter } from "./redis";
 import { getDriver } from "./drivers";
+import { attachRedisAdapter } from "./redis";
 
 function isJoinPayload(p: unknown): p is { gameId: string } {
   return (

@@ -19,7 +19,8 @@ export function displayName(user: {
   name?: string | null;
   email?: string | null;
 }): string | null {
-  if (typeof user.name === "string" && user.name.trim()) return user.name.trim();
+  if (typeof user.name === "string" && user.name.trim())
+    return user.name.trim();
   if (typeof user.email === "string" && user.email.trim())
     return user.email.trim();
   return null;
@@ -30,7 +31,10 @@ const MS_PER_MINUTE = 60 * MS_PER_SECOND;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
 
-function pluralUnit(n: number, unit: "second" | "minute" | "hour" | "day"): string {
+function pluralUnit(
+  n: number,
+  unit: "second" | "minute" | "hour" | "day",
+): string {
   return `${n} ${unit}${n === 1 ? "" : "s"}`;
 }
 
@@ -40,7 +44,9 @@ function pluralUnit(n: number, unit: "second" | "minute" | "hour" | "day"): stri
 /** "Member for" label from an ISO timestamp to now. Reads the clock here (not
  * in a component) so it stays out of React's render-purity analysis. */
 export function memberForLabel(createdAtIso: string): string {
-  return formatElapsedAsLargestUnit(Date.now() - new Date(createdAtIso).getTime());
+  return formatElapsedAsLargestUnit(
+    Date.now() - new Date(createdAtIso).getTime(),
+  );
 }
 
 export function formatElapsedAsLargestUnit(elapsedMs: number): string {

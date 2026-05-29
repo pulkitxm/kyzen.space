@@ -13,8 +13,7 @@ const variants: Record<Variant, string> = {
   secondary:
     "border border-border bg-card text-card-foreground hover:bg-surface-overlay",
   ghost: "text-foreground hover:bg-surface-overlay",
-  danger:
-    "border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20",
+  danger: "border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20",
 };
 
 const sizes: Record<Size, string> = {
@@ -31,7 +30,15 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   function Button(
-    { variant = "primary", size = "md", loading, className, children, disabled, ...props },
+    {
+      variant = "primary",
+      size = "md",
+      loading,
+      className,
+      children,
+      disabled,
+      ...props
+    },
     ref,
   ) {
     return (

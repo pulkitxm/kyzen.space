@@ -75,7 +75,10 @@ export function ProfilePageView({
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[300px,minmax(0,1fr)] lg:gap-10">
           <aside className="flex flex-col gap-5 lg:sticky lg:top-8 lg:self-start">
-            <StatsCard memberForLabel={memberForLabel} totalGamesPlayed={totalGamesPlayed} />
+            <StatsCard
+              memberForLabel={memberForLabel}
+              totalGamesPlayed={totalGamesPlayed}
+            />
             <ActivitySection
               profileUsername={username}
               mostPlayed={activityMostPlayed}
@@ -221,7 +224,9 @@ function StatsCard({
           </div>
           <div className="min-w-0">
             <p className="text-sm text-muted-foreground">Games played</p>
-            <p className="text-base font-semibold text-card-foreground">{totalGamesPlayed}</p>
+            <p className="text-base font-semibold text-card-foreground">
+              {totalGamesPlayed}
+            </p>
           </div>
         </li>
         <li className="flex gap-3">
@@ -230,7 +235,9 @@ function StatsCard({
           </div>
           <div className="min-w-0">
             <p className="text-sm text-muted-foreground">Member for</p>
-            <p className="text-base font-semibold text-card-foreground">{memberForLabel}</p>
+            <p className="text-base font-semibold text-card-foreground">
+              {memberForLabel}
+            </p>
           </div>
         </li>
       </ul>
@@ -265,7 +272,10 @@ function ActivitySection({
               href={mostPlayed.href}
               className="flex gap-3 rounded-xl border border-border bg-surface-overlay/40 p-3 transition hover:border-border/60 hover:bg-surface-hover/80"
             >
-              <ActivityThumb cover={mostPlayed.coverImage} name={mostPlayed.name} />
+              <ActivityThumb
+                cover={mostPlayed.coverImage}
+                name={mostPlayed.name}
+              />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   <IconHeart className="text-primary" />
@@ -327,15 +337,35 @@ function IconController() {
 function IconCalendar() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect
+        x="3"
+        y="5"
+        width="18"
+        height="16"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M3 9h18M8 3v4M16 3v4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
 
 function IconHeart({ className }: { className?: string }) {
   return (
-    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
       <path d="M12 21s-6.716-4.11-9-8.5C.5 8.5 2.5 5 7 5c2.5 0 5 2 5 2s2.5-2 5-2c4.5 0 6.5 3.5 4 7.5-2.284 4.39-9 8.5-9 8.5z" />
     </svg>
   );

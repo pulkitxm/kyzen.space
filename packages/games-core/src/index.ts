@@ -1,43 +1,39 @@
 export type {
   GameEngine,
-  Outcome,
-  Seat,
-  ReduceResult,
-  StepResult,
   MoveContext,
+  Outcome,
+  ReduceResult,
+  Seat,
+  StepResult,
 } from "./engine";
-
+export type {
+  Cell,
+  Mark,
+  TicTacToeMove,
+  TicTacToeState,
+} from "./games/tic-tac-toe";
+export {
+  emptyBoard,
+  isBoardFull,
+  isTerminal,
+  lineWinner,
+  TIC_TAC_TOE,
+  ticTacToeEngine,
+  WIN_LINES,
+} from "./games/tic-tac-toe";
+export type {
+  ClientJoinRoom,
+  ClientMakeMove,
+  GameJson,
+  MatchDescriptor,
+  MoveJson,
+  ServerErrorPayload,
+  ServerGameOverPayload,
+  ServerGameStatePayload,
+  ServerMoveMadePayload,
+} from "./messages";
 export {
   getEngine,
   hasEngine,
   listGameTypes,
 } from "./registry";
-
-export type {
-  ClientJoinRoom,
-  ClientMakeMove,
-  GameJson,
-  MoveJson,
-  ServerGameStatePayload,
-  ServerMoveMadePayload,
-  ServerGameOverPayload,
-  ServerErrorPayload,
-  MatchDescriptor,
-} from "./messages";
-
-export {
-  ticTacToeEngine,
-  TIC_TAC_TOE,
-  emptyBoard,
-  lineWinner,
-  isBoardFull,
-  isTerminal,
-  WIN_LINES,
-} from "./games/tic-tac-toe";
-
-export type {
-  Cell,
-  Mark,
-  TicTacToeState,
-  TicTacToeMove,
-} from "./games/tic-tac-toe";

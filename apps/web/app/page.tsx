@@ -2,8 +2,8 @@ import Link from "next/link";
 
 import { GameCard } from "@/app/game-card";
 import { SignOutForm } from "@/app/sign-out-form";
-import { getServerSession } from "@/lib/get-server-session";
 import { GAMES } from "@/lib/games";
+import { getServerSession } from "@/lib/get-server-session";
 import { displayName } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -40,10 +40,16 @@ export default async function Home() {
                 })()}
               </p>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <Link href="/profile" className="underline-offset-4 hover:underline">
+                <Link
+                  href="/profile"
+                  className="underline-offset-4 hover:underline"
+                >
                   Profile
                 </Link>
-                <Link href="/account" className="underline-offset-4 hover:underline">
+                <Link
+                  href="/account"
+                  className="underline-offset-4 hover:underline"
+                >
                   Account
                 </Link>
                 <SignOutForm />

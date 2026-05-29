@@ -1,8 +1,8 @@
 "use client";
 
+import type { Cell, TicTacToeState as TicState } from "@gamelobby/games-core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import type { Cell, TicTacToeState as TicState } from "@gamelobby/games-core";
 
 type GameJson = {
   id: string;
@@ -64,11 +64,7 @@ function buildStateAtStep(
     const pid = String(m.playerId ?? "");
     const role = roleForPlayer(players, pid);
     const md = m.moveData as { row?: unknown; col?: unknown };
-    if (
-      !role ||
-      typeof md.row !== "number" ||
-      typeof md.col !== "number"
-    ) {
+    if (!role || typeof md.row !== "number" || typeof md.col !== "number") {
       continue;
     }
     const idx = md.row * 3 + md.col;
@@ -107,7 +103,13 @@ function ReplayToolbar({
       role="toolbar"
       aria-label="Replay controls"
     >
-      <button type="button" className={glass} onClick={onFirst} disabled={step <= 0} title="First">
+      <button
+        type="button"
+        className={glass}
+        onClick={onFirst}
+        disabled={step <= 0}
+        title="First"
+      >
         <IconFirst />
       </button>
       <button
@@ -152,7 +154,17 @@ function ReplayToolbar({
 
 function IconFirst() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <polyline points="11 18 6 12 11 6" />
       <polyline points="18 18 13 12 18 6" />
       <line x1="4" y1="4" x2="4" y2="20" />
@@ -162,7 +174,17 @@ function IconFirst() {
 
 function IconPrev() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <polyline points="15 18 9 12 15 6" />
     </svg>
   );
@@ -170,7 +192,17 @@ function IconPrev() {
 
 function IconNext() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <polyline points="9 18 15 12 9 6" />
     </svg>
   );
@@ -178,7 +210,17 @@ function IconNext() {
 
 function IconLast() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <polyline points="13 18 18 12 13 6" />
       <polyline points="6 18 11 12 6 6" />
       <line x1="20" y1="4" x2="20" y2="20" />
@@ -188,7 +230,13 @@ function IconLast() {
 
 function IconPlay() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
       <polygon points="8 5 19 12 8 19 8 5" />
     </svg>
   );
@@ -196,7 +244,13 @@ function IconPlay() {
 
 function IconPause() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
       <rect x="6" y="5" width="4" height="14" rx="1" />
       <rect x="14" y="5" width="4" height="14" rx="1" />
     </svg>
@@ -230,15 +284,16 @@ export function TicTacToeGameClient({
     [],
   );
 
-  const isLive =
-    game.status === "waiting" || game.status === "active";
+  const isLive = game.status === "waiting" || game.status === "active";
 
-  const isPast =
-    game.status === "completed" || game.status === "abandoned";
+  const isPast = game.status === "completed" || game.status === "abandoned";
 
   const sortedLen = useMemo(() => sortMoves(moves).length, [moves]);
 
-  const liveSocketKey = useMemo((): { gameId: string; userId: string } | null => {
+  const liveSocketKey = useMemo((): {
+    gameId: string;
+    userId: string;
+  } | null => {
     if (!userId || !isLive) return null;
     return { gameId, userId };
   }, [gameId, userId, isLive]);
@@ -297,10 +352,13 @@ export function TicTacToeGameClient({
       setError(err.message);
     });
 
-    socket.on("game_state", (payload: { game: GameJson; moves: MoveJson[] }) => {
-      setGame(payload.game);
-      setMoves(payload.moves);
-    });
+    socket.on(
+      "game_state",
+      (payload: { game: GameJson; moves: MoveJson[] }) => {
+        setGame(payload.game);
+        setMoves(payload.moves);
+      },
+    );
 
     socket.on("move_made", (payload: { gameState: TicState }) => {
       setGame((g) => ({ ...g, gameState: payload.gameState }));
@@ -323,11 +381,7 @@ export function TicTacToeGameClient({
 
   const replayState = useMemo(
     () =>
-      buildStateAtStep(
-        moves,
-        Math.min(replayStep, sortedLen),
-        game.players,
-      ),
+      buildStateAtStep(moves, Math.min(replayStep, sortedLen), game.players),
     [moves, replayStep, sortedLen, game.players],
   );
 
@@ -452,9 +506,7 @@ export function TicTacToeGameClient({
         </p>
       )}
 
-      {error ? (
-        <p className="mb-4 text-sm text-danger">{error}</p>
-      ) : null}
+      {error ? <p className="mb-4 text-sm text-danger">{error}</p> : null}
 
       {winnerLabel ? (
         <p className="mb-4 text-sm font-medium text-primary">{winnerLabel}</p>
@@ -469,7 +521,9 @@ export function TicTacToeGameClient({
             <button
               key={idx}
               type="button"
-              disabled={isPast || !canMove || mark !== null || game.status !== "active"}
+              disabled={
+                isPast || !canMove || mark !== null || game.status !== "active"
+              }
               onClick={() => makeMove(row, col)}
               className="flex size-16 items-center justify-center rounded-lg border border-border bg-surface-raised text-2xl font-semibold text-card-foreground outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60"
             >
@@ -492,7 +546,8 @@ export function TicTacToeGameClient({
             onLast={goLast}
           />
           <p className="mt-3 text-xs text-muted-foreground">
-            Position after {Math.min(replayStep, sortedLen)} of {sortedLen} moves
+            Position after {Math.min(replayStep, sortedLen)} of {sortedLen}{" "}
+            moves
           </p>
         </>
       ) : (

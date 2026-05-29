@@ -1,5 +1,5 @@
-import * as React from "react";
 import Link from "next/link";
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /** Consistent page shell: centered, max-width, vertical rhythm. */
@@ -41,7 +41,13 @@ export function PageHeader({
   );
 }
 
-export function BackLink({ href, children }: { href: string; children: React.ReactNode }) {
+export function BackLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
   return (
     <Link
       href={href}

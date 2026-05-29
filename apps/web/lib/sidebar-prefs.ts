@@ -1,10 +1,10 @@
 import {
+  clampWidthSafe,
   DEFAULT_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
   SIDEBAR_COLLAPSED_KEY,
   SIDEBAR_WIDTH_KEY,
-  clampWidthSafe,
 } from "@/lib/sidebar-atoms-shared";
 
 /** Keeps SSR + first client sidebar layout aligned (prevents hydration snap). */

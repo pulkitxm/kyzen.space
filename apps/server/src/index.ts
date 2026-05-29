@@ -3,8 +3,8 @@ import { getRequestListener } from "@hono/node-server";
 import cors from "cors";
 import express from "express";
 import { app as honoApp } from "./api";
-import { attachRealtime } from "./realtime";
 import { env } from "./env";
+import { attachRealtime } from "./realtime";
 
 const server = express();
 

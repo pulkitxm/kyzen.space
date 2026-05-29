@@ -1,12 +1,12 @@
-export { db, schema, type DB } from "./client";
+export { type DB, db, schema } from "./client";
 export * as games from "./repositories/games";
 export * as profiles from "./repositories/profiles";
 export type {
-  GameRow,
-  MoveRow,
-  UserProfileRow,
   GamePlayer,
-  GameStatus,
+  GameRow,
   GameStat,
+  GameStatus,
+  MoveRow,
   ProfileStats,
+  UserProfileRow,
 } from "./schema";

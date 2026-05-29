@@ -1,7 +1,7 @@
-import { Hono } from "hono";
 import { getEngine, hasEngine, TIC_TAC_TOE } from "@gamelobby/games-core";
-import { games, profiles, type GameStatus } from "../../db";
+import { Hono } from "hono";
 import { getAuth } from "../../auth";
+import { type GameStatus, games, profiles } from "../../db";
 import { serializeGame, serializeMove } from "../serialize";
 
 const UUID_RE =
@@ -10,12 +10,15 @@ const UUID_RE =
 export const gamesRouter = new Hono()
   .get("/", async (c) => {
     const gameType = c.req.query("gameType") ?? undefined;
-    const status = (c.req.query("status") as GameStatus | undefined) ?? undefined;
+    const status =
+      (c.req.query("status") as GameStatus | undefined) ?? undefined;
     const list = await games.listGames({ gameType, status, limit: 50 });
     return c.json({ games: list.map(serializeGame) });
   })
   .post("/", async (c) => {
-    const session = await getAuth().api.getSession({ headers: c.req.raw.headers });
+    const session = await getAuth().api.getSession({
+      headers: c.req.raw.headers,
+    });
     if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
 
     const body = await c.req.json().catch(() => null);

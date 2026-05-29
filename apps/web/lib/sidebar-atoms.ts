@@ -1,19 +1,19 @@
+import { atomWithStorage, createJSONStorage } from "jotai/utils";
 import {
-  SIDEBAR_COLLAPSED_KEY,
-  SIDEBAR_WIDTH_KEY,
   clampWidth,
   clampWidthSafe,
   DEFAULT_SIDEBAR_WIDTH,
-} from "@/lib/sidebar-atoms-shared";
-import { atomWithStorage, createJSONStorage } from "jotai/utils";
-
-export {
   SIDEBAR_COLLAPSED_KEY,
   SIDEBAR_WIDTH_KEY,
+} from "@/lib/sidebar-atoms-shared";
+
+export {
   clampWidthSafe,
   DEFAULT_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
+  SIDEBAR_COLLAPSED_KEY,
+  SIDEBAR_WIDTH_KEY,
 } from "@/lib/sidebar-atoms-shared";
 
 const noopStringStorage = {

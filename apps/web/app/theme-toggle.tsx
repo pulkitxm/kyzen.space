@@ -43,7 +43,10 @@ export function ThemeToggle({ collapsed, className }: ThemeToggleProps) {
     >
       <span className="flex size-7 shrink-0 items-center justify-center">
         {!mounted ? (
-          <span className="size-4 rounded-sm bg-sidebar-foreground/15" aria-hidden />
+          <span
+            className="size-4 rounded-sm bg-sidebar-foreground/15"
+            aria-hidden
+          />
         ) : isDark ? (
           <FaSun className="size-4 shrink-0" aria-hidden />
         ) : (
@@ -53,7 +56,9 @@ export function ThemeToggle({ collapsed, className }: ThemeToggleProps) {
       <span
         className={cn(
           "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sidebar-foreground/90 text-sm transition-[opacity,max-width,filter] duration-250 ease-in-out",
-          collapsed ? "max-w-0 opacity-0 blur-[2px]" : "max-w-48 opacity-100 blur-0",
+          collapsed
+            ? "max-w-0 opacity-0 blur-[2px]"
+            : "max-w-48 opacity-100 blur-0",
         )}
       >
         Appearance

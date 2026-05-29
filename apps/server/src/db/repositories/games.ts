@@ -1,12 +1,12 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import {
-  game,
-  move,
   type GamePlayer,
   type GameRow,
   type GameStatus,
+  game,
   type MoveRow,
+  move,
 } from "../schema";
 
 export type CreateGameInput = {
@@ -41,7 +41,9 @@ export type ListGamesFilter = {
   limit?: number;
 };
 
-export async function listGames(filter: ListGamesFilter = {}): Promise<GameRow[]> {
+export async function listGames(
+  filter: ListGamesFilter = {},
+): Promise<GameRow[]> {
   const conds = [];
   if (filter.gameType) conds.push(eq(game.gameType, filter.gameType));
   if (filter.status) conds.push(eq(game.status, filter.status));
@@ -79,7 +81,10 @@ export type GameUpdate = Partial<
   >
 >;
 
-export async function updateGame(id: string, patch: GameUpdate): Promise<GameRow> {
+export async function updateGame(
+  id: string,
+  patch: GameUpdate,
+): Promise<GameRow> {
   const [row] = await db
     .update(game)
     .set({ ...patch, updatedAt: new Date() })

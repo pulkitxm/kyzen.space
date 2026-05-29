@@ -1,17 +1,26 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useAtom } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
-import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { FaChevronLeft, FaChevronRight, FaGamepad, FaUser } from "react-icons/fa";
-
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  FaChevronLeft,
+  FaChevronRight,
+  FaGamepad,
+  FaUser,
+} from "react-icons/fa";
 import { ThemeToggle } from "@/app/theme-toggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { getCategoryGroups } from "@/lib/games";
-import type { SidebarPrefs } from "@/lib/sidebar-prefs";
-import { persistSidebarPrefsToCookie } from "@/lib/sidebar-prefs";
 import {
   clampWidthSafe,
   DEFAULT_SIDEBAR_WIDTH,
@@ -20,6 +29,8 @@ import {
   sidebarCollapsedAtom,
   sidebarWidthAtom,
 } from "@/lib/sidebar-atoms";
+import type { SidebarPrefs } from "@/lib/sidebar-prefs";
+import { persistSidebarPrefsToCookie } from "@/lib/sidebar-prefs";
 import { cn } from "@/lib/utils";
 
 export interface SidebarProps {
@@ -44,7 +55,10 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const atomsToHydrate = sidebarPrefsTrusted
-    ? new Map<typeof sidebarCollapsedAtom | typeof sidebarWidthAtom, boolean | number>([
+    ? new Map<
+        typeof sidebarCollapsedAtom | typeof sidebarWidthAtom,
+        boolean | number
+      >([
         [sidebarCollapsedAtom, sidebarPrefs.collapsed],
         [sidebarWidthAtom, clampWidthSafe(sidebarPrefs.width)],
       ])
@@ -159,7 +173,10 @@ export function Sidebar({
     };
 
     const handleMouseUp = (e: MouseEvent) => {
-      if (!resizeStartedFromCollapsedRef.current && e.clientX < MIN_SIDEBAR_WIDTH)
+      if (
+        !resizeStartedFromCollapsedRef.current &&
+        e.clientX < MIN_SIDEBAR_WIDTH
+      )
         toggleCollapsed();
       resizeStartedFromCollapsedRef.current = false;
       setIsResizing(false);
@@ -185,7 +202,9 @@ export function Sidebar({
 
   const textClasses = cn(
     "overflow-hidden whitespace-nowrap transition-[opacity,max-width,filter] duration-250 ease-in-out",
-    displayCollapsed ? "max-w-0 opacity-0 blur-[2px]" : "max-w-48 opacity-100 blur-0",
+    displayCollapsed
+      ? "max-w-0 opacity-0 blur-[2px]"
+      : "max-w-48 opacity-100 blur-0",
   );
 
   const avatarLetter =
@@ -239,12 +258,20 @@ export function Sidebar({
           href="/"
           onClick={onCloseMobile}
           className="flex min-w-0 items-center rounded-lg transition-[gap,padding,opacity] duration-250 ease-in-out hover:opacity-90"
-          style={{ gap: displayCollapsed ? 0 : 10, paddingLeft: displayCollapsed ? 8 : 0 }}
+          style={{
+            gap: displayCollapsed ? 0 : 10,
+            paddingLeft: displayCollapsed ? 8 : 0,
+          }}
         >
           <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-sm font-bold select-none">
             GL
           </span>
-          <span className={cn("font-semibold text-sidebar-foreground text-sm", textClasses)}>
+          <span
+            className={cn(
+              "font-semibold text-sidebar-foreground text-sm",
+              textClasses,
+            )}
+          >
             GameLobby
           </span>
         </Link>
@@ -261,10 +288,18 @@ export function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 py-3" aria-label="Games">
+      <nav
+        className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 py-3"
+        aria-label="Games"
+      >
         {groups.map(({ category, games }) => (
           <div key={category.id} className="mb-4">
-            <div className={cn("mb-1 px-2.5 py-1 font-medium text-sidebar-foreground/60 text-xs uppercase tracking-wider", textClasses)}>
+            <div
+              className={cn(
+                "mb-1 px-2.5 py-1 font-medium text-sidebar-foreground/60 text-xs uppercase tracking-wider",
+                textClasses,
+              )}
+            >
               {category.label}
             </div>
             <div className="flex flex-col gap-1">
@@ -280,8 +315,11 @@ export function Sidebar({
                       isActive
                         ? "bg-sidebar-accent text-sidebar-foreground"
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-                      !displayCollapsed && isActive && "border-l-2 border-sidebar-primary",
-                      !(displayCollapsed || isActive) && "border-l-2 border-transparent",
+                      !displayCollapsed &&
+                        isActive &&
+                        "border-l-2 border-sidebar-primary",
+                      !(displayCollapsed || isActive) &&
+                        "border-l-2 border-transparent",
                     )}
                     style={{
                       paddingLeft: displayCollapsed
@@ -289,13 +327,22 @@ export function Sidebar({
                         : isActive
                           ? "8px"
                           : "10px",
-                      paddingRight: displayCollapsed ? `${centeredPad}px` : "10px",
+                      paddingRight: displayCollapsed
+                        ? `${centeredPad}px`
+                        : "10px",
                     }}
                   >
-                    <span className={cn("flex shrink-0", isActive && "text-sidebar-primary")}>
+                    <span
+                      className={cn(
+                        "flex shrink-0",
+                        isActive && "text-sidebar-primary",
+                      )}
+                    >
                       <FaGamepad className="h-4 w-4 shrink-0" />
                     </span>
-                    <span className={cn("font-medium", textClasses)}>{game.name}</span>
+                    <span className={cn("font-medium", textClasses)}>
+                      {game.name}
+                    </span>
                   </Link>
                 );
                 return displayCollapsed ? (
@@ -338,12 +385,18 @@ export function Sidebar({
                     : "bg-sidebar-accent text-sidebar-foreground/60",
                 )}
               >
-                {signedIn && avatarLetter ? avatarLetter : <FaUser className="size-3" />}
+                {signedIn && avatarLetter ? (
+                  avatarLetter
+                ) : (
+                  <FaUser className="size-3" />
+                )}
               </div>
               <span
                 className={cn(
                   "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sidebar-foreground/80 text-sm transition-[opacity,max-width,filter] duration-250 ease-in-out",
-                  displayCollapsed ? "max-w-0 opacity-0 blur-[2px]" : "max-w-48 opacity-100 blur-0",
+                  displayCollapsed
+                    ? "max-w-0 opacity-0 blur-[2px]"
+                    : "max-w-48 opacity-100 blur-0",
                 )}
               >
                 {signedIn ? (username ?? "Profile") : "Sign in"}

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { games, profiles } from "../../db";
 import { getAuth } from "../../auth";
+import { games, profiles } from "../../db";
 
 const RESERVED = new Set(["api", "auth", "games", "profile", "account"]);
 const RECENT_PAGE_SIZE = 5;
@@ -24,7 +24,9 @@ function activityRow(g: {
 
 export const profilesRouter = new Hono()
   .get("/me", async (c) => {
-    const session = await getAuth().api.getSession({ headers: c.req.raw.headers });
+    const session = await getAuth().api.getSession({
+      headers: c.req.raw.headers,
+    });
     if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
 
     const profile = await profiles.getProfileByUserId(session.user.id);
@@ -56,7 +58,9 @@ export const profilesRouter = new Hono()
       10,
     );
     const limit =
-      Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(50, rawLimit) : RECENT_PAGE_SIZE;
+      Number.isFinite(rawLimit) && rawLimit > 0
+        ? Math.min(50, rawLimit)
+        : RECENT_PAGE_SIZE;
 
     const profile = await profiles.getProfileByUsername(username);
     if (!profile) return c.json({ error: "Not found" }, 404);

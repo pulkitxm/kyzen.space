@@ -50,7 +50,11 @@ export interface GameEngine<State, Input> {
    * REAL-TIME (future): advance the sim one fixed step from buffered inputs.
    * Pure & deterministic. Omitted for turn-based engines.
    */
-  step?(state: State, inputs: Map<string, Input>, dt: number): StepResult<State>;
+  step?(
+    state: State,
+    inputs: Map<string, Input>,
+    dt: number,
+  ): StepResult<State>;
 
   /** Simulation rate in Hz (real-time engines only). */
   readonly tickRate?: number;

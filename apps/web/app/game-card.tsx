@@ -19,7 +19,9 @@ export function GameCard({
         >
           <div>
             <p className="font-medium text-card-foreground">{game.name}</p>
-            <p className="mt-0.5 text-sm text-muted-foreground">{game.description}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {game.description}
+            </p>
           </div>
           <span className="ml-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground">
             →
@@ -56,9 +58,14 @@ export function GameCard({
           <h3 className="text-lg font-semibold tracking-tight text-card-foreground">
             {game.name}
           </h3>
-          <p className="text-sm leading-snug text-muted-foreground">{game.description}</p>
+          <p className="text-sm leading-snug text-muted-foreground">
+            {game.description}
+          </p>
           <p className="mt-3 text-sm font-medium text-primary transition group-hover:opacity-80">
-            Play<span className="ml-1 transition group-hover:translate-x-px">→</span>
+            Play
+            <span className="ml-1 transition group-hover:translate-x-px">
+              →
+            </span>
           </p>
         </div>
       </Link>

@@ -1,5 +1,5 @@
 import type { GameEngine } from "./engine";
-import { ticTacToeEngine, TIC_TAC_TOE } from "./games/tic-tac-toe";
+import { TIC_TAC_TOE, ticTacToeEngine } from "./games/tic-tac-toe";
 
 /** All registered game engines, keyed by `type`. Add new games here. */
 const engines: Record<string, GameEngine<unknown, unknown>> = {

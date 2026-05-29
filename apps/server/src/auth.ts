@@ -34,7 +34,11 @@ export const auth = betterAuth({
           try {
             await ensureUsernameForUser(createdUser.id, createdUser.name);
           } catch (err) {
-            console.error("Failed to provision profile for", createdUser.id, err);
+            console.error(
+              "Failed to provision profile for",
+              createdUser.id,
+              err,
+            );
           }
         },
       },

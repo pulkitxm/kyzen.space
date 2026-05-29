@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { ProfilePageView } from "@/app/[username]/profile-ui";
 import { serverFetchJson } from "@/lib/api-server";
+import { getServerSession } from "@/lib/get-server-session";
 import {
   mapApiRowsToActivity,
   PROFILE_ACTIVITY_PAGE_SIZE,
@@ -10,11 +11,10 @@ import {
 } from "@/lib/profile-activity-games";
 import {
   buildStatGames,
+  type ProfileStats,
   pickMostPlayed,
   totalGamesPlayed,
-  type ProfileStats,
 } from "@/lib/profile-stats";
-import { getServerSession } from "@/lib/get-server-session";
 import { memberForLabel } from "@/lib/utils";
 
 const RESERVED = new Set([

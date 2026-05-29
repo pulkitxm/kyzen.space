@@ -1,11 +1,11 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import {
-  user,
-  userProfile,
   type GameStat,
   type ProfileStats,
   type UserProfileRow,
+  user,
+  userProfile,
 } from "../schema";
 
 /** Display name from the Better Auth `user` table (for public profiles). */

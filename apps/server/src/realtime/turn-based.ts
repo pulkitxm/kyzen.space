@@ -1,13 +1,13 @@
-import type { Server as IOServer, Socket } from "socket.io";
 import {
-  getEngine,
   type ClientJoinRoom,
   type ClientMakeMove,
+  getEngine,
   type Outcome,
   type ServerGameStatePayload,
 } from "@gamelobby/games-core";
-import { games, profiles, type GamePlayer, type GameRow } from "../db";
+import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
+import { type GamePlayer, type GameRow, games, profiles } from "../db";
 import { emitToGame, joinGameRoom } from "./rooms";
 
 /**
@@ -79,7 +79,8 @@ async function finalize(gameRow: GameRow, outcome: Outcome): Promise<GameRow> {
   });
 
   for (const p of players) {
-    if (outcome.draw) await profiles.bumpStats(p.userId, gameRow.gameType, "drawn");
+    if (outcome.draw)
+      await profiles.bumpStats(p.userId, gameRow.gameType, "drawn");
     else if (p.userId === winnerUserId)
       await profiles.bumpStats(p.userId, gameRow.gameType, "won");
     else await profiles.bumpStats(p.userId, gameRow.gameType, "lost");

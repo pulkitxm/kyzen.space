@@ -28,12 +28,20 @@
   --surface: var(--palette-lucky);
   --surface-raised: #ffffff;
   --surface-overlay: color-mix(in srgb, var(--palette-lucky) 76%, white);
-  --surface-hover: color-mix(in srgb, var(--palette-lucky) 80%, var(--palette-gold));
+  --surface-hover: color-mix(
+    in srgb,
+    var(--palette-lucky) 80%,
+    var(--palette-gold)
+  );
 
   --card: #ffffff;
   --card-foreground: var(--palette-pine);
 
-  --muted-foreground: color-mix(in srgb, var(--palette-pine) 70%, var(--palette-gold));
+  --muted-foreground: color-mix(
+    in srgb,
+    var(--palette-pine) 70%,
+    var(--palette-gold)
+  );
 
   --border: color-mix(in srgb, var(--palette-gold) 30%, var(--palette-lucky));
   --ring: var(--palette-nemo);
@@ -82,14 +90,26 @@ html.dark {
   --foreground: var(--palette-lucky);
 
   --surface: color-mix(in srgb, var(--palette-pine) 88%, var(--palette-mezzo));
-  --surface-raised: color-mix(in srgb, var(--palette-pine) 70%, var(--palette-mezzo));
+  --surface-raised: color-mix(
+    in srgb,
+    var(--palette-pine) 70%,
+    var(--palette-mezzo)
+  );
   --surface-overlay: var(--palette-mezzo);
-  --surface-hover: color-mix(in srgb, var(--palette-mezzo) 84%, var(--palette-gold));
+  --surface-hover: color-mix(
+    in srgb,
+    var(--palette-mezzo) 84%,
+    var(--palette-gold)
+  );
 
   --card: color-mix(in srgb, var(--palette-pine) 64%, var(--palette-mezzo));
   --card-foreground: var(--palette-lucky);
 
-  --muted-foreground: color-mix(in srgb, var(--palette-lucky) 58%, var(--palette-gold));
+  --muted-foreground: color-mix(
+    in srgb,
+    var(--palette-lucky) 58%,
+    var(--palette-gold)
+  );
 
   --border: color-mix(in srgb, var(--palette-lucky) 13%, transparent);
   --ring: var(--palette-nemo);

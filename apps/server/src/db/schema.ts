@@ -109,7 +109,12 @@ export const move = pgTable(
 );
 
 /** Per-game-type stats: { played, won, lost, drawn }. */
-export type GameStat = { played: number; won: number; lost: number; drawn: number };
+export type GameStat = {
+  played: number;
+  won: number;
+  lost: number;
+  drawn: number;
+};
 export type ProfileStats = Record<string, GameStat>;
 
 export const userProfile = pgTable("user_profile", {

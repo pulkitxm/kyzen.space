@@ -12,7 +12,9 @@ import { client, db } from "./client";
  * Use fileURLToPath (not URL.pathname) so a space in the repo path isn't left
  * percent-encoded — drizzle reads the folder with fs and would 404 on `%20`.
  */
-const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
+const migrationsFolder = fileURLToPath(
+  new URL("../../drizzle", import.meta.url),
+);
 
 await migrate(db, { migrationsFolder });
 await client.end();

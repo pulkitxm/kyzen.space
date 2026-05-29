@@ -44,8 +44,8 @@ export default async function AuthPage() {
             <p className="mt-4 text-center text-xs text-muted-foreground">
               Add <span className="font-mono">GOOGLE_CLIENT_ID</span> and{" "}
               <span className="font-mono">GOOGLE_CLIENT_SECRET</span> to{" "}
-              <span className="font-mono">.env.local</span>, set the redirect URI
-              to{" "}
+              <span className="font-mono">.env.local</span>, set the redirect
+              URI to{" "}
               <span className="break-all font-mono text-[11px] text-muted-foreground">
                 [your app URL]/api/auth/callback/google
               </span>

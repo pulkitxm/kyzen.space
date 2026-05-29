@@ -106,7 +106,9 @@ export function PaginatedRecentGames({
             >
               <RecentGameThumb cover={row.coverImage} name={row.name} />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-card-foreground">{row.name}</p>
+                <p className="truncate font-medium text-card-foreground">
+                  {row.name}
+                </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{when}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {statusLabel(row.status)}

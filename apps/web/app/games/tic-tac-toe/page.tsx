@@ -1,9 +1,8 @@
-import { serverFetchJson } from "@/lib/api-server";
-import { BackLink, PageContainer, PageHeader } from "@/components/ui/page";
-import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";
-
 import { PlayButton } from "@/app/games/tic-tac-toe/play-button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BackLink, PageContainer, PageHeader } from "@/components/ui/page";
+import { serverFetchJson } from "@/lib/api-server";
 
 export const dynamic = "force-dynamic";
 

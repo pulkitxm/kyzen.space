@@ -1,6 +1,11 @@
 import { GAMES } from "@/lib/games";
 
-export type GameStat = { played: number; won: number; lost: number; drawn: number };
+export type GameStat = {
+  played: number;
+  won: number;
+  lost: number;
+  drawn: number;
+};
 export type ProfileStats = Record<string, GameStat>;
 
 export type ProfileStatGame = {

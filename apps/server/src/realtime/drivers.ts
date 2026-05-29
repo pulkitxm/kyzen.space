@@ -10,7 +10,11 @@ import { handleJoinRoom, handleMakeMove } from "./turn-based";
  */
 export interface RealtimeDriver {
   readonly kind: string;
-  joinRoom(io: IOServer, socket: Socket, payload: { gameId: string }): Promise<void>;
+  joinRoom(
+    io: IOServer,
+    socket: Socket,
+    payload: { gameId: string },
+  ): Promise<void>;
   makeMove(
     io: IOServer,
     socket: Socket,

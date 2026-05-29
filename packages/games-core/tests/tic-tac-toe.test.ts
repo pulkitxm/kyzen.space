@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import {
-  ticTacToeEngine,
-  type Mark,
-  type TicTacToeMove,
-  type TicTacToeState,
   emptyBoard,
   isBoardFull,
   isTerminal,
   lineWinner,
+  type Mark,
+  type TicTacToeMove,
+  type TicTacToeState,
+  ticTacToeEngine,
 } from "../src/games/tic-tac-toe";
 import { getEngine, hasEngine, listGameTypes } from "../src/registry";
 
@@ -31,9 +31,7 @@ function play(
 }
 
 /** Apply a sequence of [role, row, col] moves from the initial state. */
-function playSequence(
-  moves: [Mark, number, number][],
-): TicTacToeState {
+function playSequence(moves: [Mark, number, number][]): TicTacToeState {
   let state = initial();
   for (const [role, row, col] of moves) state = play(state, role, row, col);
   return state;
@@ -57,14 +55,22 @@ describe("tic-tac-toe — initial state", () => {
 
 describe("tic-tac-toe — turn & role enforcement", () => {
   test("O cannot move first", () => {
-    const res = ticTacToeEngine.reduce!(initial(), { role: "O" }, { row: 0, col: 0 });
+    const res = ticTacToeEngine.reduce!(
+      initial(),
+      { role: "O" },
+      { row: 0, col: 0 },
+    );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe("Not your turn");
   });
 
   test("same player cannot move twice in a row", () => {
     const afterX = play(initial(), "X", 0, 0);
-    const res = ticTacToeEngine.reduce!(afterX, { role: "X" }, { row: 1, col: 1 });
+    const res = ticTacToeEngine.reduce!(
+      afterX,
+      { role: "X" },
+      { row: 1, col: 1 },
+    );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe("Not your turn");
   });
@@ -93,14 +99,22 @@ describe("tic-tac-toe — move validity", () => {
     ["col > 2", { row: 0, col: 3 }],
     ["non-integer row", { row: 1.5, col: 0 }],
   ])("rejects out-of-bounds move (%s)", (_label, move) => {
-    const res = ticTacToeEngine.reduce!(initial(), { role: "X" }, move as TicTacToeMove);
+    const res = ticTacToeEngine.reduce!(
+      initial(),
+      { role: "X" },
+      move as TicTacToeMove,
+    );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe("Invalid move");
   });
 
   test("rejects an occupied cell", () => {
     const afterX = play(initial(), "X", 1, 1);
-    const res = ticTacToeEngine.reduce!(afterX, { role: "O" }, { row: 1, col: 1 });
+    const res = ticTacToeEngine.reduce!(
+      afterX,
+      { role: "O" },
+      { row: 1, col: 1 },
+    );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toBe("Cell occupied");
   });
@@ -134,7 +148,11 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
     let outcome: import("../src/engine").Outcome | undefined;
     for (let i = 0; i < 3; i++) {
       const [xr, xc] = toRC(xCells[i]!);
-      const r = ticTacToeEngine.reduce!(state, { role: "X" }, { row: xr, col: xc });
+      const r = ticTacToeEngine.reduce!(
+        state,
+        { role: "X" },
+        { row: xr, col: xc },
+      );
       expect(r.ok).toBe(true);
       if (!r.ok) throw new Error(r.error);
       state = r.state;
@@ -163,7 +181,11 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
       ["O", 1, 1], // 4
       ["X", 2, 2], // 8
     ]);
-    const res = ticTacToeEngine.reduce!(state, { role: "O" }, { row: 1, col: 2 }); // 5
+    const res = ticTacToeEngine.reduce!(
+      state,
+      { role: "O" },
+      { row: 1, col: 2 },
+    ); // 5
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error(res.error);
     expect(res.outcome).toEqual({
@@ -198,7 +220,11 @@ describe("tic-tac-toe — draw", () => {
       ["X", 1, 1],
       ["O", 2, 2],
     ]);
-    const res = ticTacToeEngine.reduce!(state, { role: "X" }, { row: 2, col: 1 });
+    const res = ticTacToeEngine.reduce!(
+      state,
+      { role: "X" },
+      { row: 2, col: 1 },
+    );
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error(res.error);
     expect(isBoardFull(res.state.board)).toBe(true);
@@ -218,11 +244,19 @@ describe("tic-tac-toe — post-game", () => {
       ["X", 0, 1],
       ["O", 1, 1],
     ]);
-    const winning = ticTacToeEngine.reduce!(state, { role: "X" }, { row: 0, col: 2 });
+    const winning = ticTacToeEngine.reduce!(
+      state,
+      { role: "X" },
+      { row: 0, col: 2 },
+    );
     expect(winning.ok).toBe(true);
     if (!winning.ok) throw new Error(winning.error);
     state = winning.state;
-    const after = ticTacToeEngine.reduce!(state, { role: "O" }, { row: 2, col: 2 });
+    const after = ticTacToeEngine.reduce!(
+      state,
+      { role: "O" },
+      { row: 2, col: 2 },
+    );
     expect(after.ok).toBe(false);
     if (!after.ok) expect(after.error).toBe("Game is not active");
   });
@@ -270,7 +304,11 @@ describe("tic-tac-toe — full playthroughs", () => {
       state = res.state;
       outcome = res.outcome;
     }
-    expect(outcome).toEqual({ status: "completed", winnerRole: "X", draw: false });
+    expect(outcome).toEqual({
+      status: "completed",
+      winnerRole: "X",
+      draw: false,
+    });
   });
 });
 

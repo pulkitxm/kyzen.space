@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-
-import Script from "next/script";
 import { cookies } from "next/headers";
+import Script from "next/script";
 
 import { AppShellClient } from "@/app/app-shell";
 import { Providers } from "@/app/providers";
 import { serverFetchJson } from "@/lib/api-server";
 import { getServerSession } from "@/lib/get-server-session";
 import {
+  parseSidebarPrefsCookieValue,
   SIDEBAR_LS_BOOT_SCRIPT,
   SIDEBAR_PREFS_COOKIE,
-  parseSidebarPrefsCookieValue,
 } from "@/lib/sidebar-prefs";
 import "./globals.css";
 
@@ -46,7 +45,11 @@ export default async function RootLayout({
     username = me?.profile.username ?? null;
   }
 
-  const profileHref = signedIn ? (username ? `/${username}` : "/profile") : "/auth";
+  const profileHref = signedIn
+    ? username
+      ? `/${username}`
+      : "/profile"
+    : "/auth";
 
   const cookieStore = await cookies();
   const prefCookieRaw = cookieStore.get(SIDEBAR_PREFS_COOKIE)?.value;
