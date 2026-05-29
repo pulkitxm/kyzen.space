@@ -8,7 +8,6 @@ import {
   userProfile,
 } from "../schema";
 
-/** Display name from the Better Auth `user` table (for public profiles). */
 export async function getDisplayName(userId: string): Promise<string | null> {
   const [row] = await db
     .select({ name: user.name })
@@ -32,7 +31,6 @@ export async function getProfileByUserId(
 export async function getProfileByUsername(
   username: string,
 ): Promise<UserProfileRow | null> {
-  // case-insensitive match
   const [row] = await db
     .select()
     .from(userProfile)
@@ -63,7 +61,6 @@ export async function createProfile(input: {
 
 const EMPTY_STAT: GameStat = { played: 0, won: 0, lost: 0, drawn: 0 };
 
-/** Increment a single outcome for a user's game-type stats. */
 export async function bumpStats(
   userId: string,
   gameType: string,

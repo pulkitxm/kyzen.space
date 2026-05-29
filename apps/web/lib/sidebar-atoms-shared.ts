@@ -1,4 +1,3 @@
-/** Shared sidebar storage keys / bounds (used by jotai atoms, cookies, bootstrap script). */
 export const SIDEBAR_COLLAPSED_KEY = "gl-sidebar-collapsed";
 export const SIDEBAR_WIDTH_KEY = "gl-sidebar-width";
 

@@ -7,16 +7,6 @@ import { ensureUsernameForUser } from "./username";
 
 const log = childLogger({ mod: "auth" });
 
-/**
- * Better Auth, backed by the Drizzle/Postgres adapter.
- *
- * Differences from the old Next-embedded config:
- *  - drizzleAdapter (was mongodbAdapter)
- *  - NO nextCookies() plugin — the Express/Hono handler sets cookies itself
- *  - trustedOrigins includes the web origin (CORS/CSRF)
- *  - prod cross-subdomain cookie config for app.x.com ↔ api.x.com
- *  - a user-create hook provisions a user_profile + username on first sign-in
- */
 export const auth = betterAuth({
   secret: env.betterAuthSecret,
   baseURL: env.betterAuthUrl,
@@ -63,7 +53,6 @@ export const auth = betterAuth({
 
 export type Auth = typeof auth;
 
-/** Kept for parity with call sites that used the old lazy getter. */
 export function getAuth(): Auth {
   return auth;
 }

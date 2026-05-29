@@ -14,7 +14,6 @@ export interface GameEntry {
   description: string;
   href: string;
   categoryId: string;
-  /** Path under `public/`, e.g. `/games/foo.png`. */
   coverImage?: string;
 }
 
@@ -29,7 +28,6 @@ export const GAMES: GameEntry[] = [
   },
 ];
 
-/** Category groups for sidebar; omits empty categories. */
 export function getCategoryGroups(): {
   category: GameCategoryDef;
   games: GameEntry[];

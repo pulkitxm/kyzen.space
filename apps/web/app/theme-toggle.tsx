@@ -23,7 +23,6 @@ function useHydrated() {
   );
 }
 
-/** Matches typical next-themes wiring: cycles explicit light ↔ dark via `resolvedTheme`. */
 export function ThemeToggle({ collapsed, className }: ThemeToggleProps) {
   const mounted = useHydrated();
   const { resolvedTheme, setTheme } = useTheme();

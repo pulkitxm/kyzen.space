@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-/* ═══ Raw palette from the brand board ═══ */
 :root {
   --palette-pine: #122417;
   --palette-mezzo: #1a4a24;
@@ -8,13 +7,11 @@
   --palette-gold: #a38554;
   --palette-nemo: #ff5524;
 
-  /* ─── Semantic tokens (light) ─── */
   --primary: var(--palette-mezzo);
   --primary-dark: var(--palette-pine);
   --primary-hover: color-mix(in srgb, var(--palette-mezzo) 88%, black);
   --primary-foreground: var(--palette-lucky);
 
-  /* Status (semantic) — paired with -foreground for text on a solid fill */
   --success: var(--palette-mezzo);
   --success-foreground: var(--palette-lucky);
   --warning: var(--palette-gold);
@@ -49,7 +46,7 @@
   --banner-from: var(--palette-lucky);
   --banner-via: var(--palette-gold);
   --banner-to: var(--palette-mezzo);
-  --banner-fade: rgb(219 237 204 / 0.92); /* lucky */
+  --banner-fade: rgb(219 237 204 / 0.92);
   --banner-curve: var(--surface);
 
   --sidebar: var(--palette-pine);
@@ -61,7 +58,6 @@
   --sidebar-border: color-mix(in srgb, var(--palette-lucky) 12%, transparent);
   --sidebar-ring: var(--palette-nemo);
 
-  /* UI accents */
   --accent-warm: var(--palette-nemo);
   --page-ambient: color-mix(in srgb, var(--primary) 14%, transparent);
   --success-border: color-mix(in srgb, var(--palette-mezzo) 42%, transparent);
@@ -72,7 +68,6 @@
   color-scheme: light;
 }
 
-/* Dark: `next-themes` sets `class="dark"` on `<html>` (default can follow system preference). */
 html.dark {
   --primary: var(--palette-gold);
   --primary-dark: var(--palette-nemo);
@@ -117,7 +112,7 @@ html.dark {
   --banner-from: var(--palette-pine);
   --banner-via: var(--palette-mezzo);
   --banner-to: var(--palette-gold);
-  --banner-fade: rgb(18 36 23 / 0.92); /* pine */
+  --banner-fade: rgb(18 36 23 / 0.92);
   --banner-curve: var(--surface);
 
   --sidebar: color-mix(in srgb, var(--palette-pine) 94%, black);
@@ -139,7 +134,6 @@ html.dark {
   color-scheme: dark;
 }
 
-/* ─── Tailwind: bridge semantic CSS variables to utilities ─── */
 @theme inline {
   --color-accent-warm: var(--accent-warm);
   --color-page-ambient: var(--page-ambient);
@@ -148,7 +142,6 @@ html.dark {
   --color-success-label-bg: var(--success-label-bg);
   --color-success-label-text: var(--success-label-text);
 
-  /* Semantic tokens (palette composition lives only above in :root) */
   --color-primary: var(--primary);
   --color-primary-dark: var(--primary-dark);
   --color-primary-hover: var(--primary-hover);

@@ -9,11 +9,6 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-/* ─────────────────────────────────────────────────────────────
- * Better Auth core tables (singular names, camelCase fields).
- * Shapes match Better Auth's expected Drizzle schema.
- * ───────────────────────────────────────────────────────────── */
-
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -70,12 +65,6 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updated_at").$defaultFn(() => new Date()),
 });
 
-/* ─────────────────────────────────────────────────────────────
- * Application tables. game_state / players / stats use jsonb so the
- * schema stays game-agnostic — new games need no migration.
- * ───────────────────────────────────────────────────────────── */
-
-/** A player seated in a game. */
 export type GamePlayer = { userId: string; username: string; role: string };
 
 export type GameStatus = "waiting" | "active" | "completed" | "abandoned";
@@ -108,7 +97,6 @@ export const move = pgTable(
   (t) => [unique("move_game_number_uq").on(t.gameId, t.moveNumber)],
 );
 
-/** Per-game-type stats: { played, won, lost, drawn }. */
 export type GameStat = {
   played: number;
   won: number;

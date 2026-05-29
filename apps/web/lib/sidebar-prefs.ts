@@ -7,7 +7,6 @@ import {
   SIDEBAR_WIDTH_KEY,
 } from "@/lib/sidebar-atoms-shared";
 
-/** Keeps SSR + first client sidebar layout aligned (prevents hydration snap). */
 export const SIDEBAR_PREFS_COOKIE = "gl_sidebar";
 
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 400;
@@ -63,15 +62,9 @@ export function persistSidebarPrefsToCookie(prefs: SidebarPrefs): void {
   try {
     const v = encodeSidebarPrefsCookieValue(prefs);
     document.cookie = `${SIDEBAR_PREFS_COOKIE}=${v}; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
-  } catch {
-    //
-  }
+  } catch {}
 }
 
-/**
- * Runs before Next hydrates: mirror localStorage prefs into cookie so SSR on
- * reload matches what the jotai atoms will read when the Cookie header arrives.
- */
 export const SIDEBAR_LS_BOOT_SCRIPT = `(function(){try{
 var KC=${JSON.stringify(SIDEBAR_COLLAPSED_KEY)};
 var KW=${JSON.stringify(SIDEBAR_WIDTH_KEY)};

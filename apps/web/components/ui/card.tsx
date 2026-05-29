@@ -1,7 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-/** Surface container with consistent radius, border, padding, and shadow. */
 export function Card({
   className,
   ...props

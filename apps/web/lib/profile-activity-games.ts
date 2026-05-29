@@ -1,9 +1,7 @@
 import { GAMES } from "@/lib/games";
 
-/** Recent-games pagination size on public profiles. */
 export const PROFILE_ACTIVITY_PAGE_SIZE = 5;
 
-/** Raw activity row as returned by the backend (catalog-agnostic). */
 export type ProfileActivityApiRow = {
   id: string;
   gameType: string;
@@ -11,7 +9,6 @@ export type ProfileActivityApiRow = {
   updatedAt: string;
 };
 
-/** Display row after joining with the frontend games catalog. */
 export type ProfileActivityGameRow = {
   id: string;
   href: string;

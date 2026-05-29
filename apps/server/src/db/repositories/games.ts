@@ -55,7 +55,6 @@ export async function listGames(
     .limit(filter.limit ?? 50);
 }
 
-/** Find one waiting game of a type that the user is NOT already in (for matchmaking). */
 export async function findWaitingGameToJoin(
   gameType: string,
   excludeUserId: string,
@@ -93,12 +92,10 @@ export async function updateGame(
   return row!;
 }
 
-/** Games a user has participated in, most-recent first (paginated). */
 export async function gamesForUser(
   userId: string,
   opts: { offset?: number; limit?: number } = {},
 ): Promise<GameRow[]> {
-  // players is jsonb array of objects; check membership via a containment query.
   const member = sql`${game.players} @> ${JSON.stringify([{ userId }])}::jsonb`;
   return db
     .select()
@@ -108,8 +105,6 @@ export async function gamesForUser(
     .offset(opts.offset ?? 0)
     .limit(opts.limit ?? 20);
 }
-
-/* ── moves ── */
 
 export async function listMoves(gameId: string): Promise<MoveRow[]> {
   return db

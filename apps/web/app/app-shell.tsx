@@ -30,7 +30,6 @@ export function AppShellClient({
     <TooltipProvider delayDuration={300}>
       <Provider>
         <div className="flex h-screen overflow-hidden bg-background">
-          {/* Mobile overlay */}
           {mobileOpen && (
             <button
               type="button"
@@ -40,7 +39,6 @@ export function AppShellClient({
             />
           )}
 
-          {/* Mobile open button */}
           <button
             type="button"
             onClick={() => setMobileOpen(true)}

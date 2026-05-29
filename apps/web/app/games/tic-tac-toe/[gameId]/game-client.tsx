@@ -17,7 +17,6 @@ type MoveJson = Record<string, unknown>;
 export type TicTacToeClientProps = {
   gameId: string;
   userId: string | null;
-  /** Server-fetched game/moves — `gameState`/`moveData` are `unknown` on the wire. */
   initialGame: {
     id: string;
     status: string;

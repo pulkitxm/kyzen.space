@@ -11,12 +11,6 @@ import { games, profiles } from "../../db";
 import { env } from "../../env";
 import type { LoggerEnv } from "../middleware/logger";
 
-/**
- * Match-allocation seam (plan decision #11). Returns a connection descriptor
- * so the web client never hardcodes WHERE a match is hosted. Today every match
- * is hosted on this same Socket.IO origin; a future real-time fleet only
- * changes `serverUrl` (and issues a real join token).
- */
 export const matchmakingRouter = new Hono<LoggerEnv>().post("/", async (c) => {
   const session = await getAuth().api.getSession({
     headers: c.req.raw.headers,
@@ -32,7 +26,6 @@ export const matchmakingRouter = new Hono<LoggerEnv>().post("/", async (c) => {
   const profile = await profiles.getProfileByUserId(session.user.id);
   if (!profile) return c.json({ error: "Profile not found" }, 400);
 
-  // Join an existing waiting table, else open a new one.
   let match = await games.findWaitingGameToJoin(gameType, session.user.id);
   const joined = Boolean(match);
   if (!match) {
@@ -58,8 +51,6 @@ export const matchmakingRouter = new Hono<LoggerEnv>().post("/", async (c) => {
   const descriptor: MatchDescriptor = {
     matchId: match.id,
     serverUrl: env.publicRealtimeUrl,
-    // Cookie auth is sufficient today; this is a placeholder for a future
-    // dedicated-fleet join token. Not yet validated by the realtime layer.
     token: randomUUID(),
   };
   return c.json(descriptor);

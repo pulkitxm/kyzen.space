@@ -5,10 +5,6 @@ import { useState } from "react";
 
 import { clientFetch } from "@/lib/api-client";
 
-/**
- * Starts matchmaking for tic-tac-toe. Calls the backend match-allocation
- * endpoint, then navigates to the returned match. Falls back to /auth on 401.
- */
 export function PlayButton() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);

@@ -16,7 +16,6 @@ export type ProfileStatGame = {
   played: number;
 };
 
-/** Join backend stats with the frontend catalog into per-game played counts. */
 export function buildStatGames(stats: ProfileStats): ProfileStatGame[] {
   return GAMES.map((g) => {
     const s = stats[g.id];

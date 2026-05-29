@@ -10,13 +10,6 @@ import { serializeGame, serializeMove } from "../api/serialize";
 import { type GamePlayer, type GameRow, games, profiles } from "../db";
 import { emitToGame, joinGameRoom } from "./rooms";
 
-/**
- * Generic turn-based dispatcher. This is the "common module": it knows nothing
- * about any specific game. It loads the right engine by `gameType`, validates
- * moves via the pure `engine.reduce`, persists through repositories, and
- * broadcasts state. New turn-based games need only register an engine.
- */
-
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -33,7 +26,6 @@ async function emitFullState(io: IOServer, gameRow: GameRow) {
   emitToGame(io, gameRow.id, "game_state", payload);
 }
 
-/** Seat a newcomer into a waiting game, activating it when full. */
 async function ensureSeated(
   gameRow: GameRow,
   userId: string,

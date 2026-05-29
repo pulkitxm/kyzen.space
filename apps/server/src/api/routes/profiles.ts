@@ -5,7 +5,6 @@ import { games, profiles } from "../../db";
 const RESERVED = new Set(["api", "auth", "games", "profile", "account"]);
 const RECENT_PAGE_SIZE = 5;
 
-/** Minimal game shape for profile activity — the web maps to its catalog. */
 function activityRow(g: {
   id: string;
   gameType: string;

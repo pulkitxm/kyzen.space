@@ -2,7 +2,6 @@ import Link from "next/link";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-/** Consistent page shell: centered, max-width, vertical rhythm. */
 export function PageContainer({
   className,
   size = "md",

@@ -34,7 +34,6 @@ import { persistSidebarPrefsToCookie } from "@/lib/sidebar-prefs";
 import { cn } from "@/lib/utils";
 
 export interface SidebarProps {
-  /** Pref came from Cookie header → matches SSR markup; skips local-storage flash gate. */
   sidebarPrefsTrusted: boolean;
   sidebarPrefs: SidebarPrefs;
   mobileOpen: boolean;
@@ -71,7 +70,6 @@ export function Sidebar({
     () => true,
     () => false,
   );
-  /** Without a cookie SSR uses defaults but localStorage may differ → gate one frame until after hydrate. */
   const layoutKnown = sidebarPrefsTrusted || clientReady;
   const displayCollapsed = layoutKnown ? collapsed : false;
   const displayWidth = layoutKnown ? width : DEFAULT_SIDEBAR_WIDTH;
@@ -224,7 +222,6 @@ export function Sidebar({
         } as React.CSSProperties
       }
     >
-      {/* Drag / collapse handle */}
       <div
         className={cn(
           "group absolute top-0 -right-2 z-10 hidden h-full w-4 cursor-col-resize md:block",
@@ -252,7 +249,6 @@ export function Sidebar({
         </button>
       </div>
 
-      {/* Logo */}
       <div className="flex items-center gap-2 overflow-hidden border-b border-sidebar-border px-3 py-3.5">
         <Link
           href="/"
@@ -276,7 +272,6 @@ export function Sidebar({
           </span>
         </Link>
         <div className="flex-1" />
-        {/* Mobile close button */}
         <button
           type="button"
           onClick={onCloseMobile}
@@ -287,7 +282,6 @@ export function Sidebar({
         </button>
       </div>
 
-      {/* Nav */}
       <nav
         className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 py-3"
         aria-label="Games"
@@ -359,7 +353,6 @@ export function Sidebar({
         ))}
       </nav>
 
-      {/* Appearance + profile */}
       <div className="border-t border-sidebar-border px-2 py-3">
         <div className="mb-2">
           <ThemeToggle collapsed={displayCollapsed} />

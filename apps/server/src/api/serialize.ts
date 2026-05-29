@@ -5,7 +5,6 @@ function iso(d: Date | null | undefined): string | null {
   return d ? new Date(d).toISOString() : null;
 }
 
-/** DB game row → client-facing JSON. */
 export function serializeGame(row: GameRow): GameJson {
   return {
     id: row.id,
@@ -21,7 +20,6 @@ export function serializeGame(row: GameRow): GameJson {
   };
 }
 
-/** DB move row → client-facing JSON. */
 export function serializeMove(row: MoveRow): MoveJson {
   return {
     id: row.id,

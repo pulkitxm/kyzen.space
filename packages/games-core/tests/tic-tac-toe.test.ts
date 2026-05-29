@@ -17,7 +17,6 @@ function initial(): TicTacToeState {
   return ticTacToeEngine.createInitialState(SEATS);
 }
 
-/** Apply a move and assert it succeeded, returning the next state. */
 function play(
   state: TicTacToeState,
   role: Mark,
@@ -30,7 +29,6 @@ function play(
   return res.state;
 }
 
-/** Apply a sequence of [role, row, col] moves from the initial state. */
 function playSequence(moves: [Mark, number, number][]): TicTacToeState {
   let state = initial();
   for (const [role, row, col] of moves) state = play(state, role, row, col);
@@ -128,7 +126,6 @@ describe("tic-tac-toe — move validity", () => {
 });
 
 describe("tic-tac-toe — win detection (all 8 lines)", () => {
-  // Each case: X occupies the winning line; O fills two non-blocking cells.
   const lineCases: { name: string; xCells: number[]; oCells: number[] }[] = [
     { name: "row 0", xCells: [0, 1, 2], oCells: [3, 4] },
     { name: "row 1", xCells: [3, 4, 5], oCells: [0, 1] },
@@ -143,7 +140,6 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
   const toRC = (i: number): [number, number] => [Math.floor(i / 3), i % 3];
 
   test.each(lineCases)("X wins on $name", ({ xCells, oCells }) => {
-    // Interleave X and O moves: X on its line, O on fillers. X has 3, O has 2.
     let state = initial();
     let outcome: import("../src/engine").Outcome | undefined;
     for (let i = 0; i < 3; i++) {
@@ -157,7 +153,6 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
       if (!r.ok) throw new Error(r.error);
       state = r.state;
       outcome = r.outcome;
-      // After X's 3rd move the line completes; O only plays twice.
       if (i < 2) {
         const [or, oc] = toRC(oCells[i]!);
         state = play(state, "O", or, oc);
@@ -172,8 +167,6 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
   });
 
   test("O can also win", () => {
-    // X: 0,1,5 ; O: 3,4,5? build an O column win on col 0 (0,3,6) blocked... use row1 for O
-    // Sequence: X0, O3, X1, O4, X8(no win), O5 -> O wins row1 (3,4,5)
     const state = playSequence([
       ["X", 0, 0],
       ["O", 1, 0], // 3
@@ -185,7 +178,7 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
       state,
       { role: "O" },
       { row: 1, col: 2 },
-    ); // 5
+    );
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error(res.error);
     expect(res.outcome).toEqual({
@@ -206,10 +199,6 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
 
 describe("tic-tac-toe — draw", () => {
   test("full board with no line is a draw", () => {
-    // Classic cat's game:
-    // X O X
-    // X X O
-    // O X O
     const state = playSequence([
       ["X", 0, 0],
       ["O", 0, 1],
@@ -283,7 +272,6 @@ describe("tic-tac-toe — full playthroughs", () => {
       placed += 1;
       expect(state.board.filter((c) => c !== null).length).toBe(placed);
     }
-    // After these 5 moves the game is still active (no line yet).
     expect(lastOutcome).toEqual({ status: "active" });
   });
 

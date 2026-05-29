@@ -24,7 +24,6 @@ export function emptyBoard(): Cell[] {
   return Array.from({ length: BOARD_SIZE }, () => null);
 }
 
-/** Returns the winning mark if a line is complete, else null. Pure. */
 export function lineWinner(board: Cell[]): Mark | null {
   for (const [a, b, c] of WIN_LINES) {
     const v = board[a];
@@ -49,7 +48,6 @@ function outcomeFor(state: TicTacToeState): Outcome {
   return { status: "active" };
 }
 
-/** True once the game has a winner or a full board. */
 export function isTerminal(state: TicTacToeState): boolean {
   return outcomeFor(state).status === "completed";
 }
@@ -66,19 +64,15 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
   },
 
   reduce(state, ctx, input): ReduceResult<TicTacToeState> {
-    // Already over?
     if (isTerminal(state)) {
       return { ok: false, error: "Game is not active" };
     }
-    // Valid role?
     if (!isMark(ctx.role)) {
       return { ok: false, error: "Not a player in this game" };
     }
-    // Whose turn?
     if (state.currentTurn !== ctx.role) {
       return { ok: false, error: "Not your turn" };
     }
-    // Valid coordinates?
     const { row, col } = input ?? ({} as TicTacToeMove);
     if (
       !Number.isInteger(row) ||

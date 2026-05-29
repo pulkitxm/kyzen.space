@@ -6,11 +6,6 @@ import { childLogger } from "../logger";
 
 const log = childLogger({ mod: "realtime:redis" });
 
-/**
- * Horizontal scale-out: when REDIS_URL is set, attach the Socket.IO redis
- * adapter so room broadcasts fan out across every server instance via Redis
- * pub/sub. No-op (single node) in dev when REDIS_URL is unset.
- */
 export function attachRedisAdapter(io: IOServer): void {
   if (!env.redisUrl) {
     log.info("single-node mode (no REDIS_URL)");

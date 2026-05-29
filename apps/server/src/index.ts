@@ -20,7 +20,6 @@ server.get("/health", (_req, res) => {
   res.json({ ok: true, service: "gamelobby-server" });
 });
 
-// Delegate everything under /api to the Hono app (basePath "/api").
 const honoListener = getRequestListener(honoApp.fetch);
 server.all(/^\/api(\/.*)?$/, (req, res) => {
   void honoListener(req, res);
@@ -28,7 +27,6 @@ server.all(/^\/api(\/.*)?$/, (req, res) => {
 
 const httpServer = createServer(server);
 
-// Realtime (Socket.IO) shares the same HTTP server.
 attachRealtime(httpServer);
 
 httpServer
@@ -43,7 +41,6 @@ httpServer
     );
   });
 
-// Surface anything that would otherwise crash silently.
 process.on("unhandledRejection", (reason) => {
   logger.error({ err: reason }, "unhandledRejection");
 });

@@ -1,11 +1,6 @@
 import { Hono } from "hono";
 import { getAuth } from "../../auth";
 
-/**
- * Session/account management. These mirror the old Next form-action endpoints
- * but live entirely on the backend now. They return JSON; the web client
- * navigates after a successful call.
- */
 export const accountRouter = new Hono()
   .get("/sessions", async (c) => {
     const auth = getAuth();

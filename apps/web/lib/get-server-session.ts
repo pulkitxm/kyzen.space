@@ -13,10 +13,6 @@ export type ServerSession = {
   session: { id: string; token?: string };
 } | null;
 
-/**
- * Current session via the backend's Better Auth endpoint, forwarding cookies.
- * Cached per-request so multiple components share one round-trip.
- */
 export const getServerSession = cache(async (): Promise<ServerSession> => {
   return serverFetchJson<ServerSession>("/api/auth/get-session");
 });

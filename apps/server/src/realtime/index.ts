@@ -26,15 +26,9 @@ function isMovePayload(p: unknown): p is { gameId: string; moveData: unknown } {
   );
 }
 
-/**
- * Attach the realtime layer to the shared HTTP server: authenticate sockets via
- * the Better Auth session cookie, then route generic events through the driver
- * resolved for each game's type.
- */
 export function attachRealtime(httpServer: HTTPServer): IOServer {
   const io = new IOServer(httpServer, {
     path: "/socket.io",
-    // WebSocket-only avoids sticky-session requirements behind a load balancer.
     transports: ["websocket"],
     cors: { origin: env.webUrl, credentials: true },
   });

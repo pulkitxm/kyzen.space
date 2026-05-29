@@ -1,10 +1,8 @@
 "use client";
 
-/** Browser-facing base URL for the Express API (inlined at build). */
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-/** Fetch the backend from the browser, sending the session cookie. */
 export async function clientFetch(
   path: string,
   init?: RequestInit,
@@ -15,7 +13,6 @@ export async function clientFetch(
   });
 }
 
-/** As clientFetch, but parses JSON (throws on non-2xx). */
 export async function clientFetchJson<T>(
   path: string,
   init?: RequestInit,

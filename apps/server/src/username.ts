@@ -19,12 +19,6 @@ function randomSuffix(): string {
   return Math.random().toString(36).slice(2, 8);
 }
 
-/**
- * Ensure a user has a profile with a unique username. Idempotent: returns the
- * existing username if a profile already exists. Used by the Better Auth
- * user-create hook so first sign-in provisions a profile without the frontend
- * ever touching the DB.
- */
 export async function ensureUsernameForUser(
   userId: string,
   displayName: string | null | undefined,

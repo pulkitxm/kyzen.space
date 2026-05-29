@@ -19,7 +19,6 @@ type AccountSessionsResponse = {
   sessions: AccountSession[];
 };
 
-/** Current session + all active sessions, from the backend account API. */
 export const getAccountSessions = cache(async () => {
   const data = await serverFetchJson<AccountSessionsResponse>(
     "/api/account/sessions",

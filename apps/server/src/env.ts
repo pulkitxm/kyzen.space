@@ -1,9 +1,3 @@
-/**
- * Typed, validated access to the single root `.env` (loaded by Bun via
- * `--env-file=../../.env`). Required vars throw at startup if missing so we
- * fail fast rather than at first use.
- */
-
 function required(name: string): string {
   const v = process.env[name];
   if (!v || !v.trim()) {
@@ -30,7 +24,6 @@ export const env = {
   port: number("PORT", 4000),
   host: optional("HOST", "0.0.0.0"),
 
-  /** pino level: fatal|error|warn|info|debug|trace. Default: debug (dev), info (prod). */
   logLevel:
     optional("LOG_LEVEL") ||
     (optional("NODE_ENV") === "production" ? "info" : "debug"),
@@ -45,7 +38,6 @@ export const env = {
   googleClientSecret: optional("GOOGLE_CLIENT_SECRET"),
 
   redisUrl: optional("REDIS_URL"),
-  /** Origin advertised to clients for realtime connections. */
   publicRealtimeUrl:
     optional("PUBLIC_REALTIME_URL") ||
     optional("BETTER_AUTH_URL", "http://localhost:4000"),
