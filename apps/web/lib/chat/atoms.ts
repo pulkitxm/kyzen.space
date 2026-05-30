@@ -1,6 +1,7 @@
 import type {
   ConversationJson,
   FriendshipJson,
+  GifJson,
   MessageJson,
   NotificationJson,
   TypingUser,
@@ -14,6 +15,11 @@ export const recentEmojisAtom = atomWithStorage<string[]>(
   "gl-recent-emojis",
   [],
 );
+
+/** Cached GIF results keyed by query ("" = trending), so the combined picker
+ * keeps its fetched pages across open/close instead of refetching each time. */
+export type GifCacheEntry = { gifs: GifJson[]; nextOffset: number | null };
+export const gifCacheAtom = atom<Map<string, GifCacheEntry>>(new Map());
 
 /** A message in the client store; optimistic sends carry `pending` + `clientId`. */
 export type ChatMessage = MessageJson & {

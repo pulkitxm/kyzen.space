@@ -4,7 +4,11 @@ import type { GifJson } from "@gamelobby/chat-core";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clientFetchJson } from "@/lib/api-client";
-import { recentEmojisAtom } from "@/lib/chat/atoms";
+import {
+  type GifCacheEntry,
+  gifCacheAtom,
+  recentEmojisAtom,
+} from "@/lib/chat/atoms";
 import { type EmojiGroup, loadEmojiGroups } from "@/lib/chat/emoji";
 
 const MAX_RECENT = 24;
@@ -61,7 +65,8 @@ const SECTION_LABEL =
 /**
  * One panel for both emojis and GIFs. A single query drives both: matching
  * emojis fill the top two rows, GIF results fill the scrollable remainder
- * (trending when idle), paging in more as you reach the bottom.
+ * (trending when idle), paging in more as you reach the bottom. Fetched GIF
+ * pages are cached globally so re-opening the picker doesn't refetch.
  */
 export function ComposerPicker({
   onEmoji,
@@ -74,11 +79,10 @@ export function ComposerPicker({
   const [recents, setRecents] = useAtom(recentEmojisAtom);
   const [groups, setGroups] = useState<EmojiGroup[] | null>(null);
 
-  const [gifs, setGifs] = useState<GifJson[]>([]);
-  const [gifLoading, setGifLoading] = useState(true);
-  const [gifError, setGifError] = useState(false);
+  const [cache, setCache] = useAtom(gifCacheAtom);
+  const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const nextOffsetRef = useRef<number | null>(0);
+  const [error, setError] = useState(false);
   const reqIdRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -93,6 +97,8 @@ export function ComposerPicker({
   }, []);
 
   const query = q.trim();
+  const entry = cache.get(query) ?? null;
+  const gifs = entry?.gifs ?? [];
 
   const emojiStrip = useMemo(() => {
     if (!query) {
@@ -120,9 +126,8 @@ export function ComposerPicker({
       const reqId = ++reqIdRef.current;
       if (append) setLoadingMore(true);
       else {
-        setGifLoading(true);
-        setGifError(false);
-        setLoadingMore(false);
+        setLoading(true);
+        setError(false);
       }
       try {
         const url = value
@@ -133,42 +138,55 @@ export function ComposerPicker({
           nextOffset: number | null;
         }>(url);
         if (reqId !== reqIdRef.current) return; // a newer request superseded us
-        nextOffsetRef.current = res.nextOffset;
-        setGifs((prev) => (append ? [...prev, ...res.gifs] : res.gifs));
+        setCache((prev) => {
+          const next = new Map(prev);
+          const base = append ? (prev.get(value)?.gifs ?? []) : [];
+          next.set(value, {
+            gifs: [...base, ...res.gifs],
+            nextOffset: res.nextOffset,
+          });
+          return next;
+        });
       } catch {
         if (reqId !== reqIdRef.current) return;
-        nextOffsetRef.current = null;
         if (!append) {
-          setGifError(true);
-          setGifs([]);
+          setError(true);
+          setCache((prev) => {
+            const next = new Map(prev);
+            next.set(value, { gifs: [], nextOffset: null });
+            return next;
+          });
         }
       } finally {
         if (reqId === reqIdRef.current) {
-          setGifLoading(false);
+          setLoading(false);
           setLoadingMore(false);
         }
       }
     },
-    [],
+    [setCache],
   );
 
-  // (Re)load the first GIF page whenever the query settles.
+  // Load the first GIF page when the query settles — but only if we haven't
+  // already cached it (so re-opening or re-searching is instant).
   useEffect(() => {
     const value = q.trim();
-    nextOffsetRef.current = 0;
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    setError(false);
+    if (cache.has(value)) return;
     const t = setTimeout(() => void fetchGifs(value, 0, false), 300);
     return () => clearTimeout(t);
-  }, [q, fetchGifs]);
+  }, [q, cache, fetchGifs]);
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
-    if (!el || loadingMore || gifLoading) return;
-    if (nextOffsetRef.current == null) return;
+    if (!el || loadingMore || loading) return;
+    const current = cache.get(q.trim());
+    if (!current || current.nextOffset == null) return;
     if (el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM) {
-      void fetchGifs(q.trim(), nextOffsetRef.current, true);
+      void fetchGifs(q.trim(), current.nextOffset, true);
     }
-  }, [fetchGifs, q, loadingMore, gifLoading]);
+  }, [cache, q, loadingMore, loading, fetchGifs]);
 
   const pickEmoji = (native: string) => {
     setRecents((prev) =>
@@ -176,6 +194,9 @@ export function ComposerPicker({
     );
     onEmoji(native);
   };
+
+  const showSkeletons =
+    !error && gifs.length === 0 && (loading || !cache.has(query));
 
   return (
     <div className="flex h-[28rem] w-[22rem] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
@@ -200,7 +221,7 @@ export function ComposerPicker({
                 type="button"
                 title={e.id}
                 onClick={() => pickEmoji(e.native)}
-                className="flex size-8 items-center justify-center rounded text-xl hover:bg-surface-overlay"
+                className="flex size-8 items-center justify-center rounded text-xl outline-none hover:bg-surface-overlay"
               >
                 {e.native}
               </button>
@@ -215,11 +236,11 @@ export function ComposerPicker({
         className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-2"
       >
         <div className={SECTION_LABEL}>{query ? "GIFs" : "Trending GIFs"}</div>
-        {gifError ? (
+        {error ? (
           <div className="p-4 text-center text-muted-foreground text-xs">
             GIFs unavailable
           </div>
-        ) : gifLoading ? (
+        ) : showSkeletons ? (
           <div className="columns-2 gap-2">
             <GifSkeletons count={8} />
           </div>
@@ -234,7 +255,7 @@ export function ComposerPicker({
                 key={g.id}
                 type="button"
                 onClick={() => onGif(g)}
-                className="mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg transition hover:opacity-90"
+                className="mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg outline-none transition hover:opacity-90"
               >
                 {/* biome-ignore lint/a11y/useAltText: alt provided via title */}
                 <img
@@ -254,10 +275,6 @@ export function ComposerPicker({
             {loadingMore ? <GifSkeletons count={4} seed={gifs.length} /> : null}
           </div>
         )}
-      </div>
-
-      <div className="border-border border-t px-3 py-1 text-[10px] text-muted-foreground">
-        Powered by Klipy
       </div>
     </div>
   );

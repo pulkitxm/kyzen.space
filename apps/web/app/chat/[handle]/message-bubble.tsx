@@ -6,7 +6,7 @@ import type {
   MessageMetadata,
   SystemMeta,
 } from "@gamelobby/chat-core";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import type { ChatMessage } from "@/lib/chat/atoms";
 import { timeOfDay } from "@/lib/chat/format";
@@ -33,6 +33,64 @@ function systemText(
     default:
       return "Updated the conversation";
   }
+}
+
+/**
+ * A GIF message: edge-to-edge (no bubble), click to open in the lightbox.
+ * Reserves its exact box from the GIF's dimensions and shows a skeleton until
+ * the (often slow) GIF finishes loading, so the layout never shifts.
+ */
+function GifMessage({
+  gif,
+  pending,
+  stamp,
+}: {
+  gif: GifMeta;
+  pending?: boolean;
+  stamp: string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const width = Math.min(320, gif.width > 0 ? gif.width : 320);
+  const ratio =
+    gif.width && gif.height ? `${gif.width} / ${gif.height}` : "1 / 1";
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          void openImageLightbox({
+            src: gif.fullUrl,
+            width: gif.width,
+            height: gif.height,
+            alt: gif.title,
+          })
+        }
+        aria-label={gif.title ? `Open GIF: ${gif.title}` : "Open GIF"}
+        className={cn(
+          "relative block overflow-hidden rounded-xl outline-none transition hover:opacity-90",
+          pending && "opacity-60",
+        )}
+        style={{ width }}
+      >
+        {!loaded ? (
+          <div className="absolute inset-0 animate-pulse bg-surface-overlay" />
+        ) : null}
+        {/* biome-ignore lint/a11y/useAltText: alt provided via title */}
+        <img
+          src={gif.fullUrl}
+          alt={gif.title ?? "GIF"}
+          width={gif.width || undefined}
+          height={gif.height || undefined}
+          onLoad={() => setLoaded(true)}
+          className={cn("block h-auto w-full", !loaded && "opacity-0")}
+          style={{ aspectRatio: ratio }}
+        />
+      </button>
+      <span className="px-1 pb-1.5 text-[10px] text-muted-foreground">
+        {stamp}
+      </span>
+    </>
+  );
 }
 
 // Split on http(s) URLs; the capture group lands matches on odd indices.
@@ -126,44 +184,7 @@ export function MessageBubble({
             <em className="opacity-70">Message deleted</em>
           </div>
         ) : gif ? (
-          // GIFs render edge-to-edge — no bubble background or padding.
-          <>
-            <button
-              type="button"
-              onClick={() =>
-                void openImageLightbox({
-                  src: gif.fullUrl,
-                  width: gif.width,
-                  height: gif.height,
-                  alt: gif.title,
-                })
-              }
-              aria-label={gif.title ? `Open GIF: ${gif.title}` : "Open GIF"}
-              className={cn(
-                "block overflow-hidden rounded-xl transition hover:opacity-90",
-                message.pending && "opacity-60",
-              )}
-              style={{ maxWidth: 320 }}
-            >
-              {/* biome-ignore lint/a11y/useAltText: alt provided via title */}
-              <img
-                src={gif.fullUrl}
-                alt={gif.title ?? "GIF"}
-                width={gif.width || undefined}
-                height={gif.height || undefined}
-                className="block h-auto w-full"
-                style={{
-                  aspectRatio:
-                    gif.width && gif.height
-                      ? `${gif.width} / ${gif.height}`
-                      : undefined,
-                }}
-              />
-            </button>
-            <span className="px-1 text-[10px] text-muted-foreground">
-              {stamp}
-            </span>
-          </>
+          <GifMessage gif={gif} pending={message.pending} stamp={stamp} />
         ) : (
           <div className={bubbleClass}>
             <span className="whitespace-pre-wrap break-words">

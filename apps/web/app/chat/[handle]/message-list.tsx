@@ -2,15 +2,15 @@
 
 import type { MemberJson, MessageJson } from "@gamelobby/chat-core";
 import { useStore } from "jotai";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { FaArrowDown } from "react-icons/fa";
 import { clientFetchJson } from "@/lib/api-client";
 import { type ChatMessage, messagesAtomFamily } from "@/lib/chat/atoms";
 import { MessageBubble } from "./message-bubble";
 
 const PAGE_SIZE = 20;
-const LOAD_OLDER_AT = 160; // px from top
-const SHOW_JUMP_AT = 280; // px from bottom
+const LOAD_OLDER_AT = 200; // px from the top (older) edge
+const SHOW_JUMP_AT = 280; // px scrolled up from the bottom
 
 export function MessageList({
   conversationId,
@@ -29,36 +29,21 @@ export function MessageList({
   const containerRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<string | null>(initialNextCursor);
   const loadingRef = useRef(false);
-  const didInitRef = useRef(false);
-  // When set, the next layout pass restored scroll after prepending older
-  // messages — holds the scrollHeight measured just before the prepend.
-  const restoreFromRef = useRef<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [showJump, setShowJump] = useState(false);
 
   const nameOf = (id: string | null | undefined) =>
     members.find((m) => m.id === id)?.username ?? "Someone";
 
-  // Pin the viewport correctly: jump to bottom on first paint (instant, no
-  // smooth-scroll cost even with many messages), keep it stable when older
-  // messages are prepended, and follow new messages only when near the bottom.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: react to message changes
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    if (!didInitRef.current) {
-      didInitRef.current = true;
-      el.scrollTop = el.scrollHeight;
-      return;
-    }
-    if (restoreFromRef.current != null) {
-      el.scrollTop += el.scrollHeight - restoreFromRef.current;
-      restoreFromRef.current = null;
-      return;
-    }
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
-    if (nearBottom) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  // Group consecutive messages (chronological order) before reversing for the
+  // column-reverse layout below.
+  const rows = messages.map((m, i) => {
+    const prev = messages[i - 1];
+    return {
+      m,
+      showAvatar: m.sender?.id !== prev?.sender?.id || m.kind === "system",
+    };
+  });
 
   const loadOlder = useCallback(async () => {
     if (loadingRef.current || !cursorRef.current) return;
@@ -75,9 +60,7 @@ export function MessageList({
       );
       cursorRef.current = res.nextCursor;
       const older = [...res.messages].reverse(); // newest-first -> chronological
-      const el = containerRef.current;
-      if (older.length && el) {
-        restoreFromRef.current = el.scrollHeight;
+      if (older.length) {
         store.set(messagesAtomFamily(conversationId), (prev) => {
           const seen = new Set(prev.map((m) => m.id));
           const fresh = older.filter((m) => !seen.has(m.id));
@@ -92,20 +75,22 @@ export function MessageList({
     }
   }, [conversationId, store]);
 
+  // In a column-reverse scroller the bottom (latest) is scrollTop 0, and the
+  // magnitude grows as you scroll up — so prepending older messages at the top
+  // never moves the viewport, and we never need to scroll on load.
   const onScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
-    setShowJump(
-      el.scrollHeight - el.scrollTop - el.clientHeight > SHOW_JUMP_AT,
-    );
-    if (el.scrollTop < LOAD_OLDER_AT && el.scrollHeight > el.clientHeight) {
+    const fromBottom = Math.abs(el.scrollTop);
+    const fromTop = el.scrollHeight - el.clientHeight - fromBottom;
+    setShowJump(fromBottom > SHOW_JUMP_AT);
+    if (fromTop < LOAD_OLDER_AT && el.scrollHeight > el.clientHeight) {
       void loadOlder();
     }
   }, [loadOlder]);
 
   const jumpToBottom = () => {
-    const el = containerRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    containerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -120,18 +105,16 @@ export function MessageList({
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-4 py-4 md:px-6"
+        className="flex min-h-0 flex-1 flex-col-reverse gap-0.5 overflow-y-auto px-4 py-4 md:px-6"
       >
-        {messages.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="py-10 text-center text-muted-foreground text-sm">
             No messages yet. Say hi 👋
           </div>
         ) : (
-          messages.map((m, i) => {
-            const prev = messages[i - 1];
-            const showAvatar =
-              m.sender?.id !== prev?.sender?.id || m.kind === "system";
-            return (
+          [...rows]
+            .reverse()
+            .map(({ m, showAvatar }) => (
               <MessageBubble
                 key={m.id}
                 message={m}
@@ -139,8 +122,7 @@ export function MessageList({
                 showAvatar={showAvatar}
                 nameOf={nameOf}
               />
-            );
-          })
+            ))
         )}
       </div>
       {showJump ? (
@@ -148,7 +130,7 @@ export function MessageList({
           type="button"
           onClick={jumpToBottom}
           aria-label="Scroll to latest"
-          className="absolute right-4 bottom-4 flex size-10 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground shadow-md transition hover:bg-surface-overlay"
+          className="absolute right-4 bottom-4 flex size-10 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground shadow-md outline-none transition hover:bg-surface-overlay"
         >
           <FaArrowDown className="size-4" />
         </button>
