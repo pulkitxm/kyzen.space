@@ -4,7 +4,10 @@ import { getAuth } from "../auth";
 import { games } from "../db";
 import { env } from "../env";
 import { childLogger } from "../logger";
+import { attachChatHandlers, joinUserRooms } from "./chat";
 import { getDriver } from "./drivers";
+import { attachFriendHandlers } from "./friends";
+import { setIO } from "./io";
 import { attachRedisAdapter } from "./redis";
 
 const log = childLogger({ mod: "realtime" });
@@ -34,6 +37,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
   });
 
   attachRedisAdapter(io);
+  setIO(io);
 
   io.use(async (socket, next) => {
     try {
@@ -57,6 +61,11 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
   io.on("connection", (socket) => {
     const slog = log.child({ socketId: socket.id, userId: socket.data.userId });
     slog.info("socket connected");
+
+    // Chat lane: join personal + conversation rooms, register chat/friend handlers.
+    void joinUserRooms(socket);
+    attachChatHandlers(io, socket);
+    attachFriendHandlers(io, socket);
 
     socket.on("join_room", (payload: unknown, cb?: (err?: string) => void) => {
       void (async () => {

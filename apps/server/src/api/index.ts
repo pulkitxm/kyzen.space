@@ -3,8 +3,12 @@ import { getAuth } from "../auth";
 import { logger } from "../logger";
 import { type LoggerEnv, requestLogger } from "./middleware/logger";
 import { accountRouter } from "./routes/account";
+import { conversationsRouter } from "./routes/conversations";
+import { friendsRouter } from "./routes/friends";
 import { gamesRouter } from "./routes/games";
 import { matchmakingRouter } from "./routes/matchmaking";
+import { messagesRouter } from "./routes/messages";
+import { notificationsRouter } from "./routes/notifications";
 import { profilesRouter } from "./routes/profiles";
 
 const authApp = new Hono().all("*", (c) => getAuth().handler(c.req.raw));
@@ -16,7 +20,11 @@ export const app = new Hono<LoggerEnv>()
   .route("/account", accountRouter)
   .route("/games", gamesRouter)
   .route("/matchmaking", matchmakingRouter)
-  .route("/profiles", profilesRouter);
+  .route("/profiles", profilesRouter)
+  .route("/friends", friendsRouter)
+  .route("/conversations", conversationsRouter)
+  .route("/messages", messagesRouter)
+  .route("/notifications", notificationsRouter);
 
 app.onError((err, c) => {
   const log = c.get("log") ?? logger;
