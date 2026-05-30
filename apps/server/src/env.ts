@@ -29,6 +29,8 @@ export const env = {
     (optional("NODE_ENV") === "production" ? "info" : "debug"),
 
   databaseUrl: required("DATABASE_URL"),
+  // Dev/test only: artificially delay every DB query by this many ms (0 = off).
+  dbLatencyMs: number("DB_LATENCY_MS", 0),
 
   betterAuthSecret: required("BETTER_AUTH_SECRET"),
   betterAuthUrl: optional("BETTER_AUTH_URL", "http://localhost:4000"),
