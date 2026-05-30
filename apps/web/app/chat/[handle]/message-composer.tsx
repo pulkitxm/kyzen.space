@@ -48,12 +48,18 @@ export function MessageComposer({
   }, []);
 
   // Grow the textarea to fit its content (Shift+Enter newlines, wrapping),
-  // up to MAX_TEXTAREA_HEIGHT; collapses back when text is cleared.
+  // up to MAX_TEXTAREA_HEIGHT; collapses back when text is cleared. With
+  // border-box sizing, scrollHeight excludes the border, so add it back —
+  // otherwise the content overflows by the border width and a scrollbar shows
+  // permanently. Only allow scrolling once we actually hit the cap.
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+    const borderY = ta.offsetHeight - ta.clientHeight; // top + bottom border
+    const full = ta.scrollHeight + borderY;
+    ta.style.height = `${Math.min(full, MAX_TEXTAREA_HEIGHT)}px`;
+    ta.style.overflowY = full > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
   }, [text]);
 
   const lastTypingRef = useRef(0);
@@ -268,7 +274,7 @@ export function MessageComposer({
           }}
           rows={1}
           placeholder="Message…"
-          className="max-h-40 min-h-11 flex-1 resize-none overflow-y-auto rounded-2xl border border-border bg-surface-raised px-4 py-2.5 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="max-h-40 min-h-11 flex-1 resize-none overflow-y-hidden rounded-2xl border border-border bg-surface-raised px-4 py-2.5 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <button
           type="button"
