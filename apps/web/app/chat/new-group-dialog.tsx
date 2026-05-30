@@ -2,6 +2,7 @@
 
 import { CHAT_EVENTS } from "@gamelobby/chat-core";
 import { useAtomValue } from "jotai";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui";
@@ -70,7 +71,15 @@ export function NewGroupDialog({
         <div className="mb-3 max-h-64 overflow-y-auto rounded-xl border border-border">
           {friends.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground text-sm">
-              Add friends first to create a group.
+              No friends yet.{" "}
+              <Link
+                href="/friends"
+                onClick={onClose}
+                className="text-primary hover:underline"
+              >
+                Add friends
+              </Link>{" "}
+              to create a group.
             </div>
           ) : (
             friends.map((f) => {
