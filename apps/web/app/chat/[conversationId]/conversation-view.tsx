@@ -6,8 +6,9 @@ import {
   type MessageJson,
 } from "@gamelobby/chat-core";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
+import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { FaArrowLeft } from "react-icons/fa";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
 import {
@@ -33,24 +34,26 @@ export function ConversationView({
   const conversationId = initialConversation.id;
   const setActive = useSetAtom(activeConversationIdAtom);
   const { socket } = useSocket();
+
+  // Hydrate server-fetched history (newest-first -> chronological) synchronously,
+  // before first paint, so there's no empty-state flicker.
+  const initialReversed = useMemo(
+    () => [...initialMessages].reverse(),
+    [initialMessages],
+  );
+  useHydrateAtoms(
+    new Map([[messagesAtomFamily(conversationId), initialReversed]]),
+  );
   const messages = useAtomValue(messagesAtomFamily(conversationId));
 
-  // Seed message history (API is newest-first; store chronologically) + ensure
-  // the conversation is in the inbox list.
+  // Ensure this conversation is present in the inbox list (e.g. on deep-link).
   useEffect(() => {
-    const cur = store.get(messagesAtomFamily(conversationId));
-    if (cur.length === 0 && initialMessages.length > 0) {
-      store.set(
-        messagesAtomFamily(conversationId),
-        [...initialMessages].reverse(),
-      );
-    }
     store.set(conversationsAtom, (prev) =>
       prev.some((c) => c.id === conversationId)
         ? prev
         : upsertConversation(prev, initialConversation),
     );
-  }, [conversationId, initialMessages, initialConversation, store]);
+  }, [conversationId, initialConversation, store]);
 
   useEffect(() => {
     setActive(conversationId);

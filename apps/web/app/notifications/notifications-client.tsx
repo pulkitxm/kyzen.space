@@ -1,11 +1,10 @@
 "use client";
 
 import { CHAT_EVENTS, type NotificationJson } from "@gamelobby/chat-core";
-import { useAtom, useStore } from "jotai";
+import { useAtomValue, useStore } from "jotai";
+import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
-import { useEffect } from "react";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
-import { clientFetchJson } from "@/lib/api-client";
 import { notificationsAtom, unreadNotificationsAtom } from "@/lib/chat/atoms";
 import { relativeTime } from "@/lib/chat/format";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
@@ -36,21 +35,15 @@ function notifHref(n: NotificationJson): string {
   return "/chat";
 }
 
-export function NotificationsClient() {
-  const [notifs, setNotifs] = useAtom(notificationsAtom);
+export function NotificationsClient({
+  initialNotifications,
+}: {
+  initialNotifications: NotificationJson[];
+}) {
+  useHydrateAtoms(new Map([[notificationsAtom, initialNotifications]]));
+  const notifs = useAtomValue(notificationsAtom);
   const store = useStore();
   const { socket } = useSocket();
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await clientFetchJson<{
-          notifications: NotificationJson[];
-        }>("/api/notifications?limit=50");
-        setNotifs(res.notifications);
-      } catch {}
-    })();
-  }, [setNotifs]);
 
   const markAll = async () => {
     store.set(unreadNotificationsAtom, 0);
