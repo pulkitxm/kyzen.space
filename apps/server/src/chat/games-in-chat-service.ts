@@ -1,0 +1,108 @@
+import type { GameCardMeta, MessageJson } from "@gamelobby/chat-core";
+import { type GameJson, getEngine, hasEngine } from "@gamelobby/games-core";
+import { serializeGame } from "../api/serialize";
+import { conversations, games, profiles, type SeatingMode } from "../db";
+import { notify } from "../realtime/notify";
+import { sendMessage } from "./messages-service";
+import { fail, ok, type ServiceResult } from "./result";
+
+/**
+ * Create a game from inside a conversation (the one path behind the composer
+ * game button, the `/play` slash command, and the Play → conversation picker).
+ * Seats the creator, posts a `game_card` message to the conversation, and
+ * notifies every other member ("game_started", or "game_challenge" for the
+ * specifically challenged member). DMs always use "open" seating; groups must
+ * pick "open" or "challenge".
+ */
+export async function createGameInConversation(input: {
+  userId: string;
+  conversationId: string;
+  gameType: string;
+  seatingMode?: SeatingMode;
+  challengedUserId?: string | null;
+}): Promise<ServiceResult<{ game: GameJson; message: MessageJson }>> {
+  const conv = await conversations.getById(input.conversationId);
+  if (!conv) return fail("Conversation not found", 404);
+  if (!(await conversations.isMember(input.conversationId, input.userId))) {
+    return fail("Not a member of this conversation", 403);
+  }
+  if (!hasEngine(input.gameType)) return fail("Unsupported game type", 400);
+
+  const profile = await profiles.getProfileByUserId(input.userId);
+  if (!profile) return fail("Profile not found", 400);
+
+  let seatingMode: SeatingMode;
+  let challengedUserId: string | null = null;
+  if (conv.kind === "dm") {
+    seatingMode = "open"; // DMs only ever have two participants
+  } else {
+    if (input.seatingMode !== "open" && input.seatingMode !== "challenge") {
+      return fail("Pick a seating mode for the group game", 400);
+    }
+    seatingMode = input.seatingMode;
+    if (seatingMode === "challenge") {
+      const target = input.challengedUserId;
+      if (!target || target === input.userId) {
+        return fail("Choose a member to challenge", 400);
+      }
+      if (!(await conversations.isMember(input.conversationId, target))) {
+        return fail("Challenged user is not in this conversation", 400);
+      }
+      challengedUserId = target;
+    }
+  }
+
+  const engine = getEngine(input.gameType);
+  const created = await games.createGame({
+    gameType: input.gameType,
+    status: "waiting",
+    players: [
+      {
+        userId: input.userId,
+        username: profile.username,
+        role: engine.roles[0]!,
+      },
+    ],
+    gameState: engine.createInitialState([{ role: engine.roles[0]! }]),
+    conversationId: input.conversationId,
+    creatorUserId: input.userId,
+    seatingMode,
+    challengedUserId,
+  });
+
+  const metadata: GameCardMeta = {
+    gameId: created.id,
+    gameType: input.gameType,
+    seatingMode,
+    challengedUserId,
+    creatorUsername: profile.username,
+  };
+  const sent = await sendMessage({
+    conversationId: input.conversationId,
+    senderId: input.userId,
+    kind: "game_card",
+    metadata,
+    gameId: created.id,
+  });
+  if (!sent.ok) return fail(sent.error, sent.status);
+
+  // One notification per other member; challenged member gets the challenge variant.
+  const memberIds = await conversations.getMemberIds(input.conversationId);
+  for (const uid of memberIds) {
+    if (uid === input.userId) continue;
+    await notify(
+      uid,
+      challengedUserId === uid ? "game_challenge" : "game_started",
+      {
+        actorId: input.userId,
+        payload: {
+          conversationId: input.conversationId,
+          gameId: created.id,
+          gameType: input.gameType,
+        },
+      },
+    );
+  }
+
+  return ok({ game: serializeGame(created), message: sent.value });
+}
