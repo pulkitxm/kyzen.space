@@ -1,5 +1,6 @@
 "use client";
 
+import "photoswipe/style.css";
 import type {
   GifMeta,
   MessageMetadata,
@@ -9,6 +10,7 @@ import type { ReactNode } from "react";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import type { ChatMessage } from "@/lib/chat/atoms";
 import { timeOfDay } from "@/lib/chat/format";
+import { openImageLightbox } from "@/lib/chat/lightbox";
 import { cn } from "@/lib/utils";
 
 function systemText(
@@ -126,16 +128,38 @@ export function MessageBubble({
         ) : gif ? (
           // GIFs render edge-to-edge — no bubble background or padding.
           <>
-            {/* biome-ignore lint/a11y/useAltText: alt provided via title */}
-            <img
-              src={gif.fullUrl}
-              alt={gif.title ?? "GIF"}
+            <button
+              type="button"
+              onClick={() =>
+                void openImageLightbox({
+                  src: gif.fullUrl,
+                  width: gif.width,
+                  height: gif.height,
+                  alt: gif.title,
+                })
+              }
+              aria-label={gif.title ? `Open GIF: ${gif.title}` : "Open GIF"}
               className={cn(
-                "block h-auto w-full rounded-xl",
+                "block overflow-hidden rounded-xl transition hover:opacity-90",
                 message.pending && "opacity-60",
               )}
               style={{ maxWidth: 320 }}
-            />
+            >
+              {/* biome-ignore lint/a11y/useAltText: alt provided via title */}
+              <img
+                src={gif.fullUrl}
+                alt={gif.title ?? "GIF"}
+                width={gif.width || undefined}
+                height={gif.height || undefined}
+                className="block h-auto w-full"
+                style={{
+                  aspectRatio:
+                    gif.width && gif.height
+                      ? `${gif.width} / ${gif.height}`
+                      : undefined,
+                }}
+              />
+            </button>
             <span className="px-1 text-[10px] text-muted-foreground">
               {stamp}
             </span>

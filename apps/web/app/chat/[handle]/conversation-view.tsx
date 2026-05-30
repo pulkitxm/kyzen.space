@@ -29,10 +29,12 @@ export function ConversationView({
   userId,
   initialConversation,
   initialMessages,
+  initialNextCursor,
 }: {
   userId: string;
   initialConversation: ConversationJson;
   initialMessages: MessageJson[];
+  initialNextCursor: string | null;
 }) {
   const store = useStore();
   const conversationId = initialConversation.id;
@@ -157,9 +159,11 @@ export function ConversationView({
       </header>
 
       <MessageList
+        conversationId={conversationId}
         messages={messages}
         userId={userId}
         members={conversation.members}
+        initialNextCursor={initialNextCursor}
       />
       <TypingIndicator conversationId={conversationId} userId={userId} />
       <MessageComposer conversationId={conversationId} me={me} />

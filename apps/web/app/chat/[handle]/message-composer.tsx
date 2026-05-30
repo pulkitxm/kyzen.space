@@ -19,13 +19,8 @@ import { loadShortcodes } from "@/lib/chat/emoji";
 import { replaceShortcodeBeforeSpace } from "@/lib/chat/shortcodes";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 
-const EmojiPicker = dynamic(
-  () => import("./emoji-picker").then((m) => m.EmojiPicker),
-  { ssr: false },
-);
-
-const GifPicker = dynamic(
-  () => import("./gif-picker").then((m) => m.GifPicker),
+const ComposerPicker = dynamic(
+  () => import("./composer-picker").then((m) => m.ComposerPicker),
   { ssr: false },
 );
 
@@ -41,7 +36,6 @@ export function MessageComposer({
 }) {
   const [text, setText] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [gifOpen, setGifOpen] = useState(false);
   const store = useStore();
   const { socket } = useSocket();
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -121,7 +115,7 @@ export function MessageComposer({
       const end = ta?.selectionEnd ?? start;
       const next = text.slice(0, start) + native + text.slice(end);
       setText(next);
-      setPickerOpen(false);
+      // Keep the picker open so several emojis can be added in a row.
       requestAnimationFrame(() => {
         ta?.focus();
         const pos = start + native.length;
@@ -168,7 +162,7 @@ export function MessageComposer({
       store.set(messagesAtomFamily(conversationId), (prev) =>
         upsertMessage(prev, optimistic),
       );
-      setGifOpen(false);
+      setPickerOpen(false);
       try {
         await emitAck(socket, CHAT_EVENTS.sendMessage, {
           conversationId,
@@ -235,49 +229,27 @@ export function MessageComposer({
 
   return (
     <div className="relative border-border border-t px-4 py-3">
-      {pickerOpen || gifOpen ? (
+      {pickerOpen ? (
         <button
           type="button"
           aria-label="Close picker"
           className="fixed inset-0 z-10 cursor-default"
-          onClick={() => {
-            setPickerOpen(false);
-            setGifOpen(false);
-          }}
+          onClick={() => setPickerOpen(false)}
         />
       ) : null}
       {pickerOpen ? (
         <div className="absolute bottom-full left-3 z-20 mb-2">
-          <EmojiPicker onSelect={insertEmoji} />
-        </div>
-      ) : null}
-      {gifOpen ? (
-        <div className="absolute bottom-full left-3 z-20 mb-2">
-          <GifPicker onSelect={sendGif} />
+          <ComposerPicker onEmoji={insertEmoji} onGif={sendGif} />
         </div>
       ) : null}
       <div className="flex items-end gap-2">
         <button
           type="button"
-          onClick={() => {
-            setPickerOpen((o) => !o);
-            setGifOpen(false);
-          }}
-          aria-label="Emoji"
+          onClick={() => setPickerOpen((o) => !o)}
+          aria-label="Emoji & GIFs"
           className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-surface-overlay hover:text-foreground"
         >
           <FaRegSmile className="size-5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setGifOpen((o) => !o);
-            setPickerOpen(false);
-          }}
-          aria-label="GIF"
-          className="flex h-11 shrink-0 items-center justify-center rounded-2xl px-2.5 font-bold text-[11px] text-muted-foreground transition hover:bg-surface-overlay hover:text-foreground"
-        >
-          GIF
         </button>
         <textarea
           ref={taRef}

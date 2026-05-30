@@ -32,13 +32,15 @@ export default async function ConversationPage({
   const msgs = await serverFetchJson<{
     messages: MessageJson[];
     nextCursor: string | null;
-  }>(`/api/conversations/${conv.conversation.id}/messages?limit=30`);
+  }>(`/api/conversations/${conv.conversation.id}/messages?limit=20`);
 
   return (
     <ConversationView
+      key={conv.conversation.id}
       userId={session.user.id}
       initialConversation={conv.conversation}
       initialMessages={msgs?.messages ?? []}
+      initialNextCursor={msgs?.nextCursor ?? null}
     />
   );
 }
