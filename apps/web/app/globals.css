@@ -211,6 +211,19 @@ body {
 }
 
 @layer utilities {
+  @keyframes gif-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  /* Smoothly reveal media over its blurred placeholder (CSS-only, no JS). */
+  .animate-gif-fade-in {
+    animation: gif-fade-in 0.45s ease-out both;
+  }
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
