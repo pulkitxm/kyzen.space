@@ -1,3 +1,6 @@
+# Host port is set from DATABASE_URL via `bun db:start` (scripts/db-compose.ts).
+name: gamelobby
+
 services:
   postgres:
     image: postgres:16
@@ -7,7 +10,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: gamelobby
     ports:
-      - "5432:5432"
+      - "${GAMELOBBY_DB_PORT:-5432}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
