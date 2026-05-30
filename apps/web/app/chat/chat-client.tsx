@@ -2,24 +2,36 @@
 
 import { useAtomValue } from "jotai";
 import Link from "next/link";
-import { FaUserFriends } from "react-icons/fa";
+import { useState } from "react";
+import { FaUserFriends, FaUsers } from "react-icons/fa";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
 import { conversationsAtom } from "@/lib/chat/atoms";
 import { messagePreview, relativeTime } from "@/lib/chat/format";
+import { NewGroupDialog } from "./new-group-dialog";
 
 export function ChatListClient({ userId }: { userId: string }) {
   const conversations = useAtomValue(conversationsAtom);
+  const [groupOpen, setGroupOpen] = useState(false);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
       <header className="flex items-center justify-between border-b border-border px-4 py-3.5">
         <h1 className="font-semibold text-lg">Messages</h1>
-        <Link
-          href="/friends"
-          className="flex items-center gap-1.5 text-primary text-sm hover:underline"
-        >
-          <FaUserFriends className="size-4" /> Friends
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setGroupOpen(true)}
+            className="flex items-center gap-1.5 text-primary text-sm hover:underline"
+          >
+            <FaUsers className="size-4" /> New group
+          </button>
+          <Link
+            href="/friends"
+            className="flex items-center gap-1.5 text-primary text-sm hover:underline"
+          >
+            <FaUserFriends className="size-4" /> Friends
+          </Link>
+        </div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -89,6 +101,8 @@ export function ChatListClient({ userId }: { userId: string }) {
           })
         )}
       </div>
+
+      <NewGroupDialog open={groupOpen} onClose={() => setGroupOpen(false)} />
     </div>
   );
 }
