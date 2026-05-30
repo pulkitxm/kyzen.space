@@ -35,8 +35,8 @@ export function ThemeToggle({ collapsed, className }: ThemeToggleProps) {
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
       className={cn(
-        "flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg text-sidebar-foreground/70 outline-none transition-[gap,padding] duration-250 ease-in-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-        collapsed ? "justify-center px-0" : "px-2.5",
+        "flex h-9 w-full cursor-pointer items-center rounded-lg text-sidebar-foreground/70 outline-none transition-[gap,padding] duration-250 ease-in-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+        collapsed ? "justify-center gap-0 px-0" : "gap-2.5 px-2.5",
         className,
       )}
     >

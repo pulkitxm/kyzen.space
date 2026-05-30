@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "start": "turbo run start",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
@@ -18,7 +19,7 @@
     "check": "biome check .",
     "db:start": "docker compose -f scripts/docker-compose.yml up -d postgres",
     "db:stop": "docker compose -f scripts/docker-compose.yml down",
-    "db:reset": "docker compose -f scripts/docker-compose.yml down -v",
+    "db:reset": "docker compose -f scripts/docker-compose.yml down -v && docker compose -f scripts/docker-compose.yml up -d",
     "db:studio": "docker compose -f scripts/docker-compose.yml --profile studio up -d postgres adminer && echo Adminer → http://127.0.0.1:18081",
     "db:generate": "bun --env-file=.env drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "bun --env-file=.env apps/server/src/db/migrate.ts",
