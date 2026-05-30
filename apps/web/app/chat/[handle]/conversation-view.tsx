@@ -8,7 +8,7 @@ import {
 import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FaArrowLeft } from "react-icons/fa";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
 import {
@@ -18,6 +18,7 @@ import {
   upsertConversation,
 } from "@/lib/chat/atoms";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
+import { GroupSettingsDialog } from "./group-settings-dialog";
 import { MessageComposer } from "./message-composer";
 import { MessageList } from "./message-list";
 
@@ -34,6 +35,7 @@ export function ConversationView({
   const conversationId = initialConversation.id;
   const setActive = useSetAtom(activeConversationIdAtom);
   const { socket } = useSocket();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Hydrate server-fetched history (newest-first -> chronological) synchronously,
   // before first paint, so there's no empty-state flicker.
@@ -45,6 +47,12 @@ export function ConversationView({
     new Map([[messagesAtomFamily(conversationId), initialReversed]]),
   );
   const messages = useAtomValue(messagesAtomFamily(conversationId));
+
+  // Prefer the live conversation so member/name changes reflect immediately.
+  const liveConv = useAtomValue(conversationsAtom).find(
+    (c) => c.id === conversationId,
+  );
+  const conversation = liveConv ?? initialConversation;
 
   // Ensure this conversation is present in the inbox list (e.g. on deep-link).
   useEffect(() => {
@@ -74,16 +82,15 @@ export function ConversationView({
     );
   }, [lastId, conversationId, socket, store]);
 
-  const me = initialConversation.members.find((m) => m.id === userId);
-  const others = initialConversation.members.filter((m) => m.id !== userId);
-  const title =
-    initialConversation.kind === "group"
-      ? (initialConversation.name ?? "Group")
-      : (others[0]?.username ?? "Direct message");
-  const subtitle =
-    initialConversation.kind === "group"
-      ? `${initialConversation.members.length} members`
-      : `@${others[0]?.username ?? ""}`;
+  const me = conversation.members.find((m) => m.id === userId);
+  const others = conversation.members.filter((m) => m.id !== userId);
+  const isGroup = conversation.kind === "group";
+  const title = isGroup
+    ? (conversation.name ?? "Group")
+    : (others[0]?.username ?? "Direct message");
+  const subtitle = isGroup
+    ? `${conversation.members.length} members · tap to manage`
+    : `@${others[0]?.username ?? ""}`;
 
   return (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
@@ -95,36 +102,59 @@ export function ConversationView({
         >
           <FaArrowLeft className="size-4" />
         </Link>
-        {initialConversation.kind === "group" ? (
-          <AvatarStack
-            users={others.map((m) => ({
-              id: m.id,
-              avatar: m.avatar,
-              seed: m.username,
-            }))}
-            size={32}
-          />
+        {isGroup ? (
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          >
+            <AvatarStack
+              users={others.map((m) => ({
+                id: m.id,
+                avatar: m.avatar,
+                seed: m.username,
+              }))}
+              size={32}
+            />
+            <div className="min-w-0">
+              <div className="truncate font-medium text-sm">{title}</div>
+              <div className="truncate text-muted-foreground text-xs">
+                {subtitle}
+              </div>
+            </div>
+          </button>
         ) : (
-          <PresenceAvatar
-            config={others[0]?.avatar ?? null}
-            seed={others[0]?.username ?? "?"}
-            size={36}
-          />
+          <>
+            <PresenceAvatar
+              config={others[0]?.avatar ?? null}
+              seed={others[0]?.username ?? "?"}
+              size={36}
+            />
+            <div className="min-w-0">
+              <div className="truncate font-medium text-sm">{title}</div>
+              <div className="truncate text-muted-foreground text-xs">
+                {subtitle}
+              </div>
+            </div>
+          </>
         )}
-        <div className="min-w-0">
-          <div className="truncate font-medium text-sm">{title}</div>
-          <div className="truncate text-muted-foreground text-xs">
-            {subtitle}
-          </div>
-        </div>
       </header>
 
       <MessageList
         messages={messages}
         userId={userId}
-        members={initialConversation.members}
+        members={conversation.members}
       />
       <MessageComposer conversationId={conversationId} me={me} />
+
+      {isGroup ? (
+        <GroupSettingsDialog
+          conversation={conversation}
+          userId={userId}
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

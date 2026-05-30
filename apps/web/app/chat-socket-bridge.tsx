@@ -137,6 +137,13 @@ export function ChatSocketBridge({
   useSocketEvent<ServerConversationUpdated>(
     CHAT_EVENTS.conversationUpdated,
     ({ conversation }) => {
+      // If I'm no longer a member (I left or was removed), drop it from my list.
+      if (!conversation.members.some((m) => m.id === userId)) {
+        store.set(conversationsAtom, (prev) =>
+          prev.filter((c) => c.id !== conversation.id),
+        );
+        return;
+      }
       store.set(conversationsAtom, (prev) =>
         upsertConversation(prev, conversation),
       );
