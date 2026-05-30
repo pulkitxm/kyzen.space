@@ -19,12 +19,14 @@ import {
   type ServerPresenceUpdate,
   type ServerTypingUpdate,
 } from "@gamelobby/chat-core";
+import type { ServerGameUpdatePayload } from "@gamelobby/games-core";
 import { useStore } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import {
   activeConversationIdAtom,
   conversationsAtom,
   friendsAtom,
+  gameSummariesAtom,
   incomingRequestsAtom,
   messagesAtomFamily,
   notificationsAtom,
@@ -256,6 +258,18 @@ export function ChatSocketBridge({
       store.set(typingAtomFamily(conversationId), typers);
     },
   );
+
+  useSocketEvent<ServerGameUpdatePayload>(CHAT_EVENTS.gameUpdate, (p) => {
+    store.set(gameSummariesAtom, (prev) => {
+      const next = new Map(prev);
+      next.set(p.gameId, {
+        status: p.status,
+        winner: p.winner,
+        players: p.players,
+      });
+      return next;
+    });
+  });
 
   return null;
 }

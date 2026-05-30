@@ -166,7 +166,11 @@ export function ConversationView({
         initialNextCursor={initialNextCursor}
       />
       <TypingIndicator conversationId={conversationId} userId={userId} />
-      <MessageComposer conversationId={conversationId} me={me} />
+      <MessageComposer
+        conversationId={conversationId}
+        conversation={conversation}
+        me={me}
+      />
 
       {isGroup ? (
         <GroupSettingsDialog
