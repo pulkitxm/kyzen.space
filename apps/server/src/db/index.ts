@@ -17,5 +17,6 @@ export type {
   MoveRow,
   NotificationRow,
   ProfileStats,
+  SeatingMode,
   UserProfileRow,
 } from "./schema";
