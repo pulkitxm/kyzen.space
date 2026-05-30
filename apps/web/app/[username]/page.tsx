@@ -1,3 +1,4 @@
+import type { AvatarConfig } from "@gamelobby/avatar";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -37,6 +38,7 @@ type ProfileResponse = {
     username: string;
     displayName: string | null;
     stats: ProfileStats;
+    avatar: AvatarConfig | null;
     createdAt: string;
   };
   games: ProfileActivityApiRow[];
@@ -82,6 +84,7 @@ export default async function PublicProfilePage({ params }: Props) {
     <ProfilePageView
       username={profile.username}
       displayName={profile.displayName}
+      avatar={profile.avatar}
       isOwnProfile={session?.user?.id === profile.userId}
       memberForLabel={memberLabel}
       totalGamesPlayed={totalGamesPlayed(stats)}

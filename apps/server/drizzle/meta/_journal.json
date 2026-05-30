@@ -8,6 +8,13 @@
       "when": 1780070847705,
       "tag": "0000_faithful_dragon_lord",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780124683313,
+      "tag": "0001_old_gertrude_yorkes",
+      "breakpoints": true
     }
   ]
 }

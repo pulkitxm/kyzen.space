@@ -1,5 +1,6 @@
 "use client";
 
+import type { AvatarConfig } from "@gamelobby/avatar";
 import { useAtom } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
@@ -20,6 +21,7 @@ import {
 } from "react-icons/fa";
 import { ThemeToggle } from "@/app/theme-toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
+import { Character } from "@/components/ui";
 import { getCategoryGroups } from "@/lib/games";
 import {
   clampWidthSafe,
@@ -39,6 +41,7 @@ export interface SidebarProps {
   mobileOpen: boolean;
   onCloseMobile: () => void;
   username: string | null;
+  avatar: AvatarConfig | null;
   signedIn: boolean;
   profileHref: string;
 }
@@ -49,6 +52,7 @@ export function Sidebar({
   mobileOpen,
   onCloseMobile,
   username,
+  avatar,
   signedIn,
   profileHref,
 }: SidebarProps) {
@@ -204,9 +208,6 @@ export function Sidebar({
       ? "max-w-0 opacity-0 blur-[2px]"
       : "max-w-48 opacity-100 blur-0",
   );
-
-  const avatarLetter =
-    username?.trim().charAt(0).toUpperCase() ?? (signedIn ? "U" : null);
 
   return (
     <aside
@@ -372,14 +373,19 @@ export function Sidebar({
             >
               <div
                 className={cn(
-                  "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
+                  "flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-medium",
                   signedIn
                     ? "bg-sidebar-primary/15 text-sidebar-primary"
                     : "bg-sidebar-accent text-sidebar-foreground/60",
                 )}
               >
-                {signedIn && avatarLetter ? (
-                  avatarLetter
+                {signedIn ? (
+                  <Character
+                    config={avatar}
+                    fallbackSeed={username ?? "player"}
+                    size={28}
+                    className="size-full"
+                  />
                 ) : (
                   <FaUser className="size-3" />
                 )}

@@ -1,3 +1,4 @@
+import type { AvatarConfig } from "@gamelobby/avatar";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../client";
 import {
@@ -51,12 +52,28 @@ export async function isUsernameTaken(username: string): Promise<boolean> {
 export async function createProfile(input: {
   userId: string;
   username: string;
+  avatar?: AvatarConfig | null;
 }): Promise<UserProfileRow> {
   const [row] = await db
     .insert(userProfile)
-    .values({ userId: input.userId, username: input.username, stats: {} })
+    .values({
+      userId: input.userId,
+      username: input.username,
+      stats: {},
+      avatar: input.avatar ?? null,
+    })
     .returning();
   return row!;
+}
+
+export async function updateAvatar(
+  userId: string,
+  avatar: AvatarConfig,
+): Promise<void> {
+  await db
+    .update(userProfile)
+    .set({ avatar, updatedAt: new Date() })
+    .where(eq(userProfile.userId, userId));
 }
 
 const EMPTY_STAT: GameStat = { played: 0, won: 0, lost: 0, drawn: 0 };

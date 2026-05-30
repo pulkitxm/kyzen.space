@@ -1,3 +1,4 @@
+import type { AvatarConfig } from "@gamelobby/avatar";
 import {
   boolean,
   integer,
@@ -113,6 +114,7 @@ export const userProfile = pgTable("user_profile", {
     .references(() => user.id, { onDelete: "cascade" }),
   username: text("username").notNull().unique(),
   stats: jsonb("stats").$type<ProfileStats>().notNull().default({}),
+  avatar: jsonb("avatar").$type<AvatarConfig | null>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
