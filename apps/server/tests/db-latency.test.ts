@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { withLatency } from "../src/db/latency";
+import { resolveDbLatencyMs, withLatency } from "../src/db/latency";
 
 type Pending<T> = PromiseLike<T> & {
   values: () => Pending<T>;
@@ -51,6 +51,20 @@ function fakeSql(): FakeSql {
 
 const DELAY = 60;
 const TOLERANCE = 15;
+
+describe("resolveDbLatencyMs — production safety", () => {
+  it("forces 0 in production regardless of the requested value", () => {
+    expect(resolveDbLatencyMs("production", 800)).toBe(0);
+    expect(resolveDbLatencyMs("production", 999999)).toBe(0);
+    expect(resolveDbLatencyMs("production", 0)).toBe(0);
+  });
+
+  it("passes the requested value through outside production", () => {
+    expect(resolveDbLatencyMs("development", 800)).toBe(800);
+    expect(resolveDbLatencyMs("test", 50)).toBe(50);
+    expect(resolveDbLatencyMs("", 800)).toBe(800);
+  });
+});
 
 describe("withLatency — disabled", () => {
   it("returns the same client untouched when ms is 0", () => {

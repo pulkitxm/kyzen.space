@@ -60,6 +60,10 @@ function wrapClient<T extends object>(
   });
 }
 
+export function resolveDbLatencyMs(nodeEnv: string, requestedMs: number): number {
+  return nodeEnv === "production" ? 0 : requestedMs;
+}
+
 export function withLatency<T extends object>(client: T, ms: number): T {
   if (!Number.isFinite(ms) || ms <= 0) {
     return client;
