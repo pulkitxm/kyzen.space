@@ -6,7 +6,7 @@ import {
 } from "../../chat/assemble";
 import * as conversationsService from "../../chat/conversations-service";
 import * as messagesService from "../../chat/messages-service";
-import { conversations, messages } from "../../db";
+import { conversations, messages, profiles } from "../../db";
 import { getUserId, readJson } from "../auth-context";
 
 const UUID_RE =
@@ -44,6 +44,19 @@ export const conversationsRouter = new Hono()
     const res = await conversationsService.createGroup(userId, name, memberIds);
     if (!res.ok) return c.json({ error: res.error }, res.status);
     return c.json({ conversation: res.value }, 201);
+  })
+  // Resolve a DM by the other user's username (get-or-create). Powers the
+  // username-based URL /chat/<username>.
+  .get("/with/:username", async (c) => {
+    const userId = await getUserId(c);
+    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const profile = await profiles.getProfileByUsername(
+      c.req.param("username"),
+    );
+    if (!profile) return c.json({ error: "Not found" }, 404);
+    const res = await conversationsService.createDm(userId, profile.userId);
+    if (!res.ok) return c.json({ error: res.error }, res.status);
+    return c.json({ conversation: res.value });
   })
   .get("/:id", async (c) => {
     const userId = await getUserId(c);

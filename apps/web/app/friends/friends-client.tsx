@@ -46,20 +46,12 @@ export function FriendsClient({
   const { socket } = useSocket();
   const router = useRouter();
 
+  // Navigate to the username-based DM URL; the page resolves/creates the DM.
   const startDm = useCallback(
-    async (otherId: string) => {
-      try {
-        const res = await emitAck<{ conversation: { id: string } }>(
-          socket,
-          CHAT_EVENTS.createDm,
-          { userId: otherId },
-        );
-        router.push(`/chat/${res.conversation.id}`);
-      } catch {
-        // surfaced by a future toast; ignore for now
-      }
+    (username: string) => {
+      router.push(`/chat/${username}`);
     },
-    [socket, router],
+    [router],
   );
 
   const respond = useCallback(
@@ -144,7 +136,7 @@ export function FriendsClient({
                       @{f.user.username}
                     </div>
                   </div>
-                  <Button size="sm" onClick={() => startDm(f.user.id)}>
+                  <Button size="sm" onClick={() => startDm(f.user.username)}>
                     Message
                   </Button>
                   <Button

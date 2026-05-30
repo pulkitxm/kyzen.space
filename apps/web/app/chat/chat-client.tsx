@@ -47,10 +47,14 @@ export function ChatListClient({
               c.kind === "group"
                 ? (c.name ?? "Group")
                 : (c.name ?? others[0]?.username ?? "Direct message");
+            const href =
+              c.kind === "dm" && others[0]
+                ? `/chat/${others[0].username}`
+                : `/chat/${c.id}`;
             return (
               <Link
                 key={c.id}
-                href={`/chat/${c.id}`}
+                href={href}
                 className="flex items-center gap-3 border-border/60 border-b px-4 py-3 transition hover:bg-surface-overlay"
               >
                 {c.kind === "group" ? (
