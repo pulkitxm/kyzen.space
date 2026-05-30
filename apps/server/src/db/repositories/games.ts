@@ -7,6 +7,7 @@ import {
   game,
   type MoveRow,
   move,
+  type SeatingMode,
 } from "../schema";
 
 export type CreateGameInput = {
@@ -14,6 +15,11 @@ export type CreateGameInput = {
   players: GamePlayer[];
   gameState: unknown;
   status?: GameStatus;
+  // Phase 3 — link a game to the conversation it was created from.
+  conversationId?: string | null;
+  creatorUserId?: string | null;
+  seatingMode?: SeatingMode | null;
+  challengedUserId?: string | null;
 };
 
 export async function createGame(input: CreateGameInput): Promise<GameRow> {
@@ -25,6 +31,10 @@ export async function createGame(input: CreateGameInput): Promise<GameRow> {
       players: input.players,
       gameState: input.gameState,
       winner: null,
+      conversationId: input.conversationId ?? null,
+      creatorUserId: input.creatorUserId ?? null,
+      seatingMode: input.seatingMode ?? null,
+      challengedUserId: input.challengedUserId ?? null,
     })
     .returning();
   return row!;
