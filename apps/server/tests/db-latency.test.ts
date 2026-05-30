@@ -1,10 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { withLatency } from "../src/db/latency";
 
-// A minimal stand-in for a postgres.js `Sql` client. It exposes the three
-// methods drizzle-orm/postgres-js actually executes queries through —
-// `unsafe`, `begin`, and `savepoint` — plus a non-query property to prove
-// pass-through. Each "pending query" is lazy: it does not run until awaited.
 type Pending<T> = PromiseLike<T> & {
   values: () => Pending<T>;
   executed: boolean;
@@ -54,7 +50,7 @@ function fakeSql(): FakeSql {
 }
 
 const DELAY = 60;
-const TOLERANCE = 15; // setTimeout fires no earlier than the requested delay
+const TOLERANCE = 15;
 
 describe("withLatency — disabled", () => {
   it("returns the same client untouched when ms is 0", () => {
@@ -95,7 +91,6 @@ describe("withLatency — enabled", () => {
     const slow = withLatency(sql, DELAY);
     const pending = slow.unsafe("SELECT 1");
 
-    // Building the query must not run it; execution happens after the delay.
     expect(sql.lastPending!.executed).toBe(false);
     await pending;
     expect(sql.lastPending!.executed).toBe(true);
