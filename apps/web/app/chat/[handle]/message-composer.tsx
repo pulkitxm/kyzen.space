@@ -2,7 +2,7 @@
 
 import { CHAT_EVENTS, type MemberJson } from "@gamelobby/chat-core";
 import { useStore } from "jotai";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type ChatMessage,
   messagesAtomFamily,
@@ -20,6 +20,43 @@ export function MessageComposer({
   const [text, setText] = useState("");
   const store = useStore();
   const { socket } = useSocket();
+
+  const lastTypingRef = useRef(0);
+  const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopTyping = useCallback(() => {
+    if (idleRef.current) {
+      clearTimeout(idleRef.current);
+      idleRef.current = null;
+    }
+    lastTypingRef.current = 0;
+    socket?.emit(CHAT_EVENTS.typingStop, { conversationId });
+  }, [socket, conversationId]);
+
+  const onType = useCallback(
+    (value: string) => {
+      setText(value);
+      if (!value.trim()) {
+        stopTyping();
+        return;
+      }
+      const now = Date.now();
+      if (now - lastTypingRef.current > 2000) {
+        lastTypingRef.current = now;
+        socket?.emit(CHAT_EVENTS.typingStart, { conversationId });
+      }
+      if (idleRef.current) clearTimeout(idleRef.current);
+      idleRef.current = setTimeout(() => {
+        idleRef.current = null;
+        lastTypingRef.current = 0;
+        socket?.emit(CHAT_EVENTS.typingStop, { conversationId });
+      }, 3000);
+    },
+    [socket, conversationId, stopTyping],
+  );
+
+  // Stop typing when leaving the conversation / unmounting.
+  useEffect(() => stopTyping, [stopTyping]);
 
   const send = useCallback(async () => {
     const body = text.trim();
@@ -50,6 +87,7 @@ export function MessageComposer({
       upsertMessage(prev, optimistic),
     );
     setText("");
+    stopTyping();
     try {
       await emitAck(socket, CHAT_EVENTS.sendMessage, {
         conversationId,
@@ -64,13 +102,13 @@ export function MessageComposer({
         ),
       );
     }
-  }, [text, conversationId, me, socket, store]);
+  }, [text, conversationId, me, socket, store, stopTyping]);
 
   return (
     <div className="flex items-end gap-2 border-border border-t px-4 py-3">
       <textarea
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => onType(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();

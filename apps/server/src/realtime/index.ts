@@ -10,6 +10,7 @@ import { attachFriendHandlers } from "./friends";
 import { setIO } from "./io";
 import { handlePresenceConnect, handlePresenceDisconnect } from "./presence";
 import { attachRedisAdapter } from "./redis";
+import { attachTypingHandlers } from "./typing";
 
 const log = childLogger({ mod: "realtime" });
 
@@ -67,6 +68,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
     void joinUserRooms(socket);
     attachChatHandlers(io, socket);
     attachFriendHandlers(io, socket);
+    attachTypingHandlers(io, socket);
     void handlePresenceConnect(io, socket);
 
     socket.on("join_room", (payload: unknown, cb?: (err?: string) => void) => {

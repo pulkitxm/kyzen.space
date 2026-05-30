@@ -17,6 +17,7 @@ import {
   type ServerNotificationRead,
   type ServerPresenceSnapshot,
   type ServerPresenceUpdate,
+  type ServerTypingUpdate,
 } from "@gamelobby/chat-core";
 import { useStore } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
@@ -29,6 +30,7 @@ import {
   notificationsAtom,
   outgoingRequestsAtom,
   presenceAtom,
+  typingAtomFamily,
   unreadNotificationsAtom,
   upsertConversation,
   upsertMessage,
@@ -247,6 +249,13 @@ export function ChatSocketBridge({
       return next;
     });
   });
+
+  useSocketEvent<ServerTypingUpdate>(
+    CHAT_EVENTS.typingUpdate,
+    ({ conversationId, typers }) => {
+      store.set(typingAtomFamily(conversationId), typers);
+    },
+  );
 
   return null;
 }

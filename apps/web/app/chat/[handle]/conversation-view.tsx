@@ -23,6 +23,7 @@ import { emitAck, useSocket } from "@/lib/socket/socket-context";
 import { GroupSettingsDialog } from "./group-settings-dialog";
 import { MessageComposer } from "./message-composer";
 import { MessageList } from "./message-list";
+import { TypingIndicator } from "./typing-indicator";
 
 export function ConversationView({
   userId,
@@ -160,6 +161,7 @@ export function ConversationView({
         userId={userId}
         members={conversation.members}
       />
+      <TypingIndicator conversationId={conversationId} userId={userId} />
       <MessageComposer conversationId={conversationId} me={me} />
 
       {isGroup ? (
