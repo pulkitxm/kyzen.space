@@ -1,3 +1,4 @@
+import type { AvatarConfig } from "@gamelobby/avatar";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
@@ -38,11 +39,13 @@ export default async function RootLayout({
   const signedIn = Boolean(session?.user);
 
   let username: string | null = null;
+  let avatar: AvatarConfig | null = null;
   if (session?.user?.id) {
-    const me = await serverFetchJson<{ profile: { username: string } }>(
-      "/api/profiles/me",
-    );
+    const me = await serverFetchJson<{
+      profile: { username: string; avatar: AvatarConfig | null };
+    }>("/api/profiles/me");
     username = me?.profile.username ?? null;
+    avatar = me?.profile.avatar ?? null;
   }
 
   const profileHref = signedIn
@@ -70,6 +73,7 @@ export default async function RootLayout({
         <Providers>
           <AppShellClient
             username={username}
+            avatar={avatar}
             signedIn={signedIn}
             profileHref={profileHref}
             sidebarPrefsTrusted={sidebarPrefsTrusted}

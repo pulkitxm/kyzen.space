@@ -1,5 +1,6 @@
 "use client";
 
+import type { AvatarConfig } from "@gamelobby/avatar";
 import { Provider } from "jotai";
 import { useCallback, useState } from "react";
 import { FaChevronRight } from "react-icons/fa";
@@ -11,6 +12,7 @@ import type { SidebarPrefs } from "@/lib/sidebar-prefs";
 export function AppShellClient({
   children,
   username,
+  avatar,
   signedIn,
   profileHref,
   sidebarPrefsTrusted,
@@ -18,6 +20,7 @@ export function AppShellClient({
 }: {
   children: React.ReactNode;
   username: string | null;
+  avatar: AvatarConfig | null;
   signedIn: boolean;
   profileHref: string;
   sidebarPrefsTrusted: boolean;
@@ -55,6 +58,7 @@ export function AppShellClient({
             mobileOpen={mobileOpen}
             onCloseMobile={closeMobile}
             username={username}
+            avatar={avatar}
             signedIn={signedIn}
             profileHref={profileHref}
           />

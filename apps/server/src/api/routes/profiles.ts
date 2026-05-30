@@ -1,3 +1,4 @@
+import { seedAvatarConfig, validateAvatarConfig } from "@gamelobby/avatar";
 import { Hono } from "hono";
 import { getAuth } from "../../auth";
 import { games, profiles } from "../../db";
@@ -36,6 +37,7 @@ export const profilesRouter = new Hono()
         userId: profile.userId,
         username: profile.username,
         stats: profile.stats ?? {},
+        avatar: profile.avatar ?? seedAvatarConfig(profile.username),
         createdAt: new Date(profile.createdAt).toISOString(),
       },
       user: {
@@ -44,6 +46,25 @@ export const profilesRouter = new Hono()
         email: session.user.email ?? null,
       },
     });
+  })
+  .put("/me/avatar", async (c) => {
+    const session = await getAuth().api.getSession({
+      headers: c.req.raw.headers,
+    });
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+
+    const avatar = validateAvatarConfig(body);
+    if (!avatar) return c.json({ error: "Invalid avatar" }, 400);
+
+    await profiles.updateAvatar(session.user.id, avatar);
+    return c.json({ avatar });
   })
   .get("/:username/recent-games", async (c) => {
     const username = c.req.param("username");
@@ -92,6 +113,7 @@ export const profilesRouter = new Hono()
         username: profile.username,
         displayName,
         stats: profile.stats ?? {},
+        avatar: profile.avatar ?? seedAvatarConfig(profile.username),
         createdAt: new Date(profile.createdAt).toISOString(),
       },
       games: rows.map(activityRow),

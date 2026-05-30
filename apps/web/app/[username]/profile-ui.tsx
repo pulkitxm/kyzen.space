@@ -1,7 +1,10 @@
+import type { AvatarConfig } from "@gamelobby/avatar";
 import Image from "next/image";
 import Link from "next/link";
 
+import { EditableAvatar } from "@/app/[username]/avatar-editor";
 import { PaginatedRecentGames } from "@/app/[username]/profile-activity-client";
+import { Character } from "@/components/ui";
 import type { ProfileActivityGameRow } from "@/lib/profile-activity-games";
 
 export type ProfileStatGame = {
@@ -17,6 +20,7 @@ export type ProfileActivityMost = ProfileStatGame;
 export function ProfilePageView({
   username,
   displayName,
+  avatar,
   isOwnProfile,
   memberForLabel,
   totalGamesPlayed,
@@ -26,6 +30,7 @@ export function ProfilePageView({
 }: {
   username: string;
   displayName: string | null;
+  avatar: AvatarConfig | null;
   isOwnProfile: boolean;
   memberForLabel: string;
   totalGamesPlayed: number;
@@ -49,7 +54,22 @@ export function ProfilePageView({
           <Banner />
           <div className="relative z-10 mx-3 -mt-9 flex flex-col gap-6 rounded-2xl border border-border bg-card/95 p-4 shadow-xl shadow-black/5 backdrop-blur sm:mx-6 sm:flex-row sm:items-end sm:justify-between sm:gap-8 sm:p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-5">
-              <Avatar displayName={displayName} username={username} />
+              {isOwnProfile ? (
+                <EditableAvatar
+                  avatar={avatar}
+                  username={username}
+                  displayName={displayName}
+                />
+              ) : (
+                <div className="relative size-[5.75rem] shrink-0 overflow-hidden rounded-2xl ring-4 ring-card sm:size-24">
+                  <Character
+                    config={avatar}
+                    fallbackSeed={username}
+                    className="size-full"
+                    alt={`${displayName?.trim() || username} avatar`}
+                  />
+                </div>
+              )}
               <div className="min-w-0 pb-1 sm:pb-2">
                 <h1 className="text-2xl font-semibold tracking-tight text-card-foreground md:text-[1.75rem]">
                   {lineName}
@@ -123,49 +143,6 @@ function Banner() {
           )`,
         }}
       />
-    </div>
-  );
-}
-
-function profileAvatarLetters(
-  displayName: string | null | undefined,
-  username: string,
-): string {
-  const name = displayName?.trim();
-  if (name) {
-    const parts = name.split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) {
-      const a = parts[0]!.charAt(0);
-      const b = parts[1]!.charAt(0);
-      if (a && b) return (a + b).toUpperCase();
-    }
-    const first = name.charAt(0);
-    if (first) return first.toUpperCase();
-  }
-  const u = username.trim();
-  return u ? u.charAt(0).toUpperCase() : "?";
-}
-
-function Avatar({
-  displayName,
-  username,
-}: {
-  displayName: string | null;
-  username: string;
-}) {
-  const letters = profileAvatarLetters(displayName, username);
-  const letterSize =
-    letters.length >= 2 ? "text-[1.7rem] sm:text-3xl" : "text-3xl sm:text-4xl";
-
-  return (
-    <div
-      className={`relative flex size-[5.75rem] shrink-0 items-center justify-center overflow-hidden rounded-2xl font-bold text-primary-foreground ring-4 ring-card sm:size-24 ${letterSize}`}
-      style={{
-        background: `linear-gradient(to bottom right, var(--primary), var(--primary-dark))`,
-      }}
-      aria-label={`${displayName?.trim() || username} avatar`}
-    >
-      {letters}
     </div>
   );
 }

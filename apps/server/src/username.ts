@@ -1,3 +1,4 @@
+import { randomAvatarConfig } from "@gamelobby/avatar";
 import {
   createProfile,
   getProfileByUserId,
@@ -26,18 +27,27 @@ export async function ensureUsernameForUser(
   const existing = await getProfileByUserId(userId);
   if (existing) return existing.username;
 
+  const avatar = randomAvatarConfig(userId);
   const base = slugifyBase(displayName ?? "player");
   let candidate = base;
   for (let i = 0; i < 20; i++) {
     if (!(await isUsernameTaken(candidate))) {
       try {
-        const profile = await createProfile({ userId, username: candidate });
+        const profile = await createProfile({
+          userId,
+          username: candidate,
+          avatar,
+        });
         return profile.username;
       } catch {}
     }
     candidate = `${base}_${randomSuffix()}`;
   }
   candidate = `player_${randomSuffix()}`;
-  const profile = await createProfile({ userId, username: candidate });
+  const profile = await createProfile({
+    userId,
+    username: candidate,
+    avatar,
+  });
   return profile.username;
 }

@@ -8,9 +8,11 @@
     "build": "tsc --noEmit",
     "start": "bun --env-file=../../.env src/index.ts",
     "lint": "tsc --noEmit",
+    "test": "bun test tests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@gamelobby/avatar": "workspace:*",
     "@gamelobby/games-core": "workspace:*",
     "@hono/node-server": "^1.13.7",
     "@socket.io/redis-adapter": "^8.3.0",
