@@ -6,12 +6,13 @@ import type {
   MessageMetadata,
   SystemMeta,
 } from "@gamelobby/chat-core";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import type { ChatMessage } from "@/lib/chat/atoms";
 import { timeOfDay } from "@/lib/chat/format";
 import { openImageLightbox } from "@/lib/chat/lightbox";
 import { cn } from "@/lib/utils";
+import { BlurImage } from "./blur-image";
 
 function systemText(
   meta: MessageMetadata | null,
@@ -49,7 +50,6 @@ function GifMessage({
   pending?: boolean;
   stamp: string;
 }) {
-  const [loaded, setLoaded] = useState(false);
   const width = Math.min(320, gif.width > 0 ? gif.width : 320);
   const ratio =
     gif.width && gif.height ? `${gif.width} / ${gif.height}` : "1 / 1";
@@ -67,23 +67,16 @@ function GifMessage({
         }
         aria-label={gif.title ? `Open GIF: ${gif.title}` : "Open GIF"}
         className={cn(
-          "relative block overflow-hidden rounded-xl outline-none transition hover:opacity-90",
+          "block overflow-hidden rounded-xl outline-none transition hover:opacity-90",
           pending && "opacity-60",
         )}
         style={{ width }}
       >
-        {!loaded ? (
-          <div className="absolute inset-0 animate-pulse bg-surface-overlay" />
-        ) : null}
-        {/* biome-ignore lint/a11y/useAltText: alt provided via title */}
-        <img
+        <BlurImage
           src={gif.fullUrl}
+          blurPreview={gif.blurPreview}
           alt={gif.title ?? "GIF"}
-          width={gif.width || undefined}
-          height={gif.height || undefined}
-          onLoad={() => setLoaded(true)}
-          className={cn("block h-auto w-full", !loaded && "opacity-0")}
-          style={{ aspectRatio: ratio }}
+          aspectRatio={ratio}
         />
       </button>
       <span className="px-1 pb-1.5 text-[10px] text-muted-foreground">
