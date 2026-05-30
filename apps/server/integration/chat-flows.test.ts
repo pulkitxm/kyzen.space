@@ -451,9 +451,11 @@ describe.skipIf(!DB_UP)("notifications", () => {
   });
 });
 
-// Visible signal when the suite is skipped for lack of a database.
-describe.skipIf(DB_UP)("chat integration (skipped)", () => {
-  it("database not reachable — run `bun run db:start` then retry", () => {
-    expect(DB_UP).toBe(false);
+// Only when the DB is unreachable do we surface one clearly-worded skipped
+// marker, so it's obvious the suites above didn't run. When the DB is up,
+// nothing extra shows — just the passing tests.
+if (!DB_UP) {
+  describe("chat integration", () => {
+    it.skip("skipped — database unreachable; run `bun run db:start`", () => {});
   });
-});
+}
