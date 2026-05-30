@@ -26,6 +26,7 @@ export function GroupSettingsDialog({
   const router = useRouter();
   const [name, setName] = useState(conversation.name ?? "");
   const [busy, setBusy] = useState(false);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   if (!open) return null;
 
@@ -127,13 +128,38 @@ export function GroupSettingsDialog({
                 {m.role === "owner" ? (
                   <span className="text-muted-foreground text-xs">Owner</span>
                 ) : isOwner ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => removeMember(m.id)}
-                  >
-                    Remove
-                  </Button>
+                  confirmRemoveId === m.id ? (
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground text-xs">
+                        Remove?
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => {
+                          removeMember(m.id);
+                          setConfirmRemoveId(null);
+                        }}
+                      >
+                        Yes
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConfirmRemoveId(null)}
+                      >
+                        No
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmRemoveId(m.id)}
+                    >
+                      Remove
+                    </Button>
+                  )
                 ) : null}
               </li>
             ))}
