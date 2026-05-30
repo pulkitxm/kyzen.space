@@ -256,6 +256,23 @@ function IconPause() {
   );
 }
 
+function StatusDot({ online }: { online: boolean }) {
+  const tone = online ? "bg-success" : "bg-danger";
+  return (
+    <span
+      className="relative inline-flex size-3 items-center justify-center"
+      role="status"
+      aria-label={online ? "Online" : "Offline"}
+      title={online ? "Online" : "Offline"}
+    >
+      <span
+        className={`absolute inline-flex size-3 animate-ping rounded-full opacity-70 ${tone}`}
+      />
+      <span className={`relative inline-flex size-2.5 rounded-full ${tone}`} />
+    </span>
+  );
+}
+
 export function TicTacToeGameClient({
   gameId,
   userId,
@@ -484,25 +501,15 @@ export function TicTacToeGameClient({
 
   return (
     <div className="mt-8">
-      {isPast ? (
-        <p className="mb-4 text-xs text-muted-foreground">
-          Finished game — ← → previous/next move · Space play/pause (resumes
-          from the current move, or from the start if you&apos;re already at the
-          end). Stops at the final move. No live connection.
-        </p>
-      ) : !userId ? (
+      {isPast ? null : !userId ? (
         <p className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
           Sign in to join this table and play. Open the same link while signed
           in as the second player to fill the match.
         </p>
       ) : (
-        <p className="mb-4 text-xs text-muted-foreground">
-          {liveSocketKey
-            ? connected
-              ? "Live · connected"
-              : "Connecting…"
-            : "Connecting…"}
-        </p>
+        <div className="mb-4 flex items-center">
+          <StatusDot online={Boolean(liveSocketKey) && connected} />
+        </div>
       )}
 
       {error ? <p className="mb-4 text-sm text-danger">{error}</p> : null}
@@ -511,7 +518,7 @@ export function TicTacToeGameClient({
         <p className="mb-4 text-sm font-medium text-primary">{winnerLabel}</p>
       ) : null}
 
-      <div className="grid max-w-[220px] grid-cols-3 gap-2">
+      <div className="grid w-fit grid-cols-3 gap-3">
         {CELL_INDICES.map((idx) => {
           const row = Math.floor(idx / 3);
           const col = idx % 3;
@@ -524,7 +531,7 @@ export function TicTacToeGameClient({
                 isPast || !canMove || mark !== null || game.status !== "active"
               }
               onClick={() => makeMove(row, col)}
-              className="flex size-16 items-center justify-center rounded-lg border border-border bg-surface-raised text-2xl font-semibold text-card-foreground outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60"
+              className="flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised text-5xl font-semibold text-card-foreground outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60 sm:size-28"
             >
               {mark ?? ""}
             </button>
