@@ -2,44 +2,24 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ConversationPicker } from "@/app/games/components/conversation-picker";
 
-import { clientFetch } from "@/lib/api-client";
-
-export function PlayButton() {
+export function PlayButton({ userId }: { userId: string | null }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-
-  const onPlay = async () => {
-    setLoading(true);
-    try {
-      const res = await clientFetch("/api/matchmaking", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ gameType: "tic-tac-toe" }),
-      });
-      if (res.status === 401) {
-        router.push("/auth");
-        return;
-      }
-      if (!res.ok) {
-        setLoading(false);
-        return;
-      }
-      const { matchId } = (await res.json()) as { matchId: string };
-      router.push(`/games/tic-tac-toe/${matchId}`);
-    } catch {
-      setLoading(false);
-    }
-  };
+  const [open, setOpen] = useState(false);
 
   return (
-    <button
-      type="button"
-      onClick={onPlay}
-      disabled={loading}
-      className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {loading ? "Finding a table…" : "Play"}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => (userId ? setOpen(true) : router.push("/auth"))}
+        className="w-full rounded-xl bg-primary px-4 py-3 font-medium text-primary-foreground text-sm shadow outline-none transition hover:opacity-90"
+      >
+        Play with a friend
+      </button>
+      {open && userId ? (
+        <ConversationPicker userId={userId} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
   );
 }

@@ -29,6 +29,7 @@ export {
   type ClientAddMembers,
   type ClientConversationRef,
   type ClientCreateDm,
+  type ClientCreateGameInConversation,
   type ClientCreateGroup,
   type ClientFriendRemove,
   type ClientFriendRequest,

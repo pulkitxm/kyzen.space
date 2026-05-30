@@ -1,14 +1,16 @@
+import { CHAT_EVENTS } from "@gamelobby/chat-core";
 import {
   type ClientJoinRoom,
   type ClientMakeMove,
   getEngine,
   type Outcome,
   type ServerGameStatePayload,
+  type ServerGameUpdatePayload,
 } from "@gamelobby/games-core";
 import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
 import { type GamePlayer, type GameRow, games, profiles } from "../db";
-import { emitToGame, joinGameRoom } from "./rooms";
+import { emitToConv, emitToGame, joinGameRoom } from "./rooms";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,16 +28,48 @@ async function emitFullState(io: IOServer, gameRow: GameRow) {
   emitToGame(io, gameRow.id, "game_state", payload);
 }
 
+/** Broadcast lightweight live status to the game's conversation, so in-chat
+ * game cards update without anyone opening the game. No-op for legacy games. */
+function emitGameUpdate(io: IOServer, gameRow: GameRow): void {
+  if (!gameRow.conversationId) return;
+  const payload: ServerGameUpdatePayload = {
+    gameId: gameRow.id,
+    status: gameRow.status,
+    winner: gameRow.winner,
+    players: (gameRow.players ?? []) as GamePlayer[],
+  };
+  emitToConv(io, gameRow.conversationId, CHAT_EVENTS.gameUpdate, payload);
+}
+
+/**
+ * Resolve the caller into a seat or a spectator. Already-seated players rejoin
+ * unchanged. With intent "spectate", or when the game is full/active, or when
+ * a "challenge" seat is reserved for someone else, the caller joins read-only
+ * (no seat) — `make_move` already rejects non-players, so this is the
+ * server-side guard against seat theft. Returns `changed: true` only when a new
+ * player was actually seated.
+ */
 async function ensureSeated(
   gameRow: GameRow,
   userId: string,
-): Promise<GameRow | { error: string }> {
+  intent: "play" | "spectate",
+): Promise<{ game: GameRow; changed: boolean }> {
   const players = (gameRow.players ?? []) as GamePlayer[];
-  if (players.some((p) => p.userId === userId)) return gameRow;
+  if (players.some((p) => p.userId === userId)) {
+    return { game: gameRow, changed: false };
+  }
 
   const engine = getEngine(gameRow.gameType);
-  if (gameRow.status !== "waiting" || players.length >= engine.maxPlayers) {
-    return { error: "Cannot join this game" };
+  const seatFree =
+    gameRow.status === "waiting" && players.length < engine.maxPlayers;
+  const challengeReserved =
+    gameRow.seatingMode === "challenge" &&
+    !!gameRow.challengedUserId &&
+    userId !== gameRow.challengedUserId;
+
+  // Anything that isn't a free, claimable seat falls through to spectating.
+  if (intent === "spectate" || !seatFree || challengeReserved) {
+    return { game: gameRow, changed: false };
   }
 
   const profile = await profiles.getProfileByUserId(userId);
@@ -44,7 +78,7 @@ async function ensureSeated(
   const nextPlayers = [...players, { userId, username, role }];
   const becomesActive = nextPlayers.length >= engine.minPlayers;
 
-  return games.updateGame(gameRow.id, {
+  const game = await games.updateGame(gameRow.id, {
     players: nextPlayers,
     status: becomesActive ? "active" : "waiting",
     startedAt: becomesActive ? new Date() : gameRow.startedAt,
@@ -52,6 +86,7 @@ async function ensureSeated(
       gameRow.gameState ??
       engine.createInitialState(nextPlayers.map((p) => ({ role: p.role }))),
   });
+  return { game, changed: true };
 }
 
 async function finalize(gameRow: GameRow, outcome: Outcome): Promise<GameRow> {
@@ -91,11 +126,15 @@ export async function handleJoinRoom(
   const gameRow = await games.getGameById(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
 
-  const seated = await ensureSeated(gameRow, userId);
-  if ("error" in seated) return err(socket, seated.error);
+  const { game, changed } = await ensureSeated(
+    gameRow,
+    userId,
+    payload.intent ?? "play",
+  );
 
   joinGameRoom(socket, payload.gameId);
-  await emitFullState(io, seated);
+  await emitFullState(io, game);
+  if (changed) emitGameUpdate(io, game);
 }
 
 export async function handleMakeMove(
@@ -143,5 +182,6 @@ export async function handleMakeMove(
 
   if (updated.status === "completed") {
     emitToGame(io, gameRow.id, "game_over", { winner: updated.winner });
+    emitGameUpdate(io, updated);
   }
 }

@@ -80,18 +80,34 @@ export type GamePlayer = { userId: string; username: string; role: string };
 
 export type GameStatus = "waiting" | "active" | "completed" | "abandoned";
 
-export const game = pgTable("game", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  gameType: text("game_type").notNull(),
-  status: text("status").$type<GameStatus>().notNull().default("waiting"),
-  players: jsonb("players").$type<GamePlayer[]>().notNull().default([]),
-  winner: text("winner"),
-  gameState: jsonb("game_state").$type<unknown>(),
-  startedAt: timestamp("started_at"),
-  completedAt: timestamp("completed_at"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+/** How a seat is claimed in a chat-created game. */
+export type SeatingMode = "open" | "challenge";
+
+export const game = pgTable(
+  "game",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    gameType: text("game_type").notNull(),
+    status: text("status").$type<GameStatus>().notNull().default("waiting"),
+    players: jsonb("players").$type<GamePlayer[]>().notNull().default([]),
+    winner: text("winner"),
+    gameState: jsonb("game_state").$type<unknown>(),
+    // Phase 3 — game-in-chat link columns (all nullable; legacy games have none).
+    conversationId: uuid("conversation_id").references(() => conversation.id, {
+      onDelete: "set null",
+    }),
+    creatorUserId: text("creator_user_id"),
+    seatingMode: text("seating_mode").$type<SeatingMode>(),
+    challengedUserId: text("challenged_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("game_conversation_idx").on(t.conversationId)],
+);
 
 export const move = pgTable(
   "move",

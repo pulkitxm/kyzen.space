@@ -7,6 +7,7 @@ import { childLogger } from "../logger";
 import { attachChatHandlers, joinUserRooms } from "./chat";
 import { getDriver } from "./drivers";
 import { attachFriendHandlers } from "./friends";
+import { attachGameChatHandlers } from "./games-in-chat";
 import { setIO } from "./io";
 import { handlePresenceConnect, handlePresenceDisconnect } from "./presence";
 import { attachRedisAdapter } from "./redis";
@@ -14,7 +15,9 @@ import { attachTypingHandlers } from "./typing";
 
 const log = childLogger({ mod: "realtime" });
 
-function isJoinPayload(p: unknown): p is { gameId: string } {
+function isJoinPayload(
+  p: unknown,
+): p is { gameId: string; intent?: "play" | "spectate" } {
   return (
     !!p &&
     typeof p === "object" &&
@@ -69,6 +72,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
     attachChatHandlers(io, socket);
     attachFriendHandlers(io, socket);
     attachTypingHandlers(io, socket);
+    attachGameChatHandlers(io, socket);
     void handlePresenceConnect(io, socket);
 
     socket.on("join_room", (payload: unknown, cb?: (err?: string) => void) => {

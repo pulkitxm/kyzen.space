@@ -1,21 +1,12 @@
 import Link from "next/link";
 import { PlayButton } from "@/app/games/tic-tac-toe/play-button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { BackLink, PageContainer, PageHeader } from "@/components/ui/page";
-import { serverFetchJson } from "@/lib/api-server";
+import { getServerSession } from "@/lib/get-server-session";
 
 export const dynamic = "force-dynamic";
 
-type WaitingGame = {
-  id: string;
-  players: { userId: string; username: string; role: string }[];
-};
-
 export default async function TicTacToeLobbyPage() {
-  const data = await serverFetchJson<{ games: WaitingGame[] }>(
-    "/api/games?gameType=tic-tac-toe&status=waiting",
-  );
-  const waiting = data?.games ?? [];
+  const session = await getServerSession();
 
   return (
     <PageContainer>
@@ -23,41 +14,23 @@ export default async function TicTacToeLobbyPage() {
       <div className="mt-6">
         <PageHeader
           title="Tic-tac-toe"
-          description="Open a table or join one waiting for an opponent."
+          description="Games happen inside your chats — pick a friend or group to play with."
         />
       </div>
 
       <div className="mt-8 max-w-sm">
-        <PlayButton />
+        <PlayButton userId={session?.user?.id ?? null} />
       </div>
 
-      <h2 className="mt-10 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-        Waiting for opponent
-      </h2>
-      {waiting.length === 0 ? (
-        <div className="mt-3 max-w-md">
-          <EmptyState
-            title="No open tables"
-            description="Start one with Play and an opponent can join."
-          />
-        </div>
-      ) : (
-        <ul className="mt-3 max-w-md space-y-2">
-          {waiting.map((g) => (
-            <li key={g.id}>
-              <Link
-                href={`/games/tic-tac-toe/${g.id}`}
-                className="block rounded-lg border border-border px-3 py-2 text-sm text-card-foreground transition hover:bg-surface-overlay"
-              >
-                Table · Host{" "}
-                <span className="font-medium">
-                  {g.players[0]?.username ?? "?"}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <p className="mt-6 max-w-md text-muted-foreground text-sm">
+        Starting a game posts a game card into that conversation and opens it
+        side-by-side with the chat. You can also start one from the game button
+        in any conversation, or jump straight to{" "}
+        <Link href="/chat" className="text-primary hover:underline">
+          your chats
+        </Link>
+        .
+      </p>
     </PageContainer>
   );
 }

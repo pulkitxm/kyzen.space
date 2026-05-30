@@ -2,6 +2,7 @@
 
 import "photoswipe/style.css";
 import type {
+  GameCardMeta,
   GifMeta,
   MessageMetadata,
   SystemMeta,
@@ -13,6 +14,7 @@ import { timeOfDay } from "@/lib/chat/format";
 import { openImageLightbox } from "@/lib/chat/lightbox";
 import { cn } from "@/lib/utils";
 import { BlurImage } from "./blur-image";
+import { GameCardMessage } from "./game-card-message";
 
 function systemText(
   meta: MessageMetadata | null,
@@ -176,6 +178,12 @@ export function MessageBubble({
           <div className={bubbleClass}>
             <em className="opacity-70">Message deleted</em>
           </div>
+        ) : message.kind === "game_card" && message.gameId ? (
+          <GameCardMessage
+            gameId={message.gameId}
+            meta={message.metadata as GameCardMeta}
+            userId={userId}
+          />
         ) : gif ? (
           <GifMessage gif={gif} pending={message.pending} stamp={stamp} />
         ) : (

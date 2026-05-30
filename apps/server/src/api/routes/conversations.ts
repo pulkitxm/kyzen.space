@@ -5,6 +5,7 @@ import {
   assembleMessages,
 } from "../../chat/assemble";
 import * as conversationsService from "../../chat/conversations-service";
+import { createGameInConversation } from "../../chat/games-in-chat-service";
 import * as messagesService from "../../chat/messages-service";
 import { conversations, messages, profiles } from "../../db";
 import { getUserId, readJson } from "../auth-context";
@@ -117,6 +118,28 @@ export const conversationsRouter = new Hono()
     });
     if (!res.ok) return c.json({ error: res.error }, res.status);
     return c.json({ message: res.value }, 201);
+  })
+  .post("/:id/games", async (c) => {
+    const userId = await getUserId(c);
+    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const id = c.req.param("id");
+    if (!UUID_RE.test(id)) return c.json({ error: "Not found" }, 404);
+    const body = await readJson(c);
+    const res = await createGameInConversation({
+      userId,
+      conversationId: id,
+      gameType: typeof body?.gameType === "string" ? body.gameType : "",
+      seatingMode:
+        body?.seatingMode === "open" || body?.seatingMode === "challenge"
+          ? body.seatingMode
+          : undefined,
+      challengedUserId:
+        typeof body?.challengedUserId === "string"
+          ? body.challengedUserId
+          : null,
+    });
+    if (!res.ok) return c.json({ error: res.error }, res.status);
+    return c.json(res.value, 201);
   })
   .post("/:id/read", async (c) => {
     const userId = await getUserId(c);

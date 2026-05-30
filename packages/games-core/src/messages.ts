@@ -1,5 +1,7 @@
 export type ClientJoinRoom = {
   gameId: string;
+  /** "spectate" joins read-only (no seat). Defaults to "play". */
+  intent?: "play" | "spectate";
 };
 
 export type ClientMakeMove<Move = unknown> = {
@@ -14,10 +16,23 @@ export type GameJson = {
   winner: string | null;
   players: { userId: string; username: string; role: string }[];
   gameState: unknown;
+  /** Phase 3 — set when the game was created from a conversation. */
+  conversationId?: string | null;
+  creatorUserId?: string | null;
+  seatingMode?: "open" | "challenge" | null;
+  challengedUserId?: string | null;
   startedAt?: string | null;
   completedAt?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+};
+
+/** Lightweight live status broadcast to a conversation so its game card updates. */
+export type ServerGameUpdatePayload = {
+  gameId: string;
+  status: string;
+  winner: string | null;
+  players: { userId: string; username: string; role: string }[];
 };
 
 export type MoveJson = {

@@ -2,6 +2,7 @@
 
 import {
   CHAT_EVENTS,
+  type ConversationJson,
   type GifJson,
   type GifMeta,
   type MemberJson,
@@ -18,6 +19,7 @@ import {
 import { loadShortcodes } from "@/lib/chat/emoji";
 import { replaceShortcodeBeforeSpace } from "@/lib/chat/shortcodes";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
+import { GameLauncher } from "./game-launcher";
 
 const ComposerPicker = dynamic(
   () => import("./composer-picker").then((m) => m.ComposerPicker),
@@ -29,9 +31,11 @@ const MAX_TEXTAREA_HEIGHT = 160;
 
 export function MessageComposer({
   conversationId,
+  conversation,
   me,
 }: {
   conversationId: string;
+  conversation: ConversationJson;
   me: MemberJson | undefined;
 }) {
   const [text, setText] = useState("");
@@ -257,6 +261,9 @@ export function MessageComposer({
         >
           <FaRegSmile className="size-5" />
         </button>
+        {me ? (
+          <GameLauncher conversation={conversation} userId={me.id} />
+        ) : null}
         <textarea
           ref={taRef}
           value={text}

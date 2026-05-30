@@ -33,6 +33,8 @@ export const CHAT_EVENTS = {
   // phase 2
   typingStart: "typing_start",
   typingStop: "typing_stop",
+  // phase 3 — create a game from inside a conversation (ack returns game+message)
+  createGameInConversation: "game:create_in_conversation",
 
   // server -> client (broadcasts)
   messageNew: "message_new",
@@ -51,6 +53,8 @@ export const CHAT_EVENTS = {
   typingUpdate: "typing_update",
   presenceUpdate: "presence_update",
   presenceSnapshot: "presence_snapshot",
+  // phase 3 — live game-card status, broadcast to the game's conversation room
+  gameUpdate: "game_update",
 } as const;
 
 /** Ack callbacks resolve to a success payload or an error. */
@@ -95,6 +99,15 @@ export type ClientFriendRespond = {
 export type ClientFriendRemove = { userId: string };
 
 export type ClientNotificationRead = { id: string };
+
+export type ClientCreateGameInConversation = {
+  conversationId: string;
+  gameType: string;
+  /** Required for groups; ignored for DMs (always "open"). */
+  seatingMode?: "open" | "challenge";
+  /** When seatingMode is "challenge", the member who must take the second seat. */
+  challengedUserId?: string | null;
+};
 
 // ---- server -> client payloads ----
 
