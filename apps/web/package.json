@@ -14,6 +14,7 @@
     "@dicebear/collection": "^9.0.0",
     "@dicebear/core": "^9.0.0",
     "@gamelobby/avatar": "workspace:*",
+    "@gamelobby/chat-core": "workspace:*",
     "@gamelobby/games-core": "workspace:*",
     "@radix-ui/react-tooltip": "^1.2.8",
     "better-auth": "^1.6.9",

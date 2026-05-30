@@ -1,5 +1,5 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "../client";
 import {
   type GameStat,
@@ -97,4 +97,56 @@ export async function bumpStats(
     .update(userProfile)
     .set({ stats, updatedAt: new Date() })
     .where(eq(userProfile.userId, userId));
+}
+
+/** A user as exposed to other users (id, username, display name, avatar). */
+export type PublicUserRow = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatar: AvatarConfig | null;
+};
+
+const PUBLIC_USER_COLUMNS = {
+  id: userProfile.userId,
+  username: userProfile.username,
+  displayName: user.name,
+  avatar: userProfile.avatar,
+} as const;
+
+export async function getPublicUsers(
+  userIds: string[],
+): Promise<PublicUserRow[]> {
+  if (userIds.length === 0) return [];
+  return db
+    .select(PUBLIC_USER_COLUMNS)
+    .from(userProfile)
+    .innerJoin(user, eq(userProfile.userId, user.id))
+    .where(inArray(userProfile.userId, userIds));
+}
+
+export async function getPublicUser(
+  userId: string,
+): Promise<PublicUserRow | null> {
+  const [row] = await getPublicUsers([userId]);
+  return row ?? null;
+}
+
+export async function searchByUsername(
+  query: string,
+  viewerId: string,
+  limit = 20,
+): Promise<PublicUserRow[]> {
+  const term = `%${query.replace(/[%_\\]/g, "")}%`;
+  return db
+    .select(PUBLIC_USER_COLUMNS)
+    .from(userProfile)
+    .innerJoin(user, eq(userProfile.userId, user.id))
+    .where(
+      and(
+        sql`lower(${userProfile.username}) like lower(${term})`,
+        ne(userProfile.userId, viewerId),
+      ),
+    )
+    .limit(limit);
 }

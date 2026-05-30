@@ -74,6 +74,7 @@ export default async function RootLayout({
           <AppShellClient
             username={username}
             avatar={avatar}
+            userId={session?.user?.id ?? null}
             signedIn={signedIn}
             profileHref={profileHref}
             sidebarPrefsTrusted={sidebarPrefsTrusted}

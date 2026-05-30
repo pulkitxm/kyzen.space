@@ -1,6 +1,16 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
+import type {
+  ConversationKind,
+  FriendStatus,
+  MemberRole,
+  MessageKind,
+  MessageMetadata,
+  NotificationPayload,
+  NotificationType,
+} from "@gamelobby/chat-core";
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -122,3 +132,138 @@ export const userProfile = pgTable("user_profile", {
 export type GameRow = typeof game.$inferSelect;
 export type MoveRow = typeof move.$inferSelect;
 export type UserProfileRow = typeof userProfile.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Friends + chat (plaintext messages; no encryption)
+// ---------------------------------------------------------------------------
+
+// One row per unordered user pair. `pairKey` = sorted(a,b).join(":"), computed
+// in the repo, so a single UNIQUE prevents A->B and B->A duplicate requests.
+export const friendship = pgTable(
+  "friendship",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requesterId: text("requester_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    addresseeId: text("addressee_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    pairKey: text("pair_key").notNull(),
+    status: text("status").$type<FriendStatus>().notNull().default("pending"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    respondedAt: timestamp("responded_at"),
+  },
+  (t) => [
+    unique("friendship_pair_uq").on(t.pairKey),
+    index("friendship_addressee_status_idx").on(t.addresseeId, t.status),
+    index("friendship_requester_status_idx").on(t.requesterId, t.status),
+  ],
+);
+
+// DM or group container. For DMs, `dmKey` = sorted(a,b).join(":") dedupes the
+// pair (Postgres treats multiple NULLs as distinct, so groups — dmKey NULL —
+// are unaffected by the UNIQUE). `lastMessageId` is a denormalized cache, not a FK.
+export const conversation = pgTable(
+  "conversation",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    kind: text("kind").$type<ConversationKind>().notNull(),
+    name: text("name"),
+    avatarUrl: text("avatar_url"),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    dmKey: text("dm_key").unique(),
+    lastMessageId: uuid("last_message_id"),
+    lastMessageAt: timestamp("last_message_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("conversation_last_message_at_idx").on(t.lastMessageAt)],
+);
+
+// Membership + per-member read state. `leftAt` soft-leave keeps group history's
+// sender resolvable after someone leaves. `lastReadMessageId` is a cache pointer (no FK).
+export const conversationMember = pgTable(
+  "conversation_member",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: text("role").$type<MemberRole>().notNull().default("member"),
+    lastReadMessageId: uuid("last_read_message_id"),
+    lastReadAt: timestamp("last_read_at"),
+    muted: boolean("muted").notNull().default(false),
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+    leftAt: timestamp("left_at"),
+  },
+  (t) => [
+    unique("conversation_member_uq").on(t.conversationId, t.userId),
+    index("conversation_member_user_idx").on(t.userId),
+  ],
+);
+
+// All message kinds, stored PLAINTEXT. `body` for text/system; `metadata` for
+// gif/game_card/system; `gameId` set for game_card. Soft delete via `deletedAt`.
+// Paginate by (conversationId, createdAt) — never by the non-monotonic uuid id.
+export const message = pgTable(
+  "message",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    senderId: text("sender_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    kind: text("kind").$type<MessageKind>().notNull().default("text"),
+    body: text("body"),
+    metadata: jsonb("metadata").$type<MessageMetadata>(),
+    gameId: uuid("game_id").references(() => game.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    editedAt: timestamp("edited_at"),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (t) => [
+    index("message_conv_created_idx").on(t.conversationId, t.createdAt),
+    index("message_game_idx").on(t.gameId),
+  ],
+);
+
+// Per-recipient, persisted (so offline users get them on next load) + pushed realtime.
+export const notification = pgTable(
+  "notification",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: text("type").$type<NotificationType>().notNull(),
+    actorId: text("actor_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    payload: jsonb("payload")
+      .$type<NotificationPayload>()
+      .notNull()
+      .default({}),
+    readAt: timestamp("read_at"),
+    resolvedAt: timestamp("resolved_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("notification_user_created_idx").on(t.userId, t.createdAt),
+    index("notification_user_unread_idx").on(t.userId, t.readAt),
+  ],
+);
+
+export type FriendshipRow = typeof friendship.$inferSelect;
+export type ConversationRow = typeof conversation.$inferSelect;
+export type ConversationMemberRow = typeof conversationMember.$inferSelect;
+export type MessageRow = typeof message.$inferSelect;
+export type NotificationRow = typeof notification.$inferSelect;

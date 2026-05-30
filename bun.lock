@@ -16,6 +16,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@gamelobby/avatar": "workspace:*",
+        "@gamelobby/chat-core": "workspace:*",
         "@gamelobby/games-core": "workspace:*",
         "@hono/node-server": "^1.13.7",
         "@socket.io/redis-adapter": "^8.3.0",
@@ -46,6 +47,7 @@
         "@dicebear/collection": "^9.0.0",
         "@dicebear/core": "^9.0.0",
         "@gamelobby/avatar": "workspace:*",
+        "@gamelobby/chat-core": "workspace:*",
         "@gamelobby/games-core": "workspace:*",
         "@radix-ui/react-tooltip": "^1.2.8",
         "better-auth": "^1.6.9",
@@ -73,6 +75,17 @@
     "packages/avatar": {
       "name": "@gamelobby/avatar",
       "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "^1.1.14",
+        "typescript": "^5",
+      },
+    },
+    "packages/chat-core": {
+      "name": "@gamelobby/chat-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@gamelobby/avatar": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "^1.1.14",
         "typescript": "^5",
@@ -313,6 +326,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.11", "", {}, "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg=="],
 
     "@gamelobby/avatar": ["@gamelobby/avatar@workspace:packages/avatar"],
+
+    "@gamelobby/chat-core": ["@gamelobby/chat-core@workspace:packages/chat-core"],
 
     "@gamelobby/games-core": ["@gamelobby/games-core@workspace:packages/games-core"],
 

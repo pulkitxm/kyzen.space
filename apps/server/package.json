@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@gamelobby/avatar": "workspace:*",
+    "@gamelobby/chat-core": "workspace:*",
     "@gamelobby/games-core": "workspace:*",
     "@hono/node-server": "^1.13.7",
     "@socket.io/redis-adapter": "^8.3.0",

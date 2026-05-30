@@ -19,6 +19,7 @@ import {
   FaGamepad,
   FaUser,
 } from "react-icons/fa";
+import { SidebarSocialNav } from "@/app/sidebar-social-nav";
 import { ThemeToggle } from "@/app/theme-toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { Character } from "@/components/ui";
@@ -285,8 +286,14 @@ export function Sidebar({
 
       <nav
         className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 py-3"
-        aria-label="Games"
+        aria-label="Navigation"
       >
+        {signedIn ? (
+          <SidebarSocialNav
+            collapsed={displayCollapsed}
+            onNavigate={onCloseMobile}
+          />
+        ) : null}
         {groups.map(({ category, games }) => (
           <div key={category.id} className="mb-4">
             <div
