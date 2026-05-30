@@ -68,7 +68,7 @@ export function NotificationsClient({
   };
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
+    <div className="mx-auto flex h-full w-full max-w-4xl flex-col">
       <header className="flex items-center justify-between border-border border-b px-4 py-3.5">
         <h1 className="font-semibold text-lg">Notifications</h1>
         <button

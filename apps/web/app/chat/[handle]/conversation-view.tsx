@@ -102,7 +102,7 @@ export function ConversationView({
     : presenceLabel(otherPresence);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col">
       <header className="flex items-center gap-3 border-border border-b px-4 py-3">
         <Link
           href="/chat"

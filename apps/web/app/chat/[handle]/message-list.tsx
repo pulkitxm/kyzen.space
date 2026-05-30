@@ -37,7 +37,7 @@ export function MessageList({
   return (
     <div
       ref={containerRef}
-      className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+      className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-4 py-4 md:px-6"
     >
       {messages.length === 0 ? (
         <div className="py-10 text-center text-muted-foreground text-sm">

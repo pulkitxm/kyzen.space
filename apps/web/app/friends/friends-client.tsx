@@ -67,7 +67,7 @@ export function FriendsClient() {
   ];
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
+    <div className="mx-auto flex h-full w-full max-w-4xl flex-col">
       <header className="border-border border-b px-4 pt-4">
         <h1 className="mb-3 font-semibold text-lg">Friends</h1>
         <div className="flex gap-1">

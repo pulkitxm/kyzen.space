@@ -75,7 +75,7 @@ export function MessageBubble({
       ) : null}
       <div
         className={cn(
-          "max-w-[75%] rounded-2xl px-3 py-2 text-sm",
+          "max-w-[min(42rem,85%)] rounded-2xl px-3.5 py-2 text-sm",
           own
             ? "bg-primary text-primary-foreground"
             : "bg-surface-overlay text-card-foreground",
