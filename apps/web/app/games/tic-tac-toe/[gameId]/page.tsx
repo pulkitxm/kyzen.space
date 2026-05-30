@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { BackLink, PageContainer } from "@/components/ui/page";
+import { PageContainer } from "@/components/ui/page";
 import { serverFetchJson } from "@/lib/api-server";
 import { getServerSession } from "@/lib/get-server-session";
 
@@ -29,15 +29,6 @@ export default async function TicTacToeGamePage({ params }: Props) {
 
   return (
     <PageContainer size="sm">
-      <BackLink href="/games/tic-tac-toe">← Lobby</BackLink>
-      <h1 className="mt-6 text-xl font-semibold text-foreground">
-        Tic-tac-toe
-      </h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Status:{" "}
-        <span className="font-medium text-foreground">{data.game.status}</span>
-      </p>
-
       <TicTacToeGameClient
         gameId={gameId}
         userId={session?.user?.id ?? null}
