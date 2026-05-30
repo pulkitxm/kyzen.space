@@ -49,6 +49,7 @@ export {
   type ServerMessageUpdated,
   type ServerNotificationNew,
   type ServerNotificationRead,
+  type ServerPresenceSnapshot,
   type ServerPresenceUpdate,
   type ServerReadReceipt,
   type ServerTypingUpdate,

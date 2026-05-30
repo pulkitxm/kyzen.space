@@ -15,8 +15,10 @@ import {
   activeConversationIdAtom,
   conversationsAtom,
   messagesAtomFamily,
+  presenceAtom,
   upsertConversation,
 } from "@/lib/chat/atoms";
+import { onlineCount, presenceLabel } from "@/lib/chat/presence";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 import { GroupSettingsDialog } from "./group-settings-dialog";
 import { MessageComposer } from "./message-composer";
@@ -82,15 +84,21 @@ export function ConversationView({
     );
   }, [lastId, conversationId, socket, store]);
 
+  const presence = useAtomValue(presenceAtom);
   const me = conversation.members.find((m) => m.id === userId);
   const others = conversation.members.filter((m) => m.id !== userId);
   const isGroup = conversation.kind === "group";
+  const otherPresence = others[0] ? presence.get(others[0].id) : undefined;
   const title = isGroup
     ? (conversation.name ?? "Group")
     : (others[0]?.username ?? "Direct message");
   const subtitle = isGroup
-    ? `${conversation.members.length} members · tap to manage`
-    : `@${others[0]?.username ?? ""}`;
+    ? `${onlineCount(
+        presence,
+        conversation.members.map((m) => m.id),
+        userId,
+      )} online · ${conversation.members.length} members · tap to manage`
+    : presenceLabel(otherPresence);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
@@ -129,10 +137,17 @@ export function ConversationView({
               config={others[0]?.avatar ?? null}
               seed={others[0]?.username ?? "?"}
               size={36}
+              online={otherPresence?.online ? true : undefined}
             />
             <div className="min-w-0">
               <div className="truncate font-medium text-sm">{title}</div>
-              <div className="truncate text-muted-foreground text-xs">
+              <div
+                className={
+                  otherPresence?.online
+                    ? "truncate text-emerald-500 text-xs"
+                    : "truncate text-muted-foreground text-xs"
+                }
+              >
                 {subtitle}
               </div>
             </div>

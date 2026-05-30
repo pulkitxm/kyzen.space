@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
-import { conversationsAtom, friendsAtom } from "@/lib/chat/atoms";
+import { conversationsAtom, friendsAtom, presenceAtom } from "@/lib/chat/atoms";
+import { presenceLabel } from "@/lib/chat/presence";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 
 export function GroupSettingsDialog({
@@ -21,6 +22,7 @@ export function GroupSettingsDialog({
   onClose: () => void;
 }) {
   const friends = useAtomValue(friendsAtom);
+  const presence = useAtomValue(presenceAtom);
   const store = useStore();
   const { socket } = useSocket();
   const router = useRouter();
@@ -118,51 +120,73 @@ export function GroupSettingsDialog({
             Members ({conversation.members.length})
           </div>
           <ul className="mb-4 flex flex-col gap-1">
-            {conversation.members.map((m) => (
-              <li key={m.id} className="flex items-center gap-3 px-1 py-1.5">
-                <PresenceAvatar config={m.avatar} seed={m.username} size={32} />
-                <span className="min-w-0 flex-1 truncate text-sm">
-                  {m.displayName ?? m.username}
-                  {m.id === userId ? " (you)" : ""}
-                </span>
-                {m.role === "owner" ? (
-                  <span className="text-muted-foreground text-xs">Owner</span>
-                ) : isOwner ? (
-                  confirmRemoveId === m.id ? (
-                    <div className="flex items-center gap-1">
-                      <span className="text-muted-foreground text-xs">
-                        Remove?
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => {
-                          removeMember(m.id);
-                          setConfirmRemoveId(null);
-                        }}
-                      >
-                        Yes
-                      </Button>
+            {conversation.members.map((m) => {
+              const p =
+                m.id === userId
+                  ? { online: true, lastSeen: null }
+                  : presence.get(m.id);
+              return (
+                <li key={m.id} className="flex items-center gap-3 px-1 py-1.5">
+                  <PresenceAvatar
+                    config={m.avatar}
+                    seed={m.username}
+                    size={32}
+                    online={p?.online ? true : undefined}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm">
+                      {m.displayName ?? m.username}
+                      {m.id === userId ? " (you)" : ""}
+                    </div>
+                    <div
+                      className={
+                        p?.online
+                          ? "truncate text-emerald-500 text-xs"
+                          : "truncate text-muted-foreground text-xs"
+                      }
+                    >
+                      {presenceLabel(p)}
+                    </div>
+                  </div>
+                  {m.role === "owner" ? (
+                    <span className="text-muted-foreground text-xs">Owner</span>
+                  ) : isOwner ? (
+                    confirmRemoveId === m.id ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-muted-foreground text-xs">
+                          Remove?
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => {
+                            removeMember(m.id);
+                            setConfirmRemoveId(null);
+                          }}
+                        >
+                          Yes
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setConfirmRemoveId(null)}
+                        >
+                          No
+                        </Button>
+                      </div>
+                    ) : (
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setConfirmRemoveId(null)}
+                        onClick={() => setConfirmRemoveId(m.id)}
                       >
-                        No
+                        Remove
                       </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConfirmRemoveId(m.id)}
-                    >
-                      Remove
-                    </Button>
-                  )
-                ) : null}
-              </li>
-            ))}
+                    )
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
 
           {isOwner && addable.length > 0 ? (

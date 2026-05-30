@@ -15,6 +15,8 @@ import {
   type ServerMessageUpdated,
   type ServerNotificationNew,
   type ServerNotificationRead,
+  type ServerPresenceSnapshot,
+  type ServerPresenceUpdate,
 } from "@gamelobby/chat-core";
 import { useStore } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
@@ -26,6 +28,7 @@ import {
   messagesAtomFamily,
   notificationsAtom,
   outgoingRequestsAtom,
+  presenceAtom,
   unreadNotificationsAtom,
   upsertConversation,
   upsertMessage,
@@ -217,6 +220,33 @@ export function ChatSocketBridge({
       }
     },
   );
+
+  useSocketEvent<ServerPresenceSnapshot>(
+    CHAT_EVENTS.presenceSnapshot,
+    ({ entries }) => {
+      store.set(presenceAtom, (prev) => {
+        const next = new Map(prev);
+        for (const e of entries) {
+          next.set(e.userId, {
+            online: e.status === "online",
+            lastSeen: e.lastSeen ?? null,
+          });
+        }
+        return next;
+      });
+    },
+  );
+
+  useSocketEvent<ServerPresenceUpdate>(CHAT_EVENTS.presenceUpdate, (e) => {
+    store.set(presenceAtom, (prev) => {
+      const next = new Map(prev);
+      next.set(e.userId, {
+        online: e.status === "online",
+        lastSeen: e.lastSeen ?? null,
+      });
+      return next;
+    });
+  });
 
   return null;
 }

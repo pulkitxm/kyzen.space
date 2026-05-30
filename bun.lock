@@ -50,6 +50,9 @@
         "@gamelobby/chat-core": "workspace:*",
         "@gamelobby/games-core": "workspace:*",
         "@radix-ui/react-tooltip": "^1.2.8",
+        "@slidoapp/emoji-mart": "^5.8.7",
+        "@slidoapp/emoji-mart-data": "^1.2.4",
+        "@slidoapp/emoji-mart-react": "^1.1.5",
         "better-auth": "^1.6.9",
         "jotai": "^2.19.1",
         "jotai-family": "^1.0.2",
@@ -493,6 +496,12 @@
     "@radix-ui/rect": ["@radix-ui/rect@1.1.1", "", {}, "sha512-HPwpGIzkl28mWyZqG52jiqDJ12waP11Pa1lGoiyUkIEuMLBP0oeK/C89esbXrxsky5we7dfd8U58nm0SgAWpVw=="],
 
     "@rtsao/scc": ["@rtsao/scc@1.1.0", "", {}, "sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g=="],
+
+    "@slidoapp/emoji-mart": ["@slidoapp/emoji-mart@5.8.7", "", {}, "sha512-zn8CBoZRFY0M0Tps0rFgcbu1nhQDmnSoD8CqkTVobI9k3MK2WHIYRp50DXhMxRoQnoct4nomrVaY9kU01ARDTQ=="],
+
+    "@slidoapp/emoji-mart-data": ["@slidoapp/emoji-mart-data@1.2.4", "", {}, "sha512-wyZjYb0Q/Cxgq+90G9Bs8Ynvaed3WMgXhkKs/7LOFd5XWfdQ5XQEPeiv52xp8zuNHjCQK964JiK/YP0g0bpQsQ=="],
+
+    "@slidoapp/emoji-mart-react": ["@slidoapp/emoji-mart-react@1.1.5", "", { "peerDependencies": { "@slidoapp/emoji-mart": "^5.6", "react": "^16.8 || ^17 || ^18 || ^19" } }, "sha512-I0FPvnxazx8AjiWXvU3KcusZ0Aw+FpC57ikyXyeHi9aMUUSYZbXkiaIumKmYtAPWP/9S+q3cCWXnECFHokOV1A=="],
 
     "@socket.io/component-emitter": ["@socket.io/component-emitter@3.1.2", "", {}, "sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA=="],
 

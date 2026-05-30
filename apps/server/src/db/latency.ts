@@ -60,7 +60,10 @@ function wrapClient<T extends object>(
   });
 }
 
-export function resolveDbLatencyMs(nodeEnv: string, requestedMs: number): number {
+export function resolveDbLatencyMs(
+  nodeEnv: string,
+  requestedMs: number,
+): number {
   return nodeEnv === "production" ? 0 : requestedMs;
 }
 

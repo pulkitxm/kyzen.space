@@ -50,6 +50,7 @@ export const CHAT_EVENTS = {
   // phase 2
   typingUpdate: "typing_update",
   presenceUpdate: "presence_update",
+  presenceSnapshot: "presence_snapshot",
 } as const;
 
 /** Ack callbacks resolve to a success payload or an error. */
@@ -137,4 +138,10 @@ export type ServerPresenceUpdate = {
   userId: string;
   status: PresenceStatus;
   lastSeen?: string | null;
+};
+
+/** Snapshot of the current presence of everyone the connecting user cares about
+ * (their friends + conversation co-members), sent once on connect. */
+export type ServerPresenceSnapshot = {
+  entries: ServerPresenceUpdate[];
 };

@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { FaUserFriends, FaUsers } from "react-icons/fa";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
-import { conversationsAtom } from "@/lib/chat/atoms";
+import { conversationsAtom, presenceAtom } from "@/lib/chat/atoms";
 import { messagePreview, relativeTime } from "@/lib/chat/format";
 import { NewGroupDialog } from "./new-group-dialog";
 
 export function ChatListClient({ userId }: { userId: string }) {
   const conversations = useAtomValue(conversationsAtom);
+  const presence = useAtomValue(presenceAtom);
   const [groupOpen, setGroupOpen] = useState(false);
 
   return (
@@ -74,6 +75,11 @@ export function ChatListClient({ userId }: { userId: string }) {
                     config={others[0]?.avatar ?? null}
                     seed={others[0]?.username ?? "?"}
                     size={44}
+                    online={
+                      others[0] && presence.get(others[0].id)?.online
+                        ? true
+                        : undefined
+                    }
                   />
                 )}
                 <div className="min-w-0 flex-1">

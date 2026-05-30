@@ -30,8 +30,9 @@ export const unreadNotificationsAtom = atom<number>(0);
 /** The conversation currently open on screen (so we don't badge it as unread). */
 export const activeConversationIdAtom = atom<string | null>(null);
 
-// Phase 2 (typing / presence) — declared now so consumers can read them safely.
-export const onlineUsersAtom = atom<Set<string>>(new Set<string>());
+// Phase 2 (typing / presence).
+export type PresenceInfo = { online: boolean; lastSeen: string | null };
+export const presenceAtom = atom<Map<string, PresenceInfo>>(new Map());
 export const typingAtomFamily = atomFamily((_conversationId: string) =>
   atom<TypingUser[]>([]),
 );

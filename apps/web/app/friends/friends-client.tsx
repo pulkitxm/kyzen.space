@@ -11,6 +11,7 @@ import {
   friendsAtom,
   incomingRequestsAtom,
   outgoingRequestsAtom,
+  presenceAtom,
 } from "@/lib/chat/atoms";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ export function FriendsClient() {
   const friends = useAtomValue(friendsAtom);
   const incoming = useAtomValue(incomingRequestsAtom);
   const outgoing = useAtomValue(outgoingRequestsAtom);
+  const presence = useAtomValue(presenceAtom);
   const store = useStore();
   const { socket } = useSocket();
   const router = useRouter();
@@ -107,6 +109,7 @@ export function FriendsClient() {
                     config={f.user.avatar}
                     seed={f.user.username}
                     size={40}
+                    online={presence.get(f.user.id)?.online ? true : undefined}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium text-sm">
