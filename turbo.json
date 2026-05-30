@@ -16,7 +16,8 @@
     "PUBLIC_REALTIME_URL",
     "API_URL",
     "NEXT_PUBLIC_API_URL",
-    "NEXT_PUBLIC_SOCKET_URL"
+    "NEXT_PUBLIC_SOCKET_URL",
+    "KLIPY_API_KEY"
   ],
   "tasks": {
     "dev": {

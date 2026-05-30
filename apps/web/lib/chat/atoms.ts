@@ -6,7 +6,14 @@ import type {
   TypingUser,
 } from "@gamelobby/chat-core";
 import { atom } from "jotai";
+import { atomWithStorage } from "jotai/utils";
 import { atomFamily } from "jotai-family";
+
+/** Recently-used emojis (native), most-recent first, persisted to localStorage. */
+export const recentEmojisAtom = atomWithStorage<string[]>(
+  "gl-recent-emojis",
+  [],
+);
 
 /** A message in the client store; optimistic sends carry `pending` + `clientId`. */
 export type ChatMessage = MessageJson & {
