@@ -6,7 +6,7 @@ import type {
   TypingUser,
 } from "@gamelobby/chat-core";
 import { atom } from "jotai";
-import { atomFamily } from "jotai/utils";
+import { atomFamily } from "jotai-family";
 
 /** A message in the client store; optimistic sends carry `pending` + `clientId`. */
 export type ChatMessage = MessageJson & {
