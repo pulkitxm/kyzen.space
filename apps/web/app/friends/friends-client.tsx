@@ -1,12 +1,7 @@
 "use client";
 
-import {
-  CHAT_EVENTS,
-  type FriendshipJson,
-  type SearchUserJson,
-} from "@gamelobby/chat-core";
+import { CHAT_EVENTS, type SearchUserJson } from "@gamelobby/chat-core";
 import { useAtomValue, useStore } from "jotai";
-import { useHydrateAtoms } from "jotai/utils";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui";
@@ -22,22 +17,7 @@ import { cn } from "@/lib/utils";
 
 type Tab = "friends" | "requests" | "add";
 
-export function FriendsClient({
-  initialFriends,
-  initialIncoming,
-  initialOutgoing,
-}: {
-  initialFriends: FriendshipJson[];
-  initialIncoming: FriendshipJson[];
-  initialOutgoing: FriendshipJson[];
-}) {
-  useHydrateAtoms(
-    new Map([
-      [friendsAtom, initialFriends],
-      [incomingRequestsAtom, initialIncoming],
-      [outgoingRequestsAtom, initialOutgoing],
-    ]),
-  );
+export function FriendsClient() {
   const [tab, setTab] = useState<Tab>("friends");
   const friends = useAtomValue(friendsAtom);
   const incoming = useAtomValue(incomingRequestsAtom);

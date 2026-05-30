@@ -12,7 +12,8 @@ export function relativeTime(iso: string | null | undefined): string {
   if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d`;
-  return new Date(iso).toLocaleDateString(undefined, {
+  // Pin the locale so SSR and client hydration produce identical output.
+  return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
   });
@@ -20,7 +21,10 @@ export function relativeTime(iso: string | null | undefined): string {
 
 export function timeOfDay(iso: string | null | undefined): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleTimeString(undefined, {
+  // Pin the locale so SSR and client hydration produce identical output
+  // (an ambient `undefined` locale renders "PM" on the server but "pm" in
+  // some browsers, causing a hydration mismatch).
+  return new Date(iso).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
   });

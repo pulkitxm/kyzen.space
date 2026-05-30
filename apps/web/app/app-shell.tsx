@@ -1,6 +1,7 @@
 "use client";
 
 import type { AvatarConfig } from "@gamelobby/avatar";
+import type { ConversationJson, FriendshipJson } from "@gamelobby/chat-core";
 import { Provider } from "jotai";
 import { useCallback, useState } from "react";
 import { FaChevronRight } from "react-icons/fa";
@@ -20,6 +21,11 @@ export function AppShellClient({
   profileHref,
   sidebarPrefsTrusted,
   sidebarPrefs,
+  initialConversations,
+  initialFriends,
+  initialIncoming,
+  initialOutgoing,
+  initialUnreadNotifications,
 }: {
   children: React.ReactNode;
   username: string | null;
@@ -29,6 +35,11 @@ export function AppShellClient({
   profileHref: string;
   sidebarPrefsTrusted: boolean;
   sidebarPrefs: SidebarPrefs;
+  initialConversations: ConversationJson[];
+  initialFriends: FriendshipJson[];
+  initialIncoming: FriendshipJson[];
+  initialOutgoing: FriendshipJson[];
+  initialUnreadNotifications: number;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const closeMobile = useCallback(() => setMobileOpen(false), []);
@@ -37,7 +48,16 @@ export function AppShellClient({
     <TooltipProvider delayDuration={300}>
       <Provider>
         <SocketProvider enabled={signedIn}>
-          {signedIn && userId ? <ChatSocketBridge userId={userId} /> : null}
+          {signedIn && userId ? (
+            <ChatSocketBridge
+              userId={userId}
+              initialConversations={initialConversations}
+              initialFriends={initialFriends}
+              initialIncoming={initialIncoming}
+              initialOutgoing={initialOutgoing}
+              initialUnreadNotifications={initialUnreadNotifications}
+            />
+          ) : null}
           <div className="flex h-screen overflow-hidden bg-background">
             {mobileOpen && (
               <button

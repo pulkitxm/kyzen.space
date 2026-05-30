@@ -1,4 +1,5 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
+import type { ConversationJson, FriendshipJson } from "@gamelobby/chat-core";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
@@ -40,12 +41,35 @@ export default async function RootLayout({
 
   let username: string | null = null;
   let avatar: AvatarConfig | null = null;
+  // Seed chat/social state on the server (no client fetch on load); the socket
+  // keeps these atoms live afterward.
+  let initialConversations: ConversationJson[] = [];
+  let initialFriends: FriendshipJson[] = [];
+  let initialIncoming: FriendshipJson[] = [];
+  let initialOutgoing: FriendshipJson[] = [];
+  let initialUnreadNotifications = 0;
   if (session?.user?.id) {
-    const me = await serverFetchJson<{
-      profile: { username: string; avatar: AvatarConfig | null };
-    }>("/api/profiles/me");
+    const [me, convs, fr, reqs, notif] = await Promise.all([
+      serverFetchJson<{
+        profile: { username: string; avatar: AvatarConfig | null };
+      }>("/api/profiles/me"),
+      serverFetchJson<{ conversations: ConversationJson[] }>(
+        "/api/conversations",
+      ),
+      serverFetchJson<{ friends: FriendshipJson[] }>("/api/friends"),
+      serverFetchJson<{
+        incoming: FriendshipJson[];
+        outgoing: FriendshipJson[];
+      }>("/api/friends/requests"),
+      serverFetchJson<{ count: number }>("/api/notifications/unread-count"),
+    ]);
     username = me?.profile.username ?? null;
     avatar = me?.profile.avatar ?? null;
+    initialConversations = convs?.conversations ?? [];
+    initialFriends = fr?.friends ?? [];
+    initialIncoming = reqs?.incoming ?? [];
+    initialOutgoing = reqs?.outgoing ?? [];
+    initialUnreadNotifications = notif?.count ?? 0;
   }
 
   const profileHref = signedIn
@@ -79,6 +103,11 @@ export default async function RootLayout({
             profileHref={profileHref}
             sidebarPrefsTrusted={sidebarPrefsTrusted}
             sidebarPrefs={sidebarPrefs}
+            initialConversations={initialConversations}
+            initialFriends={initialFriends}
+            initialIncoming={initialIncoming}
+            initialOutgoing={initialOutgoing}
+            initialUnreadNotifications={initialUnreadNotifications}
           >
             {children}
           </AppShellClient>

@@ -23,6 +23,19 @@ export async function getById(id: string): Promise<ConversationRow | null> {
   return row ?? null;
 }
 
+/** The existing DM for a pair, without creating one. */
+export async function findDm(
+  a: string,
+  b: string,
+): Promise<ConversationRow | null> {
+  const [row] = await db
+    .select()
+    .from(conversation)
+    .where(eq(conversation.dmKey, dmKey(a, b)))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function getOrCreateDm(
   a: string,
   b: string,

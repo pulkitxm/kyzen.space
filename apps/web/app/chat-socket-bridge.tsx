@@ -17,8 +17,7 @@ import {
   type ServerNotificationRead,
 } from "@gamelobby/chat-core";
 import { useStore } from "jotai";
-import { useEffect } from "react";
-import { clientFetchJson } from "@/lib/api-client";
+import { useHydrateAtoms } from "jotai/utils";
 import {
   activeConversationIdAtom,
   conversationsAtom,
@@ -37,40 +36,41 @@ import { useSocketEvent } from "@/lib/socket/socket-context";
  * Bridges global socket events into Jotai atoms (and seeds those atoms on mount).
  * Mounted once inside the app shell so sidebar badges + lists stay live everywhere.
  */
-export function ChatSocketBridge({ userId }: { userId: string }) {
+export function ChatSocketBridge({
+  userId,
+  initialConversations,
+  initialFriends,
+  initialIncoming,
+  initialOutgoing,
+  initialUnreadNotifications,
+}: {
+  userId: string;
+  initialConversations: ConversationJson[];
+  initialFriends: FriendshipJson[];
+  initialIncoming: FriendshipJson[];
+  initialOutgoing: FriendshipJson[];
+  initialUnreadNotifications: number;
+}) {
   const store = useStore();
 
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      const [convs, fr, reqs, notifs] = await Promise.all([
-        clientFetchJson<{ conversations: ConversationJson[] }>(
-          "/api/conversations",
-        ).catch(() => null),
-        clientFetchJson<{ friends: FriendshipJson[] }>("/api/friends").catch(
-          () => null,
-        ),
-        clientFetchJson<{
-          incoming: FriendshipJson[];
-          outgoing: FriendshipJson[];
-        }>("/api/friends/requests").catch(() => null),
-        clientFetchJson<{ count: number }>(
-          "/api/notifications/unread-count",
-        ).catch(() => null),
-      ]);
-      if (!active) return;
-      if (convs) store.set(conversationsAtom, convs.conversations);
-      if (fr) store.set(friendsAtom, fr.friends);
-      if (reqs) {
-        store.set(incomingRequestsAtom, reqs.incoming);
-        store.set(outgoingRequestsAtom, reqs.outgoing);
-      }
-      if (notifs) store.set(unreadNotificationsAtom, notifs.count);
-    })();
-    return () => {
-      active = false;
-    };
-  }, [store]);
+  // Hydrate server-seeded chat state synchronously (no client fetch on load);
+  // socket events keep these atoms live afterward.
+  useHydrateAtoms(
+    new Map<
+      | typeof conversationsAtom
+      | typeof friendsAtom
+      | typeof incomingRequestsAtom
+      | typeof outgoingRequestsAtom
+      | typeof unreadNotificationsAtom,
+      ConversationJson[] | FriendshipJson[] | number
+    >([
+      [conversationsAtom, initialConversations],
+      [friendsAtom, initialFriends],
+      [incomingRequestsAtom, initialIncoming],
+      [outgoingRequestsAtom, initialOutgoing],
+      [unreadNotificationsAtom, initialUnreadNotifications],
+    ]),
+  );
 
   useSocketEvent<ServerMessageNew>(
     CHAT_EVENTS.messageNew,

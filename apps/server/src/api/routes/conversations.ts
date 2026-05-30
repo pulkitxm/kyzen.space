@@ -54,6 +54,17 @@ export const conversationsRouter = new Hono()
       c.req.param("username"),
     );
     if (!profile) return c.json({ error: "Not found" }, 404);
+    if (profile.userId === userId) {
+      return c.json({ error: "Cannot DM yourself" }, 400);
+    }
+    // Open an existing DM regardless of current friendship; only creating a new
+    // DM requires being friends.
+    const existing = await conversations.findDm(userId, profile.userId);
+    if (existing) {
+      return c.json({
+        conversation: await assembleConversation(existing, userId),
+      });
+    }
     const res = await conversationsService.createDm(userId, profile.userId);
     if (!res.ok) return c.json({ error: res.error }, res.status);
     return c.json({ conversation: res.value });

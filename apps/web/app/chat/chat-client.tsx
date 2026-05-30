@@ -1,22 +1,13 @@
 "use client";
 
-import type { ConversationJson } from "@gamelobby/chat-core";
 import { useAtomValue } from "jotai";
-import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
 import { FaUserFriends } from "react-icons/fa";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
 import { conversationsAtom } from "@/lib/chat/atoms";
 import { messagePreview, relativeTime } from "@/lib/chat/format";
 
-export function ChatListClient({
-  userId,
-  initialConversations,
-}: {
-  userId: string;
-  initialConversations: ConversationJson[];
-}) {
-  useHydrateAtoms(new Map([[conversationsAtom, initialConversations]]));
+export function ChatListClient({ userId }: { userId: string }) {
   const conversations = useAtomValue(conversationsAtom);
 
   return (
