@@ -29,6 +29,9 @@ const GifPicker = dynamic(
   { ssr: false },
 );
 
+// Cap auto-grow at ~6 lines; keep in sync with the `max-h-40` class below.
+const MAX_TEXTAREA_HEIGHT = 160;
+
 export function MessageComposer({
   conversationId,
   me,
@@ -49,6 +52,15 @@ export function MessageComposer({
       shortcodesRef.current = m;
     });
   }, []);
+
+  // Grow the textarea to fit its content (Shift+Enter newlines, wrapping),
+  // up to MAX_TEXTAREA_HEIGHT; collapses back when text is cleared.
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+  }, [text]);
 
   const lastTypingRef = useRef(0);
   const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -284,7 +296,7 @@ export function MessageComposer({
           }}
           rows={1}
           placeholder="Message…"
-          className="max-h-40 min-h-11 flex-1 resize-none rounded-2xl border border-border bg-surface-raised px-4 py-2.5 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="max-h-40 min-h-11 flex-1 resize-none overflow-y-auto rounded-2xl border border-border bg-surface-raised px-4 py-2.5 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <button
           type="button"

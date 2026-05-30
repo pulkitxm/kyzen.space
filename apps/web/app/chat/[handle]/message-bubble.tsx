@@ -5,6 +5,7 @@ import type {
   MessageMetadata,
   SystemMeta,
 } from "@gamelobby/chat-core";
+import type { ReactNode } from "react";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import type { ChatMessage } from "@/lib/chat/atoms";
 import { timeOfDay } from "@/lib/chat/format";
@@ -32,6 +33,36 @@ function systemText(
   }
 }
 
+// Split on http(s) URLs; the capture group lands matches on odd indices.
+const URL_RE = /(https?:\/\/[^\s]+)/g;
+
+/** Render plaintext, turning bare URLs into clickable links. */
+function linkify(text: string, own: boolean): ReactNode {
+  return text.split(URL_RE).map((part, i) => {
+    if (i % 2 === 0) return part;
+    // Trim trailing punctuation that's almost never part of the URL.
+    const trailing = part.match(/[.,!?)]+$/)?.[0] ?? "";
+    const href = trailing ? part.slice(0, -trailing.length) : part;
+    return (
+      // biome-ignore lint/suspicious/noArrayIndexKey: split output is positional and stable
+      <span key={i}>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "break-all underline underline-offset-2 hover:opacity-80",
+            own ? "text-primary-foreground" : "text-primary",
+          )}
+        >
+          {href}
+        </a>
+        {trailing}
+      </span>
+    );
+  });
+}
+
 export function MessageBubble({
   message,
   userId,
@@ -54,6 +85,15 @@ export function MessageBubble({
   const own = message.sender?.id === userId;
   const gif =
     message.kind === "gif" ? (message.metadata as GifMeta | null) : null;
+  const stamp = message.pending ? "Sending…" : timeOfDay(message.createdAt);
+
+  const bubbleClass = cn(
+    "rounded-2xl px-3.5 py-2 text-sm",
+    own
+      ? "bg-primary text-primary-foreground"
+      : "bg-surface-overlay text-card-foreground",
+    message.pending && "opacity-60",
+  );
 
   return (
     <div
@@ -75,36 +115,46 @@ export function MessageBubble({
       ) : null}
       <div
         className={cn(
-          "max-w-[min(42rem,85%)] rounded-2xl px-3.5 py-2 text-sm",
-          own
-            ? "bg-primary text-primary-foreground"
-            : "bg-surface-overlay text-card-foreground",
-          message.pending && "opacity-60",
+          "flex max-w-[min(42rem,85%)] flex-col gap-0.5",
+          own ? "items-end" : "items-start",
         )}
       >
         {message.deletedAt ? (
-          <em className="opacity-70">Message deleted</em>
+          <div className={bubbleClass}>
+            <em className="opacity-70">Message deleted</em>
+          </div>
         ) : gif ? (
-          // biome-ignore lint/a11y/useAltText: alt provided via title
-          <img
-            src={gif.previewUrl}
-            alt={gif.title ?? "GIF"}
-            className="rounded-lg"
-            style={{ maxWidth: 220 }}
-          />
+          // GIFs render edge-to-edge — no bubble background or padding.
+          <>
+            {/* biome-ignore lint/a11y/useAltText: alt provided via title */}
+            <img
+              src={gif.fullUrl}
+              alt={gif.title ?? "GIF"}
+              className={cn(
+                "block h-auto w-full rounded-xl",
+                message.pending && "opacity-60",
+              )}
+              style={{ maxWidth: 320 }}
+            />
+            <span className="px-1 text-[10px] text-muted-foreground">
+              {stamp}
+            </span>
+          </>
         ) : (
-          <span className="whitespace-pre-wrap break-words">
-            {message.body}
-          </span>
+          <div className={bubbleClass}>
+            <span className="whitespace-pre-wrap break-words">
+              {linkify(message.body ?? "", own)}
+            </span>
+            <div
+              className={cn(
+                "mt-0.5 text-[10px]",
+                own ? "text-primary-foreground/70" : "text-muted-foreground",
+              )}
+            >
+              {stamp}
+            </div>
+          </div>
         )}
-        <div
-          className={cn(
-            "mt-0.5 text-[10px]",
-            own ? "text-primary-foreground/70" : "text-muted-foreground",
-          )}
-        >
-          {message.pending ? "Sending…" : timeOfDay(message.createdAt)}
-        </div>
       </div>
     </div>
   );
