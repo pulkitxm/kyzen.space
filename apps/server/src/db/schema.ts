@@ -13,12 +13,22 @@ import {
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import {
+  COLOR_MODES,
+  DEFAULT_COLOR_MODE,
+  DEFAULT_THEME,
+  THEME_IDS,
+} from "../lib/theme";
+
+export const themeEnum = pgEnum("app_theme", THEME_IDS);
+export const colorModeEnum = pgEnum("color_mode", COLOR_MODES);
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -141,6 +151,8 @@ export const userProfile = pgTable("user_profile", {
   username: text("username").notNull().unique(),
   stats: jsonb("stats").$type<ProfileStats>().notNull().default({}),
   avatar: jsonb("avatar").$type<AvatarConfig | null>(),
+  theme: themeEnum("theme").notNull().default(DEFAULT_THEME),
+  colorMode: colorModeEnum("color_mode").notNull().default(DEFAULT_COLOR_MODE),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

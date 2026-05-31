@@ -1,5 +1,6 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import type { ColorMode, ThemeId } from "../../lib/theme";
 import { db } from "../client";
 import {
   type GameStat,
@@ -73,6 +74,21 @@ export async function updateAvatar(
   await db
     .update(userProfile)
     .set({ avatar, updatedAt: new Date() })
+    .where(eq(userProfile.userId, userId));
+}
+
+export async function updateAppearance(
+  userId: string,
+  patch: { theme?: ThemeId; colorMode?: ColorMode },
+): Promise<void> {
+  const set: { theme?: ThemeId; colorMode?: ColorMode; updatedAt: Date } = {
+    updatedAt: new Date(),
+  };
+  if (patch.theme !== undefined) set.theme = patch.theme;
+  if (patch.colorMode !== undefined) set.colorMode = patch.colorMode;
+  await db
+    .update(userProfile)
+    .set(set)
     .where(eq(userProfile.userId, userId));
 }
 

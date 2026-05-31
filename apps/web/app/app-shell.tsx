@@ -58,7 +58,7 @@ export function AppShellClient({
               initialUnreadNotifications={initialUnreadNotifications}
             />
           ) : null}
-          <div className="flex h-screen overflow-hidden bg-background">
+          <div className="app-canvas flex h-screen overflow-hidden">
             {mobileOpen && (
               <button
                 type="button"

@@ -1,0 +1,1 @@
+ALTER TABLE "user_profile" ALTER COLUMN "theme" SET DEFAULT 'midnight-blue';

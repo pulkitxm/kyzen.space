@@ -16,6 +16,7 @@ import {
 import {
   FaChevronLeft,
   FaChevronRight,
+  FaCog,
   FaGamepad,
   FaUser,
 } from "react-icons/fa";
@@ -291,6 +292,7 @@ export function Sidebar({
         {signedIn ? (
           <SidebarSocialNav
             collapsed={displayCollapsed}
+            collapsedPad={centeredPad}
             onNavigate={onCloseMobile}
           />
         ) : null}
@@ -362,8 +364,53 @@ export function Sidebar({
       </nav>
 
       <div className="border-t border-sidebar-border px-2 py-3">
+        <div className="mb-1">
+          <ThemeToggle collapsed={displayCollapsed} signedIn={signedIn} />
+        </div>
         <div className="mb-2">
-          <ThemeToggle collapsed={displayCollapsed} />
+          {(() => {
+            const isActive = pathname.startsWith("/settings");
+            const settingsLink = (
+              <Link
+                href="/settings"
+                onClick={onCloseMobile}
+                className={cn(
+                  "flex h-9 w-full cursor-pointer items-center rounded-lg outline-none transition-[gap,padding,background-color] duration-250 ease-in-out focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-foreground"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                )}
+                style={{
+                  gap: displayCollapsed ? 0 : 10,
+                  paddingLeft: displayCollapsed ? 12 : 10,
+                  paddingRight: displayCollapsed ? 12 : 10,
+                }}
+                aria-label="Settings"
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center">
+                  <FaCog className="size-4 shrink-0" aria-hidden />
+                </span>
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sidebar-foreground/90 text-sm transition-[opacity,max-width,filter] duration-250 ease-in-out",
+                    displayCollapsed
+                      ? "max-w-0 opacity-0 blur-[2px]"
+                      : "max-w-48 opacity-100 blur-0",
+                  )}
+                >
+                  Settings
+                </span>
+              </Link>
+            );
+            return displayCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>{settingsLink}</TooltipTrigger>
+                <TooltipContent side="right">Settings</TooltipContent>
+              </Tooltip>
+            ) : (
+              settingsLink
+            );
+          })()}
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
