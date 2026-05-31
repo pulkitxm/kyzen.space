@@ -14,6 +14,12 @@ import {
   SIDEBAR_LS_BOOT_SCRIPT,
   SIDEBAR_PREFS_COOKIE,
 } from "@/lib/sidebar-prefs";
+import {
+  type ColorMode,
+  DEFAULT_THEME,
+  PALETTE_BOOT_SCRIPT,
+  type ThemeId,
+} from "@/lib/themes";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -41,6 +47,8 @@ export default async function RootLayout({
 
   let username: string | null = null;
   let avatar: AvatarConfig | null = null;
+  let userTheme: ThemeId | null = null;
+  let userMode: ColorMode | null = null;
   // Seed chat/social state on the server (no client fetch on load); the socket
   // keeps these atoms live afterward.
   let initialConversations: ConversationJson[] = [];
@@ -51,7 +59,12 @@ export default async function RootLayout({
   if (session?.user?.id) {
     const [me, convs, fr, reqs, notif] = await Promise.all([
       serverFetchJson<{
-        profile: { username: string; avatar: AvatarConfig | null };
+        profile: {
+          username: string;
+          avatar: AvatarConfig | null;
+          theme: ThemeId;
+          colorMode: ColorMode;
+        };
       }>("/api/profiles/me"),
       serverFetchJson<{ conversations: ConversationJson[] }>(
         "/api/conversations",
@@ -65,6 +78,8 @@ export default async function RootLayout({
     ]);
     username = me?.profile.username ?? null;
     avatar = me?.profile.avatar ?? null;
+    userTheme = me?.profile.theme ?? null;
+    userMode = me?.profile.colorMode ?? null;
     initialConversations = convs?.conversations ?? [];
     initialFriends = fr?.friends ?? [];
     initialIncoming = reqs?.incoming ?? [];
@@ -88,13 +103,21 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
+      data-theme={userTheme ?? DEFAULT_THEME}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-background text-foreground">
+      <body className="min-h-full text-foreground">
         <Script id="gl-sidebar-cookie-bootstrap" strategy="beforeInteractive">
           {SIDEBAR_LS_BOOT_SCRIPT}
         </Script>
-        <Providers>
+        <Script id="gl-palette-bootstrap" strategy="beforeInteractive">
+          {PALETTE_BOOT_SCRIPT}
+        </Script>
+        <Providers
+          initialPalette={userTheme}
+          initialMode={userMode}
+          signedIn={signedIn}
+        >
           <AppShellClient
             username={username}
             avatar={avatar}

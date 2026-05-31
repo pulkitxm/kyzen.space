@@ -10,12 +10,18 @@ type Profile = {
   username: string;
   stats: Record<string, unknown>;
   avatar: AvatarConfig | null;
+  theme: string;
+  colorMode: string;
   createdAt: Date;
 } | null;
 
 let currentSession: Session = null;
 let storedProfile: Profile = null;
 const updateAvatarCalls: Array<{ userId: string; avatar: AvatarConfig }> = [];
+const updateAppearanceCalls: Array<{
+  userId: string;
+  patch: { theme?: string; colorMode?: string };
+}> = [];
 
 mock.module("../src/auth", () => ({
   getAuth: () => ({
@@ -30,6 +36,12 @@ mock.module("../src/db", () => ({
     getDisplayName: async () => "Display Name",
     updateAvatar: async (userId: string, avatar: AvatarConfig) => {
       updateAvatarCalls.push({ userId, avatar });
+    },
+    updateAppearance: async (
+      userId: string,
+      patch: { theme?: string; colorMode?: string },
+    ) => {
+      updateAppearanceCalls.push({ userId, patch });
     },
   },
   games: {
@@ -49,6 +61,8 @@ function makeProfile(
     username: "tester",
     stats: {},
     avatar: VALID_AVATAR,
+    theme: "sangria",
+    colorMode: "dark",
     createdAt: new Date("2024-01-01T00:00:00Z"),
     ...over,
   };
@@ -66,6 +80,81 @@ beforeEach(() => {
   currentSession = null;
   storedProfile = null;
   updateAvatarCalls.length = 0;
+  updateAppearanceCalls.length = 0;
+});
+
+function putAppearance(body: string | object) {
+  return profilesRouter.request("/me/appearance", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
+describe("PUT /me/appearance", () => {
+  it("returns 401 when unauthenticated", async () => {
+    const res = await putAppearance({ theme: "sangria" });
+    expect(res.status).toBe(401);
+    expect(updateAppearanceCalls).toHaveLength(0);
+  });
+
+  describe("when authenticated", () => {
+    beforeEach(() => {
+      currentSession = { user: { id: "user-9", name: "T", email: "t@e.com" } };
+    });
+
+    it("returns 400 on malformed JSON", async () => {
+      const res = await putAppearance("{ not json");
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("rejects an invalid theme", async () => {
+      const res = await putAppearance({ theme: "neon" });
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("rejects an invalid colorMode", async () => {
+      const res = await putAppearance({ colorMode: "sepia" });
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("returns 400 when nothing is provided", async () => {
+      const res = await putAppearance({});
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("persists a valid theme with the session user id", async () => {
+      const res = await putAppearance({ theme: "midnight-blue" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ theme: "midnight-blue" });
+      expect(updateAppearanceCalls).toHaveLength(1);
+      expect(updateAppearanceCalls[0]!.userId).toBe("user-9");
+      expect(updateAppearanceCalls[0]!.patch).toEqual({
+        theme: "midnight-blue",
+      });
+    });
+
+    it("persists theme and colorMode together", async () => {
+      const res = await putAppearance({
+        theme: "royal-ember",
+        colorMode: "light",
+      });
+      expect(res.status).toBe(200);
+      expect(updateAppearanceCalls[0]!.patch).toEqual({
+        theme: "royal-ember",
+        colorMode: "light",
+      });
+    });
+
+    it("ignores a client-supplied userId", async () => {
+      await putAppearance({ theme: "sangria", userId: "attacker" });
+      expect(updateAppearanceCalls[0]!.userId).toBe("user-9");
+    });
+  });
 });
 
 describe("PUT /me/avatar — auth gate", () => {
