@@ -1,0 +1,1 @@
+ALTER TABLE "user_profile" ADD COLUMN "chat_layout" jsonb;
