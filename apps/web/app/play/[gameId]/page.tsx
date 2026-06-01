@@ -2,6 +2,7 @@ import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
 import type { GameJson, MoveJson } from "@gamelobby/games-core";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";
+import type { ChatLayout } from "@/lib/chat-layout";
 import { getServerSession } from "@/lib/get-server-session";
 import { PlayClient } from "./play-client";
 
@@ -45,6 +46,12 @@ export default async function PlayPage({
     }
   }
 
+  // Pull the saved chat layout (DB fallback; localStorage wins on the client).
+  const me = await serverFetchJson<{
+    profile: { chatLayout: ChatLayout | null };
+  }>("/api/profiles/me");
+  const dbLayout = me?.profile?.chatLayout ?? null;
+
   return (
     <PlayClient
       gameId={gameId}
@@ -55,6 +62,7 @@ export default async function PlayPage({
       conversation={conversation}
       initialMessages={messages}
       initialNextCursor={nextCursor}
+      dbLayout={dbLayout}
     />
   );
 }

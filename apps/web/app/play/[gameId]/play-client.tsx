@@ -2,6 +2,7 @@
 
 import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
+import type { ChatLayout } from "@/lib/chat-layout";
 import { type GameClientProps, getGameClient } from "@/lib/game-clients";
 import { GameChatSplit } from "./game-chat-split";
 
@@ -14,6 +15,7 @@ export function PlayClient({
   conversation,
   initialMessages,
   initialNextCursor,
+  dbLayout,
 }: {
   gameId: string;
   userId: string;
@@ -23,6 +25,7 @@ export function PlayClient({
   conversation: ConversationJson | null;
   initialMessages: MessageJson[];
   initialNextCursor: string | null;
+  dbLayout: ChatLayout | null;
 }) {
   const GameClient = getGameClient(gameType);
 
@@ -48,6 +51,7 @@ export function PlayClient({
 
   return (
     <GameChatSplit
+      dbLayout={dbLayout}
       game={gameNode}
       chat={
         <ConversationView
