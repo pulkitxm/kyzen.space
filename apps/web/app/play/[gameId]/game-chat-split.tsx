@@ -56,11 +56,14 @@ export function GameChatSplit({
   geomRef.current = geometry;
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const persist = useCallback(() => {
+  // `override` lets callers persist a value they just set in the same event,
+  // before the matching ref has been refreshed by a re-render (e.g. the mode
+  // toggles call setMode + persist synchronously).
+  const persist = useCallback((override?: Partial<ChatLayout>) => {
     const layout: ChatLayout = {
-      mode: modeRef.current,
-      chatWidth: widthRef.current,
-      popout: geomRef.current,
+      mode: override?.mode ?? modeRef.current,
+      chatWidth: override?.chatWidth ?? widthRef.current,
+      popout: override?.popout ?? geomRef.current,
     };
     writeChatLayout(layout);
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -122,7 +125,7 @@ export function GameChatSplit({
     const onChange = () => {
       if (!mq.matches && modeRef.current === "popout") {
         setMode("mounted");
-        persist();
+        persist({ mode: "mounted" });
       }
     };
     mq.addEventListener("change", onChange);
@@ -157,12 +160,12 @@ export function GameChatSplit({
 
   const popOut = useCallback(() => {
     setMode("popout");
-    persist();
+    persist({ mode: "popout" });
   }, [persist]);
 
   const dock = useCallback(() => {
     setMode("mounted");
-    persist();
+    persist({ mode: "mounted" });
   }, [persist]);
 
   const isPopout = mode === "popout";
