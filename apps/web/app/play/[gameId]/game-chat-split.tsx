@@ -76,7 +76,9 @@ export function GameChatSplit({
       void clientFetch("/api/profiles/me/chat-layout", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(layout),
+        // Only `mode` is synced cross-device; positions/sizes are device-local
+        // (localStorage + cookie above), so a desktop layout can't break mobile.
+        body: JSON.stringify({ mode: layout.mode }),
       }).catch(() => {});
     }, SAVE_DEBOUNCE_MS);
   }, []);
