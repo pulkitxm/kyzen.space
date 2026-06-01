@@ -131,11 +131,15 @@ export function ChatPopoutWindow({
     <div
       style={style}
       className={cn(
-        "relative flex min-h-0 flex-col overflow-hidden bg-background",
+        // `relative`/`fixed` are mutually exclusive position utilities — never
+        // emit both, or Tailwind's source order can let `relative` win and the
+        // popout `left`/`top` offsets shove it off-screen. Both modes still give
+        // the absolutely-positioned children a containing block.
+        "flex min-h-0 flex-col overflow-hidden bg-background",
         isPopout
           ? "fixed z-50 rounded-xl border border-border shadow-2xl"
           : cn(
-              "border-border md:shrink-0 md:border-l max-md:!w-full",
+              "relative border-border md:shrink-0 md:border-l max-md:!w-full",
               mountedVisible ? "flex" : "hidden md:flex",
             ),
       )}
