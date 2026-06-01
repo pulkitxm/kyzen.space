@@ -1,6 +1,7 @@
 "use client";
 
 import type { AvatarConfig } from "@gamelobby/avatar";
+import { getCategoryGroups } from "@gamelobby/games-core";
 import { useAtom } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
@@ -24,7 +25,6 @@ import { SidebarSocialNav } from "@/app/sidebar-social-nav";
 import { ThemeToggle } from "@/app/theme-toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { Character } from "@/components/ui";
-import { getCategoryGroups } from "@/lib/games";
 import {
   clampWidthSafe,
   DEFAULT_SIDEBAR_WIDTH,
@@ -89,7 +89,12 @@ export function Sidebar({
   const hasResizedThisGestureRef = useRef(false);
   const resizeStartedFromCollapsedRef = useRef(false);
 
-  const groups = getCategoryGroups();
+  // Derive the lobby href from the game type (URLs are a web concern; game
+  // metadata lives in games-core). Keeps the render below using `game.href`.
+  const groups = getCategoryGroups().map(({ category, games }) => ({
+    category,
+    games: games.map((game) => ({ ...game, href: `/games/${game.type}` })),
+  }));
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => !prev);

@@ -1,5 +1,5 @@
 import type { GameCardMeta, MessageJson } from "@gamelobby/chat-core";
-import { type GameJson, getEngine, hasEngine } from "@gamelobby/games-core";
+import { type GameJson, getDefinition, hasEngine } from "@gamelobby/games-core";
 import { serializeGame } from "../api/serialize";
 import { conversations, games, profiles, type SeatingMode } from "../db";
 import { notify } from "../realtime/notify";
@@ -20,6 +20,7 @@ export async function createGameInConversation(input: {
   gameType: string;
   seatingMode?: SeatingMode;
   challengedUserId?: string | null;
+  config?: unknown;
 }): Promise<ServiceResult<{ game: GameJson; message: MessageJson }>> {
   const conv = await conversations.getById(input.conversationId);
   if (!conv) return fail("Conversation not found", 404);
@@ -27,6 +28,10 @@ export async function createGameInConversation(input: {
     return fail("Not a member of this conversation", 403);
   }
   if (!hasEngine(input.gameType)) return fail("Unsupported game type", 400);
+
+  const definition = getDefinition(input.gameType);
+  const parsedConfig = definition.configSchema.safeParse(input.config ?? {});
+  if (!parsedConfig.success) return fail("Invalid game config", 400);
 
   const profile = await profiles.getProfileByUserId(input.userId);
   if (!profile) return fail("Profile not found", 400);
@@ -52,7 +57,7 @@ export async function createGameInConversation(input: {
     }
   }
 
-  const engine = getEngine(input.gameType);
+  const { engine } = definition;
   const created = await games.createGame({
     gameType: input.gameType,
     status: "waiting",
@@ -64,6 +69,7 @@ export async function createGameInConversation(input: {
       },
     ],
     gameState: engine.createInitialState([{ role: engine.roles[0]! }]),
+    config: parsedConfig.data,
     conversationId: input.conversationId,
     creatorUserId: input.userId,
     seatingMode,

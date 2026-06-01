@@ -1,15 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import {
   emptyBoard,
+  getEngine,
+  hasEngine,
   isBoardFull,
   isTerminal,
   lineWinner,
+  listGameTypes,
   type Mark,
   type TicTacToeMove,
   type TicTacToeState,
   ticTacToeEngine,
-} from "../src/games/tic-tac-toe";
-import { getEngine, hasEngine, listGameTypes } from "../src/registry";
+} from "../src/index";
 
 const SEATS = [{ role: "X" }, { role: "O" }];
 

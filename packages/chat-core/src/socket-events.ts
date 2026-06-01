@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import type {
   ConversationJson,
   FriendshipJson,
@@ -8,6 +9,7 @@ import type {
   PresenceStatus,
   TypingUser,
 } from "./dto";
+import type { clientCreateGameInConversationSchema } from "./schemas";
 
 /**
  * Canonical chat socket event names, shared by server and web so the two
@@ -98,14 +100,9 @@ export type ClientFriendRemove = { userId: string };
 
 export type ClientNotificationRead = { id: string };
 
-export type ClientCreateGameInConversation = {
-  conversationId: string;
-  gameType: string;
-  /** Required for groups; ignored for DMs (always "open"). */
-  seatingMode?: "open" | "challenge";
-  /** When seatingMode is "challenge", the member who must take the second seat. */
-  challengedUserId?: string | null;
-};
+export type ClientCreateGameInConversation = z.infer<
+  typeof clientCreateGameInConversationSchema
+>;
 
 // ---- server -> client payloads ----
 

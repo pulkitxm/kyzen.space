@@ -1,11 +1,12 @@
-import type { GameEngine, Outcome, ReduceResult, Seat } from "../engine";
-
-export const TIC_TAC_TOE = "tic-tac-toe";
-
-export type Cell = "X" | "O" | null;
-export type Mark = "X" | "O";
-export type TicTacToeState = { board: Cell[]; currentTurn: Mark };
-export type TicTacToeMove = { row: number; col: number };
+import type { GameEngine, Outcome, ReduceResult, Seat } from "../../engine";
+import {
+  type Cell,
+  type Mark,
+  TIC_TAC_TOE,
+  type TicTacToeMove,
+  type TicTacToeState,
+  ticTacToeMoveSchema,
+} from "./schemas";
 
 const BOARD_SIZE = 9;
 
@@ -73,17 +74,13 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
     if (state.currentTurn !== ctx.role) {
       return { ok: false, error: "Not your turn" };
     }
-    const { row, col } = input ?? ({} as TicTacToeMove);
-    if (
-      !Number.isInteger(row) ||
-      !Number.isInteger(col) ||
-      row < 0 ||
-      row > 2 ||
-      col < 0 ||
-      col > 2
-    ) {
+    // Structural validity lives in the schema (defense-in-depth: the driver
+    // also validates before calling reduce). Game rules live below.
+    const parsed = ticTacToeMoveSchema.safeParse(input);
+    if (!parsed.success) {
       return { ok: false, error: "Invalid move" };
     }
+    const { row, col } = parsed.data;
     const idx = row * 3 + col;
     if (state.board[idx] !== null) {
       return { ok: false, error: "Cell occupied" };

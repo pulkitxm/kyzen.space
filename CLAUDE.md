@@ -52,17 +52,18 @@ Monorepo: two apps (`apps/web`, `apps/server`) over three shared packages (`pack
 
 ### Packages (`@gamelobby/*`, imported via `workspace:*`)
 
-- **`games-core`** — framework-agnostic game logic. `GameEngine<State, Input>` (engine.ts) is the core abstraction: `createInitialState`, `reduce` (turn-based) or `step` (realtime), with `mode`/`roles`/`min`/`maxPlayers`. Engines self-register in `registry.ts`; look games up via `getEngine(type)` / `listGameTypes()`. Currently only `tic-tac-toe`. messages.ts defines the wire DTOs (`GameJson`, `MoveJson`, socket payloads) shared across the boundary.
-- **`chat-core`** — chat/social DTOs (`dto.ts`) and the socket event contract (`socket-events.ts`, `CHAT_EVENTS`). The single source of truth for realtime message shapes shared by web and server.
+- **`games-core`** — framework-agnostic game logic + schemas (**no React**, so the server can import it). A game is one self-describing `GameDefinition` (definition.ts): `engine` (`GameEngine<State, Input>` — `createInitialState`, `reduce`/`step`, `mode`/`roles`/`min`/`maxPlayers`), `meta`, and **strict Zod `stateSchema`/`moveSchema`/`configSchema`** (schemas.ts; TS types derive via `z.infer`). All definitions live in the single `GAMES` array (`games/index.ts`); `registry.ts` derives `getDefinition`/`getEngine`/`hasEngine`/`listGameMeta`/`getCategoryGroups` from it. Wire DTOs + socket-payload Zod schemas (`GameJson`, `MoveJson`, `clientJoinRoomSchema`, `clientMakeMoveSchema`) are in schemas.ts. **See `docs/adding-a-game.md`.**
+- **`games-client`** — all React game UI (web-only; peer-deps React + socket.io-client). One `"use client"` component per game under `src/games/<type>/client.tsx`, resolved by `type` via `getGameClient()` (`React.lazy`). The logic↔UI split keeps the server React-free.
+- **`chat-core`** — chat/social DTOs (`dto.ts`) + Zod schemas (`schemas.ts`, e.g. `gameCardMetaSchema`, `clientCreateGameInConversationSchema`) and the socket event contract (`socket-events.ts`, `CHAT_EVENTS`). Single source of truth for realtime message shapes shared by web and server.
 - **`avatar`** — DiceBear avataaars config: option catalog, validation, random/seed generation, equality. The repo uses ready-made DiceBear assets rather than hand-drawn art.
 
 ### `apps/server` — Express + Hono + Socket.IO on Bun
 
 `src/index.ts` mounts Express (CORS, `/health`), forwards `/api/*` to a **Hono** app (`src/api/index.ts`, router-per-feature under `api/routes/`), and attaches **Socket.IO** (`src/realtime/`). Better Auth (`auth.ts`) handles sessions/Google OAuth and provisions a profile on first sign-in; the socket middleware authenticates by reading the Better Auth session from the handshake cookie.
 
-Data access is layered: `db/schema.ts` (Drizzle/Postgres tables) → `db/repositories/*` → exposed as namespaces from `db/index.ts` (`games`, `messages`, `conversations`, …). Routes/realtime call repositories, never raw SQL.
+Data access is layered: `db/schema.ts` (Drizzle/Postgres tables) → `db/repositories/*` → exposed as namespaces from `db/index.ts` (`games`, `messages`, `conversations`, …). Routes/realtime call repositories, never raw SQL. Games use a **generic schema**: `game` (with `game_state` + `config` JSONB), `move` (`move_data` JSONB), and `game_player` (one indexed row per seat — normalizes the former players array; `getGameById` returns a `GameRecord` with `players` attached). Per-game shapes stay JSONB, validated by the game's Zod schemas — never per-game tables. The only game REST endpoint is `GET /api/games/:gameId` (games are created over the socket lane).
 
-Realtime has two lanes on one connection: a **chat lane** (`chat.ts`, `friends.ts`, `typing.ts`, `presence.ts`, `games-in-chat.ts` — handlers attached per-connection) and a **game lane** (`join_room` / `make_move` events). Game events route through a **driver** (`drivers.ts` → currently `turn-based.ts`): the driver loads the game row, picks the engine from `games-core`, applies `reduce`, persists moves, and broadcasts state to the game room and (for in-chat games) the originating conversation.
+Realtime has two lanes on one connection: a **chat lane** (`chat.ts`, `friends.ts`, `typing.ts`, `presence.ts`, `games-in-chat.ts` — handlers attached per-connection) and a **game lane** (`join_room` / `make_move` events, payloads validated by games-core Zod schemas). Game events route through a **driver** (`drivers.ts` → currently `turn-based.ts`): the driver loads the game, looks up the `GameDefinition`, validates the move + stored state against its Zod schemas, applies `reduce`, persists moves, and broadcasts state to the game room and (for in-chat games) the originating conversation.
 
 ### `apps/web` — Next.js 16, React 19, App Router, Tailwind v4, Jotai
 
@@ -73,13 +74,15 @@ Routes live in `apps/web/app/` (route folders + colocated `*-client.tsx` compone
 - **`lib/api-server.ts`** (`server-only`, `serverFetch*`) — RSC/SSR calls; forwards the user's cookies, `cache: "no-store"`. Uses `API_URL`.
 - **`lib/api-client.ts`** (`"use client"`, `clientFetch*`) — browser calls with `credentials: "include"`. Uses `NEXT_PUBLIC_API_URL`.
 
-Realtime client lives in `lib/socket/`; Jotai atoms (`lib/chat/atoms.ts`, `lib/sidebar-atoms.ts`) hold client state. Game UIs are registered in **`lib/game-clients.tsx`** — a `gameType → dynamic(ssr:false)` component map; add a new game's client component there (cover art goes in `public/games/`).
+Realtime client lives in `lib/socket/`. **State management is Jotai-first**: state shared by ≥2 components is a Jotai atom (`lib/chat/atoms.ts`, `lib/sidebar-atoms.ts`); `useState` only for state private to a single component. Games render through one **dynamic route** `app/games/[gameType]/page.tsx` (no per-game folders), driven by `listGameMeta()`/`getDefinition()` from games-core; the shared `app/games/_shared/game-lobby.tsx` renders the `configFields` form + "Play with…" entry. Game board UIs come from **`@gamelobby/games-client`** via `getGameClient(type)` (rendered inside `<Suspense>` in `app/play/[gameId]/play-client.tsx`); cover art goes in `public/games/`. Both shared packages are listed in `next.config.ts` `transpilePackages`, and `globals.css` has an `@source` for the games-client src so Tailwind keeps its classes.
 
 ### Adding a game
 
-1. Implement a `GameEngine` in `packages/games-core/src/games/` and register it in `registry.ts`.
-2. Backend move handling is engine-driven, so the turn-based driver picks it up automatically; add a new driver in `realtime/drivers.ts` only for a different `mode`.
-3. Add the client UI component to the `REGISTRY` in `apps/web/lib/game-clients.tsx`.
+A game is one `GameDefinition` (games-core) + one client component (games-client) — **no new routes, endpoints, DB tables, socket events, or drivers**. See **`docs/adding-a-game.md`** for the full guide, or use the **`game-builder`** agent (`.claude/agents/game-builder.md`) to implement one from a spec. In short:
+
+1. Add `packages/games-core/src/games/<type>/{schemas,engine,meta,index}.ts` (strict Zod schemas + engine), append the definition to the `GAMES` array, and export from `src/index.ts`.
+2. Add the `"use client"` board to `packages/games-client/src/games/<type>/client.tsx` and register it by `type` in `src/registry.ts`.
+3. The conformance suite (`packages/games-core/tests/conformance.test.ts`) covers it automatically; add a focused engine test too.
 
 ## Tests
 

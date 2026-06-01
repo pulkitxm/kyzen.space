@@ -1,6 +1,6 @@
+import { listGameMeta } from "@gamelobby/games-core";
 import { GameCard } from "@/app/game-card";
 import { BackLink, PageContainer, PageHeader } from "@/components/ui/page";
-import { GAMES } from "@/lib/games";
 
 export default function GamesIndexPage() {
   return (
@@ -13,8 +13,8 @@ export default function GamesIndexPage() {
         />
       </div>
       <ul className="mt-8 space-y-4">
-        {GAMES.map((game, i) => (
-          <GameCard key={game.id} game={game} priority={i === 0} />
+        {listGameMeta().map((game, i) => (
+          <GameCard key={game.type} game={game} priority={i === 0} />
         ))}
       </ul>
     </PageContainer>

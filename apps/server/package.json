@@ -26,7 +26,8 @@
     "ioredis": "^5.4.2",
     "pino": "^10.3.1",
     "postgres": "^3.4.9",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",

@@ -3,6 +3,7 @@
 import type { Cell, TicTacToeState as TicState } from "@gamelobby/games-core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
+import type { GameClientProps } from "../../types";
 
 type GameJson = {
   id: string;
@@ -13,19 +14,6 @@ type GameJson = {
 };
 
 type MoveJson = Record<string, unknown>;
-
-export type TicTacToeClientProps = {
-  gameId: string;
-  userId: string | null;
-  initialGame: {
-    id: string;
-    status: string;
-    winner: string | null;
-    players: { userId: string; username: string; role: string }[];
-    gameState: unknown;
-  };
-  initialMoves: Record<string, unknown>[];
-};
 
 const CELL_INDICES = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
 
@@ -60,6 +48,7 @@ function buildStateAtStep(
   const n = Math.max(0, Math.min(step, sorted.length));
   for (let i = 0; i < n; i++) {
     const m = sorted[i];
+    if (!m) continue;
     const pid = String(m.playerId ?? "");
     const role = roleForPlayer(players, pid);
     const md = m.moveData as { row?: unknown; col?: unknown };
@@ -278,7 +267,7 @@ export function TicTacToeGameClient({
   userId,
   initialGame,
   initialMoves,
-}: TicTacToeClientProps) {
+}: GameClientProps) {
   const socketRef = useRef<Socket | null>(null);
   const [game, setGame] = useState<GameJson>(initialGame as GameJson);
   const [moves, setMoves] = useState<MoveJson[]>(initialMoves);

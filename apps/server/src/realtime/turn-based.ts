@@ -1,14 +1,14 @@
 import {
   type ClientJoinRoom,
   type ClientMakeMove,
-  getEngine,
+  getDefinition,
   type Outcome,
   type ServerGameStatePayload,
 } from "@gamelobby/games-core";
 import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
 import { broadcastGameCard } from "../chat/game-card-broadcast";
-import { type GamePlayer, type GameRow, games, profiles } from "../db";
+import { type GamePlayer, type GameRecord, games, profiles } from "../db";
 import { emitToGame, joinGameRoom } from "./rooms";
 
 const UUID_RE =
@@ -18,7 +18,7 @@ function err(socket: Socket, message: string) {
   socket.emit("game_error", { message });
 }
 
-async function emitFullState(io: IOServer, gameRow: GameRow) {
+async function emitFullState(io: IOServer, gameRow: GameRecord) {
   const moves = await games.listMoves(gameRow.id);
   const payload: ServerGameStatePayload = {
     game: serializeGame(gameRow),
@@ -36,16 +36,16 @@ async function emitFullState(io: IOServer, gameRow: GameRow) {
  * player was actually seated.
  */
 async function ensureSeated(
-  gameRow: GameRow,
+  gameRow: GameRecord,
   userId: string,
   intent: "play" | "spectate",
-): Promise<{ game: GameRow; changed: boolean }> {
-  const players = (gameRow.players ?? []) as GamePlayer[];
+): Promise<{ game: GameRecord; changed: boolean }> {
+  const players = gameRow.players;
   if (players.some((p) => p.userId === userId)) {
     return { game: gameRow, changed: false };
   }
 
-  const engine = getEngine(gameRow.gameType);
+  const { engine } = getDefinition(gameRow.gameType);
   const seatFree =
     gameRow.status === "waiting" && players.length < engine.maxPlayers;
   const challengeReserved =
@@ -61,11 +61,12 @@ async function ensureSeated(
   const profile = await profiles.getProfileByUserId(userId);
   const username = profile?.username ?? "player";
   const role = engine.roles[players.length]!;
-  const nextPlayers = [...players, { userId, username, role }];
+  const newPlayer: GamePlayer = { userId, username, role };
+  const nextPlayers = [...players, newPlayer];
   const becomesActive = nextPlayers.length >= engine.minPlayers;
 
+  await games.seatPlayer(gameRow.id, newPlayer, players.length);
   const game = await games.updateGame(gameRow.id, {
-    players: nextPlayers,
     status: becomesActive ? "active" : "waiting",
     startedAt: becomesActive ? new Date() : gameRow.startedAt,
     gameState:
@@ -75,10 +76,13 @@ async function ensureSeated(
   return { game, changed: true };
 }
 
-async function finalize(gameRow: GameRow, outcome: Outcome): Promise<GameRow> {
+async function finalize(
+  gameRow: GameRecord,
+  outcome: Outcome,
+): Promise<GameRecord> {
   if (outcome.status !== "completed") return gameRow;
 
-  const players = (gameRow.players ?? []) as GamePlayer[];
+  const players = gameRow.players;
   let winnerUserId: string | null = null;
   if (!outcome.draw && outcome.winnerRole) {
     winnerUserId =
@@ -135,17 +139,23 @@ export async function handleMakeMove(
   if (!gameRow) return err(socket, "Game not found");
   if (gameRow.status !== "active") return err(socket, "Game is not active");
 
-  const players = (gameRow.players ?? []) as GamePlayer[];
-  const player = players.find((p) => p.userId === userId);
+  const player = gameRow.players.find((p) => p.userId === userId);
   if (!player) return err(socket, "Not a player in this game");
 
-  const engine = getEngine(gameRow.gameType);
-  if (!engine.reduce) return err(socket, "Game does not accept moves");
+  const def = getDefinition(gameRow.gameType);
+  if (!def.engine.reduce) return err(socket, "Game does not accept moves");
 
-  const result = engine.reduce(
-    gameRow.gameState,
+  // Strict guardrails: validate the inbound move and the stored state against
+  // the game's own schemas before handing them to the engine.
+  const parsedMove = def.moveSchema.safeParse(payload.moveData);
+  if (!parsedMove.success) return err(socket, "Invalid move");
+  const parsedState = def.stateSchema.safeParse(gameRow.gameState);
+  if (!parsedState.success) return err(socket, "Corrupt game state");
+
+  const result = def.engine.reduce(
+    parsedState.data,
     { role: player.role },
-    payload.moveData,
+    parsedMove.data,
   );
   if (!result.ok) return err(socket, result.error);
 
@@ -154,7 +164,7 @@ export async function handleMakeMove(
     gameId: gameRow.id,
     moveNumber,
     playerId: userId,
-    moveData: payload.moveData,
+    moveData: parsedMove.data,
   });
 
   let updated = await games.updateGame(gameRow.id, { gameState: result.state });

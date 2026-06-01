@@ -1,8 +1,7 @@
+import { listGameMeta } from "@gamelobby/games-core";
 import Link from "next/link";
-
 import { GameCard } from "@/app/game-card";
 import { SignOutForm } from "@/app/sign-out-form";
-import { GAMES } from "@/lib/games";
 import { getServerSession } from "@/lib/get-server-session";
 import { displayName } from "@/lib/utils";
 
@@ -63,8 +62,8 @@ export default async function Home() {
             Games
           </h2>
           <ul className="mt-3 space-y-4">
-            {GAMES.map((game, i) => (
-              <GameCard key={game.id} game={game} priority={i === 0} />
+            {listGameMeta().map((game, i) => (
+              <GameCard key={game.type} game={game} priority={i === 0} />
             ))}
           </ul>
         </section>

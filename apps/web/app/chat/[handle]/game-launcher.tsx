@@ -1,31 +1,35 @@
 "use client";
 
 import { CHAT_EVENTS, type ConversationJson } from "@gamelobby/chat-core";
+import { listGameMeta } from "@gamelobby/games-core";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FaGamepad } from "react-icons/fa";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 
-const GAME_TYPE = "tic-tac-toe";
-
 /**
  * Composer button that starts a game in the current conversation. DMs create
  * immediately ("open" seating); groups open a small menu to pick open seating
  * or challenge a specific member. On success, navigates to the side-by-side
- * /play view — everyone else gets the game card + a notification.
+ * /play view — everyone else gets the game card + a notification. The game is
+ * resolved from the catalog (`gameType`, defaulting to the first game).
  */
 export function GameLauncher({
   conversation,
   userId,
+  gameType = listGameMeta()[0]?.type ?? "",
 }: {
   conversation: ConversationJson;
   userId: string;
+  gameType?: string;
 }) {
   const { socket } = useSocket();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const gameName =
+    listGameMeta().find((m) => m.type === gameType)?.name ?? "Game";
   const isGroup = conversation.kind === "group";
   const others = conversation.members.filter((m) => m.id !== userId);
 
@@ -41,7 +45,7 @@ export function GameLauncher({
         CHAT_EVENTS.createGameInConversation,
         {
           conversationId: conversation.id,
-          gameType: GAME_TYPE,
+          gameType,
           seatingMode,
           challengedUserId,
         },
@@ -65,7 +69,7 @@ export function GameLauncher({
           />
           <div className="absolute bottom-full left-0 z-20 mb-2 w-60 rounded-xl border border-border bg-card p-1 shadow-xl">
             <div className="px-2 py-1 font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
-              Tic-tac-toe
+              {gameName}
             </div>
             <button
               type="button"

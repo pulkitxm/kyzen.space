@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Game UI ships from the games-client package; include its source so Tailwind
+   v4 keeps the board's utility classes (they live outside the app's scan root). */
+@source "../../../packages/games-client/src/**/*.{ts,tsx}";
+
 /* ===========================================================================
    Appearance = two axes:
      1. Palette  -> <html data-theme="..."> sets the two brand hues (--d, --v)

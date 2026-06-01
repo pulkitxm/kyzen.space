@@ -1,13 +1,13 @@
 "use client";
 
 import type { GameCardMeta } from "@gamelobby/chat-core";
+import { listGameMeta } from "@gamelobby/games-core";
 import Link from "next/link";
 import { FaGamepad } from "react-icons/fa";
-import { GAMES } from "@/lib/games";
 import { cn } from "@/lib/utils";
 
 function gameName(gameType: string): string {
-  return GAMES.find((g) => g.id === gameType)?.name ?? gameType;
+  return listGameMeta().find((m) => m.type === gameType)?.name ?? gameType;
 }
 
 /**

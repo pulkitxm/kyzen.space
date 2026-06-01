@@ -102,9 +102,10 @@ export const game = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     gameType: text("game_type").notNull(),
     status: text("status").$type<GameStatus>().notNull().default("waiting"),
-    players: jsonb("players").$type<GamePlayer[]>().notNull().default([]),
     winner: text("winner"),
     gameState: jsonb("game_state").$type<unknown>(),
+    // Opaque per-game setup, validated against the game's `configSchema`.
+    config: jsonb("config").$type<unknown>(),
     // Phase 3 — game-in-chat link columns (all nullable; legacy games have none).
     conversationId: uuid("conversation_id").references(() => conversation.id, {
       onDelete: "set null",
@@ -137,6 +138,30 @@ export const move = pgTable(
   (t) => [unique("move_game_number_uq").on(t.gameId, t.moveNumber)],
 );
 
+// One row per seated player. Normalizes the former `game.players` JSONB array so
+// "my games" and "who's in this game" are indexed joins instead of a containment
+// scan, and leaves room for per-seat data (result, rating) later. `username` is
+// denormalized (matching the old card behavior) so a card resolves without a
+// profile join. `seatOrder` is the engine role index (0 → roles[0], …).
+export const gamePlayer = pgTable(
+  "game_player",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => game.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    username: text("username").notNull(),
+    role: text("role").notNull(),
+    seatOrder: integer("seat_order").notNull(),
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  },
+  (t) => [
+    unique("game_player_uq").on(t.gameId, t.userId),
+    index("game_player_user_idx").on(t.userId),
+  ],
+);
+
 export type GameStat = {
   played: number;
   won: number;
@@ -164,6 +189,7 @@ export const userProfile = pgTable("user_profile", {
 
 export type GameRow = typeof game.$inferSelect;
 export type MoveRow = typeof move.$inferSelect;
+export type GamePlayerRow = typeof gamePlayer.$inferSelect;
 export type UserProfileRow = typeof userProfile.$inferSelect;
 
 // ---------------------------------------------------------------------------

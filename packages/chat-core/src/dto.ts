@@ -1,4 +1,6 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
+import type { z } from "zod";
+import type { gameCardMetaSchema, notificationPayloadSchema } from "./schemas";
 
 /** A user as exposed to other users (no email/private fields). */
 export type PublicUser = {
@@ -54,22 +56,9 @@ export type GifMeta = {
  *  are NOT persisted — the server resolves the game's live state onto the
  *  metadata when it assembles the message (and re-broadcasts on status change),
  *  so the card renders the correct status/winner on first paint with no client
- *  lookup. They are optional only for legacy/never-resolved messages. */
-export type GameCardMeta = {
-  gameId: string;
-  gameType: string;
-  seatingMode: "open" | "challenge";
-  challengedUserId?: string | null;
-  creatorUsername: string;
-  /** Current game status ("waiting" | "active" | "completed" | …). */
-  status?: string;
-  /** Winner userId, or "draw"; null until the game completes. */
-  winner?: string | null;
-  /** Winner's display name; null for a draw or unfinished game. */
-  winnerUsername?: string | null;
-  /** Seated players, for the viewer-specific action (Open vs Spectate/Join). */
-  players?: { userId: string; username: string; role: string }[];
-};
+ *  lookup. They are optional only for legacy/never-resolved messages.
+ *  Shape + validation: see `gameCardMetaSchema`. */
+export type GameCardMeta = z.infer<typeof gameCardMetaSchema>;
 
 export type SystemEvent =
   | "member_added"
@@ -123,12 +112,7 @@ export type NotificationType =
   | "game_started"
   | "game_challenge";
 
-export type NotificationPayload = {
-  conversationId?: string;
-  gameId?: string;
-  gameType?: string;
-  requestId?: string;
-};
+export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
 export type NotificationJson = {
   id: string;

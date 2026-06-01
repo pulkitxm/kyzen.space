@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // `node` provides `process.env` (Next inlines NEXT_PUBLIC_* at build time).
+    "types": ["react", "react-dom", "node"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}
