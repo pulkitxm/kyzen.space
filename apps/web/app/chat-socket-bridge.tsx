@@ -4,6 +4,7 @@ import {
   CHAT_EVENTS,
   type ConversationJson,
   type FriendshipJson,
+  type NotificationJson,
   type ServerConversationNew,
   type ServerConversationUpdated,
   type ServerFriendAccepted,
@@ -33,6 +34,7 @@ import {
   typingAtomFamily,
   unreadNotificationsAtom,
   upsertConversation,
+  upsertFriend,
   upsertMessage,
 } from "@/lib/chat/atoms";
 import { useSocketEvent } from "@/lib/socket/socket-context";
@@ -47,6 +49,7 @@ export function ChatSocketBridge({
   initialFriends,
   initialIncoming,
   initialOutgoing,
+  initialNotifications,
   initialUnreadNotifications,
 }: {
   userId: string;
@@ -54,6 +57,7 @@ export function ChatSocketBridge({
   initialFriends: FriendshipJson[];
   initialIncoming: FriendshipJson[];
   initialOutgoing: FriendshipJson[];
+  initialNotifications: NotificationJson[];
   initialUnreadNotifications: number;
 }) {
   const store = useStore();
@@ -66,13 +70,15 @@ export function ChatSocketBridge({
       | typeof friendsAtom
       | typeof incomingRequestsAtom
       | typeof outgoingRequestsAtom
+      | typeof notificationsAtom
       | typeof unreadNotificationsAtom,
-      ConversationJson[] | FriendshipJson[] | number
+      ConversationJson[] | FriendshipJson[] | NotificationJson[] | number
     >([
       [conversationsAtom, initialConversations],
       [friendsAtom, initialFriends],
       [incomingRequestsAtom, initialIncoming],
       [outgoingRequestsAtom, initialOutgoing],
+      [notificationsAtom, initialNotifications],
       [unreadNotificationsAtom, initialUnreadNotifications],
     ]),
   );
@@ -168,10 +174,7 @@ export function ChatSocketBridge({
   useSocketEvent<ServerFriendAccepted>(
     CHAT_EVENTS.friendAccepted,
     ({ friendship }) => {
-      store.set(friendsAtom, (prev) => [
-        friendship,
-        ...prev.filter((f) => f.user.id !== friendship.user.id),
-      ]);
+      store.set(friendsAtom, (prev) => upsertFriend(prev, friendship));
       store.set(incomingRequestsAtom, (prev) =>
         prev.filter((f) => f.user.id !== friendship.user.id),
       );

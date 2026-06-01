@@ -4,12 +4,8 @@ import { useAtomValue } from "jotai";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { IconType } from "react-icons";
-import { FaBell, FaComments, FaUserFriends } from "react-icons/fa";
-import {
-  pendingRequestCountAtom,
-  totalUnreadAtom,
-  unreadNotificationsAtom,
-} from "@/lib/chat/atoms";
+import { FaComments, FaUserFriends } from "react-icons/fa";
+import { pendingRequestCountAtom, totalUnreadAtom } from "@/lib/chat/atoms";
 import { cn } from "@/lib/utils";
 
 export function SidebarSocialNav({
@@ -24,7 +20,6 @@ export function SidebarSocialNav({
   const pathname = usePathname();
   const unread = useAtomValue(totalUnreadAtom);
   const pending = useAtomValue(pendingRequestCountAtom);
-  const notif = useAtomValue(unreadNotificationsAtom);
 
   const items: {
     href: string;
@@ -38,12 +33,6 @@ export function SidebarSocialNav({
       label: "Friends",
       icon: FaUserFriends,
       badge: pending,
-    },
-    {
-      href: "/notifications",
-      label: "Notifications",
-      icon: FaBell,
-      badge: notif,
     },
   ];
 

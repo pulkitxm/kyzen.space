@@ -17,6 +17,7 @@
     "@gamelobby/chat-core": "workspace:*",
     "@gamelobby/games-client": "workspace:*",
     "@gamelobby/games-core": "workspace:*",
+    "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@slidoapp/emoji-mart-data": "^1.2.4",
     "better-auth": "^1.6.9",

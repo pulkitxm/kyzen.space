@@ -1,5 +1,9 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
-import type { ConversationJson, FriendshipJson } from "@gamelobby/chat-core";
+import type {
+  ConversationJson,
+  FriendshipJson,
+  NotificationJson,
+} from "@gamelobby/chat-core";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
@@ -72,9 +76,10 @@ export default async function RootLayout({
   let initialFriends: FriendshipJson[] = [];
   let initialIncoming: FriendshipJson[] = [];
   let initialOutgoing: FriendshipJson[] = [];
+  let initialNotifications: NotificationJson[] = [];
   let initialUnreadNotifications = 0;
   if (session?.user?.id) {
-    const [me, convs, fr, reqs, notif] = await Promise.all([
+    const [me, convs, fr, reqs, notif, notifList] = await Promise.all([
       serverFetchJson<{
         profile: {
           username: string;
@@ -93,6 +98,9 @@ export default async function RootLayout({
         outgoing: FriendshipJson[];
       }>("/api/friends/requests"),
       serverFetchJson<{ count: number }>("/api/notifications/unread-count"),
+      serverFetchJson<{ notifications: NotificationJson[] }>(
+        "/api/notifications?limit=50",
+      ),
     ]);
     username = me?.profile.username ?? null;
     avatar = me?.profile.avatar ?? null;
@@ -104,6 +112,7 @@ export default async function RootLayout({
     initialIncoming = reqs?.incoming ?? [];
     initialOutgoing = reqs?.outgoing ?? [];
     initialUnreadNotifications = notif?.count ?? 0;
+    initialNotifications = notifList?.notifications ?? [];
   }
 
   const profileHref = signedIn ? "/profile" : "/auth";
@@ -171,6 +180,7 @@ export default async function RootLayout({
             initialFriends={initialFriends}
             initialIncoming={initialIncoming}
             initialOutgoing={initialOutgoing}
+            initialNotifications={initialNotifications}
             initialUnreadNotifications={initialUnreadNotifications}
           >
             {children}

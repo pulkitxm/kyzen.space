@@ -21,8 +21,8 @@ import {
   FaGamepad,
   FaUser,
 } from "react-icons/fa";
+import { NotificationsPopover } from "@/app/notifications-popover";
 import { SidebarSocialNav } from "@/app/sidebar-social-nav";
-import { ThemeToggle } from "@/app/theme-toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { Character } from "@/components/ui";
 import {
@@ -369,9 +369,14 @@ export function Sidebar({
       </nav>
 
       <div className="border-t border-sidebar-border px-2 py-3">
-        <div className="mb-1">
-          <ThemeToggle collapsed={displayCollapsed} signedIn={signedIn} />
-        </div>
+        {signedIn ? (
+          <div className="mb-2">
+            <NotificationsPopover
+              collapsed={displayCollapsed}
+              onNavigate={onCloseMobile}
+            />
+          </div>
+        ) : null}
         <div className="mb-2">
           {(() => {
             const isActive = pathname.startsWith("/settings");

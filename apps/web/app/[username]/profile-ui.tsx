@@ -82,10 +82,10 @@ export function ProfilePageView({
             {isOwnProfile ? (
               <div className="flex shrink-0 items-center gap-2 sm:mb-2">
                 <Link
-                  href="/account"
+                  href="/settings"
                   className="inline-flex items-center rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary-hover"
                 >
-                  Account
+                  Settings
                 </Link>
                 <ProfileOverflowMenu />
               </div>

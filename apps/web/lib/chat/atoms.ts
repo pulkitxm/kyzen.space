@@ -94,6 +94,14 @@ export function bumpConversation(
   return [updated, ...list.filter((_, i) => i !== idx)];
 }
 
+/** Add (or replace, deduped by the friend's user id) an accepted friend, newest first. */
+export function upsertFriend(
+  list: FriendshipJson[],
+  friendship: FriendshipJson,
+): FriendshipJson[] {
+  return [friendship, ...list.filter((f) => f.user.id !== friendship.user.id)];
+}
+
 export function upsertConversation(
   list: ConversationJson[],
   conversation: ConversationJson,
