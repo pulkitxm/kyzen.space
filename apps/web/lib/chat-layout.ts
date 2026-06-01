@@ -154,33 +154,6 @@ export function edgeForIcon(
   return best;
 }
 
-/** Top-left coordinate for the edge-stash tab, derived from the icon's last position. */
-export function stashTabPos(
-  icon: IconPos,
-  edge: StashEdge,
-  vw: number,
-  vh: number,
-): IconPos {
-  const cx = icon.x + ICON_SIZE / 2;
-  const cy = icon.y + ICON_SIZE / 2;
-  if (edge === "left" || edge === "right") {
-    const y = clampNum(
-      cy - EDGE_TAB_LENGTH / 2,
-      ICON_MARGIN,
-      Math.max(ICON_MARGIN, vh - EDGE_TAB_LENGTH - ICON_MARGIN),
-      ICON_MARGIN,
-    );
-    return { x: edge === "left" ? 0 : vw - EDGE_TAB_THICKNESS, y };
-  }
-  const x = clampNum(
-    cx - EDGE_TAB_LENGTH / 2,
-    ICON_MARGIN,
-    Math.max(ICON_MARGIN, vw - EDGE_TAB_LENGTH - ICON_MARGIN),
-    ICON_MARGIN,
-  );
-  return { x, y: edge === "top" ? 0 : vh - EDGE_TAB_THICKNESS };
-}
-
 export function normalizeChatLayout(o: unknown): ChatLayout {
   if (typeof o !== "object" || o === null || Array.isArray(o))
     return DEFAULT_CHAT_LAYOUT;

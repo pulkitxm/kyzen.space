@@ -5,7 +5,6 @@ import {
   clampIcon,
   DEFAULT_CHAT_LAYOUT,
   DEFAULT_ICON,
-  EDGE_TAB_THICKNESS,
   edgeForIcon,
   ICON_MARGIN,
   ICON_SIZE,
@@ -13,7 +12,6 @@ import {
   MIN_CHAT,
   POPOUT_MARGIN,
   parseChatLayout,
-  stashTabPos,
 } from "../lib/chat-layout";
 
 describe("clampChatWidth", () => {
@@ -128,23 +126,5 @@ describe("edgeForIcon", () => {
   it("on a corner, picks the edge with the larger overshoot", () => {
     // cx = -72 (left over 72), cy = -32 (top over 32) → left wins.
     expect(edgeForIcon({ x: -100, y: -60 }, 1200, 800)).toBe("left");
-  });
-});
-
-describe("stashTabPos", () => {
-  it("pins to the correct edge coordinate", () => {
-    expect(stashTabPos({ x: 600, y: 400 }, "left", 1200, 800).x).toBe(0);
-    expect(stashTabPos({ x: 600, y: 400 }, "right", 1200, 800).x).toBe(
-      1200 - EDGE_TAB_THICKNESS,
-    );
-    expect(stashTabPos({ x: 600, y: 400 }, "top", 1200, 800).y).toBe(0);
-    expect(stashTabPos({ x: 600, y: 400 }, "bottom", 1200, 800).y).toBe(
-      800 - EDGE_TAB_THICKNESS,
-    );
-  });
-
-  it("clamps the along-edge coordinate on-screen", () => {
-    const p = stashTabPos({ x: 600, y: -9999 }, "left", 1200, 800);
-    expect(p.y).toBeGreaterThanOrEqual(ICON_MARGIN);
   });
 });

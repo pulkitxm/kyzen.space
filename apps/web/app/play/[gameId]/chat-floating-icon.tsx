@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { type CSSProperties, useCallback, useRef } from "react";
 import {
   FaChevronDown,
   FaChevronLeft,
@@ -13,14 +13,24 @@ import {
   EDGE_TAB_LENGTH,
   EDGE_TAB_THICKNESS,
   edgeForIcon,
+  ICON_MARGIN,
   ICON_SIZE,
   type IconPos,
   type StashEdge,
-  stashTabPos,
 } from "@/lib/chat-layout";
 import { cn } from "@/lib/utils";
 
 const DRAG_THRESHOLD = 4;
+
+// Position via CSS clamp() + vw/vh units so the server-rendered HTML matches the
+// first client paint exactly (no flash on reload, no window access during SSR).
+// clamp() also resolves the bottom-right sentinel (a huge stored coord) on its own.
+function clampX(px: number, reserve: number) {
+  return `clamp(${ICON_MARGIN}px, ${px}px, calc(100vw - ${reserve}px))`;
+}
+function clampY(px: number, reserve: number) {
+  return `clamp(${ICON_MARGIN}px, ${px}px, calc(100vh - ${reserve}px))`;
+}
 
 function Chevron({ edge }: { edge: StashEdge }) {
   const cls = "size-4";
@@ -101,13 +111,24 @@ export function ChatFloatingIcon({
   );
 
   if (stashEdge) {
-    const pos = stashTabPos(
-      icon,
-      stashEdge,
-      window.innerWidth,
-      window.innerHeight,
-    );
+    // Pin the cross-axis to the edge via CSS; clamp the along-edge coordinate
+    // (derived from the icon center) with vw/vh so SSR and client agree.
+    const centerX = icon.x + ICON_SIZE / 2;
+    const centerY = icon.y + ICON_SIZE / 2;
     const vertical = stashEdge === "left" || stashEdge === "right";
+    const style: CSSProperties = vertical
+      ? {
+          [stashEdge === "left" ? "left" : "right"]: 0,
+          top: clampY(centerY - EDGE_TAB_LENGTH / 2, EDGE_TAB_LENGTH + ICON_MARGIN),
+          width: EDGE_TAB_THICKNESS,
+          height: EDGE_TAB_LENGTH,
+        }
+      : {
+          [stashEdge === "top" ? "top" : "bottom"]: 0,
+          left: clampX(centerX - EDGE_TAB_LENGTH / 2, EDGE_TAB_LENGTH + ICON_MARGIN),
+          width: EDGE_TAB_LENGTH,
+          height: EDGE_TAB_THICKNESS,
+        };
     return (
       <button
         type="button"
@@ -116,12 +137,7 @@ export function ChatFloatingIcon({
           onCommit();
         }}
         aria-label="Show chat icon"
-        style={{
-          left: pos.x,
-          top: pos.y,
-          width: vertical ? EDGE_TAB_THICKNESS : EDGE_TAB_LENGTH,
-          height: vertical ? EDGE_TAB_LENGTH : EDGE_TAB_THICKNESS,
-        }}
+        style={style}
         className={cn(
           "fixed z-50 flex items-center justify-center bg-primary text-primary-foreground shadow-lg outline-none transition hover:bg-primary-hover",
           stashEdge === "left" && "rounded-r-lg",
@@ -140,7 +156,12 @@ export function ChatFloatingIcon({
       type="button"
       onMouseDown={startDrag}
       aria-label="Restore chat"
-      style={{ left: icon.x, top: icon.y, width: ICON_SIZE, height: ICON_SIZE }}
+      style={{
+        left: clampX(icon.x, ICON_SIZE + ICON_MARGIN),
+        top: clampY(icon.y, ICON_SIZE + ICON_MARGIN),
+        width: ICON_SIZE,
+        height: ICON_SIZE,
+      }}
       className="fixed z-50 flex cursor-grab items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl outline-none transition hover:bg-primary-hover active:cursor-grabbing"
     >
       <FaCommentDots className="size-6" />
