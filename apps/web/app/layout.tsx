@@ -95,11 +95,7 @@ export default async function RootLayout({
     initialUnreadNotifications = notif?.count ?? 0;
   }
 
-  const profileHref = signedIn
-    ? username
-      ? `/${username}`
-      : "/profile"
-    : "/auth";
+  const profileHref = signedIn ? "/profile" : "/auth";
 
   const cookieStore = await cookies();
   const prefCookieRaw = cookieStore.get(SIDEBAR_PREFS_COOKIE)?.value;
