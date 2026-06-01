@@ -13,10 +13,12 @@ bun install                 # install all workspace deps
 bun run dev                 # turbo: run web (:3000) + server (:4000) in watch mode
 bun run build               # turbo: build all (^build ordering: packages before apps)
 bun run test                # turbo: run every workspace's tests
-bun run typecheck           # tsc --noEmit across all workspaces
+bun run type-check          # tsc --noEmit across all workspaces (no build step; Turbo-cached)
 bun run check               # biome check (format + import organize, lint disabled)
 bun run fix                 # biome check --write (autofix formatting/imports)
 ```
+
+**Always run `bun run type-check` after making code changes and before declaring work done, committing, or opening a PR.** It's fast (no build step, Turbo-cached) and catches type errors that tests may miss. Fix any errors it reports before finishing.
 
 Per-workspace / single test (cd into the workspace, or use `--filter`):
 

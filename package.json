@@ -12,7 +12,7 @@
     "start": "turbo run start",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "typecheck": "turbo run typecheck",
+    "type-check": "turbo run type-check",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "fix": "biome check --write .",

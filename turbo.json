@@ -36,9 +36,7 @@
     "lint": {
       "dependsOn": ["^build"]
     },
-    "typecheck": {
-      "dependsOn": ["^build"]
-    },
+    "type-check": {},
     "test": {
       "dependsOn": ["^build"]
     }
