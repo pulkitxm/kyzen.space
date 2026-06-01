@@ -122,11 +122,11 @@ html:not(.dark) {
   --banner-fade: color-mix(in srgb, white 92%, transparent);
   --banner-curve: var(--surface);
 
-  --sidebar: var(--d);
+  --sidebar: color-mix(in srgb, var(--d) 82%, #ffffff);
   --sidebar-foreground: #eef1f8;
   --sidebar-primary: var(--v);
   --sidebar-primary-foreground: #f7f9fd;
-  --sidebar-accent: color-mix(in srgb, var(--d) 78%, var(--v));
+  --sidebar-accent: color-mix(in srgb, var(--d) 70%, var(--v));
   --sidebar-accent-foreground: #eef1f8;
   --sidebar-border: color-mix(in srgb, #ffffff 12%, transparent);
   --sidebar-ring: var(--v);
@@ -138,9 +138,10 @@ html:not(.dark) {
   --success-label-bg: color-mix(in srgb, var(--v) 16%, transparent);
   --success-label-text: var(--d);
 
-  /* Doodle background: subtle dark line over the pale page. */
-  --pattern-ink: color-mix(in srgb, #11151c 78%, var(--v));
-  --pattern-opacity: 0.05;
+  /* Doodle background: subtle dark line over the pale page. A pale page needs
+     more ink than the dark mode to register, so darken and lift opacity. */
+  --pattern-ink: color-mix(in srgb, #11151c 88%, var(--v));
+  --pattern-opacity: 0.09;
 
   color-scheme: light;
 }
