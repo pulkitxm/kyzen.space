@@ -177,8 +177,10 @@ export function ChatPopoutWindow({
         <FaExpand className="size-3.5" />
       </button>
 
-      {/* Chat content — STABLE position across modes (never remounts). */}
-      <div className="relative min-h-0 flex-1">{children}</div>
+      {/* Chat content — STABLE position across modes (never remounts). `flex`
+          makes the child stretch to full height so ConversationView's h-full
+          resolves (otherwise the message list/composer collapse). */}
+      <div className="relative flex min-h-0 flex-1">{children}</div>
 
       {/* Resize handle (popout only), bottom-left corner. */}
       {/** biome-ignore lint/a11y/noStaticElementInteractions: resize surface */}
