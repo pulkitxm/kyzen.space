@@ -10,7 +10,7 @@
     "lint": "tsc --noEmit",
     "test": "bun test tests",
     "test:integration": "bun --env-file=../../.env test integration",
-    "typecheck": "tsc --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@gamelobby/avatar": "workspace:*",

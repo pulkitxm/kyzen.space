@@ -8,7 +8,7 @@
     "start": "next start --port 3000",
     "lint": "eslint",
     "test": "bun test tests",
-    "typecheck": "tsc --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@dicebear/collection": "^9.0.0",
