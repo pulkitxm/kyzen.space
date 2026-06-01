@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
-import { FaCompress, FaExpand } from "react-icons/fa6";
+import { FaCompress, FaExpand, FaXmark } from "react-icons/fa6";
 import {
   type ChatMode,
   clampGeometry,
@@ -20,22 +20,27 @@ import { cn } from "@/lib/utils";
  */
 export function ChatPopoutWindow({
   mode,
+  minimized,
   geometry,
   chatWidth,
   mountedVisible,
   onPopOut,
   onDock,
+  onMinimize,
   onGeometryChange,
   onCommit,
   children,
 }: {
   mode: ChatMode;
+  /** When minimized the chrome hides but children stay mounted (socket alive). */
+  minimized: boolean;
   geometry: PopoutGeometry;
   chatWidth: number;
   /** mounted-mode visibility (mobile tab === "chat"); ignored when popped out. */
   mountedVisible: boolean;
   onPopOut: () => void;
   onDock: () => void;
+  onMinimize: () => void;
   onGeometryChange: (next: PopoutGeometry) => void;
   onCommit: () => void;
   children: ReactNode;
@@ -138,6 +143,7 @@ export function ChatPopoutWindow({
         // popout `left`/`top` offsets shove it off-screen. Both modes still give
         // the absolutely-positioned children a containing block.
         "flex min-h-0 flex-col bg-background",
+        minimized && "hidden",
         isPopout
           ? "fixed z-50 rounded-xl border border-border shadow-2xl"
           : cn(
@@ -158,28 +164,50 @@ export function ChatPopoutWindow({
         )}
       >
         <span className="font-medium text-muted-foreground text-xs">Chat</span>
-        <button
-          type="button"
-          onClick={onDock}
-          className="text-muted-foreground outline-none transition hover:text-foreground"
-          aria-label="Dock chat"
-        >
-          <FaCompress className="size-4" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onMinimize}
+            className="text-muted-foreground outline-none transition hover:text-foreground"
+            aria-label="Minimize chat"
+          >
+            <FaXmark className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onDock}
+            className="text-muted-foreground outline-none transition hover:text-foreground"
+            aria-label="Dock chat"
+          >
+            <FaCompress className="size-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Pop-out button overlay (mounted mode only). */}
-      <button
-        type="button"
-        onClick={onPopOut}
-        aria-label="Pop out chat"
+      {/* Mounted-mode overlay controls (md+ only): pop out + minimize. */}
+      <div
         className={cn(
-          "absolute top-3 right-3 z-10 rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground outline-none backdrop-blur transition hover:text-foreground",
-          isPopout ? "hidden" : "hidden md:block",
+          "absolute top-3 right-3 z-10 flex items-center gap-1.5",
+          isPopout ? "hidden" : "hidden md:flex",
         )}
       >
-        <FaExpand className="size-3.5" />
-      </button>
+        <button
+          type="button"
+          onClick={onPopOut}
+          aria-label="Pop out chat"
+          className="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground outline-none backdrop-blur transition hover:text-foreground"
+        >
+          <FaExpand className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={onMinimize}
+          aria-label="Minimize chat"
+          className="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground outline-none backdrop-blur transition hover:text-foreground"
+        >
+          <FaXmark className="size-3.5" />
+        </button>
+      </div>
 
       {/* Chat content — STABLE position across modes (never remounts). `flex`
           makes the child stretch to full height so ConversationView's h-full
