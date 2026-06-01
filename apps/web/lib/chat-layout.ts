@@ -5,10 +5,16 @@ export type ChatMode = "mounted" | "popout";
 
 export type PopoutGeometry = { x: number; y: number; w: number; h: number };
 
+export type StashEdge = "left" | "right" | "top" | "bottom";
+export type IconPos = { x: number; y: number };
+
 export type ChatLayout = {
   mode: ChatMode;
+  minimized: boolean;
+  stashEdge: StashEdge | null;
   chatWidth: number; // chat-pane width in px; the game pane flex-fills the rest
   popout: PopoutGeometry;
+  icon: IconPos; // last on-viewport floating-icon position (device-local)
 };
 
 // The chat pane is the bounded one (kept deliberately small); the game pane
@@ -26,6 +32,12 @@ export const MIN_CHAT_POPOUT_H = 320;
 export const MAX_CHAT_POPOUT_H = 900;
 export const POPOUT_MARGIN = 16;
 
+// Floating-icon (minimized) bounds.
+export const ICON_SIZE = 56;
+export const ICON_MARGIN = 16;
+export const EDGE_TAB_THICKNESS = 22; // how far the stash tab pokes in from the edge
+export const EDGE_TAB_LENGTH = 44; // tab size along the edge
+
 export const CHAT_LAYOUT_KEY = "gl_chat_layout";
 
 export const DEFAULT_POPOUT: PopoutGeometry = {
@@ -35,10 +47,15 @@ export const DEFAULT_POPOUT: PopoutGeometry = {
   h: 520,
 };
 
+export const DEFAULT_ICON: IconPos = { x: 100000, y: 100000 }; // sentinel → clampIcon pulls to bottom-right
+
 export const DEFAULT_CHAT_LAYOUT: ChatLayout = {
   mode: "mounted",
+  minimized: false,
+  stashEdge: null,
   chatWidth: DEFAULT_CHAT_W,
   popout: DEFAULT_POPOUT,
+  icon: DEFAULT_ICON,
 };
 
 function clampNum(
@@ -96,6 +113,74 @@ export function clampGeometry(
   };
 }
 
+function validStashEdge(v: unknown): StashEdge | null {
+  return v === "left" || v === "right" || v === "top" || v === "bottom"
+    ? v
+    : null;
+}
+
+/** Keep the floating icon fully on-screen; resolves the bottom-right sentinel. */
+export function clampIcon(icon: IconPos, vw: number, vh: number): IconPos {
+  const maxX = Math.max(ICON_MARGIN, vw - ICON_SIZE - ICON_MARGIN);
+  const maxY = Math.max(ICON_MARGIN, vh - ICON_SIZE - ICON_MARGIN);
+  return {
+    x: clampNum(icon.x, ICON_MARGIN, maxX, maxX),
+    y: clampNum(icon.y, ICON_MARGIN, maxY, maxY),
+  };
+}
+
+/** Which viewport edge the icon center has crossed (largest overshoot), or null. */
+export function edgeForIcon(
+  icon: IconPos,
+  vw: number,
+  vh: number,
+): StashEdge | null {
+  const cx = icon.x + ICON_SIZE / 2;
+  const cy = icon.y + ICON_SIZE / 2;
+  const overshoot: Array<[StashEdge, number]> = [
+    ["left", -cx],
+    ["right", cx - vw],
+    ["top", -cy],
+    ["bottom", cy - vh],
+  ];
+  let best: StashEdge | null = null;
+  let bestOver = 0;
+  for (const [edge, o] of overshoot) {
+    if (o > bestOver) {
+      bestOver = o;
+      best = edge;
+    }
+  }
+  return best;
+}
+
+/** Top-left coordinate for the edge-stash tab, derived from the icon's last position. */
+export function stashTabPos(
+  icon: IconPos,
+  edge: StashEdge,
+  vw: number,
+  vh: number,
+): IconPos {
+  const cx = icon.x + ICON_SIZE / 2;
+  const cy = icon.y + ICON_SIZE / 2;
+  if (edge === "left" || edge === "right") {
+    const y = clampNum(
+      cy - EDGE_TAB_LENGTH / 2,
+      ICON_MARGIN,
+      Math.max(ICON_MARGIN, vh - EDGE_TAB_LENGTH - ICON_MARGIN),
+      ICON_MARGIN,
+    );
+    return { x: edge === "left" ? 0 : vw - EDGE_TAB_THICKNESS, y };
+  }
+  const x = clampNum(
+    cx - EDGE_TAB_LENGTH / 2,
+    ICON_MARGIN,
+    Math.max(ICON_MARGIN, vw - EDGE_TAB_LENGTH - ICON_MARGIN),
+    ICON_MARGIN,
+  );
+  return { x, y: edge === "top" ? 0 : vh - EDGE_TAB_THICKNESS };
+}
+
 export function normalizeChatLayout(o: unknown): ChatLayout {
   if (typeof o !== "object" || o === null || Array.isArray(o))
     return DEFAULT_CHAT_LAYOUT;
@@ -104,14 +189,24 @@ export function normalizeChatLayout(o: unknown): ChatLayout {
     typeof r.popout === "object" && r.popout !== null
       ? (r.popout as Record<string, unknown>)
       : {};
+  const ic =
+    typeof r.icon === "object" && r.icon !== null
+      ? (r.icon as Record<string, unknown>)
+      : {};
   return {
     mode: r.mode === "popout" ? "popout" : "mounted",
+    minimized: r.minimized === true,
+    stashEdge: validStashEdge(r.stashEdge),
     chatWidth: clampNum(r.chatWidth, MIN_CHAT, MAX_CHAT, DEFAULT_CHAT_W),
     popout: {
       x: finiteOr(p.x, DEFAULT_POPOUT.x),
       y: finiteOr(p.y, DEFAULT_POPOUT.y),
       w: clampNum(p.w, MIN_CHAT_POPOUT_W, MAX_CHAT_POPOUT_W, DEFAULT_POPOUT.w),
       h: clampNum(p.h, MIN_CHAT_POPOUT_H, MAX_CHAT_POPOUT_H, DEFAULT_POPOUT.h),
+    },
+    icon: {
+      x: finiteOr(ic.x, DEFAULT_ICON.x),
+      y: finiteOr(ic.y, DEFAULT_ICON.y),
     },
   };
 }
