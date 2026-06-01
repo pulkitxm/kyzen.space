@@ -1,6 +1,7 @@
 import type {
   ConversationJson,
   FriendshipJson,
+  GameCardMeta,
   MessageJson,
   NotificationJson,
 } from "@gamelobby/chat-core";
@@ -15,19 +16,41 @@ import {
   conversations,
   type FriendshipRow,
   friends,
+  type GamePlayer,
+  games,
   type MessageRow,
   messages,
   type NotificationRow,
   profiles,
 } from "../db";
+import { enrichGameCardMeta } from "./game-card";
 
 // Hydrate DB rows into client DTOs (resolving the related public users).
+
+/** Resolve the live game state onto a `game_card` message's metadata so the
+ *  chat card renders the right status/winner on first paint. No-op otherwise. */
+async function withGameCardStatus(
+  msg: MessageJson,
+  row: MessageRow,
+): Promise<MessageJson> {
+  if (msg.kind !== "game_card" || !row.gameId || !msg.metadata) return msg;
+  const game = await games.getGameById(row.gameId);
+  if (!game) return msg;
+  return {
+    ...msg,
+    metadata: enrichGameCardMeta(msg.metadata as GameCardMeta, {
+      status: game.status,
+      winner: game.winner,
+      players: (game.players ?? []) as GamePlayer[],
+    }),
+  };
+}
 
 export async function assembleMessage(row: MessageRow): Promise<MessageJson> {
   const sender = row.senderId
     ? await profiles.getPublicUser(row.senderId)
     : null;
-  return serializeMessage(row, sender);
+  return withGameCardStatus(serializeMessage(row, sender), row);
 }
 
 export async function assembleMessages(
@@ -38,8 +61,13 @@ export async function assembleMessages(
   );
   const users = await profiles.getPublicUsers(ids);
   const byId = new Map(users.map((u) => [u.id, u]));
-  return rows.map((r) =>
-    serializeMessage(r, r.senderId ? (byId.get(r.senderId) ?? null) : null),
+  return Promise.all(
+    rows.map((r) =>
+      withGameCardStatus(
+        serializeMessage(r, r.senderId ? (byId.get(r.senderId) ?? null) : null),
+        r,
+      ),
+    ),
   );
 }
 

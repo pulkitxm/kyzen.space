@@ -44,6 +44,18 @@ export async function getByIds(ids: string[]): Promise<MessageRow[]> {
   return db.select().from(message).where(inArray(message.id, ids));
 }
 
+/** The `game_card` message that started a given game (one per game). */
+export async function getGameCardByGameId(
+  gameId: string,
+): Promise<MessageRow | null> {
+  const [row] = await db
+    .select()
+    .from(message)
+    .where(and(eq(message.gameId, gameId), eq(message.kind, "game_card")))
+    .limit(1);
+  return row ?? null;
+}
+
 /** Newest-first keyset page. Client reverses for display. */
 export async function listMessages(
   conversationId: string,

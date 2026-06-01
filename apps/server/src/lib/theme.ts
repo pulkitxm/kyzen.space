@@ -10,6 +10,13 @@ export const THEME_IDS = [
   "crimson-nights",
   "midnight-blue",
   "royal-ember",
+  "forest",
+  "violet",
+  "slate",
+  "amber",
+  "rose",
+  "cyan",
+  "csk",
 ] as const;
 
 export type ThemeId = (typeof THEME_IDS)[number];

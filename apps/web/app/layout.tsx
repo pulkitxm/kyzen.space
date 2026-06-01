@@ -3,12 +3,17 @@ import type { ConversationJson, FriendshipJson } from "@gamelobby/chat-core";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
-import Script from "next/script";
 
 import { AppShellClient } from "@/app/app-shell";
 import { Providers } from "@/app/providers";
 import { serverFetchJson } from "@/lib/api-server";
+import { CHAT_LAYOUT_BOOT_SCRIPT } from "@/lib/chat-layout";
 import { getServerSession } from "@/lib/get-server-session";
+import {
+  DEFAULT_PATTERN,
+  PATTERN_BOOT_SCRIPT,
+  type PatternId,
+} from "@/lib/patterns";
 import {
   parseSidebarPrefsCookieValue,
   SIDEBAR_LS_BOOT_SCRIPT,
@@ -49,6 +54,7 @@ export default async function RootLayout({
   let avatar: AvatarConfig | null = null;
   let userTheme: ThemeId | null = null;
   let userMode: ColorMode | null = null;
+  let userPattern: PatternId | null = null;
   // Seed chat/social state on the server (no client fetch on load); the socket
   // keeps these atoms live afterward.
   let initialConversations: ConversationJson[] = [];
@@ -64,6 +70,7 @@ export default async function RootLayout({
           avatar: AvatarConfig | null;
           theme: ThemeId;
           colorMode: ColorMode;
+          pattern: PatternId;
         };
       }>("/api/profiles/me"),
       serverFetchJson<{ conversations: ConversationJson[] }>(
@@ -80,6 +87,7 @@ export default async function RootLayout({
     avatar = me?.profile.avatar ?? null;
     userTheme = me?.profile.theme ?? null;
     userMode = me?.profile.colorMode ?? null;
+    userPattern = me?.profile.pattern ?? null;
     initialConversations = convs?.conversations ?? [];
     initialFriends = fr?.friends ?? [];
     initialIncoming = reqs?.incoming ?? [];
@@ -104,18 +112,44 @@ export default async function RootLayout({
       lang="en"
       suppressHydrationWarning
       data-theme={userTheme ?? DEFAULT_THEME}
+      data-pattern={userPattern ?? DEFAULT_PATTERN}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/*
+          Inline FOUC-prevention boot scripts: read cookies/localStorage and set
+          data-* attributes on <html> before paint. Authored as raw <script> tags
+          via dangerouslySetInnerHTML (not next/script) so React 19 hoists and
+          executes them from the initial HTML — passing inline code as text
+          children renders an inert <script> ("Scripts inside React components are
+          never executed when rendering on the client").
+        */}
+        <script
+          id="gl-sidebar-cookie-bootstrap"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline boot script
+          dangerouslySetInnerHTML={{ __html: SIDEBAR_LS_BOOT_SCRIPT }}
+        />
+        <script
+          id="gl-chat-layout-bootstrap"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline boot script
+          dangerouslySetInnerHTML={{ __html: CHAT_LAYOUT_BOOT_SCRIPT }}
+        />
+        <script
+          id="gl-palette-bootstrap"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline boot script
+          dangerouslySetInnerHTML={{ __html: PALETTE_BOOT_SCRIPT }}
+        />
+        <script
+          id="gl-pattern-bootstrap"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline boot script
+          dangerouslySetInnerHTML={{ __html: PATTERN_BOOT_SCRIPT }}
+        />
+      </head>
       <body className="min-h-full text-foreground">
-        <Script id="gl-sidebar-cookie-bootstrap" strategy="beforeInteractive">
-          {SIDEBAR_LS_BOOT_SCRIPT}
-        </Script>
-        <Script id="gl-palette-bootstrap" strategy="beforeInteractive">
-          {PALETTE_BOOT_SCRIPT}
-        </Script>
         <Providers
           initialPalette={userTheme}
           initialMode={userMode}
+          initialPattern={userPattern}
           signedIn={signedIn}
         >
           <AppShellClient

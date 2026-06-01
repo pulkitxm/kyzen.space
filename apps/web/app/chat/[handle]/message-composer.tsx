@@ -10,6 +10,7 @@ import {
 import { useStore } from "jotai";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BiSend } from "react-icons/bi";
 import { FaRegSmile } from "react-icons/fa";
 import {
   type ChatMessage,
@@ -248,7 +249,7 @@ export function MessageComposer({
         />
       ) : null}
       {pickerOpen ? (
-        <div className="absolute bottom-full left-3 z-20 mb-2">
+        <div className="absolute right-3 bottom-full z-20 mb-2">
           <ComposerPicker onEmoji={insertEmoji} onGif={sendGif} />
         </div>
       ) : null}
@@ -287,9 +288,10 @@ export function MessageComposer({
           type="button"
           onClick={() => void send()}
           disabled={!text.trim()}
-          className="h-11 shrink-0 rounded-2xl bg-primary px-5 font-medium text-primary-foreground text-sm transition hover:bg-primary-hover disabled:opacity-50"
+          aria-label="Send"
+          className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition hover:bg-primary-hover disabled:opacity-50"
         >
-          Send
+          <BiSend className="size-4" />
         </button>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { ThemePicker } from "@/app/settings/theme-picker";
+import { AppearanceTabs } from "@/app/settings/appearance-tabs";
 import { getServerSession } from "@/lib/get-server-session";
 
 export const metadata: Metadata = {
@@ -34,15 +34,15 @@ export default async function SettingsPage() {
             Appearance
           </h2>
           <p className="mt-0.5 text-muted-foreground text-sm">
-            Pick a color mode, then hover a palette to preview it live and click
-            to apply.
+            Switch between Theme and Doodles. Hover an option to preview it live
+            and click to apply.
             {signedIn
               ? " Your choices are saved to your account."
               : " Sign in to save your choices across devices."}
           </p>
         </div>
 
-        <ThemePicker signedIn={signedIn} />
+        <AppearanceTabs signedIn={signedIn} />
       </section>
     </div>
   );

@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 
 import { AppearanceProvider } from "@/lib/appearance";
+import { DEFAULT_PATTERN, type PatternId } from "@/lib/patterns";
 import {
   type ColorMode,
   DEFAULT_COLOR_MODE,
@@ -15,6 +16,7 @@ export function Providers({
   children,
   initialPalette,
   initialMode,
+  initialPattern,
   signedIn,
 }: {
   children: ReactNode;
@@ -22,6 +24,8 @@ export function Providers({
   initialPalette?: ThemeId | null;
   /** The signed-in user's persisted color mode, or null when signed out. */
   initialMode?: ColorMode | null;
+  /** The signed-in user's persisted background pattern, or null when signed out. */
+  initialPattern?: PatternId | null;
   signedIn: boolean;
 }) {
   return (
@@ -36,6 +40,7 @@ export function Providers({
       <AppearanceProvider
         initialPalette={initialPalette ?? DEFAULT_THEME}
         initialMode={initialMode ?? null}
+        initialPattern={initialPattern ?? DEFAULT_PATTERN}
         signedIn={signedIn}
       >
         {children}

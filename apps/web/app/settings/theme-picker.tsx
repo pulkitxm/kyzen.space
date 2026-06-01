@@ -7,9 +7,8 @@ import { useColorModeSetting, usePalette } from "@/lib/appearance";
 import {
   type ColorMode,
   DEFAULT_THEME,
-  type ThemeId,
   THEMES,
-  themeGradient,
+  type ThemeId,
 } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 
@@ -104,8 +103,12 @@ export function ThemePicker({ signedIn }: { signedIn: boolean }) {
               >
                 <div
                   className="relative h-28 w-full overflow-hidden rounded-xl shadow-inner"
-                  style={{ background: themeGradient(def) }}
+                  style={{ backgroundColor: def.deep }}
                 >
+                  <span
+                    className="absolute bottom-3 left-3 size-7 rounded-full ring-1 ring-white/15"
+                    style={{ backgroundColor: def.vivid }}
+                  />
                   {active ? (
                     <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
                       <FaCheck className="size-3" aria-hidden />

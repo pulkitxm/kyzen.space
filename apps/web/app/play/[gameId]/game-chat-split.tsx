@@ -1,5 +1,6 @@
 "use client";
 
+import { useAtomValue } from "jotai";
 import {
   type ReactNode,
   useCallback,
@@ -7,83 +8,244 @@ import {
   useRef,
   useState,
 } from "react";
+import { clientFetch } from "@/lib/api-client";
+import { messagesAtomFamily } from "@/lib/chat/atoms";
+import {
+  type ChatLayout,
+  type ChatMode,
+  clampChatWidth,
+  clampGeometry,
+  type IconPos,
+  type PopoutGeometry,
+  persistChatLayout,
+  readChatLayout,
+  type StashEdge,
+} from "@/lib/chat-layout";
 import { cn } from "@/lib/utils";
+import { ChatFloatingIcon } from "./chat-floating-icon";
+import { ChatPopoutWindow } from "./chat-popout-window";
 
-// Tic-tac-toe cells are ~size-24/28, so keep the game pane wide enough to never
-// break the board; chat takes the remainder.
-const MIN_GAME = 360;
-const MAX_GAME = 760;
-const DEFAULT_GAME = 480;
-const STORAGE_KEY = "gl_game_split";
+const SAVE_DEBOUNCE_MS = 600;
 
 /**
- * Side-by-side game + chat with a draggable divider (md+), collapsing to tabs
- * below md. The game and chat nodes are mounted once and only shown/hidden, so
- * switching tabs never tears down the game's socket.
+ * Side-by-side game + chat. The chat is the bounded right-hand pane (draggable
+ * divider, md+); the game pane flex-fills. Below md it collapses to tabs. The
+ * chat can pop out into a floating, draggable, resizable window; when popped out
+ * the game pane goes full-width. The chat subtree is mounted once and never
+ * remounts across mode toggles.
  */
 export function GameChatSplit({
+  conversationId,
   game,
   chat,
+  initialLayout,
+  layoutTrusted,
 }: {
+  /** Conversation rendered in `chat` — used to count unread while minimized. */
+  conversationId: string;
   game: ReactNode;
   chat: ReactNode;
+  /** Server-resolved layout (from the cookie, else DB, else default). */
+  initialLayout: ChatLayout;
+  /** True when `initialLayout` came from the cookie (matches localStorage). */
+  layoutTrusted: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef(false);
-  const widthRef = useRef(DEFAULT_GAME);
-  const [width, setWidth] = useState(DEFAULT_GAME);
+
+  // Seed from the server-resolved layout so the first client render matches the
+  // SSR HTML — no mounted→popout / width snap on load.
+  const [mode, setMode] = useState<ChatMode>(initialLayout.mode);
+  const [chatWidth, setChatWidth] = useState(initialLayout.chatWidth);
+  const [geometry, setGeometry] = useState<PopoutGeometry>(
+    initialLayout.popout,
+  );
+  const [minimized, setMinimized] = useState(initialLayout.minimized);
+  const [stashEdge, setStashEdge] = useState<StashEdge | null>(
+    initialLayout.stashEdge,
+  );
+  const [icon, setIcon] = useState<IconPos>(initialLayout.icon);
   const [tab, setTab] = useState<"game" | "chat">("game");
 
-  useEffect(() => {
-    const v = Number(localStorage.getItem(STORAGE_KEY));
-    if (Number.isFinite(v) && v >= MIN_GAME && v <= MAX_GAME) {
-      widthRef.current = v;
-      setWidth(v);
-    }
+  const modeRef = useRef(mode);
+  const widthRef = useRef(chatWidth);
+  const geomRef = useRef(geometry);
+  const minimizedRef = useRef(minimized);
+  const stashRef = useRef(stashEdge);
+  const iconRef = useRef(icon);
+  modeRef.current = mode;
+  widthRef.current = chatWidth;
+  geomRef.current = geometry;
+  minimizedRef.current = minimized;
+  stashRef.current = stashEdge;
+  iconRef.current = icon;
+
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // `override` lets callers persist a value they just set in the same event,
+  // before the matching ref has been refreshed by a re-render (e.g. the mode
+  // toggles call setMode + persist synchronously).
+  const persist = useCallback((override?: Partial<ChatLayout>) => {
+    const layout: ChatLayout = {
+      mode: override?.mode ?? modeRef.current,
+      minimized: override?.minimized ?? minimizedRef.current,
+      // `stashEdge` is nullable, so `null` is a real value — guard on undefined.
+      stashEdge:
+        override?.stashEdge !== undefined
+          ? override.stashEdge
+          : stashRef.current,
+      chatWidth: override?.chatWidth ?? widthRef.current,
+      popout: override?.popout ?? geomRef.current,
+      icon: override?.icon ?? iconRef.current,
+    };
+    persistChatLayout(layout);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void clientFetch("/api/profiles/me/chat-layout", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        // Only `mode` is synced cross-device; positions/sizes are device-local
+        // (localStorage + cookie above), so a desktop layout can't break mobile.
+        body: JSON.stringify({ mode: layout.mode }),
+      }).catch(() => {});
+    }, SAVE_DEBOUNCE_MS);
   }, []);
 
+  // Flush any pending debounced save when unmounting.
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (!draggingRef.current || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const next = Math.min(
-        MAX_GAME,
-        Math.max(MIN_GAME, e.clientX - rect.left),
-      );
-      widthRef.current = next;
-      setWidth(next);
-    };
-    const onUp = () => {
-      if (!draggingRef.current) return;
-      draggingRef.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      try {
-        localStorage.setItem(STORAGE_KEY, String(widthRef.current));
-      } catch {}
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
     return () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
+      if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, []);
 
-  const startDrag = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    draggingRef.current = true;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
+  // Initial state is already seeded from the SSR layout. Two post-hydration
+  // reconciliations remain:
+  //  1. If the cookie was absent at SSR (untrusted), localStorage may hold a
+  //     fresher layout than the DB/default we rendered — adopt it.
+  //  2. Pop-out is desktop-only: if we hydrated popout on a small screen, dock.
+  useEffect(() => {
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+    if (!layoutTrusted) {
+      const ls = readChatLayout();
+      if (ls) {
+        setMode(isDesktop ? ls.mode : "mounted");
+        setChatWidth(ls.chatWidth);
+        setGeometry(ls.popout);
+        setMinimized(isDesktop ? ls.minimized : false);
+        setStashEdge(ls.stashEdge);
+        setIcon(ls.icon);
+        return;
+      }
+    }
+    if (!isDesktop) setMode((m) => (m === "popout" ? "mounted" : m));
+  }, [layoutTrusted]);
+
+  // Re-clamp the chat width to keep both panes in-bounds as the container
+  // resizes (makes the min/max responsive).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setChatWidth((w) => clampChatWidth(w, el.clientWidth));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
-  const resetWidth = () => {
-    widthRef.current = DEFAULT_GAME;
-    setWidth(DEFAULT_GAME);
-    try {
-      localStorage.setItem(STORAGE_KEY, String(DEFAULT_GAME));
-    } catch {}
-  };
+  // Keep the floating window inside the viewport (concretizes the default
+  // sentinel to bottom-right, and re-clamps on window resize).
+  useEffect(() => {
+    const onResize = () =>
+      setGeometry((g) =>
+        clampGeometry(g, window.innerWidth, window.innerHeight),
+      );
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // If we drop below md while popped out, fall back to mounted.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const onChange = () => {
+      if (!mq.matches && modeRef.current === "popout") {
+        setMode("mounted");
+        persist({ mode: "mounted" });
+      }
+      // Minimize is desktop-only: restore the chat if we drop below md.
+      if (!mq.matches && minimizedRef.current) {
+        setMinimized(false);
+        setStashEdge(null);
+        persist({ minimized: false, stashEdge: null });
+      }
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [persist]);
+
+  // Divider drag (md+, mounted). Chat is the right-hand sized pane, so its width
+  // is measured from the container's right edge.
+  const startDrag = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const el = containerRef.current;
+      if (!el) return;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      const onMove = (ev: MouseEvent) => {
+        const rect = el.getBoundingClientRect();
+        setChatWidth(clampChatWidth(rect.right - ev.clientX, el.clientWidth));
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        persist();
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    [persist],
+  );
+
+  const popOut = useCallback(() => {
+    setMode("popout");
+    persist({ mode: "popout" });
+  }, [persist]);
+
+  const dock = useCallback(() => {
+    setMode("mounted");
+    persist({ mode: "mounted" });
+  }, [persist]);
+
+  // Unread badge: count messages that arrive while minimized (in-memory diff,
+  // snapshotted at minimize time, cleared on restore).
+  const messages = useAtomValue(messagesAtomFamily(conversationId));
+  const unreadBaseRef = useRef(messages.length);
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (!minimized) return;
+    setUnread(Math.max(0, messages.length - unreadBaseRef.current));
+  }, [messages.length, minimized]);
+
+  const minimize = useCallback(() => {
+    unreadBaseRef.current = messages.length;
+    setUnread(0);
+    setMinimized(true);
+    persist({ minimized: true });
+  }, [persist, messages.length]);
+
+  const restore = useCallback(() => {
+    setMinimized(false);
+    setStashEdge(null);
+    setUnread(0);
+    persist({ minimized: false, stashEdge: null });
+  }, [persist]);
+
+  const changeStash = useCallback((edge: StashEdge | null) => {
+    setStashEdge(edge);
+  }, []);
+
+  const isPopout = mode === "popout";
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -106,34 +268,54 @@ export function GameChatSplit({
         ))}
       </div>
 
-      <div ref={containerRef} className="flex min-h-0 flex-1">
+      <div ref={containerRef} className="relative flex min-h-0 flex-1">
+        {/* Game pane flex-fills; the board centers via its own max width. */}
         <div
-          style={{ width }}
           className={cn(
-            "min-h-0 overflow-auto max-md:!w-full md:shrink-0",
+            "min-h-0 min-w-0 flex-1 overflow-hidden",
             tab === "game" ? "flex" : "hidden md:flex",
           )}
         >
           <div className="min-h-0 w-full">{game}</div>
         </div>
 
-        {/* Draggable divider (md+ only); double-click resets. */}
+        {/* Draggable divider (md+, mounted only). */}
         <button
           type="button"
           aria-label="Resize"
           onMouseDown={startDrag}
-          onDoubleClick={resetWidth}
-          className="hidden w-1.5 shrink-0 cursor-col-resize bg-border/40 outline-none transition hover:bg-primary md:block"
+          className={cn(
+            "w-1.5 shrink-0 cursor-col-resize bg-border/40 outline-none transition hover:bg-primary",
+            isPopout ? "hidden" : "hidden md:block",
+          )}
         />
 
-        <div
-          className={cn(
-            "min-h-0 flex-1 border-border md:border-l",
-            tab === "chat" ? "flex" : "hidden md:flex",
-          )}
+        <ChatPopoutWindow
+          mode={mode}
+          minimized={minimized}
+          geometry={geometry}
+          chatWidth={chatWidth}
+          mountedVisible={tab === "chat"}
+          onPopOut={popOut}
+          onDock={dock}
+          onMinimize={minimize}
+          onGeometryChange={setGeometry}
+          onCommit={persist}
         >
           <div className="min-h-0 w-full">{chat}</div>
-        </div>
+        </ChatPopoutWindow>
+
+        {minimized && (
+          <ChatFloatingIcon
+            icon={icon}
+            stashEdge={stashEdge}
+            unread={unread}
+            onIconChange={setIcon}
+            onStashChange={changeStash}
+            onRestore={restore}
+            onCommit={persist}
+          />
+        )}
       </div>
     </div>
   );

@@ -300,7 +300,7 @@ export function ComposerPicker({
     !error && gifs.length === 0 && (loading || !cache.has(query));
 
   return (
-    <div className="flex h-[32rem] w-[26rem] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+    <div className="flex h-[32rem] w-[26rem] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}

@@ -1,0 +1,238 @@
+// Pure layout math + persistence helpers for the play-page game/chat split.
+// Mirror of apps/server/src/lib/chat-layout.ts — keep bounds in sync.
+
+export type ChatMode = "mounted" | "popout";
+
+export type PopoutGeometry = { x: number; y: number; w: number; h: number };
+
+export type StashEdge = "left" | "right" | "top" | "bottom";
+export type IconPos = { x: number; y: number };
+
+export type ChatLayout = {
+  mode: ChatMode;
+  minimized: boolean;
+  stashEdge: StashEdge | null;
+  chatWidth: number; // chat-pane width in px; the game pane flex-fills the rest
+  popout: PopoutGeometry;
+  icon: IconPos; // last on-viewport floating-icon position (device-local)
+};
+
+// The chat pane is the bounded one (kept deliberately small); the game pane
+// flex-fills the remainder, with the board centered by its own max width.
+// MIN_GAME guarantees the game pane always keeps room.
+export const MIN_GAME = 360;
+export const MIN_CHAT = 280;
+export const MAX_CHAT = 420;
+export const DEFAULT_CHAT_W = 360;
+
+// Floating-window size bounds.
+export const MIN_CHAT_POPOUT_W = 300;
+export const MAX_CHAT_POPOUT_W = 560;
+export const MIN_CHAT_POPOUT_H = 320;
+export const MAX_CHAT_POPOUT_H = 900;
+export const POPOUT_MARGIN = 16;
+
+// Floating-icon (minimized) bounds.
+export const ICON_SIZE = 56;
+export const ICON_MARGIN = 16;
+export const EDGE_TAB_THICKNESS = 22; // how far the stash tab pokes in from the edge
+export const EDGE_TAB_LENGTH = 44; // tab size along the edge
+
+export const CHAT_LAYOUT_KEY = "gl_chat_layout";
+
+export const DEFAULT_POPOUT: PopoutGeometry = {
+  x: 100000, // sentinel; clampGeometry pulls it to bottom-right
+  y: 100000,
+  w: 380,
+  h: 520,
+};
+
+export const DEFAULT_ICON: IconPos = { x: 100000, y: 100000 }; // sentinel → clampIcon pulls to bottom-right
+
+export const DEFAULT_CHAT_LAYOUT: ChatLayout = {
+  mode: "mounted",
+  minimized: false,
+  stashEdge: null,
+  chatWidth: DEFAULT_CHAT_W,
+  popout: DEFAULT_POPOUT,
+  icon: DEFAULT_ICON,
+};
+
+function clampNum(
+  n: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  const v = typeof n === "number" ? n : Number(n);
+  const base = Number.isFinite(v) ? v : fallback;
+  return Math.min(max, Math.max(min, base));
+}
+
+function finiteOr(n: unknown, fallback: number): number {
+  const v = typeof n === "number" ? n : Number(n);
+  return Number.isFinite(v) ? v : fallback;
+}
+
+/**
+ * Clamp the chat-pane width into [MIN_CHAT, MAX_CHAT], while keeping the game
+ * pane at least MIN_GAME wide for the given container. Responsive: callers
+ * re-run this on container resize.
+ */
+export function clampChatWidth(width: number, containerW: number): number {
+  const hi = Math.min(MAX_CHAT, containerW - MIN_GAME);
+  if (hi < MIN_CHAT) return MIN_CHAT; // container too small for both mins
+  return clampNum(width, MIN_CHAT, hi, DEFAULT_CHAT_W);
+}
+
+/** Clamp a floating-window geometry to the viewport (size + on-screen position). */
+export function clampGeometry(
+  geo: PopoutGeometry,
+  vw: number,
+  vh: number,
+): PopoutGeometry {
+  const w = clampNum(
+    geo.w,
+    MIN_CHAT_POPOUT_W,
+    Math.max(MIN_CHAT_POPOUT_W, Math.min(MAX_CHAT_POPOUT_W, vw)),
+    DEFAULT_POPOUT.w,
+  );
+  const h = clampNum(
+    geo.h,
+    MIN_CHAT_POPOUT_H,
+    Math.max(MIN_CHAT_POPOUT_H, Math.min(MAX_CHAT_POPOUT_H, vh)),
+    DEFAULT_POPOUT.h,
+  );
+  const maxX = Math.max(0, vw - w - POPOUT_MARGIN);
+  const maxY = Math.max(0, vh - h - POPOUT_MARGIN);
+  return {
+    w,
+    h,
+    x: clampNum(geo.x, 0, maxX, maxX),
+    y: clampNum(geo.y, 0, maxY, maxY),
+  };
+}
+
+function validStashEdge(v: unknown): StashEdge | null {
+  return v === "left" || v === "right" || v === "top" || v === "bottom"
+    ? v
+    : null;
+}
+
+/** Keep the floating icon fully on-screen; resolves the bottom-right sentinel. */
+export function clampIcon(icon: IconPos, vw: number, vh: number): IconPos {
+  const maxX = Math.max(ICON_MARGIN, vw - ICON_SIZE - ICON_MARGIN);
+  const maxY = Math.max(ICON_MARGIN, vh - ICON_SIZE - ICON_MARGIN);
+  return {
+    x: clampNum(icon.x, ICON_MARGIN, maxX, maxX),
+    y: clampNum(icon.y, ICON_MARGIN, maxY, maxY),
+  };
+}
+
+/** Which viewport edge the icon center has crossed (largest overshoot), or null. */
+export function edgeForIcon(
+  icon: IconPos,
+  vw: number,
+  vh: number,
+): StashEdge | null {
+  const cx = icon.x + ICON_SIZE / 2;
+  const cy = icon.y + ICON_SIZE / 2;
+  const overshoot: Array<[StashEdge, number]> = [
+    ["left", -cx],
+    ["right", cx - vw],
+    ["top", -cy],
+    ["bottom", cy - vh],
+  ];
+  let best: StashEdge | null = null;
+  let bestOver = 0;
+  for (const [edge, o] of overshoot) {
+    if (o > bestOver) {
+      bestOver = o;
+      best = edge;
+    }
+  }
+  return best;
+}
+
+export function normalizeChatLayout(o: unknown): ChatLayout {
+  if (typeof o !== "object" || o === null || Array.isArray(o))
+    return DEFAULT_CHAT_LAYOUT;
+  const r = o as Record<string, unknown>;
+  const p =
+    typeof r.popout === "object" && r.popout !== null
+      ? (r.popout as Record<string, unknown>)
+      : {};
+  const ic =
+    typeof r.icon === "object" && r.icon !== null
+      ? (r.icon as Record<string, unknown>)
+      : {};
+  return {
+    mode: r.mode === "popout" ? "popout" : "mounted",
+    minimized: r.minimized === true,
+    stashEdge: validStashEdge(r.stashEdge),
+    chatWidth: clampNum(r.chatWidth, MIN_CHAT, MAX_CHAT, DEFAULT_CHAT_W),
+    popout: {
+      x: finiteOr(p.x, DEFAULT_POPOUT.x),
+      y: finiteOr(p.y, DEFAULT_POPOUT.y),
+      w: clampNum(p.w, MIN_CHAT_POPOUT_W, MAX_CHAT_POPOUT_W, DEFAULT_POPOUT.w),
+      h: clampNum(p.h, MIN_CHAT_POPOUT_H, MAX_CHAT_POPOUT_H, DEFAULT_POPOUT.h),
+    },
+    icon: {
+      x: finiteOr(ic.x, DEFAULT_ICON.x),
+      y: finiteOr(ic.y, DEFAULT_ICON.y),
+    },
+  };
+}
+
+export function parseChatLayout(raw: string | null | undefined): ChatLayout {
+  if (!raw) return DEFAULT_CHAT_LAYOUT;
+  try {
+    return normalizeChatLayout(JSON.parse(raw));
+  } catch {
+    return DEFAULT_CHAT_LAYOUT;
+  }
+}
+
+export function readChatLayout(): ChatLayout | null {
+  try {
+    const raw = localStorage.getItem(CHAT_LAYOUT_KEY);
+    return raw ? parseChatLayout(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+// --- Cookie sync (server-readable, so SSR renders the right layout, no flash).
+// localStorage stays the source of truth; the cookie mirrors it for the server.
+
+export const CHAT_LAYOUT_COOKIE = CHAT_LAYOUT_KEY;
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 400;
+
+/** Parse the URI-encoded JSON cookie value (server + client). */
+export function parseChatLayoutCookie(value: string | undefined): ChatLayout {
+  if (!value) return DEFAULT_CHAT_LAYOUT;
+  try {
+    return normalizeChatLayout(JSON.parse(decodeURIComponent(value)));
+  } catch {
+    return DEFAULT_CHAT_LAYOUT;
+  }
+}
+
+/** Persist to localStorage (client) AND the cookie (next SSR, flash-free). */
+export function persistChatLayout(layout: ChatLayout): void {
+  const json = JSON.stringify(layout);
+  try {
+    localStorage.setItem(CHAT_LAYOUT_KEY, json);
+  } catch {}
+  try {
+    document.cookie = `${CHAT_LAYOUT_COOKIE}=${encodeURIComponent(json)}; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
+  } catch {}
+}
+
+// Runs before React hydrates: re-mirror localStorage into the cookie so the
+// next navigation's SSR matches (covers a cleared/expired cookie).
+export const CHAT_LAYOUT_BOOT_SCRIPT = `(function(){try{
+var K=${JSON.stringify(CHAT_LAYOUT_KEY)};
+var v=null;try{v=localStorage.getItem(K)}catch(e){}
+if(v){document.cookie=${JSON.stringify(CHAT_LAYOUT_COOKIE)}+"="+encodeURIComponent(v)+"; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax";}
+}catch(e){}})();`;

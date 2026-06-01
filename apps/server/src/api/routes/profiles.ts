@@ -2,6 +2,12 @@ import { seedAvatarConfig, validateAvatarConfig } from "@gamelobby/avatar";
 import { Hono } from "hono";
 import { getAuth } from "../../auth";
 import { games, profiles } from "../../db";
+import { validateChatModePref } from "../../lib/chat-layout";
+import {
+  DEFAULT_PATTERN,
+  isValidPattern,
+  type PatternId,
+} from "../../lib/pattern";
 import {
   type ColorMode,
   DEFAULT_COLOR_MODE,
@@ -48,6 +54,8 @@ export const profilesRouter = new Hono()
         avatar: profile.avatar ?? seedAvatarConfig(profile.username),
         theme: profile.theme ?? DEFAULT_THEME,
         colorMode: profile.colorMode ?? DEFAULT_COLOR_MODE,
+        pattern: profile.pattern ?? DEFAULT_PATTERN,
+        chatLayout: profile.chatLayout ?? null,
         createdAt: new Date(profile.createdAt).toISOString(),
       },
       user: {
@@ -70,8 +78,16 @@ export const profilesRouter = new Hono()
       return c.json({ error: "Invalid JSON" }, 400);
     }
 
-    const raw = (body ?? {}) as { theme?: unknown; colorMode?: unknown };
-    const patch: { theme?: ThemeId; colorMode?: ColorMode } = {};
+    const raw = (body ?? {}) as {
+      theme?: unknown;
+      colorMode?: unknown;
+      pattern?: unknown;
+    };
+    const patch: {
+      theme?: ThemeId;
+      colorMode?: ColorMode;
+      pattern?: PatternId;
+    } = {};
 
     if (raw.theme !== undefined) {
       if (!isValidTheme(raw.theme))
@@ -83,11 +99,39 @@ export const profilesRouter = new Hono()
         return c.json({ error: "Invalid colorMode" }, 400);
       patch.colorMode = raw.colorMode;
     }
-    if (patch.theme === undefined && patch.colorMode === undefined)
+    if (raw.pattern !== undefined) {
+      if (!isValidPattern(raw.pattern))
+        return c.json({ error: "Invalid pattern" }, 400);
+      patch.pattern = raw.pattern;
+    }
+    if (
+      patch.theme === undefined &&
+      patch.colorMode === undefined &&
+      patch.pattern === undefined
+    )
       return c.json({ error: "Nothing to update" }, 400);
 
     await profiles.updateAppearance(session.user.id, patch);
     return c.json(patch);
+  })
+  .put("/me/chat-layout", async (c) => {
+    const session = await getAuth().api.getSession({
+      headers: c.req.raw.headers,
+    });
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+
+    const pref = validateChatModePref(body);
+    if (!pref) return c.json({ error: "Invalid layout" }, 400);
+
+    await profiles.updateChatLayout(session.user.id, pref);
+    return c.json(pref);
   })
   .put("/me/avatar", async (c) => {
     const session = await getAuth().api.getSession({

@@ -69,7 +69,7 @@ function GifMessage({
         }
         aria-label={gif.title ? `Open GIF: ${gif.title}` : "Open GIF"}
         className={cn(
-          "block overflow-hidden rounded-xl outline-none transition hover:opacity-90",
+          "block max-w-full overflow-hidden rounded-xl outline-none transition hover:opacity-90",
           pending && "opacity-60",
         )}
         style={{ width }}
