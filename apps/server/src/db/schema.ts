@@ -20,7 +20,8 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
-import type { ChatLayout } from "../lib/chat-layout";
+import type { ChatMode } from "../lib/chat-layout";
+import { DEFAULT_PATTERN, PATTERN_IDS } from "../lib/pattern";
 import {
   COLOR_MODES,
   DEFAULT_COLOR_MODE,
@@ -30,6 +31,7 @@ import {
 
 export const themeEnum = pgEnum("app_theme", THEME_IDS);
 export const colorModeEnum = pgEnum("color_mode", COLOR_MODES);
+export const patternEnum = pgEnum("app_pattern", PATTERN_IDS);
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -154,7 +156,8 @@ export const userProfile = pgTable("user_profile", {
   avatar: jsonb("avatar").$type<AvatarConfig | null>(),
   theme: themeEnum("theme").notNull().default(DEFAULT_THEME),
   colorMode: colorModeEnum("color_mode").notNull().default(DEFAULT_COLOR_MODE),
-  chatLayout: jsonb("chat_layout").$type<ChatLayout | null>(),
+  pattern: patternEnum("pattern").notNull().default(DEFAULT_PATTERN),
+  chatLayout: jsonb("chat_layout").$type<{ mode: ChatMode } | null>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

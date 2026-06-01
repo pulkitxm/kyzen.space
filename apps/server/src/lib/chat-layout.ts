@@ -46,23 +46,16 @@ function finiteOr(n: unknown, fallback: number): number {
   return Number.isFinite(v) ? v : fallback;
 }
 
-/** Returns a normalized, clamped ChatLayout, or null if `input` is not an object. */
-export function validateChatLayout(input: unknown): ChatLayout | null {
+export type ChatModePref = { mode: ChatMode };
+
+/**
+ * Validate the cross-device chat preference. Only `mode` is stored server-side;
+ * positions/sizes are device-local (localStorage + cookie on the web), so a
+ * desktop layout can never break the mobile UI.
+ */
+export function validateChatModePref(input: unknown): ChatModePref | null {
   if (typeof input !== "object" || input === null || Array.isArray(input))
     return null;
   const r = input as Record<string, unknown>;
-  const p =
-    typeof r.popout === "object" && r.popout !== null
-      ? (r.popout as Record<string, unknown>)
-      : {};
-  return {
-    mode: r.mode === "popout" ? "popout" : "mounted",
-    chatWidth: clampNum(r.chatWidth, MIN_CHAT, MAX_CHAT, DEFAULT_CHAT_W),
-    popout: {
-      x: finiteOr(p.x, DEFAULT_POPOUT.x),
-      y: finiteOr(p.y, DEFAULT_POPOUT.y),
-      w: clampNum(p.w, MIN_CHAT_POPOUT_W, MAX_CHAT_POPOUT_W, DEFAULT_POPOUT.w),
-      h: clampNum(p.h, MIN_CHAT_POPOUT_H, MAX_CHAT_POPOUT_H, DEFAULT_POPOUT.h),
-    },
-  };
+  return { mode: r.mode === "popout" ? "popout" : "mounted" };
 }

@@ -1,47 +1,24 @@
 import { describe, expect, it } from "bun:test";
-import {
-  MAX_CHAT,
-  MAX_CHAT_POPOUT_W,
-  MIN_CHAT,
-  validateChatLayout,
-} from "../src/lib/chat-layout";
+import { validateChatModePref } from "../src/lib/chat-layout";
 
-describe("validateChatLayout", () => {
+describe("validateChatModePref", () => {
   it("rejects non-objects", () => {
     for (const v of [null, undefined, "x", 5, true, []])
-      expect(validateChatLayout(v)).toBeNull();
+      expect(validateChatModePref(v)).toBeNull();
   });
 
-  it("defaults a bare object to mounted mode with clamped fields", () => {
-    const out = validateChatLayout({});
-    expect(out).not.toBeNull();
-    expect(out?.mode).toBe("mounted");
-    expect(out?.chatWidth).toBeGreaterThanOrEqual(MIN_CHAT);
-    expect(out?.chatWidth).toBeLessThanOrEqual(MAX_CHAT);
+  it("defaults an unknown or missing mode to mounted", () => {
+    expect(validateChatModePref({})).toEqual({ mode: "mounted" });
+    expect(validateChatModePref({ mode: "weird" })).toEqual({ mode: "mounted" });
   });
 
-  it("coerces an unknown mode to mounted and keeps a valid one", () => {
-    expect(validateChatLayout({ mode: "weird" })?.mode).toBe("mounted");
-    expect(validateChatLayout({ mode: "popout" })?.mode).toBe("popout");
+  it("keeps a valid popout mode", () => {
+    expect(validateChatModePref({ mode: "popout" })).toEqual({ mode: "popout" });
   });
 
-  it("clamps out-of-range numbers", () => {
-    const out = validateChatLayout({
-      mode: "popout",
-      chatWidth: 99999,
-      popout: { x: 10, y: 20, w: 99999, h: -5 },
-    });
-    expect(out?.chatWidth).toBe(MAX_CHAT);
-    expect(out?.popout.w).toBe(MAX_CHAT_POPOUT_W);
-    expect(out?.popout.x).toBe(10);
-  });
-
-  it("falls back to defaults for non-finite numbers", () => {
-    const out = validateChatLayout({
-      chatWidth: "abc",
-      popout: { x: "nope", y: null, w: undefined, h: Number.NaN },
-    });
-    expect(Number.isFinite(out?.chatWidth)).toBe(true);
-    expect(Number.isFinite(out?.popout.w)).toBe(true);
+  it("ignores any geometry fields (device-local, never stored)", () => {
+    expect(
+      validateChatModePref({ mode: "popout", chatWidth: 999, popout: { x: 1 } }),
+    ).toEqual({ mode: "popout" });
   });
 });
