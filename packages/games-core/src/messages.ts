@@ -27,14 +27,6 @@ export type GameJson = {
   updatedAt?: string | null;
 };
 
-/** Lightweight live status broadcast to a conversation so its game card updates. */
-export type ServerGameUpdatePayload = {
-  gameId: string;
-  status: string;
-  winner: string | null;
-  players: { userId: string; username: string; role: string }[];
-};
-
 export type MoveJson = {
   id: string;
   gameId: string;

@@ -50,13 +50,25 @@ export type GifMeta = {
   blurPreview?: string;
 };
 
-/** Render snapshot stored on a `kind: "game_card"` message. Live status comes from the game itself. */
+/** Render snapshot stored on a `kind: "game_card"` message. The trailing fields
+ *  are NOT persisted — the server resolves the game's live state onto the
+ *  metadata when it assembles the message (and re-broadcasts on status change),
+ *  so the card renders the correct status/winner on first paint with no client
+ *  lookup. They are optional only for legacy/never-resolved messages. */
 export type GameCardMeta = {
   gameId: string;
   gameType: string;
   seatingMode: "open" | "challenge";
   challengedUserId?: string | null;
   creatorUsername: string;
+  /** Current game status ("waiting" | "active" | "completed" | …). */
+  status?: string;
+  /** Winner userId, or "draw"; null until the game completes. */
+  winner?: string | null;
+  /** Winner's display name; null for a draw or unfinished game. */
+  winnerUsername?: string | null;
+  /** Seated players, for the viewer-specific action (Open vs Spectate/Join). */
+  players?: { userId: string; username: string; role: string }[];
 };
 
 export type SystemEvent =

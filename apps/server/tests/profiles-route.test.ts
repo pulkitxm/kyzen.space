@@ -20,7 +20,7 @@ let storedProfile: Profile = null;
 const updateAvatarCalls: Array<{ userId: string; avatar: AvatarConfig }> = [];
 const updateAppearanceCalls: Array<{
   userId: string;
-  patch: { theme?: string; colorMode?: string };
+  patch: { theme?: string; colorMode?: string; pattern?: string };
 }> = [];
 
 mock.module("../src/auth", () => ({
@@ -39,7 +39,7 @@ mock.module("../src/db", () => ({
     },
     updateAppearance: async (
       userId: string,
-      patch: { theme?: string; colorMode?: string },
+      patch: { theme?: string; colorMode?: string; pattern?: string },
     ) => {
       updateAppearanceCalls.push({ userId, patch });
     },
@@ -119,6 +119,19 @@ describe("PUT /me/appearance", () => {
       const res = await putAppearance({ colorMode: "sepia" });
       expect(res.status).toBe(400);
       expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("rejects an invalid pattern", async () => {
+      const res = await putAppearance({ pattern: "scribbles" });
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("persists a valid pattern", async () => {
+      const res = await putAppearance({ pattern: "games" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ pattern: "games" });
+      expect(updateAppearanceCalls[0]!.patch).toEqual({ pattern: "games" });
     });
 
     it("returns 400 when nothing is provided", async () => {

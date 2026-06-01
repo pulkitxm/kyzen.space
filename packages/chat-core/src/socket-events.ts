@@ -53,8 +53,6 @@ export const CHAT_EVENTS = {
   typingUpdate: "typing_update",
   presenceUpdate: "presence_update",
   presenceSnapshot: "presence_snapshot",
-  // phase 3 — live game-card status, broadcast to the game's conversation room
-  gameUpdate: "game_update",
 } as const;
 
 /** Ack callbacks resolve to a success payload or an error. */

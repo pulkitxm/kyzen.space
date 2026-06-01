@@ -8,7 +8,6 @@ import {
   PALETTE_BOOT_SCRIPT,
   THEME_IDS,
   THEMES,
-  themeGradient,
 } from "../lib/themes";
 
 describe("theme catalog", () => {
@@ -24,10 +23,8 @@ describe("theme catalog", () => {
     }
   });
 
-  it("themeGradient interpolates both stops", () => {
-    const g = themeGradient(THEMES[0]!);
-    expect(g).toContain(THEMES[0]!.deep);
-    expect(g).toContain(THEMES[0]!.vivid);
+  it("offers the full set of palettes", () => {
+    expect(THEMES).toHaveLength(11);
   });
 });
 

@@ -30,7 +30,6 @@ export type {
   ServerErrorPayload,
   ServerGameOverPayload,
   ServerGameStatePayload,
-  ServerGameUpdatePayload,
   ServerMoveMadePayload,
 } from "./messages";
 export {

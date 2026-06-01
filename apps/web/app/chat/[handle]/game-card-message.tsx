@@ -3,7 +3,6 @@
 import type { GameCardMeta } from "@gamelobby/chat-core";
 import Link from "next/link";
 import { FaGamepad } from "react-icons/fa";
-import { useGameSummary } from "@/lib/chat/use-game-summary";
 import { GAMES } from "@/lib/games";
 import { cn } from "@/lib/utils";
 
@@ -12,9 +11,11 @@ function gameName(gameType: string): string {
 }
 
 /**
- * In-chat game card. Live status (waiting/active/completed + winner) comes from
- * the shared game-summary atom; the action adapts to the viewer (Join/Accept/
- * Open/Spectate) and links to the side-by-side /play view.
+ * In-chat game card. Status, winner and players are resolved server-side onto
+ * the message metadata (see enrichGameCardMeta) and re-broadcast over
+ * `message_updated` as the game progresses, so the card renders the right state
+ * on first paint with no client-side game lookup. The action adapts to the
+ * viewer (Join/Accept/Open/Spectate) and links to the side-by-side /play view.
  */
 export function GameCardMessage({
   gameId,
@@ -25,9 +26,8 @@ export function GameCardMessage({
   meta: GameCardMeta;
   userId: string;
 }) {
-  const summary = useGameSummary(gameId);
-  const status = summary?.status ?? "waiting";
-  const players = summary?.players ?? [];
+  const status = meta.status ?? "waiting";
+  const players = meta.players ?? [];
   const isPlayer = players.some((p) => p.userId === userId);
   const isChallenged = meta.challengedUserId === userId;
 
@@ -47,10 +47,10 @@ export function GameCardMessage({
   } else if (status === "completed") {
     tone = "bg-surface-overlay text-muted-foreground";
     statusText =
-      summary?.winner === "draw"
+      meta.winner === "draw"
         ? "Draw"
-        : summary?.winner
-          ? `${players.find((p) => p.userId === summary.winner)?.username ?? "Someone"} won`
+        : meta.winner
+          ? `${meta.winnerUsername ?? "Someone"} won`
           : "Finished";
   }
 
@@ -58,7 +58,7 @@ export function GameCardMessage({
     action === "Spectate" ? `/play/${gameId}?spectate=1` : `/play/${gameId}`;
 
   return (
-    <div className="w-[min(20rem,85vw)] rounded-2xl border border-border bg-surface-raised p-3">
+    <div className="w-80 max-w-full rounded-2xl border border-border bg-surface-raised p-3">
       <div className="flex items-center gap-2.5">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <FaGamepad className="size-5" />

@@ -1,16 +1,15 @@
-import { CHAT_EVENTS } from "@gamelobby/chat-core";
 import {
   type ClientJoinRoom,
   type ClientMakeMove,
   getEngine,
   type Outcome,
   type ServerGameStatePayload,
-  type ServerGameUpdatePayload,
 } from "@gamelobby/games-core";
 import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
+import { broadcastGameCard } from "../chat/game-card-broadcast";
 import { type GamePlayer, type GameRow, games, profiles } from "../db";
-import { emitToConv, emitToGame, joinGameRoom } from "./rooms";
+import { emitToGame, joinGameRoom } from "./rooms";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,19 +25,6 @@ async function emitFullState(io: IOServer, gameRow: GameRow) {
     moves: moves.map(serializeMove),
   };
   emitToGame(io, gameRow.id, "game_state", payload);
-}
-
-/** Broadcast lightweight live status to the game's conversation, so in-chat
- * game cards update without anyone opening the game. No-op for legacy games. */
-function emitGameUpdate(io: IOServer, gameRow: GameRow): void {
-  if (!gameRow.conversationId) return;
-  const payload: ServerGameUpdatePayload = {
-    gameId: gameRow.id,
-    status: gameRow.status,
-    winner: gameRow.winner,
-    players: (gameRow.players ?? []) as GamePlayer[],
-  };
-  emitToConv(io, gameRow.conversationId, CHAT_EVENTS.gameUpdate, payload);
 }
 
 /**
@@ -134,7 +120,7 @@ export async function handleJoinRoom(
 
   joinGameRoom(socket, payload.gameId);
   await emitFullState(io, game);
-  if (changed) emitGameUpdate(io, game);
+  if (changed) await broadcastGameCard(io, game.id);
 }
 
 export async function handleMakeMove(
@@ -182,6 +168,8 @@ export async function handleMakeMove(
 
   if (updated.status === "completed") {
     emitToGame(io, gameRow.id, "game_over", { winner: updated.winner });
-    emitGameUpdate(io, updated);
+    // The move ended the game: refresh the in-chat card so it shows the result.
+    // Its status is resolved server-side on assembly (see enrichGameCardMeta).
+    await broadcastGameCard(io, updated.id);
   }
 }

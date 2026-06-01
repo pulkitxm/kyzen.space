@@ -21,15 +21,6 @@ export const recentEmojisAtom = atomWithStorage<string[]>(
 export type GifCacheEntry = { gifs: GifJson[]; nextOffset: number | null };
 export const gifCacheAtom = atom<Map<string, GifCacheEntry>>(new Map());
 
-/** Live status for in-chat game cards, keyed by gameId. Seeded by each card's
- * initial fetch and kept live by `game_update` socket broadcasts. */
-export type GameSummary = {
-  status: string;
-  winner: string | null;
-  players: { userId: string; username: string; role: string }[];
-};
-export const gameSummariesAtom = atom<Map<string, GameSummary>>(new Map());
-
 /** A message in the client store; optimistic sends carry `pending` + `clientId`. */
 export type ChatMessage = MessageJson & {
   pending?: boolean;

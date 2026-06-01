@@ -1,0 +1,1 @@
+ALTER TYPE "public"."app_pattern" ADD VALUE 'nature' BEFORE 'none';

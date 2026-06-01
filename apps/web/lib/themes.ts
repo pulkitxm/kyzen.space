@@ -10,6 +10,13 @@ export const THEME_IDS = [
   "crimson-nights",
   "midnight-blue",
   "royal-ember",
+  "forest",
+  "violet",
+  "slate",
+  "amber",
+  "rose",
+  "cyan",
+  "csk",
 ] as const;
 
 export type ThemeId = (typeof THEME_IDS)[number];
@@ -27,7 +34,7 @@ export interface ThemeDef {
   name: string;
   /** Short blurb shown under the name on the picker card. */
   blurb: string;
-  /** The two brand colors — deep base + vivid accent (the image's hex pair). */
+  /** The two brand colors — deep base + vivid accent (solid; no gradients). */
   deep: string;
   vivid: string;
 }
@@ -61,6 +68,55 @@ export const THEMES: ThemeDef[] = [
     deep: "#013f4a",
     vivid: "#068562",
   },
+  {
+    id: "forest",
+    name: "Forest",
+    blurb: "Pine & green",
+    deep: "#05140d",
+    vivid: "#22a559",
+  },
+  {
+    id: "violet",
+    name: "Violet",
+    blurb: "Indigo & purple",
+    deep: "#0d0a1f",
+    vivid: "#7c3aed",
+  },
+  {
+    id: "slate",
+    name: "Slate",
+    blurb: "Graphite & sky",
+    deep: "#0f1319",
+    vivid: "#4f8fd6",
+  },
+  {
+    id: "amber",
+    name: "Amber",
+    blurb: "Espresso & gold",
+    deep: "#1a0f04",
+    vivid: "#e0921f",
+  },
+  {
+    id: "rose",
+    name: "Rose",
+    blurb: "Wine & pink",
+    deep: "#1f0712",
+    vivid: "#e84d8a",
+  },
+  {
+    id: "cyan",
+    name: "Cyan",
+    blurb: "Teal & cyan",
+    deep: "#03161a",
+    vivid: "#06b6d4",
+  },
+  {
+    id: "csk",
+    name: "Super Kings",
+    blurb: "Yellow & navy",
+    deep: "#0a1b40",
+    vivid: "#fdb913",
+  },
 ];
 
 const THEME_SET = new Set<string>(THEME_IDS);
@@ -76,11 +132,6 @@ export function isValidColorMode(value: unknown): value is ColorMode {
 
 export function getThemeDef(id: string): ThemeDef | undefined {
   return THEMES.find((t) => t.id === id);
-}
-
-/** The theme's signature gradient (deep -> vivid), matching the in-app dark look. */
-export function themeGradient(def: ThemeDef): string {
-  return `linear-gradient(160deg, ${def.deep} 0%, ${def.vivid} 100%)`;
 }
 
 // --- Palette boot (no-flash) -------------------------------------------------
