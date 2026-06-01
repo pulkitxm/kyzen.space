@@ -131,11 +131,13 @@ export function ChatPopoutWindow({
     <div
       style={style}
       className={cn(
+        // No `overflow-hidden` here: the emoji/GIF picker is an absolutely
+        // positioned popover that must be allowed to spill outside the window.
         // `relative`/`fixed` are mutually exclusive position utilities — never
         // emit both, or Tailwind's source order can let `relative` win and the
         // popout `left`/`top` offsets shove it off-screen. Both modes still give
         // the absolutely-positioned children a containing block.
-        "flex min-h-0 flex-col overflow-hidden bg-background",
+        "flex min-h-0 flex-col bg-background",
         isPopout
           ? "fixed z-50 rounded-xl border border-border shadow-2xl"
           : cn(
@@ -149,7 +151,9 @@ export function ChatPopoutWindow({
       <div
         onMouseDown={startDrag}
         className={cn(
-          "shrink-0 select-none cursor-move items-center justify-between border-border border-b bg-muted/40 px-3 py-2",
+          // rounded-t-xl keeps the corners clean now that the window no longer
+          // clips with overflow-hidden.
+          "shrink-0 select-none cursor-move items-center justify-between rounded-t-xl border-border border-b bg-muted/40 px-3 py-2",
           isPopout ? "flex" : "hidden",
         )}
       >

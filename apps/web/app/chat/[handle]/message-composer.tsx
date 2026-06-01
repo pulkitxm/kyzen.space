@@ -248,7 +248,7 @@ export function MessageComposer({
         />
       ) : null}
       {pickerOpen ? (
-        <div className="absolute inset-x-3 bottom-full z-20 mb-2">
+        <div className="absolute right-3 bottom-full z-20 mb-2">
           <ComposerPicker onEmoji={insertEmoji} onGif={sendGif} />
         </div>
       ) : null}
