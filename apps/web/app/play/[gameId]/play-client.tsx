@@ -15,7 +15,8 @@ export function PlayClient({
   conversation,
   initialMessages,
   initialNextCursor,
-  dbLayout,
+  initialLayout,
+  layoutTrusted,
 }: {
   gameId: string;
   userId: string;
@@ -25,7 +26,8 @@ export function PlayClient({
   conversation: ConversationJson | null;
   initialMessages: MessageJson[];
   initialNextCursor: string | null;
-  dbLayout: ChatLayout | null;
+  initialLayout: ChatLayout;
+  layoutTrusted: boolean;
 }) {
   const GameClient = getGameClient(gameType);
 
@@ -51,7 +53,8 @@ export function PlayClient({
 
   return (
     <GameChatSplit
-      dbLayout={dbLayout}
+      initialLayout={initialLayout}
+      layoutTrusted={layoutTrusted}
       game={gameNode}
       chat={
         <ConversationView

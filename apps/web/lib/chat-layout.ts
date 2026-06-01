@@ -134,8 +134,37 @@ export function readChatLayout(): ChatLayout | null {
   }
 }
 
-export function writeChatLayout(layout: ChatLayout): void {
+// --- Cookie sync (server-readable, so SSR renders the right layout, no flash).
+// localStorage stays the source of truth; the cookie mirrors it for the server.
+
+export const CHAT_LAYOUT_COOKIE = CHAT_LAYOUT_KEY;
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 400;
+
+/** Parse the URI-encoded JSON cookie value (server + client). */
+export function parseChatLayoutCookie(value: string | undefined): ChatLayout {
+  if (!value) return DEFAULT_CHAT_LAYOUT;
   try {
-    localStorage.setItem(CHAT_LAYOUT_KEY, JSON.stringify(layout));
+    return normalizeChatLayout(JSON.parse(decodeURIComponent(value)));
+  } catch {
+    return DEFAULT_CHAT_LAYOUT;
+  }
+}
+
+/** Persist to localStorage (client) AND the cookie (next SSR, flash-free). */
+export function persistChatLayout(layout: ChatLayout): void {
+  const json = JSON.stringify(layout);
+  try {
+    localStorage.setItem(CHAT_LAYOUT_KEY, json);
+  } catch {}
+  try {
+    document.cookie = `${CHAT_LAYOUT_COOKIE}=${encodeURIComponent(json)}; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
   } catch {}
 }
+
+// Runs before React hydrates: re-mirror localStorage into the cookie so the
+// next navigation's SSR matches (covers a cleared/expired cookie).
+export const CHAT_LAYOUT_BOOT_SCRIPT = `(function(){try{
+var K=${JSON.stringify(CHAT_LAYOUT_KEY)};
+var v=null;try{v=localStorage.getItem(K)}catch(e){}
+if(v){document.cookie=${JSON.stringify(CHAT_LAYOUT_COOKIE)}+"="+encodeURIComponent(v)+"; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax";}
+}catch(e){}})();`;

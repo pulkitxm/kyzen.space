@@ -1,8 +1,14 @@
 import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
 import type { GameJson, MoveJson } from "@gamelobby/games-core";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";
-import type { ChatLayout } from "@/lib/chat-layout";
+import {
+  CHAT_LAYOUT_COOKIE,
+  type ChatLayout,
+  normalizeChatLayout,
+  parseChatLayoutCookie,
+} from "@/lib/chat-layout";
 import { getServerSession } from "@/lib/get-server-session";
 import { PlayClient } from "./play-client";
 
@@ -46,11 +52,21 @@ export default async function PlayPage({
     }
   }
 
-  // Pull the saved chat layout (DB fallback; localStorage wins on the client).
-  const me = await serverFetchJson<{
-    profile: { chatLayout: ChatLayout | null };
-  }>("/api/profiles/me");
-  const dbLayout = me?.profile?.chatLayout ?? null;
+  // Resolve the initial chat layout for flash-free SSR. The cookie mirrors the
+  // client's localStorage (written on every change + by the boot script), so
+  // when present it's the trusted source. Only when it's absent (e.g. first
+  // load on a new device) do we fall back to the DB (an extra fetch).
+  const layoutCookie = (await cookies()).get(CHAT_LAYOUT_COOKIE)?.value;
+  const layoutTrusted =
+    typeof layoutCookie === "string" && layoutCookie.length > 0;
+  let initialLayout = parseChatLayoutCookie(layoutCookie);
+  if (!layoutTrusted) {
+    const me = await serverFetchJson<{
+      profile: { chatLayout: ChatLayout | null };
+    }>("/api/profiles/me");
+    if (me?.profile?.chatLayout)
+      initialLayout = normalizeChatLayout(me.profile.chatLayout);
+  }
 
   return (
     <PlayClient
@@ -62,7 +78,8 @@ export default async function PlayPage({
       conversation={conversation}
       initialMessages={messages}
       initialNextCursor={nextCursor}
-      dbLayout={dbLayout}
+      initialLayout={initialLayout}
+      layoutTrusted={layoutTrusted}
     />
   );
 }

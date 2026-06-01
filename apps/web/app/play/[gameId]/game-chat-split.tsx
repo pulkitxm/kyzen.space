@@ -13,10 +13,9 @@ import {
   type ChatMode,
   clampChatWidth,
   clampGeometry,
-  DEFAULT_CHAT_LAYOUT,
   type PopoutGeometry,
+  persistChatLayout,
   readChatLayout,
-  writeChatLayout,
 } from "@/lib/chat-layout";
 import { cn } from "@/lib/utils";
 import { ChatPopoutWindow } from "./chat-popout-window";
@@ -33,18 +32,24 @@ const SAVE_DEBOUNCE_MS = 600;
 export function GameChatSplit({
   game,
   chat,
-  dbLayout,
+  initialLayout,
+  layoutTrusted,
 }: {
   game: ReactNode;
   chat: ReactNode;
-  dbLayout: ChatLayout | null;
+  /** Server-resolved layout (from the cookie, else DB, else default). */
+  initialLayout: ChatLayout;
+  /** True when `initialLayout` came from the cookie (matches localStorage). */
+  layoutTrusted: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [mode, setMode] = useState<ChatMode>("mounted");
-  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_LAYOUT.chatWidth);
+  // Seed from the server-resolved layout so the first client render matches the
+  // SSR HTML — no mounted→popout / width snap on load.
+  const [mode, setMode] = useState<ChatMode>(initialLayout.mode);
+  const [chatWidth, setChatWidth] = useState(initialLayout.chatWidth);
   const [geometry, setGeometry] = useState<PopoutGeometry>(
-    DEFAULT_CHAT_LAYOUT.popout,
+    initialLayout.popout,
   );
   const [tab, setTab] = useState<"game" | "chat">("game");
 
@@ -65,7 +70,7 @@ export function GameChatSplit({
       chatWidth: override?.chatWidth ?? widthRef.current,
       popout: override?.popout ?? geomRef.current,
     };
-    writeChatLayout(layout);
+    persistChatLayout(layout);
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       void clientFetch("/api/profiles/me/chat-layout", {
@@ -83,17 +88,24 @@ export function GameChatSplit({
     };
   }, []);
 
-  // Resolve initial layout: localStorage wins, then DB, then defaults.
-  // Pop-out is desktop-only — force mounted below md.
+  // Initial state is already seeded from the SSR layout. Two post-hydration
+  // reconciliations remain:
+  //  1. If the cookie was absent at SSR (untrusted), localStorage may hold a
+  //     fresher layout than the DB/default we rendered — adopt it.
+  //  2. Pop-out is desktop-only: if we hydrated popout on a small screen, dock.
   useEffect(() => {
-    const resolved = readChatLayout() ?? dbLayout ?? DEFAULT_CHAT_LAYOUT;
-    const isDesktop =
-      typeof window !== "undefined" &&
-      window.matchMedia("(min-width: 768px)").matches;
-    setMode(isDesktop ? resolved.mode : "mounted");
-    setChatWidth(resolved.chatWidth);
-    setGeometry(resolved.popout);
-  }, [dbLayout]);
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+    if (!layoutTrusted) {
+      const ls = readChatLayout();
+      if (ls) {
+        setMode(isDesktop ? ls.mode : "mounted");
+        setChatWidth(ls.chatWidth);
+        setGeometry(ls.popout);
+        return;
+      }
+    }
+    if (!isDesktop) setMode((m) => (m === "popout" ? "mounted" : m));
+  }, [layoutTrusted]);
 
   // Re-clamp the chat width to keep both panes in-bounds as the container
   // resizes (makes the min/max responsive).
