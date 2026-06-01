@@ -62,17 +62,22 @@ export function ChatFloatingIcon({
   onRestore: () => void;
   onCommit: () => void;
 }) {
-  const iconRef = useRef(icon);
-  iconRef.current = icon;
   const edgeRef = useRef(stashEdge);
   edgeRef.current = stashEdge;
+  // Set when a drag just ended so the trailing synthetic click (e.g. released
+  // on the edge tab) doesn't immediately un-stash.
+  const justDraggedRef = useRef(false);
 
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
+      // Origin = the bubble's ACTUAL on-screen rect, not the stored coord. The
+      // stored value may be the bottom-right sentinel that CSS clamp() resolves
+      // only at paint time; measuring keeps the drag math anchored to reality.
+      const rect = e.currentTarget.getBoundingClientRect();
+      const orig = { x: rect.left, y: rect.top };
       const startX = e.clientX;
       const startY = e.clientY;
-      const orig = iconRef.current;
       let moved = false;
       let lastInBounds = orig;
       const onMove = (ev: MouseEvent) => {
@@ -100,6 +105,10 @@ export function ChatFloatingIcon({
           onRestore();
           return;
         }
+        justDraggedRef.current = true;
+        requestAnimationFrame(() => {
+          justDraggedRef.current = false;
+        });
         onIconChange(lastInBounds);
         onCommit();
       };
@@ -119,13 +128,19 @@ export function ChatFloatingIcon({
     const style: CSSProperties = vertical
       ? {
           [stashEdge === "left" ? "left" : "right"]: 0,
-          top: clampY(centerY - EDGE_TAB_LENGTH / 2, EDGE_TAB_LENGTH + ICON_MARGIN),
+          top: clampY(
+            centerY - EDGE_TAB_LENGTH / 2,
+            EDGE_TAB_LENGTH + ICON_MARGIN,
+          ),
           width: EDGE_TAB_THICKNESS,
           height: EDGE_TAB_LENGTH,
         }
       : {
           [stashEdge === "top" ? "top" : "bottom"]: 0,
-          left: clampX(centerX - EDGE_TAB_LENGTH / 2, EDGE_TAB_LENGTH + ICON_MARGIN),
+          left: clampX(
+            centerX - EDGE_TAB_LENGTH / 2,
+            EDGE_TAB_LENGTH + ICON_MARGIN,
+          ),
           width: EDGE_TAB_LENGTH,
           height: EDGE_TAB_THICKNESS,
         };
@@ -133,6 +148,7 @@ export function ChatFloatingIcon({
       <button
         type="button"
         onClick={() => {
+          if (justDraggedRef.current) return;
           onStashChange(null);
           onCommit();
         }}

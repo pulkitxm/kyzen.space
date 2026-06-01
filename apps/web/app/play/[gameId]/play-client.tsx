@@ -53,6 +53,7 @@ export function PlayClient({
 
   return (
     <GameChatSplit
+      conversationId={conversation.id}
       initialLayout={initialLayout}
       layoutTrusted={layoutTrusted}
       game={gameNode}

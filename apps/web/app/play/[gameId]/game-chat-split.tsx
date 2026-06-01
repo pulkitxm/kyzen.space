@@ -1,5 +1,6 @@
 "use client";
 
+import { useAtomValue } from "jotai";
 import {
   type ReactNode,
   useCallback,
@@ -8,16 +9,20 @@ import {
   useState,
 } from "react";
 import { clientFetch } from "@/lib/api-client";
+import { messagesAtomFamily } from "@/lib/chat/atoms";
 import {
   type ChatLayout,
   type ChatMode,
   clampChatWidth,
   clampGeometry,
+  type IconPos,
   type PopoutGeometry,
   persistChatLayout,
   readChatLayout,
+  type StashEdge,
 } from "@/lib/chat-layout";
 import { cn } from "@/lib/utils";
+import { ChatFloatingIcon } from "./chat-floating-icon";
 import { ChatPopoutWindow } from "./chat-popout-window";
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -30,11 +35,14 @@ const SAVE_DEBOUNCE_MS = 600;
  * remounts across mode toggles.
  */
 export function GameChatSplit({
+  conversationId,
   game,
   chat,
   initialLayout,
   layoutTrusted,
 }: {
+  /** Conversation rendered in `chat` — used to count unread while minimized. */
+  conversationId: string;
   game: ReactNode;
   chat: ReactNode;
   /** Server-resolved layout (from the cookie, else DB, else default). */
@@ -51,14 +59,25 @@ export function GameChatSplit({
   const [geometry, setGeometry] = useState<PopoutGeometry>(
     initialLayout.popout,
   );
+  const [minimized, setMinimized] = useState(initialLayout.minimized);
+  const [stashEdge, setStashEdge] = useState<StashEdge | null>(
+    initialLayout.stashEdge,
+  );
+  const [icon, setIcon] = useState<IconPos>(initialLayout.icon);
   const [tab, setTab] = useState<"game" | "chat">("game");
 
   const modeRef = useRef(mode);
   const widthRef = useRef(chatWidth);
   const geomRef = useRef(geometry);
+  const minimizedRef = useRef(minimized);
+  const stashRef = useRef(stashEdge);
+  const iconRef = useRef(icon);
   modeRef.current = mode;
   widthRef.current = chatWidth;
   geomRef.current = geometry;
+  minimizedRef.current = minimized;
+  stashRef.current = stashEdge;
+  iconRef.current = icon;
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // `override` lets callers persist a value they just set in the same event,
@@ -67,8 +86,15 @@ export function GameChatSplit({
   const persist = useCallback((override?: Partial<ChatLayout>) => {
     const layout: ChatLayout = {
       mode: override?.mode ?? modeRef.current,
+      minimized: override?.minimized ?? minimizedRef.current,
+      // `stashEdge` is nullable, so `null` is a real value — guard on undefined.
+      stashEdge:
+        override?.stashEdge !== undefined
+          ? override.stashEdge
+          : stashRef.current,
       chatWidth: override?.chatWidth ?? widthRef.current,
       popout: override?.popout ?? geomRef.current,
+      icon: override?.icon ?? iconRef.current,
     };
     persistChatLayout(layout);
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -103,6 +129,9 @@ export function GameChatSplit({
         setMode(isDesktop ? ls.mode : "mounted");
         setChatWidth(ls.chatWidth);
         setGeometry(ls.popout);
+        setMinimized(isDesktop ? ls.minimized : false);
+        setStashEdge(ls.stashEdge);
+        setIcon(ls.icon);
         return;
       }
     }
@@ -140,6 +169,12 @@ export function GameChatSplit({
       if (!mq.matches && modeRef.current === "popout") {
         setMode("mounted");
         persist({ mode: "mounted" });
+      }
+      // Minimize is desktop-only: restore the chat if we drop below md.
+      if (!mq.matches && minimizedRef.current) {
+        setMinimized(false);
+        setStashEdge(null);
+        persist({ minimized: false, stashEdge: null });
       }
     };
     mq.addEventListener("change", onChange);
@@ -181,6 +216,34 @@ export function GameChatSplit({
     setMode("mounted");
     persist({ mode: "mounted" });
   }, [persist]);
+
+  // Unread badge: count messages that arrive while minimized (in-memory diff,
+  // snapshotted at minimize time, cleared on restore).
+  const messages = useAtomValue(messagesAtomFamily(conversationId));
+  const unreadBaseRef = useRef(messages.length);
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (!minimized) return;
+    setUnread(Math.max(0, messages.length - unreadBaseRef.current));
+  }, [messages.length, minimized]);
+
+  const minimize = useCallback(() => {
+    unreadBaseRef.current = messages.length;
+    setUnread(0);
+    setMinimized(true);
+    persist({ minimized: true });
+  }, [persist, messages.length]);
+
+  const restore = useCallback(() => {
+    setMinimized(false);
+    setStashEdge(null);
+    setUnread(0);
+    persist({ minimized: false, stashEdge: null });
+  }, [persist]);
+
+  const changeStash = useCallback((edge: StashEdge | null) => {
+    setStashEdge(edge);
+  }, []);
 
   const isPopout = mode === "popout";
 
@@ -229,16 +292,30 @@ export function GameChatSplit({
 
         <ChatPopoutWindow
           mode={mode}
+          minimized={minimized}
           geometry={geometry}
           chatWidth={chatWidth}
           mountedVisible={tab === "chat"}
           onPopOut={popOut}
           onDock={dock}
+          onMinimize={minimize}
           onGeometryChange={setGeometry}
           onCommit={persist}
         >
           <div className="min-h-0 w-full">{chat}</div>
         </ChatPopoutWindow>
+
+        {minimized && (
+          <ChatFloatingIcon
+            icon={icon}
+            stashEdge={stashEdge}
+            unread={unread}
+            onIconChange={setIcon}
+            onStashChange={changeStash}
+            onRestore={restore}
+            onCommit={persist}
+          />
+        )}
       </div>
     </div>
   );
