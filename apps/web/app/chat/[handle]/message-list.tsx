@@ -105,7 +105,7 @@ export function MessageList({
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="flex min-h-0 flex-1 flex-col-reverse gap-0.5 overflow-y-auto px-4 py-4 md:px-6"
+        className="flex min-h-0 flex-1 flex-col-reverse gap-0.5 overflow-x-hidden overflow-y-auto px-4 py-4 md:px-6"
       >
         {rows.length === 0 ? (
           <div className="py-10 text-center text-muted-foreground text-sm">
