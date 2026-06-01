@@ -2,6 +2,7 @@ import { seedAvatarConfig, validateAvatarConfig } from "@gamelobby/avatar";
 import { Hono } from "hono";
 import { getAuth } from "../../auth";
 import { games, profiles } from "../../db";
+import { validateChatLayout } from "../../lib/chat-layout";
 import {
   type ColorMode,
   DEFAULT_COLOR_MODE,
@@ -48,6 +49,7 @@ export const profilesRouter = new Hono()
         avatar: profile.avatar ?? seedAvatarConfig(profile.username),
         theme: profile.theme ?? DEFAULT_THEME,
         colorMode: profile.colorMode ?? DEFAULT_COLOR_MODE,
+        chatLayout: profile.chatLayout ?? null,
         createdAt: new Date(profile.createdAt).toISOString(),
       },
       user: {
@@ -88,6 +90,25 @@ export const profilesRouter = new Hono()
 
     await profiles.updateAppearance(session.user.id, patch);
     return c.json(patch);
+  })
+  .put("/me/chat-layout", async (c) => {
+    const session = await getAuth().api.getSession({
+      headers: c.req.raw.headers,
+    });
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+
+    const layout = validateChatLayout(body);
+    if (!layout) return c.json({ error: "Invalid layout" }, 400);
+
+    await profiles.updateChatLayout(session.user.id, layout);
+    return c.json(layout);
   })
   .put("/me/avatar", async (c) => {
     const session = await getAuth().api.getSession({

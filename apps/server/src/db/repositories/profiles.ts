@@ -1,5 +1,6 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import type { ChatLayout } from "../../lib/chat-layout";
 import type { ColorMode, ThemeId } from "../../lib/theme";
 import { db } from "../client";
 import {
@@ -86,9 +87,16 @@ export async function updateAppearance(
   };
   if (patch.theme !== undefined) set.theme = patch.theme;
   if (patch.colorMode !== undefined) set.colorMode = patch.colorMode;
+  await db.update(userProfile).set(set).where(eq(userProfile.userId, userId));
+}
+
+export async function updateChatLayout(
+  userId: string,
+  layout: ChatLayout,
+): Promise<void> {
   await db
     .update(userProfile)
-    .set(set)
+    .set({ chatLayout: layout, updatedAt: new Date() })
     .where(eq(userProfile.userId, userId));
 }
 
