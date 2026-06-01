@@ -12,7 +12,8 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@gamelobby/avatar": "workspace:*"
+    "@gamelobby/avatar": "workspace:*",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",

@@ -1,9 +1,10 @@
 "use client";
 
 import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
+import { type GameClientProps, getGameClient } from "@gamelobby/games-client";
+import { Suspense } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import type { ChatLayout } from "@/lib/chat-layout";
-import { type GameClientProps, getGameClient } from "@/lib/game-clients";
 import { GameChatSplit } from "./game-chat-split";
 
 export function PlayClient({
@@ -33,12 +34,14 @@ export function PlayClient({
 
   const gameNode = GameClient ? (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
-      <GameClient
-        gameId={gameId}
-        userId={userId}
-        initialGame={initialGame}
-        initialMoves={initialMoves}
-      />
+      <Suspense fallback={null}>
+        <GameClient
+          gameId={gameId}
+          userId={userId}
+          initialGame={initialGame}
+          initialMoves={initialMoves}
+        />
+      </Suspense>
     </div>
   ) : (
     <div className="p-6 text-center text-muted-foreground text-sm">

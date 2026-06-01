@@ -1,11 +1,23 @@
+import { getDefinition, hasEngine } from "@gamelobby/games-core";
 import Link from "next/link";
-import { PlayButton } from "@/app/games/tic-tac-toe/play-button";
+import { notFound } from "next/navigation";
+import { GameLobby } from "@/app/games/_shared/game-lobby";
 import { BackLink, PageContainer, PageHeader } from "@/components/ui/page";
 import { getServerSession } from "@/lib/get-server-session";
 
 export const dynamic = "force-dynamic";
 
-export default async function TicTacToeLobbyPage() {
+// Single dynamic lobby for every game — driven by the games-core registry, so
+// no per-game folder is needed. Emits the same `/games/${type}` URLs as before.
+export default async function GameLobbyPage({
+  params,
+}: {
+  params: Promise<{ gameType: string }>;
+}) {
+  const { gameType } = await params;
+  if (!hasEngine(gameType)) notFound();
+
+  const def = getDefinition(gameType);
   const session = await getServerSession();
 
   return (
@@ -13,14 +25,16 @@ export default async function TicTacToeLobbyPage() {
       <BackLink href="/games">← All games</BackLink>
       <div className="mt-6">
         <PageHeader
-          title="Tic-tac-toe"
+          title={def.meta.name}
           description="Games happen inside your chats — pick a friend or group to play with."
         />
       </div>
 
-      <div className="mt-8 max-w-sm">
-        <PlayButton userId={session?.user?.id ?? null} />
-      </div>
+      <GameLobby
+        meta={def.meta}
+        configFields={def.configFields ?? []}
+        userId={session?.user?.id ?? null}
+      />
 
       <p className="mt-6 max-w-md text-muted-foreground text-sm">
         Starting a game posts a game card into that conversation and opens it

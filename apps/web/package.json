@@ -15,6 +15,7 @@
     "@dicebear/core": "^9.0.0",
     "@gamelobby/avatar": "workspace:*",
     "@gamelobby/chat-core": "workspace:*",
+    "@gamelobby/games-client": "workspace:*",
     "@gamelobby/games-core": "workspace:*",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@slidoapp/emoji-mart-data": "^1.2.4",
