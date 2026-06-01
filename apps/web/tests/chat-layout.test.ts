@@ -1,32 +1,28 @@
 import { describe, expect, it } from "bun:test";
 import {
-  clampGameWidth,
+  clampChatWidth,
   clampGeometry,
   DEFAULT_CHAT_LAYOUT,
   MAX_CHAT,
-  MAX_GAME,
   MIN_CHAT,
-  MIN_GAME,
   POPOUT_MARGIN,
   parseChatLayout,
 } from "../lib/chat-layout";
 
-describe("clampGameWidth", () => {
-  it("keeps both panes within bounds on a wide container", () => {
-    expect(clampGameWidth(2000, 1400)).toBe(MAX_GAME);
-    expect(clampGameWidth(100, 1400)).toBe(MIN_GAME);
+describe("clampChatWidth", () => {
+  it("bounds chat within [MIN_CHAT, MAX_CHAT] on a wide container", () => {
+    expect(clampChatWidth(9999, 1400)).toBe(MAX_CHAT);
+    expect(clampChatWidth(10, 1400)).toBe(MIN_CHAT);
   });
 
-  it("never lets chat exceed MAX_CHAT (forces game wider)", () => {
-    const container = 1000; // game in [max(360,580), min(760,720)] = [580,720]
-    expect(clampGameWidth(400, container)).toBe(580);
-    expect(container - clampGameWidth(400, container)).toBeLessThanOrEqual(
-      MAX_CHAT,
-    );
+  it("shrinks chat so the game pane keeps its min width", () => {
+    // container 760 → chat max = min(420, 760 - 360) = 400.
+    expect(clampChatWidth(9999, 760)).toBe(400);
   });
 
-  it("falls back to MIN_GAME when container is too small for both mins", () => {
-    expect(clampGameWidth(500, 500)).toBe(MIN_GAME);
+  it("falls back to MIN_CHAT when the container is too small for both", () => {
+    // container 500 → chat max = min(420, 140) = 140 < MIN_CHAT → MIN_CHAT.
+    expect(clampChatWidth(300, 500)).toBe(MIN_CHAT);
   });
 });
 
@@ -54,10 +50,10 @@ describe("parseChatLayout", () => {
 
   it("coerces mode and clamps a stored width", () => {
     const out = parseChatLayout(
-      JSON.stringify({ mode: "popout", dividerWidth: 5 }),
+      JSON.stringify({ mode: "popout", chatWidth: 5 }),
     );
     expect(out.mode).toBe("popout");
-    expect(out.dividerWidth).toBe(MIN_GAME);
+    expect(out.chatWidth).toBe(MIN_CHAT);
   });
 
   it("exposes sane chat bounds", () => {

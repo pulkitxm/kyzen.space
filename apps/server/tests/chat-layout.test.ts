@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
+  MAX_CHAT,
   MAX_CHAT_POPOUT_W,
-  MAX_GAME,
-  MIN_GAME,
+  MIN_CHAT,
   validateChatLayout,
 } from "../src/lib/chat-layout";
 
@@ -16,8 +16,8 @@ describe("validateChatLayout", () => {
     const out = validateChatLayout({});
     expect(out).not.toBeNull();
     expect(out?.mode).toBe("mounted");
-    expect(out?.dividerWidth).toBeGreaterThanOrEqual(MIN_GAME);
-    expect(out?.dividerWidth).toBeLessThanOrEqual(MAX_GAME);
+    expect(out?.chatWidth).toBeGreaterThanOrEqual(MIN_CHAT);
+    expect(out?.chatWidth).toBeLessThanOrEqual(MAX_CHAT);
   });
 
   it("coerces an unknown mode to mounted and keeps a valid one", () => {
@@ -28,20 +28,20 @@ describe("validateChatLayout", () => {
   it("clamps out-of-range numbers", () => {
     const out = validateChatLayout({
       mode: "popout",
-      dividerWidth: 99999,
+      chatWidth: 99999,
       popout: { x: 10, y: 20, w: 99999, h: -5 },
     });
-    expect(out?.dividerWidth).toBe(MAX_GAME);
+    expect(out?.chatWidth).toBe(MAX_CHAT);
     expect(out?.popout.w).toBe(MAX_CHAT_POPOUT_W);
     expect(out?.popout.x).toBe(10);
   });
 
   it("falls back to defaults for non-finite numbers", () => {
     const out = validateChatLayout({
-      dividerWidth: "abc",
+      chatWidth: "abc",
       popout: { x: "nope", y: null, w: undefined, h: Number.NaN },
     });
-    expect(Number.isFinite(out?.dividerWidth)).toBe(true);
+    expect(Number.isFinite(out?.chatWidth)).toBe(true);
     expect(Number.isFinite(out?.popout.w)).toBe(true);
   });
 });

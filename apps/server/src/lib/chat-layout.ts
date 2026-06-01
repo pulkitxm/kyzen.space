@@ -7,14 +7,15 @@ export type PopoutGeometry = { x: number; y: number; w: number; h: number };
 
 export type ChatLayout = {
   mode: ChatMode;
-  dividerWidth: number; // game-pane width in px
+  chatWidth: number; // chat-pane width in px; the game pane flex-fills the rest
   popout: PopoutGeometry;
 };
 
-// Game pane bounds (px).
+// The chat pane is the bounded one; the game pane flex-fills the rest.
 export const MIN_GAME = 360;
-export const MAX_GAME = 760;
-export const DEFAULT_GAME = 480;
+export const MIN_CHAT = 280;
+export const MAX_CHAT = 420;
+export const DEFAULT_CHAT_W = 360;
 
 // Floating-window size bounds (px).
 export const MIN_CHAT_POPOUT_W = 300;
@@ -56,7 +57,7 @@ export function validateChatLayout(input: unknown): ChatLayout | null {
       : {};
   return {
     mode: r.mode === "popout" ? "popout" : "mounted",
-    dividerWidth: clampNum(r.dividerWidth, MIN_GAME, MAX_GAME, DEFAULT_GAME),
+    chatWidth: clampNum(r.chatWidth, MIN_CHAT, MAX_CHAT, DEFAULT_CHAT_W),
     popout: {
       x: finiteOr(p.x, DEFAULT_POPOUT.x),
       y: finiteOr(p.y, DEFAULT_POPOUT.y),

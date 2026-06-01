@@ -7,18 +7,17 @@ export type PopoutGeometry = { x: number; y: number; w: number; h: number };
 
 export type ChatLayout = {
   mode: ChatMode;
-  dividerWidth: number; // game-pane width in px
+  chatWidth: number; // chat-pane width in px; the game pane flex-fills the rest
   popout: PopoutGeometry;
 };
 
-// Game pane bounds.
+// The chat pane is the bounded one (kept deliberately small); the game pane
+// flex-fills the remainder, with the board centered by its own max width.
+// MIN_GAME guarantees the game pane always keeps room.
 export const MIN_GAME = 360;
-export const MAX_GAME = 760;
-export const DEFAULT_GAME = 480;
-
-// Chat pane (mounted) bounds — chat is deliberately kept small.
 export const MIN_CHAT = 280;
 export const MAX_CHAT = 420;
+export const DEFAULT_CHAT_W = 360;
 
 // Floating-window size bounds.
 export const MIN_CHAT_POPOUT_W = 300;
@@ -38,7 +37,7 @@ export const DEFAULT_POPOUT: PopoutGeometry = {
 
 export const DEFAULT_CHAT_LAYOUT: ChatLayout = {
   mode: "mounted",
-  dividerWidth: DEFAULT_GAME,
+  chatWidth: DEFAULT_CHAT_W,
   popout: DEFAULT_POPOUT,
 };
 
@@ -59,22 +58,14 @@ function finiteOr(n: unknown, fallback: number): number {
 }
 
 /**
- * Clamp the game-pane width so BOTH panes respect their min/max for the given
- * container width. Responsive: callers re-run this on container resize.
+ * Clamp the chat-pane width into [MIN_CHAT, MAX_CHAT], while keeping the game
+ * pane at least MIN_GAME wide for the given container. Responsive: callers
+ * re-run this on container resize.
  */
-export function clampGameWidth(width: number, containerW: number): number {
-  const lo = Math.max(MIN_GAME, containerW - MAX_CHAT);
-  const hi = Math.min(MAX_GAME, containerW - MIN_CHAT);
-  if (hi < lo) {
-    if (lo > MAX_GAME) {
-      // Container is so wide that even MAX_GAME leaves excess chat room;
-      // fall back to [MIN_GAME, MAX_GAME] so the user's requested width is honoured.
-      return clampNum(width, MIN_GAME, MAX_GAME, DEFAULT_GAME);
-    }
-    // Container is too small to fit both panes at their minimums.
-    return MIN_GAME;
-  }
-  return clampNum(width, lo, hi, DEFAULT_GAME);
+export function clampChatWidth(width: number, containerW: number): number {
+  const hi = Math.min(MAX_CHAT, containerW - MIN_GAME);
+  if (hi < MIN_CHAT) return MIN_CHAT; // container too small for both mins
+  return clampNum(width, MIN_CHAT, hi, DEFAULT_CHAT_W);
 }
 
 /** Clamp a floating-window geometry to the viewport (size + on-screen position). */
@@ -115,7 +106,7 @@ export function normalizeChatLayout(o: unknown): ChatLayout {
       : {};
   return {
     mode: r.mode === "popout" ? "popout" : "mounted",
-    dividerWidth: clampNum(r.dividerWidth, MIN_GAME, MAX_GAME, DEFAULT_GAME),
+    chatWidth: clampNum(r.chatWidth, MIN_CHAT, MAX_CHAT, DEFAULT_CHAT_W),
     popout: {
       x: finiteOr(p.x, DEFAULT_POPOUT.x),
       y: finiteOr(p.y, DEFAULT_POPOUT.y),
