@@ -73,6 +73,13 @@ export function GameChatSplit({
     }, SAVE_DEBOUNCE_MS);
   }, []);
 
+  // Flush any pending debounced save when unmounting.
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, []);
+
   // Resolve initial layout: localStorage wins, then DB, then defaults.
   // Pop-out is desktop-only — force mounted below md.
   useEffect(() => {
