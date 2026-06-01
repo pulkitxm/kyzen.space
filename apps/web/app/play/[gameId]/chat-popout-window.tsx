@@ -142,14 +142,18 @@ export function ChatPopoutWindow({
         // emit both, or Tailwind's source order can let `relative` win and the
         // popout `left`/`top` offsets shove it off-screen. Both modes still give
         // the absolutely-positioned children a containing block.
-        "flex min-h-0 flex-col bg-background",
-        minimized && "hidden",
-        isPopout
-          ? "fixed z-50 rounded-xl border border-border shadow-2xl"
-          : cn(
-              "relative border-border md:shrink-0 md:border-l max-md:!w-full",
-              mountedVisible ? "flex" : "hidden md:flex",
-            ),
+        // `flex` is applied only in the visible branches — never in the base —
+        // so the minimized `hidden` isn't overridden by a `md:flex` variant
+        // (a media-query utility outranks a plain `hidden` on desktop).
+        "min-h-0 flex-col bg-background",
+        minimized
+          ? "hidden"
+          : isPopout
+            ? "flex fixed z-50 rounded-xl border border-border shadow-2xl"
+            : cn(
+                "relative border-border md:shrink-0 md:border-l max-md:!w-full",
+                mountedVisible ? "flex" : "hidden md:flex",
+              ),
       )}
     >
       {/* Floating-window header (drag handle + dock). Hidden when mounted. */}
