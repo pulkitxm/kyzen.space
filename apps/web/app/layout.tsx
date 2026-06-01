@@ -2,6 +2,7 @@ import type { AvatarConfig } from "@gamelobby/avatar";
 import type { ConversationJson, FriendshipJson } from "@gamelobby/chat-core";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { cookies } from "next/headers";
 
 import { AppShellClient } from "@/app/app-shell";
@@ -35,6 +36,16 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// App-wide display face (personal-use DEMO license — see
+// app/fonts/game-paused-LICENSE.txt). Exposed as `--font-game-paused-face` and
+// wired into the `--font-sans` token in globals.css; the font only covers
+// A–Z/a–z, so the stack falls through to Geist for digits/punctuation.
+const gamePaused = localFont({
+  src: "./fonts/game-paused.otf",
+  variable: "--font-game-paused-face",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -109,7 +120,7 @@ export default async function RootLayout({
       suppressHydrationWarning
       data-theme={userTheme ?? DEFAULT_THEME}
       data-pattern={userPattern ?? DEFAULT_PATTERN}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${gamePaused.variable} h-full antialiased`}
     >
       <head>
         {/*
