@@ -5,7 +5,12 @@ import { useAtomValue, useStore } from "jotai";
 import Link from "next/link";
 import { useCallback } from "react";
 import { FaBell } from "react-icons/fa6";
-import { Popover, PopoverContent, PopoverTrigger } from "@/app/ui/popover";
+import {
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/app/ui/popover";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import { notificationsAtom, unreadNotificationsAtom } from "@/lib/chat/atoms";
 import { relativeTime } from "@/lib/chat/format";
@@ -125,24 +130,25 @@ export function NotificationsPopover({
             </div>
           ) : (
             notifs.map((n) => (
-              <Link
-                key={n.id}
-                href={notifHref(n)}
-                onClick={onNavigate}
-                className="flex items-center gap-3 border-border/60 border-b px-4 py-3 transition last:border-b-0 hover:bg-surface-overlay"
-              >
-                <PresenceAvatar
-                  config={n.actor?.avatar ?? null}
-                  seed={n.actor?.username ?? "?"}
-                  size={32}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm">{notifText(n)}</div>
-                  <div className="text-muted-foreground text-xs">
-                    {relativeTime(n.createdAt)}
+              <PopoverClose asChild key={n.id}>
+                <Link
+                  href={notifHref(n)}
+                  onClick={onNavigate}
+                  className="flex items-center gap-3 border-border/60 border-b px-4 py-3 transition last:border-b-0 hover:bg-surface-overlay"
+                >
+                  <PresenceAvatar
+                    config={n.actor?.avatar ?? null}
+                    seed={n.actor?.username ?? "?"}
+                    size={32}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm">{notifText(n)}</div>
+                    <div className="text-muted-foreground text-xs">
+                      {relativeTime(n.createdAt)}
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </PopoverClose>
             ))
           )}
         </div>
