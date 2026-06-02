@@ -2,7 +2,7 @@ import { resolveDbLatencyMs } from "./db/latency";
 
 function required(name: string): string {
   const v = process.env[name];
-  if (!v || !v.trim()) {
+  if (!v?.trim()) {
     throw new Error(`Missing required env var: ${name}`);
   }
   return v.trim();
@@ -48,7 +48,6 @@ export const env = {
     optional("PUBLIC_REALTIME_URL") ||
     optional("BETTER_AUTH_URL", "http://localhost:4000"),
 
-  // Klipy GIF API — server-only, proxied so the browser never sees the key.
   klipyApiKey: optional("KLIPY_API_KEY"),
 } as const;
 

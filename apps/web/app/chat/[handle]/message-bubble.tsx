@@ -2,6 +2,7 @@
 
 import "photoswipe/style.css";
 import type {
+  GameCardMeta,
   GifMeta,
   MessageMetadata,
   SystemMeta,
@@ -13,6 +14,7 @@ import { timeOfDay } from "@/lib/chat/format";
 import { openImageLightbox } from "@/lib/chat/lightbox";
 import { cn } from "@/lib/utils";
 import { BlurImage } from "./blur-image";
+import { GameCardMessage } from "./game-card-message";
 
 function systemText(
   meta: MessageMetadata | null,
@@ -36,11 +38,6 @@ function systemText(
   }
 }
 
-/**
- * A GIF message: edge-to-edge (no bubble), click to open in the lightbox.
- * Reserves its exact box from the GIF's dimensions and shows a skeleton until
- * the (often slow) GIF finishes loading, so the layout never shifts.
- */
 function GifMessage({
   gif,
   pending,
@@ -67,7 +64,7 @@ function GifMessage({
         }
         aria-label={gif.title ? `Open GIF: ${gif.title}` : "Open GIF"}
         className={cn(
-          "block overflow-hidden rounded-xl outline-none transition hover:opacity-90",
+          "block max-w-full overflow-hidden rounded-xl outline-none transition hover:opacity-90",
           pending && "opacity-60",
         )}
         style={{ width }}
@@ -86,14 +83,11 @@ function GifMessage({
   );
 }
 
-// Split on http(s) URLs; the capture group lands matches on odd indices.
 const URL_RE = /(https?:\/\/[^\s]+)/g;
 
-/** Render plaintext, turning bare URLs into clickable links. */
 function linkify(text: string, own: boolean): ReactNode {
   return text.split(URL_RE).map((part, i) => {
     if (i % 2 === 0) return part;
-    // Trim trailing punctuation that's almost never part of the URL.
     const trailing = part.match(/[.,!?)]+$/)?.[0] ?? "";
     const href = trailing ? part.slice(0, -trailing.length) : part;
     return (
@@ -176,6 +170,12 @@ export function MessageBubble({
           <div className={bubbleClass}>
             <em className="opacity-70">Message deleted</em>
           </div>
+        ) : message.kind === "game_card" && message.gameId ? (
+          <GameCardMessage
+            gameId={message.gameId}
+            meta={message.metadata as GameCardMeta}
+            userId={userId}
+          />
         ) : gif ? (
           <GifMessage gif={gif} pending={message.pending} stamp={stamp} />
         ) : (

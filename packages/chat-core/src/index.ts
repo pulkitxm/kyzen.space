@@ -23,12 +23,18 @@ export type {
   TypingUser,
 } from "./dto";
 export {
+  clientCreateGameInConversationSchema,
+  gameCardMetaSchema,
+  notificationPayloadSchema,
+} from "./schemas";
+export {
   type Ack,
   type AckResult,
   CHAT_EVENTS,
   type ClientAddMembers,
   type ClientConversationRef,
   type ClientCreateDm,
+  type ClientCreateGameInConversation,
   type ClientCreateGroup,
   type ClientFriendRemove,
   type ClientFriendRequest,

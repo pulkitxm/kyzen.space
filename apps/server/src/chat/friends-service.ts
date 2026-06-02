@@ -20,14 +20,12 @@ export async function sendFriendRequest(
   if (existing) {
     if (existing.status === "accepted") return fail("Already friends", 409);
     if (existing.status === "pending") {
-      // The other person already requested me -> sending back accepts it.
       if (existing.addresseeId === requesterId) {
         row = await friends.setStatus(existing.id, "accepted");
       } else {
         return fail("Friend request already sent", 409);
       }
     } else {
-      // declined -> reopen with the current direction
       row = await friends.reopenRequest(existing.id, requesterId, addresseeId);
     }
   } else {
@@ -85,7 +83,6 @@ export async function respondToRequest(
   );
   if (!updated) return fail("Failed to update request", 500);
 
-  // the actionable "you have a friend request" notification is now resolved
   await notifications.resolveByRequestId(userId, "friend_request", requestId);
 
   const requesterId = row.requesterId;

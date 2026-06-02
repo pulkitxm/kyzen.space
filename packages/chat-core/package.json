@@ -8,11 +8,11 @@
   },
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@gamelobby/avatar": "workspace:*"
+    "@gamelobby/avatar": "workspace:*",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",

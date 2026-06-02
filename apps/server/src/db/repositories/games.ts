@@ -1,106 +1,124 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { db } from "../client";
 import {
   type GamePlayer,
   type GameRow,
   type GameStatus,
   game,
+  gamePlayer,
   type MoveRow,
   move,
+  type SeatingMode,
 } from "../schema";
+
+export type GameRecord = GameRow & { players: GamePlayer[] };
 
 export type CreateGameInput = {
   gameType: string;
   players: GamePlayer[];
   gameState: unknown;
+  config?: unknown;
   status?: GameStatus;
+  conversationId?: string | null;
+  creatorUserId?: string | null;
+  seatingMode?: SeatingMode | null;
+  challengedUserId?: string | null;
 };
 
-export async function createGame(input: CreateGameInput): Promise<GameRow> {
-  const [row] = await db
-    .insert(game)
-    .values({
-      gameType: input.gameType,
-      status: input.status ?? "waiting",
-      players: input.players,
-      gameState: input.gameState,
-      winner: null,
-    })
-    .returning();
-  return row!;
+export async function createGame(input: CreateGameInput): Promise<GameRecord> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(game)
+      .values({
+        gameType: input.gameType,
+        status: input.status ?? "waiting",
+        gameState: input.gameState,
+        config: input.config ?? null,
+        winner: null,
+        conversationId: input.conversationId ?? null,
+        creatorUserId: input.creatorUserId ?? null,
+        seatingMode: input.seatingMode ?? null,
+        challengedUserId: input.challengedUserId ?? null,
+      })
+      .returning();
+    if (!row) throw new Error("Failed to create game");
+    const created = row;
+    if (input.players.length) {
+      await tx.insert(gamePlayer).values(
+        input.players.map((p, i) => ({
+          gameId: created.id,
+          userId: p.userId,
+          username: p.username,
+          role: p.role,
+          seatOrder: i,
+        })),
+      );
+    }
+    return { ...created, players: input.players };
+  });
 }
 
-export async function getGameById(id: string): Promise<GameRow | null> {
-  const [row] = await db.select().from(game).where(eq(game.id, id)).limit(1);
-  return row ?? null;
-}
-
-export type ListGamesFilter = {
-  gameType?: string;
-  status?: GameStatus;
-  limit?: number;
-};
-
-export async function listGames(
-  filter: ListGamesFilter = {},
-): Promise<GameRow[]> {
-  const conds = [];
-  if (filter.gameType) conds.push(eq(game.gameType, filter.gameType));
-  if (filter.status) conds.push(eq(game.status, filter.status));
-  return db
-    .select()
-    .from(game)
-    .where(conds.length ? and(...conds) : undefined)
-    .orderBy(desc(game.createdAt))
-    .limit(filter.limit ?? 50);
-}
-
-export async function findWaitingGameToJoin(
-  gameType: string,
-  excludeUserId: string,
-): Promise<GameRow | null> {
+export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
   const rows = await db
     .select()
-    .from(game)
-    .where(and(eq(game.gameType, gameType), eq(game.status, "waiting")))
-    .orderBy(desc(game.createdAt))
-    .limit(20);
-  return (
-    rows.find(
-      (r: GameRow) =>
-        !(r.players as GamePlayer[]).some((p) => p.userId === excludeUserId),
-    ) ?? null
-  );
+    .from(gamePlayer)
+    .where(eq(gamePlayer.gameId, gameId))
+    .orderBy(gamePlayer.seatOrder);
+  return rows.map((r) => ({
+    userId: r.userId,
+    username: r.username,
+    role: r.role,
+  }));
+}
+
+export async function getGameById(id: string): Promise<GameRecord | null> {
+  const [row] = await db.select().from(game).where(eq(game.id, id)).limit(1);
+  if (!row) return null;
+  const players = await getPlayers(id);
+  return { ...row, players };
+}
+
+export async function seatPlayer(
+  gameId: string,
+  player: GamePlayer,
+  seatOrder: number,
+): Promise<void> {
+  await db.insert(gamePlayer).values({
+    gameId,
+    userId: player.userId,
+    username: player.username,
+    role: player.role,
+    seatOrder,
+  });
 }
 
 export type GameUpdate = Partial<
-  Pick<
-    GameRow,
-    "status" | "players" | "winner" | "gameState" | "startedAt" | "completedAt"
-  >
+  Pick<GameRow, "status" | "winner" | "gameState" | "startedAt" | "completedAt">
 >;
 
 export async function updateGame(
   id: string,
   patch: GameUpdate,
-): Promise<GameRow> {
+): Promise<GameRecord> {
   const [row] = await db
     .update(game)
     .set({ ...patch, updatedAt: new Date() })
     .where(eq(game.id, id))
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to update game");
+  const players = await getPlayers(id);
+  return { ...row, players };
 }
 
 export async function gamesForUser(
   userId: string,
   opts: { offset?: number; limit?: number } = {},
 ): Promise<GameRow[]> {
-  const member = sql`${game.players} @> ${JSON.stringify([{ userId }])}::jsonb`;
   return db
-    .select()
+    .select(getTableColumns(game))
     .from(game)
-    .where(member)
+    .innerJoin(gamePlayer, eq(gamePlayer.gameId, game.id))
+    .where(eq(gamePlayer.userId, userId))
     .orderBy(desc(game.updatedAt))
     .offset(opts.offset ?? 0)
     .limit(opts.limit ?? 20);
@@ -129,5 +147,6 @@ export async function addMove(input: {
   moveData: unknown;
 }): Promise<MoveRow> {
   const [row] = await db.insert(move).values(input).returning();
-  return row!;
+  if (!row) throw new Error("Failed to add move");
+  return row;
 }

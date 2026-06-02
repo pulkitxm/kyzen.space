@@ -1,6 +1,7 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
+import type { z } from "zod";
+import type { gameCardMetaSchema, notificationPayloadSchema } from "./schemas";
 
-/** A user as exposed to other users (no email/private fields). */
 export type PublicUser = {
   id: string;
   username: string;
@@ -10,20 +11,16 @@ export type PublicUser = {
 
 export type FriendStatus = "pending" | "accepted" | "declined";
 
-/** A friendship row, oriented from the viewer's perspective. */
 export type FriendshipJson = {
   id: string;
   status: FriendStatus;
-  /** Whether the pending request was sent to ("incoming") or by ("outgoing") the viewer. */
   direction: "incoming" | "outgoing";
-  /** The other party (never the viewer). */
   user: PublicUser;
   createdAt: string | null;
 };
 
 export type FriendState = "none" | "friends" | "incoming" | "outgoing" | "self";
 
-/** A user search hit, annotated with the viewer's relationship to them. */
 export type SearchUserJson = PublicUser & {
   friendState: FriendState;
 };
@@ -38,7 +35,6 @@ export type MemberJson = PublicUser & {
 
 export type MessageKind = "text" | "gif" | "game_card" | "system";
 
-/** Normalized GIF metadata stored on a `kind: "gif"` message. */
 export type GifMeta = {
   provider: "klipy";
   providerId: string;
@@ -50,14 +46,7 @@ export type GifMeta = {
   blurPreview?: string;
 };
 
-/** Render snapshot stored on a `kind: "game_card"` message. Live status comes from the game itself. */
-export type GameCardMeta = {
-  gameId: string;
-  gameType: string;
-  seatingMode: "open" | "challenge";
-  challengedUserId?: string | null;
-  creatorUsername: string;
-};
+export type GameCardMeta = z.infer<typeof gameCardMetaSchema>;
 
 export type SystemEvent =
   | "member_added"
@@ -66,7 +55,6 @@ export type SystemEvent =
   | "group_renamed"
   | "group_created";
 
-/** Metadata stored on a `kind: "system"` message. */
 export type SystemMeta = {
   event: SystemEvent;
   actorId?: string | null;
@@ -79,13 +67,10 @@ export type MessageMetadata = GifMeta | GameCardMeta | SystemMeta;
 export type MessageJson = {
   id: string;
   conversationId: string;
-  /** null for system messages. */
   sender: PublicUser | null;
   kind: MessageKind;
-  /** Plaintext body for text/system messages; null otherwise. */
   body: string | null;
   metadata: MessageMetadata | null;
-  /** Set when kind === "game_card". */
   gameId: string | null;
   createdAt: string | null;
   editedAt: string | null;
@@ -95,7 +80,6 @@ export type MessageJson = {
 export type ConversationJson = {
   id: string;
   kind: ConversationKind;
-  /** Group name, or — for DMs — the other member's display name/username. */
   name: string | null;
   avatarUrl: string | null;
   members: MemberJson[];
@@ -111,24 +95,17 @@ export type NotificationType =
   | "game_started"
   | "game_challenge";
 
-export type NotificationPayload = {
-  conversationId?: string;
-  gameId?: string;
-  gameType?: string;
-  requestId?: string;
-};
+export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
 export type NotificationJson = {
   id: string;
   type: NotificationType;
-  /** The user who triggered the notification (null if system/unknown). */
   actor: PublicUser | null;
   payload: NotificationPayload;
   read: boolean;
   createdAt: string | null;
 };
 
-/** Provider-agnostic GIF returned by the backend GIF proxy. */
 export type GifJson = {
   id: string;
   previewUrl: string;
@@ -139,7 +116,6 @@ export type GifJson = {
   blurPreview?: string;
 };
 
-/** A user actively typing in a conversation (carries avatar info for stacked avatars). */
 export type TypingUser = {
   userId: string;
   username: string;

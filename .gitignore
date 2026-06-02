@@ -37,6 +37,9 @@ yarn-error.log*
 # root env natively (Next only reads .env from its own cwd).
 !apps/web/.env
 
+# local-only dev scratch (seed scripts, throwaway tooling)
+/extras/
+
 # vercel
 .vercel
 

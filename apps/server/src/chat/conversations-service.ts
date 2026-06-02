@@ -6,8 +6,6 @@ import { assembleConversation } from "./assemble";
 import { sendSystemMessage } from "./messages-service";
 import { fail, ok, type ServiceResult } from "./result";
 
-/** Join every connected socket of each member to the conversation room, then
- * push each member their own (viewer-specific) conversation view. */
 async function fanoutConversation(
   conversationId: string,
   memberIds: string[],
@@ -59,7 +57,6 @@ export async function createGroup(
   const trimmed = name.trim();
   if (!trimmed) return fail("Group name is required");
 
-  // keep only resolvable users (drops bad ids); creator always included
   const candidates = Array.from(new Set(memberIds)).filter(
     (id) => id !== userId,
   );
@@ -90,7 +87,7 @@ export async function addMembers(
   userIds: string[],
 ): Promise<ServiceResult<ConversationJson>> {
   const conv = await conversations.getById(conversationId);
-  if (!conv || conv.kind !== "group") return fail("Group not found", 404);
+  if (conv?.kind !== "group") return fail("Group not found", 404);
   const role = await conversations.getMemberRole(conversationId, userId);
   if (role !== "owner" && role !== "admin") {
     return fail("Only group admins can add members", 403);
@@ -123,7 +120,7 @@ export async function removeMember(
   targetUserId: string,
 ): Promise<ServiceResult<null>> {
   const conv = await conversations.getById(conversationId);
-  if (!conv || conv.kind !== "group") return fail("Group not found", 404);
+  if (conv?.kind !== "group") return fail("Group not found", 404);
 
   const isSelf = targetUserId === userId;
   if (!isSelf) {
@@ -145,7 +142,6 @@ export async function removeMember(
     actorId: userId,
     targetId: targetUserId,
   });
-  // the removed member's sockets should leave the room
   const io = getIO();
   if (io) io.in(userRoom(targetUserId)).socketsLeave(convRoom(conversationId));
   return ok(null);
@@ -157,7 +153,7 @@ export async function renameGroup(
   name: string,
 ): Promise<ServiceResult<ConversationJson>> {
   const conv = await conversations.getById(conversationId);
-  if (!conv || conv.kind !== "group") return fail("Group not found", 404);
+  if (conv?.kind !== "group") return fail("Group not found", 404);
   const role = await conversations.getMemberRole(conversationId, userId);
   if (role !== "owner" && role !== "admin") {
     return fail("Only group admins can rename the group", 403);
@@ -178,5 +174,6 @@ export async function renameGroup(
     meta: { name: trimmed },
   });
   const updated = await conversations.getById(conversationId);
-  return ok(await assembleConversation(updated!, userId));
+  if (!updated) return fail("Group not found", 404);
+  return ok(await assembleConversation(updated, userId));
 }

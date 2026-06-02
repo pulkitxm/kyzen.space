@@ -24,16 +24,16 @@
       "cache": false,
       "persistent": true
     },
+    "start": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true
+    },
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
-    "lint": {
-      "dependsOn": ["^build"]
-    },
-    "typecheck": {
-      "dependsOn": ["^build"]
-    },
+    "type-check": {},
     "test": {
       "dependsOn": ["^build"]
     }

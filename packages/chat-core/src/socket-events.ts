@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import type {
   ConversationJson,
   FriendshipJson,
@@ -8,14 +9,9 @@ import type {
   PresenceStatus,
   TypingUser,
 } from "./dto";
+import type { clientCreateGameInConversationSchema } from "./schemas";
 
-/**
- * Canonical chat socket event names, shared by server and web so the two
- * can't drift. (Game events — join_room/make_move/game_state/... — stay in
- * games-core / the existing realtime layer.)
- */
 export const CHAT_EVENTS = {
-  // client -> server (mutations; each takes an ack callback)
   conversationJoin: "conversation:join",
   conversationLeave: "conversation:leave",
   sendMessage: "send_message",
@@ -30,11 +26,10 @@ export const CHAT_EVENTS = {
   friendRemove: "friend:remove",
   notificationRead: "notification:read",
   notificationReadAll: "notification:read_all",
-  // phase 2
   typingStart: "typing_start",
   typingStop: "typing_stop",
+  createGameInConversation: "game:create_in_conversation",
 
-  // server -> client (broadcasts)
   messageNew: "message_new",
   messageUpdated: "message_updated",
   messageDeleted: "message_deleted",
@@ -47,24 +42,19 @@ export const CHAT_EVENTS = {
   notificationNew: "notification_new",
   notificationReadEvent: "notification_read",
   readReceipt: "read_receipt",
-  // phase 2
   typingUpdate: "typing_update",
   presenceUpdate: "presence_update",
   presenceSnapshot: "presence_snapshot",
 } as const;
 
-/** Ack callbacks resolve to a success payload or an error. */
 export type AckResult<T = Record<string, never>> =
   | ({ ok: true } & T)
   | { ok: false; error: string };
 
 export type Ack<T = Record<string, never>> = (res: AckResult<T>) => void;
 
-// ---- client -> server payloads ----
-
 export type ClientSendMessage = {
   conversationId: string;
-  /** Client-generated temp id, echoed back on message_new for optimistic reconcile. */
   clientId: string;
   kind?: MessageKind;
   body?: string;
@@ -96,7 +86,9 @@ export type ClientFriendRemove = { userId: string };
 
 export type ClientNotificationRead = { id: string };
 
-// ---- server -> client payloads ----
+export type ClientCreateGameInConversation = z.infer<
+  typeof clientCreateGameInConversationSchema
+>;
 
 export type ServerMessageNew = { message: MessageJson; clientId?: string };
 
@@ -140,8 +132,6 @@ export type ServerPresenceUpdate = {
   lastSeen?: string | null;
 };
 
-/** Snapshot of the current presence of everyone the connecting user cares about
- * (their friends + conversation co-members), sent once on connect. */
 export type ServerPresenceSnapshot = {
   entries: ServerPresenceUpdate[];
 };

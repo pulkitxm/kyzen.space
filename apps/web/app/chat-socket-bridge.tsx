@@ -4,6 +4,7 @@ import {
   CHAT_EVENTS,
   type ConversationJson,
   type FriendshipJson,
+  type NotificationJson,
   type ServerConversationNew,
   type ServerConversationUpdated,
   type ServerFriendAccepted,
@@ -33,20 +34,18 @@ import {
   typingAtomFamily,
   unreadNotificationsAtom,
   upsertConversation,
+  upsertFriend,
   upsertMessage,
 } from "@/lib/chat/atoms";
 import { useSocketEvent } from "@/lib/socket/socket-context";
 
-/**
- * Bridges global socket events into Jotai atoms (and seeds those atoms on mount).
- * Mounted once inside the app shell so sidebar badges + lists stay live everywhere.
- */
 export function ChatSocketBridge({
   userId,
   initialConversations,
   initialFriends,
   initialIncoming,
   initialOutgoing,
+  initialNotifications,
   initialUnreadNotifications,
 }: {
   userId: string;
@@ -54,25 +53,26 @@ export function ChatSocketBridge({
   initialFriends: FriendshipJson[];
   initialIncoming: FriendshipJson[];
   initialOutgoing: FriendshipJson[];
+  initialNotifications: NotificationJson[];
   initialUnreadNotifications: number;
 }) {
   const store = useStore();
 
-  // Hydrate server-seeded chat state synchronously (no client fetch on load);
-  // socket events keep these atoms live afterward.
   useHydrateAtoms(
     new Map<
       | typeof conversationsAtom
       | typeof friendsAtom
       | typeof incomingRequestsAtom
       | typeof outgoingRequestsAtom
+      | typeof notificationsAtom
       | typeof unreadNotificationsAtom,
-      ConversationJson[] | FriendshipJson[] | number
+      ConversationJson[] | FriendshipJson[] | NotificationJson[] | number
     >([
       [conversationsAtom, initialConversations],
       [friendsAtom, initialFriends],
       [incomingRequestsAtom, initialIncoming],
       [outgoingRequestsAtom, initialOutgoing],
+      [notificationsAtom, initialNotifications],
       [unreadNotificationsAtom, initialUnreadNotifications],
     ]),
   );
@@ -87,8 +87,8 @@ export function ChatSocketBridge({
       const activeId = store.get(activeConversationIdAtom);
       store.set(conversationsAtom, (prev) => {
         const idx = prev.findIndex((c) => c.id === message.conversationId);
-        if (idx < 0) return prev;
-        const cur = prev[idx]!;
+        const cur = idx < 0 ? undefined : prev[idx];
+        if (!cur) return prev;
         const fromMe = message.sender?.id === userId;
         const isActive = activeId === message.conversationId;
         const updated: ConversationJson = {
@@ -142,7 +142,6 @@ export function ChatSocketBridge({
   useSocketEvent<ServerConversationUpdated>(
     CHAT_EVENTS.conversationUpdated,
     ({ conversation }) => {
-      // If I'm no longer a member (I left or was removed), drop it from my list.
       if (!conversation.members.some((m) => m.id === userId)) {
         store.set(conversationsAtom, (prev) =>
           prev.filter((c) => c.id !== conversation.id),
@@ -168,10 +167,7 @@ export function ChatSocketBridge({
   useSocketEvent<ServerFriendAccepted>(
     CHAT_EVENTS.friendAccepted,
     ({ friendship }) => {
-      store.set(friendsAtom, (prev) => [
-        friendship,
-        ...prev.filter((f) => f.user.id !== friendship.user.id),
-      ]);
+      store.set(friendsAtom, (prev) => upsertFriend(prev, friendship));
       store.set(incomingRequestsAtom, (prev) =>
         prev.filter((f) => f.user.id !== friendship.user.id),
       );

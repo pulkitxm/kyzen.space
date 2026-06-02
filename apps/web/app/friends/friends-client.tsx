@@ -1,6 +1,10 @@
 "use client";
 
-import { CHAT_EVENTS, type SearchUserJson } from "@gamelobby/chat-core";
+import {
+  CHAT_EVENTS,
+  type FriendshipJson,
+  type SearchUserJson,
+} from "@gamelobby/chat-core";
 import { useAtomValue, useStore } from "jotai";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -12,6 +16,7 @@ import {
   incomingRequestsAtom,
   outgoingRequestsAtom,
   presenceAtom,
+  upsertFriend,
 } from "@/lib/chat/atoms";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 import { cn } from "@/lib/utils";
@@ -28,7 +33,6 @@ export function FriendsClient() {
   const { socket } = useSocket();
   const router = useRouter();
 
-  // Navigate to the username-based DM URL; the page resolves/creates the DM.
   const startDm = useCallback(
     (username: string) => {
       router.push(`/chat/${username}`);
@@ -42,7 +46,15 @@ export function FriendsClient() {
         prev.filter((f) => f.id !== requestId),
       );
       try {
-        await emitAck(socket, CHAT_EVENTS.friendRespond, { requestId, action });
+        const res = await emitAck<{ friendship?: FriendshipJson | null }>(
+          socket,
+          CHAT_EVENTS.friendRespond,
+          { requestId, action },
+        );
+        if (action === "accept" && res.friendship) {
+          const accepted = res.friendship;
+          store.set(friendsAtom, (prev) => upsertFriend(prev, accepted));
+        }
       } catch {}
     },
     [socket, store],

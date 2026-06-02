@@ -1,4 +1,4 @@
-import { GAMES } from "@/lib/games";
+import { listGameMeta } from "@gamelobby/games-core";
 
 export type GameStat = {
   played: number;
@@ -17,14 +17,14 @@ export type ProfileStatGame = {
 };
 
 export function buildStatGames(stats: ProfileStats): ProfileStatGame[] {
-  return GAMES.map((g) => {
-    const s = stats[g.id];
+  return listGameMeta().map((m) => {
+    const s = stats[m.type];
     const played = s && Number.isFinite(s.played) ? s.played : 0;
     return {
-      id: g.id,
-      name: g.name,
-      href: g.href,
-      coverImage: g.coverImage,
+      id: m.type,
+      name: m.name,
+      href: `/games/${m.type}`,
+      coverImage: m.coverImage,
       played,
     };
   });

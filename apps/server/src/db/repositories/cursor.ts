@@ -1,5 +1,3 @@
-// Keyset pagination cursor: base64("<createdAt ISO>|<id>"). Ordering is
-// (createdAt desc, id desc) since uuid PKs are not monotonic.
 export function encodeCursor(createdAt: Date, id: string): string {
   return Buffer.from(`${new Date(createdAt).toISOString()}|${id}`).toString(
     "base64",

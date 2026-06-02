@@ -11,8 +11,7 @@ import type {
   ConversationMemberRow,
   ConversationRow,
   FriendshipRow,
-  GamePlayer,
-  GameRow,
+  GameRecord,
   MessageRow,
   MoveRow,
   NotificationRow,
@@ -23,14 +22,18 @@ function iso(d: Date | null | undefined): string | null {
   return d ? new Date(d).toISOString() : null;
 }
 
-export function serializeGame(row: GameRow): GameJson {
+export function serializeGame(row: GameRecord): GameJson {
   return {
     id: row.id,
     gameType: row.gameType,
     status: row.status,
     winner: row.winner,
-    players: (row.players ?? []) as GamePlayer[],
+    players: row.players,
     gameState: row.gameState ?? null,
+    conversationId: row.conversationId,
+    creatorUserId: row.creatorUserId,
+    seatingMode: row.seatingMode,
+    challengedUserId: row.challengedUserId,
     startedAt: iso(row.startedAt),
     completedAt: iso(row.completedAt),
     createdAt: iso(row.createdAt),

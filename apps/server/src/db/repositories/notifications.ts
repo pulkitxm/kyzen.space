@@ -26,7 +26,8 @@ export async function create(
       payload: input.payload ?? {},
     })
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to create notification");
+  return row;
 }
 
 export async function getById(id: string): Promise<NotificationRow | null> {
@@ -50,6 +51,7 @@ export async function listForUser(
     const c = decodeCursor(opts.cursor);
     if (c) {
       conds.push(
+        // biome-ignore lint/style/noNonNullAssertion: drizzle or() returns SQL given non-empty args
         or(
           lt(notification.createdAt, c.createdAt),
           and(
@@ -109,8 +111,6 @@ export async function markAllRead(userId: string): Promise<void> {
     .where(and(eq(notification.userId, userId), isNull(notification.readAt)));
 }
 
-/** Resolve (and mark read) actionable notifications referencing a thing, e.g. a
- * friend request that has now been answered, so it stops being actionable. */
 export async function resolveByRequestId(
   userId: string,
   type: NotificationType,

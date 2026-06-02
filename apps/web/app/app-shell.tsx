@@ -1,7 +1,11 @@
 "use client";
 
 import type { AvatarConfig } from "@gamelobby/avatar";
-import type { ConversationJson, FriendshipJson } from "@gamelobby/chat-core";
+import type {
+  ConversationJson,
+  FriendshipJson,
+  NotificationJson,
+} from "@gamelobby/chat-core";
 import { Provider } from "jotai";
 import { useCallback, useState } from "react";
 import { FaChevronRight } from "react-icons/fa";
@@ -25,6 +29,7 @@ export function AppShellClient({
   initialFriends,
   initialIncoming,
   initialOutgoing,
+  initialNotifications,
   initialUnreadNotifications,
 }: {
   children: React.ReactNode;
@@ -39,6 +44,7 @@ export function AppShellClient({
   initialFriends: FriendshipJson[];
   initialIncoming: FriendshipJson[];
   initialOutgoing: FriendshipJson[];
+  initialNotifications: NotificationJson[];
   initialUnreadNotifications: number;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -55,10 +61,11 @@ export function AppShellClient({
               initialFriends={initialFriends}
               initialIncoming={initialIncoming}
               initialOutgoing={initialOutgoing}
+              initialNotifications={initialNotifications}
               initialUnreadNotifications={initialUnreadNotifications}
             />
           ) : null}
-          <div className="flex h-screen overflow-hidden bg-background">
+          <div className="app-canvas flex h-screen overflow-hidden">
             {mobileOpen && (
               <button
                 type="button"

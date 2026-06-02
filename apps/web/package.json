@@ -6,16 +6,17 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
-    "lint": "eslint",
     "test": "bun test tests",
-    "typecheck": "tsc --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@dicebear/collection": "^9.0.0",
     "@dicebear/core": "^9.0.0",
     "@gamelobby/avatar": "workspace:*",
     "@gamelobby/chat-core": "workspace:*",
+    "@gamelobby/games-client": "workspace:*",
     "@gamelobby/games-core": "workspace:*",
+    "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@slidoapp/emoji-mart-data": "^1.2.4",
     "better-auth": "^1.6.9",
@@ -36,8 +37,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -7,10 +7,9 @@
     "dev": "bun --env-file=../../.env --watch src/index.ts",
     "build": "tsc --noEmit",
     "start": "bun --env-file=../../.env src/index.ts",
-    "lint": "tsc --noEmit",
     "test": "bun test tests",
     "test:integration": "bun --env-file=../../.env test integration",
-    "typecheck": "tsc --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@gamelobby/avatar": "workspace:*",
@@ -26,7 +25,8 @@
     "ioredis": "^5.4.2",
     "pino": "^10.3.1",
     "postgres": "^3.4.9",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",

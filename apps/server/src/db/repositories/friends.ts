@@ -3,7 +3,6 @@ import { and, desc, eq, or } from "drizzle-orm";
 import { db } from "../client";
 import { type FriendshipRow, friendship } from "../schema";
 
-/** Canonical unordered-pair key so A->B and B->A map to one row. */
 export function pairKey(a: string, b: string): string {
   return [a, b].sort().join(":");
 }
@@ -47,10 +46,10 @@ export async function createRequest(
       status: "pending",
     })
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to create friend request");
+  return row;
 }
 
-/** Reuse an existing (e.g. declined) row when re-requesting, flipping direction. */
 export async function reopenRequest(
   id: string,
   requesterId: string,
@@ -67,7 +66,8 @@ export async function reopenRequest(
     })
     .where(eq(friendship.id, id))
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to reopen friend request");
+  return row;
 }
 
 export async function setStatus(
@@ -125,7 +125,6 @@ export async function listPendingOutgoing(
     .orderBy(desc(friendship.createdAt));
 }
 
-/** Ids of the user's accepted friends (the other side of each row). */
 export async function acceptedFriendIds(userId: string): Promise<string[]> {
   const rows = await listAccepted(userId);
   return rows.map((r) =>
@@ -133,7 +132,6 @@ export async function acceptedFriendIds(userId: string): Promise<string[]> {
   );
 }
 
-/** The other party of a friendship from the viewer's perspective. */
 export function otherUserId(row: FriendshipRow, viewerId: string): string {
   return row.requesterId === viewerId ? row.addresseeId : row.requesterId;
 }

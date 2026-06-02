@@ -1,5 +1,8 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import type { ChatMode } from "../../lib/chat-layout";
+import type { PatternId } from "../../lib/pattern";
+import type { ColorMode, ThemeId } from "../../lib/theme";
 import { db } from "../client";
 import {
   type GameStat,
@@ -63,7 +66,8 @@ export async function createProfile(input: {
       avatar: input.avatar ?? null,
     })
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to create profile");
+  return row;
 }
 
 export async function updateAvatar(
@@ -73,6 +77,34 @@ export async function updateAvatar(
   await db
     .update(userProfile)
     .set({ avatar, updatedAt: new Date() })
+    .where(eq(userProfile.userId, userId));
+}
+
+export async function updateAppearance(
+  userId: string,
+  patch: { theme?: ThemeId; colorMode?: ColorMode; pattern?: PatternId },
+): Promise<void> {
+  const set: {
+    theme?: ThemeId;
+    colorMode?: ColorMode;
+    pattern?: PatternId;
+    updatedAt: Date;
+  } = {
+    updatedAt: new Date(),
+  };
+  if (patch.theme !== undefined) set.theme = patch.theme;
+  if (patch.colorMode !== undefined) set.colorMode = patch.colorMode;
+  if (patch.pattern !== undefined) set.pattern = patch.pattern;
+  await db.update(userProfile).set(set).where(eq(userProfile.userId, userId));
+}
+
+export async function updateChatLayout(
+  userId: string,
+  layout: { mode: ChatMode },
+): Promise<void> {
+  await db
+    .update(userProfile)
+    .set({ chatLayout: layout, updatedAt: new Date() })
     .where(eq(userProfile.userId, userId));
 }
 
@@ -99,7 +131,6 @@ export async function bumpStats(
     .where(eq(userProfile.userId, userId));
 }
 
-/** A user as exposed to other users (id, username, display name, avatar). */
 export type PublicUserRow = {
   id: string;
   username: string;

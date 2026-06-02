@@ -1,6 +1,3 @@
-// Loads emoji-mart's data lazily (it's ~1.5MB) and derives a shortcode->native
-// map (for `:code ` replacement) and category groups (for the picker grid).
-
 type RawEmoji = {
   id: string;
   name: string;
@@ -49,7 +46,6 @@ async function loadData(): Promise<EmojiMartData> {
 const nativeOf = (data: EmojiMartData, id: string) =>
   data.emojis[id]?.skins?.[0]?.native;
 
-/** Map of `shortcode` -> native emoji (emoji ids + aliases + a few custom). */
 export async function loadShortcodes(): Promise<Map<string, string>> {
   if (shortcodesCache) return shortcodesCache;
   const data = await loadData();
@@ -70,7 +66,6 @@ export async function loadShortcodes(): Promise<Map<string, string>> {
   return map;
 }
 
-/** Category groups of native emojis (with searchable keywords) for the picker. */
 export async function loadEmojiGroups(): Promise<EmojiGroup[]> {
   if (groupsCache) return groupsCache;
   const data = await loadData();

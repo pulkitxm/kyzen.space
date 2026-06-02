@@ -1,12 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/**
- * Blur-up image — CSS only, no load listeners (so it can never get stuck on the
- * placeholder the way an `onLoad` race can). A blurred copy of the provider's
- * base64 `blurPreview` sits behind as a CSS background; the real image renders
- * on top and fades in, simply covering the blur once it paints. The box is
- * reserved from `aspectRatio` so layout never shifts.
- */
 export function BlurImage({
   src,
   blurPreview,
@@ -39,12 +32,12 @@ export function BlurImage({
       ) : (
         <span className="absolute inset-0 animate-pulse bg-surface-overlay" />
       )}
-      {/* biome-ignore lint/a11y/useAltText: alt provided via prop */}
+      {/* biome-ignore lint/performance/noImgElement: GIF with dynamic remote src and blur placeholder, not a next/image static asset */}
       <img
         src={src}
         alt={alt}
         loading={loading}
-        className="animate-gif-fade-in relative block h-full w-full object-cover"
+        className="relative block h-full w-full animate-gif-fade-in object-cover"
       />
     </span>
   );

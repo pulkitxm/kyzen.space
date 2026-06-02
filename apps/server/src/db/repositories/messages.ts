@@ -27,7 +27,8 @@ export async function insertMessage(
       gameId: input.gameId ?? null,
     })
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to insert message");
+  return row;
 }
 
 export async function getById(id: string): Promise<MessageRow | null> {
@@ -44,7 +45,17 @@ export async function getByIds(ids: string[]): Promise<MessageRow[]> {
   return db.select().from(message).where(inArray(message.id, ids));
 }
 
-/** Newest-first keyset page. Client reverses for display. */
+export async function getGameCardByGameId(
+  gameId: string,
+): Promise<MessageRow | null> {
+  const [row] = await db
+    .select()
+    .from(message)
+    .where(and(eq(message.gameId, gameId), eq(message.kind, "game_card")))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function listMessages(
   conversationId: string,
   opts: { cursor?: string; limit?: number } = {},
@@ -56,6 +67,7 @@ export async function listMessages(
     const c = decodeCursor(opts.cursor);
     if (c) {
       conds.push(
+        // biome-ignore lint/style/noNonNullAssertion: drizzle or() returns SQL given non-empty args
         or(
           lt(message.createdAt, c.createdAt),
           and(eq(message.createdAt, c.createdAt), lt(message.id, c.id)),

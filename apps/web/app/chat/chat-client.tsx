@@ -16,7 +16,7 @@ export function ChatListClient({ userId }: { userId: string }) {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-4xl flex-col">
-      <header className="flex items-center justify-between border-b border-border px-4 py-3.5">
+      <header className="flex items-center justify-between border-border border-b px-4 py-3.5">
         <h1 className="font-semibold text-lg">Messages</h1>
         <div className="flex items-center gap-3">
           <button

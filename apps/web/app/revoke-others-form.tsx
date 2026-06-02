@@ -31,7 +31,7 @@ export function RevokeOthersForm({
       <Button variant="danger" loading={pending} onClick={onRevoke}>
         Sign out all other sessions
       </Button>
-      <p className="mt-2 max-w-xl text-xs text-muted-foreground">
+      <p className="mt-2 max-w-xl text-muted-foreground text-xs">
         Ends {otherSessionCount} other active session
         {otherSessionCount === 1 ? "" : "s"}. This device stays signed in.
       </p>

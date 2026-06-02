@@ -1,9 +1,4 @@
-// End-to-end integration tests for the chat domain: friends, DMs, groups,
-// messaging, and notifications — exercising the real services + repositories
-// against Postgres. Run with: `bun run test:integration` (needs the DB up).
-// Self-skips if the database isn't reachable so CI without a DB stays green.
-
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterAll, describe, expect, it } from "bun:test";
 import { eq, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";
@@ -42,7 +37,6 @@ async function makeUser(label: string): Promise<TestUser> {
   return { id, username };
 }
 
-/** Establish an accepted friendship (request from a, accept by b). */
 async function befriend(a: TestUser, b: TestUser): Promise<void> {
   await friendsService.sendFriendRequest(a.id, b.username);
   const row = await friends.getFriendshipBetween(a.id, b.id);
@@ -163,7 +157,6 @@ describe.skipIf(!DB_UP)("friends", () => {
     const b = await makeUser("acc2");
     await friendsService.sendFriendRequest(a.id, b.username);
     const row = await friends.getFriendshipBetween(a.id, b.id);
-    // requester tries to accept their own request
     expectErr(
       await friendsService.respondToRequest(a.id, row?.id ?? "", "accept"),
       403,
@@ -195,7 +188,6 @@ describe.skipIf(!DB_UP)("friends", () => {
     const a = await makeUser("pk1");
     const b = await makeUser("pk2");
     await friendsService.sendFriendRequest(a.id, b.username);
-    // same pair queried from either direction
     const fromA = await friends.getFriendshipBetween(a.id, b.id);
     const fromB = await friends.getFriendshipBetween(b.id, a.id);
     expect(fromA?.id).toBe(fromB?.id ?? "");
@@ -209,7 +201,7 @@ describe.skipIf(!DB_UP)("direct messages", () => {
     await befriend(a, b);
     const first = await trackDm(a, b);
     const second = unwrap(await conversationsService.createDm(a.id, b.id));
-    expect(second.id).toBe(first); // get-or-create dedupes
+    expect(second.id).toBe(first);
     expect(second.kind).toBe("dm");
   });
 
@@ -230,9 +222,7 @@ describe.skipIf(!DB_UP)("direct messages", () => {
     await befriend(a, b);
     const dmId = await trackDm(a, b);
     await friendsService.removeFriend(a.id, b.id);
-    // can't create a *new* DM with a non-friend...
     expectErr(await conversationsService.createDm(a.id, b.id), 403);
-    // ...but the existing one is still openable
     const existing = await conversations.findDm(a.id, b.id);
     expect(existing?.id).toBe(dmId);
   });
@@ -350,9 +340,7 @@ describe.skipIf(!DB_UP)("groups", () => {
     const b = await makeUser("gr2");
     const c = await makeUser("gr3");
     const gid = await trackGroup(a, "Trim", [b.id, c.id]);
-    // non-owner b tries to remove c
     expectErr(await conversationsService.removeMember(b.id, gid, c.id), 403);
-    // owner removes c
     unwrap(await conversationsService.removeMember(a.id, gid, c.id));
     expect(await conversations.getMemberIds(gid)).not.toContain(c.id);
   });
@@ -446,14 +434,10 @@ describe.skipIf(!DB_UP)("notifications", () => {
     const beforeUnread = await notifications.unreadCount(b.id);
     expect(beforeUnread).toBeGreaterThan(0);
     await friendsService.respondToRequest(b.id, row?.id ?? "", "accept");
-    // the friend_request notification was marked read on resolution
     expect(await notifications.unreadCount(b.id)).toBeLessThan(beforeUnread);
   });
 });
 
-// Only when the DB is unreachable do we surface one clearly-worded skipped
-// marker, so it's obvious the suites above didn't run. When the DB is up,
-// nothing extra shows — just the passing tests.
 if (!DB_UP) {
   describe("chat integration", () => {
     it.skip("skipped — database unreachable; run `bun run db:start`", () => {});

@@ -1,4 +1,4 @@
-import { GAMES } from "@/lib/games";
+import { listGameMeta } from "@gamelobby/games-core";
 
 export const PROFILE_ACTIVITY_PAGE_SIZE = 5;
 
@@ -21,7 +21,7 @@ export type ProfileActivityGameRow = {
 export function mapApiRowToActivity(
   row: ProfileActivityApiRow,
 ): ProfileActivityGameRow {
-  const entry = GAMES.find((g) => g.id === row.gameType);
+  const entry = listGameMeta().find((m) => m.type === row.gameType);
   return {
     id: row.id,
     href: `/games/${row.gameType}/${row.id}`,

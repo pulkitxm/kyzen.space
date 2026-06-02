@@ -155,8 +155,8 @@ function AvatarEditorModal({
           onClick={attemptClose}
         />
         <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:rounded-2xl">
-          <header className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="text-base font-semibold text-card-foreground">
+          <header className="flex items-center justify-between border-border border-b px-5 py-4">
+            <h2 className="font-semibold text-base text-card-foreground">
               Customize your character
             </h2>
             <button
@@ -200,7 +200,7 @@ function AvatarEditorModal({
               type="button"
               onClick={() => setShowAll((v) => !v)}
               aria-expanded={showAll}
-              className="mt-4 flex w-full items-center justify-center gap-1.5 border-t border-border pt-4 pb-4 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+              className="mt-4 flex w-full items-center justify-center gap-1.5 border-border border-t pt-4 pb-4 font-medium text-muted-foreground text-sm transition hover:text-foreground"
             >
               {showAll ? "Hide options" : "Customize manually"}
               <ChevronIcon dir={showAll ? "up" : "down"} />
@@ -302,8 +302,8 @@ function AvatarEditorModal({
             </div>
           ) : null}
 
-          <footer className="flex items-center justify-between gap-3 border-t border-border px-5 py-4">
-            <p className="min-w-0 truncate text-sm text-danger">{error}</p>
+          <footer className="flex items-center justify-between gap-3 border-border border-t px-5 py-4">
+            <p className="min-w-0 truncate text-danger text-sm">{error}</p>
             <div className="flex shrink-0 items-center gap-2">
               <Button type="button" variant="ghost" onClick={attemptClose}>
                 Cancel
@@ -323,10 +323,10 @@ function AvatarEditorModal({
           aria-label="Unsaved changes"
         >
           <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
-            <h3 className="text-base font-semibold text-card-foreground">
+            <h3 className="font-semibold text-base text-card-foreground">
               Unsaved changes
             </h3>
-            <p className="mt-1.5 text-sm text-muted-foreground">
+            <p className="mt-1.5 text-muted-foreground text-sm">
               You have unsaved changes to your character. Save them before
               closing?
             </p>
@@ -381,9 +381,8 @@ function StyleControl({
   onChange: (style: AvatarStyle) => void;
 }) {
   return (
-    <div
-      className="flex w-44 rounded-lg border border-border bg-surface-overlay p-0.5"
-      role="group"
+    <fieldset
+      className="flex w-44 min-w-0 rounded-lg border border-border bg-surface-overlay p-0.5"
       aria-label="Character style"
     >
       {AVATAR_STYLES.map((style) => (
@@ -393,7 +392,7 @@ function StyleControl({
           aria-pressed={value === style}
           onClick={() => onChange(style)}
           className={cn(
-            "flex-1 rounded-md px-1 py-1.5 text-[11px] font-medium transition",
+            "flex-1 rounded-md px-1 py-1.5 font-medium text-[11px] transition",
             value === style
               ? "bg-card text-card-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
@@ -402,7 +401,7 @@ function StyleControl({
           {STYLE_LABELS[style]}
         </button>
       ))}
-    </div>
+    </fieldset>
   );
 }
 
@@ -420,18 +419,18 @@ function OptionStepper({
   const options = AVATAR_OPTIONS[optionKey];
   const index = Math.max(0, options.indexOf(value));
   const step = (delta: number) => {
-    const next = options[(index + delta + options.length) % options.length]!;
-    onChange(optionKey, next);
+    const next = options[(index + delta + options.length) % options.length];
+    if (next) onChange(optionKey, next);
   };
 
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-sm font-medium text-card-foreground">{label}</span>
+      <span className="font-medium text-card-foreground text-sm">{label}</span>
       <div className="flex items-center gap-1">
         <StepButton label={`Previous ${label}`} onClick={() => step(-1)}>
           <ChevronIcon dir="left" />
         </StepButton>
-        <span className="min-w-32 text-center text-sm text-muted-foreground">
+        <span className="min-w-32 text-center text-muted-foreground text-sm">
           {humanize(value)}
         </span>
         <StepButton label={`Next ${label}`} onClick={() => step(1)}>
@@ -476,7 +475,7 @@ function ColorRow({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium text-card-foreground">{label}</span>
+      <span className="font-medium text-card-foreground text-sm">{label}</span>
       <div className="flex flex-wrap gap-1.5">
         {AVATAR_COLORS[colorKey].map((hex) => (
           <button
@@ -511,7 +510,13 @@ function humanize(value: string): string {
 
 function PencilIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M4 20h4l10-10a2.828 2.828 0 10-4-4L4 16v4z"
         stroke="currentColor"
@@ -525,7 +530,13 @@ function PencilIcon() {
 
 function CloseIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M6 6l12 12M18 6L6 18"
         stroke="currentColor"
@@ -538,7 +549,13 @@ function CloseIcon() {
 
 function ShuffleIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M16 3h5v5M21 3l-7 7M4 20l7-7M16 21h5v-5M4 4l4 4"
         stroke="currentColor"
@@ -559,7 +576,13 @@ const CHEVRON_PATHS = {
 
 function ChevronIcon({ dir }: { dir: keyof typeof CHEVRON_PATHS }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d={CHEVRON_PATHS[dir]}
         stroke="currentColor"

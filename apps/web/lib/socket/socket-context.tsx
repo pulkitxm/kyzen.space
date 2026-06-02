@@ -22,11 +22,6 @@ const SocketContext = createContext<SocketContextValue>({
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
 
-/**
- * One shared Socket.IO connection for chat/presence/notifications, mounted
- * inside the Jotai provider so socket-driven atoms are in scope. Connects only
- * when signed in (auth rides the better-auth cookie via withCredentials).
- */
 export function SocketProvider({
   enabled,
   children,
@@ -78,7 +73,6 @@ export function useSocket(): SocketContextValue {
   return useContext(SocketContext);
 }
 
-/** Subscribe to a socket event for the lifetime of the component. */
 export function useSocketEvent<T = unknown>(
   event: string,
   handler: (payload: T) => void,
@@ -97,7 +91,6 @@ export function useSocketEvent<T = unknown>(
   }, [socket, event]);
 }
 
-/** Emit an event and resolve/reject from its ack callback ({ ok } | { ok:false, error }). */
 export function emitAck<T = Record<string, unknown>>(
   socket: Socket | null,
   event: string,

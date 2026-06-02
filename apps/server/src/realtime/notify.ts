@@ -8,11 +8,6 @@ import { notifications } from "../db";
 import { getIO } from "./io";
 import { emitToUser } from "./rooms";
 
-/**
- * Persist a notification (so offline recipients get it on next load) and push it
- * to the recipient's user room in realtime. Never notifies the actor of their own
- * action. Call this AFTER the triggering mutation has committed.
- */
 export async function notify(
   userId: string,
   type: NotificationType,
