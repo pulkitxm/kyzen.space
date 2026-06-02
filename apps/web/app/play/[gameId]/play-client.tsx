@@ -6,6 +6,7 @@ import {
   getGameClient,
   getGameSkeleton,
 } from "@gamelobby/games-client";
+import type { GameType } from "@gamelobby/games-core";
 import { Suspense } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import type { ChatLayout } from "@/lib/chat-layout";
@@ -26,7 +27,7 @@ export function PlayClient({
 }: {
   gameId: string;
   userId: string;
-  gameType: string;
+  gameType: GameType;
   initialGame: GameClientProps["initialGame"];
   initialMoves: GameClientProps["initialMoves"];
   conversation: ConversationJson | null;

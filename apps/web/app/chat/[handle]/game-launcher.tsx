@@ -1,7 +1,7 @@
 "use client";
 
 import { CHAT_EVENTS, type ConversationJson } from "@gamelobby/chat-core";
-import { listGameMeta } from "@gamelobby/games-core";
+import { type GameType, listGameMeta, TIC_TAC_TOE } from "@gamelobby/games-core";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FaGamepad } from "react-icons/fa6";
@@ -10,11 +10,11 @@ import { emitAck, useSocket } from "@/lib/socket/socket-context";
 export function GameLauncher({
   conversation,
   userId,
-  gameType = listGameMeta()[0]?.type ?? "",
+  gameType = listGameMeta()[0]?.type ?? TIC_TAC_TOE,
 }: {
   conversation: ConversationJson;
   userId: string;
-  gameType?: string;
+  gameType?: GameType;
 }) {
   const { socket } = useSocket();
   const router = useRouter();
