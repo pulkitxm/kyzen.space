@@ -2,12 +2,6 @@ import { describe, expect, test } from "bun:test";
 import type { GameDefinition, Seat } from "../src/index";
 import { GAMES } from "../src/index";
 
-/**
- * Reusable conformance suite: every entry in the `GAMES` array must satisfy
- * the platform contract. New games are covered automatically the moment they
- * are added to the array — no per-game wiring needed.
- */
-
 function minSeats(def: GameDefinition): Seat[] {
   return def.engine.roles
     .slice(0, def.engine.minPlayers)
@@ -77,7 +71,6 @@ for (const def of GAMES) {
       if (def.engine.mode !== "turn-based" || !def.engine.reduce) return;
       const state = def.engine.createInitialState(minSeats(def));
       const snapshot = JSON.parse(JSON.stringify(state));
-      // The move may be rejected; the contract is that reduce never mutates.
       def.engine.reduce(state, { role: def.engine.roles[0]! }, {} as never);
       expect(state).toEqual(snapshot);
     });

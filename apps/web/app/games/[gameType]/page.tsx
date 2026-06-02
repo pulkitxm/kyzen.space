@@ -7,8 +7,6 @@ import { getServerSession } from "@/lib/get-server-session";
 
 export const dynamic = "force-dynamic";
 
-// Single dynamic lobby for every game — driven by the games-core registry, so
-// no per-game folder is needed. Emits the same `/games/${type}` URLs as before.
 export default async function GameLobbyPage({
   params,
 }: {

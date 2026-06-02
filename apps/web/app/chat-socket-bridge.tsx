@@ -39,10 +39,6 @@ import {
 } from "@/lib/chat/atoms";
 import { useSocketEvent } from "@/lib/socket/socket-context";
 
-/**
- * Bridges global socket events into Jotai atoms (and seeds those atoms on mount).
- * Mounted once inside the app shell so sidebar badges + lists stay live everywhere.
- */
 export function ChatSocketBridge({
   userId,
   initialConversations,
@@ -62,8 +58,6 @@ export function ChatSocketBridge({
 }) {
   const store = useStore();
 
-  // Hydrate server-seeded chat state synchronously (no client fetch on load);
-  // socket events keep these atoms live afterward.
   useHydrateAtoms(
     new Map<
       | typeof conversationsAtom
@@ -148,7 +142,6 @@ export function ChatSocketBridge({
   useSocketEvent<ServerConversationUpdated>(
     CHAT_EVENTS.conversationUpdated,
     ({ conversation }) => {
-      // If I'm no longer a member (I left or was removed), drop it from my list.
       if (!conversation.members.some((m) => m.id === userId)) {
         store.set(conversationsAtom, (prev) =>
           prev.filter((c) => c.id !== conversation.id),

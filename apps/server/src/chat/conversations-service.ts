@@ -6,8 +6,6 @@ import { assembleConversation } from "./assemble";
 import { sendSystemMessage } from "./messages-service";
 import { fail, ok, type ServiceResult } from "./result";
 
-/** Join every connected socket of each member to the conversation room, then
- * push each member their own (viewer-specific) conversation view. */
 async function fanoutConversation(
   conversationId: string,
   memberIds: string[],
@@ -59,7 +57,6 @@ export async function createGroup(
   const trimmed = name.trim();
   if (!trimmed) return fail("Group name is required");
 
-  // keep only resolvable users (drops bad ids); creator always included
   const candidates = Array.from(new Set(memberIds)).filter(
     (id) => id !== userId,
   );
@@ -145,7 +142,6 @@ export async function removeMember(
     actorId: userId,
     targetId: targetUserId,
   });
-  // the removed member's sockets should leave the room
   const io = getIO();
   if (io) io.in(userRoom(targetUserId)).socketsLeave(convRoom(conversationId));
   return ok(null);

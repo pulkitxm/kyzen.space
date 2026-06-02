@@ -33,7 +33,6 @@ export default async function PlayPage({
   );
   if (!data) notFound();
 
-  // Pull in the linked conversation (if any, and if the viewer can see it).
   let conversation: ConversationJson | null = null;
   let messages: MessageJson[] = [];
   let nextCursor: string | null = null;
@@ -52,10 +51,6 @@ export default async function PlayPage({
     }
   }
 
-  // Resolve the initial chat layout for flash-free SSR. The cookie mirrors the
-  // client's localStorage (written on every change + by the boot script), so
-  // when present it's the trusted source. Only when it's absent (e.g. first
-  // load on a new device) do we fall back to the DB (an extra fetch).
   const layoutCookie = (await cookies()).get(CHAT_LAYOUT_COOKIE)?.value;
   const layoutTrusted =
     typeof layoutCookie === "string" && layoutCookie.length > 0;

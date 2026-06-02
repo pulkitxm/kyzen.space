@@ -5,13 +5,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConversationPicker } from "@/app/games/components/conversation-picker";
 
-/**
- * Shared lobby for every game: an optional setup form (rendered from the game's
- * declared `configFields`) followed by the common "Play with a friend" entry.
- * The collected `config` is forwarded to game creation. A game with no
- * `configFields` (e.g. tic-tac-toe) shows just the play button — identical to
- * the old per-game page. New games reuse this verbatim.
- */
 export function GameLobby({
   meta,
   configFields,
@@ -108,7 +101,6 @@ function ConfigFieldRow({
     );
   }
 
-  // select
   return (
     <label className="block">
       <span className={LABEL}>{field.label}</span>

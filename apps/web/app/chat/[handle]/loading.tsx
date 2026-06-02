@@ -1,10 +1,6 @@
 import { Skeleton } from "@/components/ui";
 
-// Mirrors app/chat/[handle]/conversation-view.tsx: full-height max-w-5xl column
-// with a header (avatar + name/subtitle), a stream of message bubbles, and the
-// composer bar.
 export default function ConversationLoading() {
-  // Alternating sender/receiver bubble widths.
   const bubbles = [
     { mine: false, w: "60%" },
     { mine: true, w: "45%" },

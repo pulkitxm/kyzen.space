@@ -42,10 +42,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// App-wide display face (personal-use DEMO license — see
-// app/fonts/game-paused-LICENSE.txt). Exposed as `--font-game-paused-face` and
-// wired into the `--font-sans` token in globals.css; the font only covers
-// A–Z/a–z, so the stack falls through to Geist for digits/punctuation.
 const gamePaused = localFont({
   src: "./fonts/game-paused.otf",
   variable: "--font-game-paused-face",
@@ -70,8 +66,6 @@ export default async function RootLayout({
   let userTheme: ThemeId | null = null;
   let userMode: ColorMode | null = null;
   let userPattern: PatternId | null = null;
-  // Seed chat/social state on the server (no client fetch on load); the socket
-  // keeps these atoms live afterward.
   let initialConversations: ConversationJson[] = [];
   let initialFriends: FriendshipJson[] = [];
   let initialIncoming: FriendshipJson[] = [];
@@ -132,14 +126,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${gamePaused.variable} h-full antialiased`}
     >
       <head>
-        {/*
-          Inline FOUC-prevention boot scripts: read cookies/localStorage and set
-          data-* attributes on <html> before paint. Authored as raw <script> tags
-          via dangerouslySetInnerHTML (not next/script) so React 19 hoists and
-          executes them from the initial HTML — passing inline code as text
-          children renders an inert <script> ("Scripts inside React components are
-          never executed when rendering on the client").
-        */}
+        {}
         <script
           id="gl-sidebar-cookie-bootstrap"
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline boot script

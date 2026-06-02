@@ -1,6 +1,5 @@
 import { Skeleton } from "@/components/ui";
 
-// Mirrors app/auth/page.tsx: centered max-w-[360px] sign-in card.
 export default function AuthLoading() {
   return (
     <div className="flex min-h-full flex-col items-center justify-center px-4 py-14">

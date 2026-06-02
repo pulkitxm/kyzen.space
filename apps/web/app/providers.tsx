@@ -20,11 +20,8 @@ export function Providers({
   signedIn,
 }: {
   children: ReactNode;
-  /** The signed-in user's persisted palette, or null when signed out. */
   initialPalette?: ThemeId | null;
-  /** The signed-in user's persisted color mode, or null when signed out. */
   initialMode?: ColorMode | null;
-  /** The signed-in user's persisted background pattern, or null when signed out. */
   initialPattern?: PatternId | null;
   signedIn: boolean;
 }) {

@@ -1,10 +1,3 @@
-// Appearance catalog (web source of truth for the picker UI + palette boot).
-// Two independent axes:
-//   - theme: which color palette (each defines its own light + dark colors via CSS)
-//   - colorMode: light / dark / system
-// Keep the id lists in sync with apps/server/src/lib/theme.ts (the server uses
-// the same ids to validate the persisted preference).
-
 export const THEME_IDS = [
   "sangria",
   "crimson-nights",
@@ -32,9 +25,7 @@ export const DEFAULT_COLOR_MODE: ColorMode = "dark";
 export interface ThemeDef {
   id: ThemeId;
   name: string;
-  /** Short blurb shown under the name on the picker card. */
   blurb: string;
-  /** The two brand colors — deep base + vivid accent (solid; no gradients). */
   deep: string;
   vivid: string;
 }
@@ -133,10 +124,6 @@ export function isValidColorMode(value: unknown): value is ColorMode {
 export function getThemeDef(id: string): ThemeDef | undefined {
   return THEMES.find((t) => t.id === id);
 }
-
-// --- Palette boot (no-flash) -------------------------------------------------
-// next-themes handles the light/dark *mode* class. The palette lives in a
-// `data-theme` attribute, so we apply the stored palette before paint here.
 
 export const PALETTE_STORAGE_KEY = "gl-palette";
 

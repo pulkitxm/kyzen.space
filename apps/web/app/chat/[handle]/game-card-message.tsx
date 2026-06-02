@@ -10,13 +10,6 @@ function gameName(gameType: string): string {
   return listGameMeta().find((m) => m.type === gameType)?.name ?? gameType;
 }
 
-/**
- * In-chat game card. Status, winner and players are resolved server-side onto
- * the message metadata (see enrichGameCardMeta) and re-broadcast over
- * `message_updated` as the game progresses, so the card renders the right state
- * on first paint with no client-side game lookup. The action adapts to the
- * viewer (Join/Accept/Open/Spectate) and links to the side-by-side /play view.
- */
 export function GameCardMessage({
   gameId,
   meta,

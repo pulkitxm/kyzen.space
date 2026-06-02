@@ -1,12 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/**
- * Blur-up image — CSS only, no load listeners (so it can never get stuck on the
- * placeholder the way an `onLoad` race can). A blurred copy of the provider's
- * base64 `blurPreview` sits behind as a CSS background; the real image renders
- * on top and fades in, simply covering the blur once it paints. The box is
- * reserved from `aspectRatio` so layout never shifts.
- */
 export function BlurImage({
   src,
   blurPreview,

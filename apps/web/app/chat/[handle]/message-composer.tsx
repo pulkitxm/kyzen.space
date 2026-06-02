@@ -27,7 +27,6 @@ const ComposerPicker = dynamic(
   { ssr: false },
 );
 
-// Cap auto-grow at ~6 lines; keep in sync with the `max-h-40` class below.
 const MAX_TEXTAREA_HEIGHT = 160;
 
 export function MessageComposer({
@@ -52,16 +51,11 @@ export function MessageComposer({
     });
   }, []);
 
-  // Grow the textarea to fit its content (Shift+Enter newlines, wrapping),
-  // up to MAX_TEXTAREA_HEIGHT; collapses back when text is cleared. With
-  // border-box sizing, scrollHeight excludes the border, so add it back —
-  // otherwise the content overflows by the border width and a scrollbar shows
-  // permanently. Only allow scrolling once we actually hit the cap.
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    const borderY = ta.offsetHeight - ta.clientHeight; // top + bottom border
+    const borderY = ta.offsetHeight - ta.clientHeight;
     const full = ta.scrollHeight + borderY;
     ta.style.height = `${Math.min(full, MAX_TEXTAREA_HEIGHT)}px`;
     ta.style.overflowY = full > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
@@ -93,12 +87,10 @@ export function MessageComposer({
     }, 3000);
   }, [socket, conversationId]);
 
-  // Stop typing when leaving the conversation / unmounting.
   useEffect(() => stopTyping, [stopTyping]);
 
   const onType = useCallback(
     (value: string, caret: number) => {
-      // WhatsApp-style `:code ` -> emoji replacement.
       if (shortcodesRef.current && value[caret - 1] === " ") {
         const replaced = replaceShortcodeBeforeSpace(value, caret, (c) =>
           shortcodesRef.current?.get(c),
@@ -126,7 +118,6 @@ export function MessageComposer({
       const end = ta?.selectionEnd ?? start;
       const next = text.slice(0, start) + native + text.slice(end);
       setText(next);
-      // Keep the picker open so several emojis can be added in a row.
       requestAnimationFrame(() => {
         ta?.focus();
         const pos = start + native.length;

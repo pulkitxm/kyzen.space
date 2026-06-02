@@ -11,13 +11,6 @@ import {
 } from "@/lib/chat-layout";
 import { cn } from "@/lib/utils";
 
-/**
- * Wraps the chat with mode-dependent chrome. Mounted: an in-flow column with a
- * fixed (bounded) width and a pop-out button overlaid top-right. Popout: a
- * position:fixed floating window with a drag header (dock button) and a
- * bottom-left resize handle. `children` stays at a stable position across modes
- * so the chat subtree never remounts.
- */
 export function ChatPopoutWindow({
   mode,
   minimized,
@@ -32,11 +25,9 @@ export function ChatPopoutWindow({
   children,
 }: {
   mode: ChatMode;
-  /** When minimized the chrome hides but children stay mounted (socket alive). */
   minimized: boolean;
   geometry: PopoutGeometry;
   chatWidth: number;
-  /** mounted-mode visibility (mobile tab === "chat"); ignored when popped out. */
   mountedVisible: boolean;
   onPopOut: () => void;
   onDock: () => void;
@@ -94,7 +85,7 @@ export function ChatPopoutWindow({
         const dy = ev.clientY - startY;
         const w = Math.max(MIN_CHAT_POPOUT_W, orig.w - dx);
         const h = Math.max(MIN_CHAT_POPOUT_H, orig.h + dy);
-        const x = orig.x + (orig.w - w); // keep right edge fixed
+        const x = orig.x + (orig.w - w);
         onGeometryChange(
           clampGeometry(
             { x, y: orig.y, w, h },
@@ -136,15 +127,6 @@ export function ChatPopoutWindow({
     <div
       style={style}
       className={cn(
-        // No `overflow-hidden` here: the emoji/GIF picker is an absolutely
-        // positioned popover that must be allowed to spill outside the window.
-        // `relative`/`fixed` are mutually exclusive position utilities — never
-        // emit both, or Tailwind's source order can let `relative` win and the
-        // popout `left`/`top` offsets shove it off-screen. Both modes still give
-        // the absolutely-positioned children a containing block.
-        // `flex` is applied only in the visible branches — never in the base —
-        // so the minimized `hidden` isn't overridden by a `md:flex` variant
-        // (a media-query utility outranks a plain `hidden` on desktop).
         "min-h-0 flex-col bg-background",
         minimized
           ? "hidden"
@@ -156,13 +138,11 @@ export function ChatPopoutWindow({
               ),
       )}
     >
-      {/* Floating-window header (drag handle + dock). Hidden when mounted. */}
+      {}
       {/** biome-ignore lint/a11y/noStaticElementInteractions: drag surface */}
       <div
         onMouseDown={startDrag}
         className={cn(
-          // rounded-t-xl keeps the corners clean now that the window no longer
-          // clips with overflow-hidden.
           "shrink-0 select-none cursor-move items-center justify-between rounded-t-xl border-border border-b bg-muted/40 px-3 py-2",
           isPopout ? "flex" : "hidden",
         )}
@@ -188,7 +168,7 @@ export function ChatPopoutWindow({
         </div>
       </div>
 
-      {/* Mounted-mode overlay controls (md+ only): pop out + minimize. */}
+      {}
       <div
         className={cn(
           "absolute top-3 right-3 z-10 flex items-center gap-1.5",
@@ -213,12 +193,10 @@ export function ChatPopoutWindow({
         </button>
       </div>
 
-      {/* Chat content — STABLE position across modes (never remounts). `flex`
-          makes the child stretch to full height so ConversationView's h-full
-          resolves (otherwise the message list/composer collapse). */}
+      {}
       <div className="relative flex min-h-0 flex-1">{children}</div>
 
-      {/* Resize handle (popout only), bottom-left corner. */}
+      {}
       {/** biome-ignore lint/a11y/noStaticElementInteractions: resize surface */}
       <div
         onMouseDown={startResize}

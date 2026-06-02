@@ -52,7 +52,6 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
     const slog = log.child({ socketId: socket.id, userId: socket.data.userId });
     slog.info("socket connected");
 
-    // Chat lane: join personal + conversation rooms, register chat/friend handlers.
     void joinUserRooms(socket);
     attachChatHandlers(io, socket);
     attachFriendHandlers(io, socket);

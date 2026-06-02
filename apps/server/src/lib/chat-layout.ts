@@ -1,30 +1,25 @@
-// Source of truth for chat-layout validation (server side). Mirror of the web
-// catalog in apps/web/lib/chat-layout.ts — keep the bounds in sync.
-
 export type ChatMode = "mounted" | "popout";
 
 export type PopoutGeometry = { x: number; y: number; w: number; h: number };
 
 export type ChatLayout = {
   mode: ChatMode;
-  chatWidth: number; // chat-pane width in px; the game pane flex-fills the rest
+  chatWidth: number;
   popout: PopoutGeometry;
 };
 
-// The chat pane is the bounded one; the game pane flex-fills the rest.
 export const MIN_GAME = 360;
 export const MIN_CHAT = 280;
 export const MAX_CHAT = 420;
 export const DEFAULT_CHAT_W = 360;
 
-// Floating-window size bounds (px).
 export const MIN_CHAT_POPOUT_W = 300;
 export const MAX_CHAT_POPOUT_W = 560;
 export const MIN_CHAT_POPOUT_H = 320;
 export const MAX_CHAT_POPOUT_H = 900;
 
 export const DEFAULT_POPOUT: PopoutGeometry = {
-  x: 100000, // sentinel; clamped to bottom-right at render time
+  x: 100000,
   y: 100000,
   w: 380,
   h: 520,
@@ -48,11 +43,6 @@ function finiteOr(n: unknown, fallback: number): number {
 
 export type ChatModePref = { mode: ChatMode };
 
-/**
- * Validate the cross-device chat preference. Only `mode` is stored server-side;
- * positions/sizes are device-local (localStorage + cookie on the web), so a
- * desktop layout can never break the mobile UI.
- */
 export function validateChatModePref(input: unknown): ChatModePref | null {
   if (typeof input !== "object" || input === null || Array.isArray(input))
     return null;

@@ -1,7 +1,5 @@
 import { Skeleton } from "@/components/ui";
 
-// Mirrors app/settings/page.tsx: max-w-3xl header + appearance card with the
-// tab-pill row and a grid of theme swatches.
 export default function SettingsLoading() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-10">

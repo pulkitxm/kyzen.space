@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { BlurImage } from "./blur-image";
 
 const MAX_RECENT = 24;
-const EMOJI_STRIP = 16; // two rows of 8 for the merged search view
+const EMOJI_STRIP = 16;
 const GIF_PAGE = 24;
 const NEAR_BOTTOM = 360;
 
@@ -27,7 +27,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   flags: "Flags",
 };
 
-// Stable, varied skeleton heights so loading GIFs read as a masonry grid.
 const SKELETON_HEIGHTS = [120, 88, 150, 104, 78, 140, 96, 132];
 
 const SECTION_LABEL =
@@ -161,13 +160,6 @@ function GifResults({
   );
 }
 
-/**
- * Composer attachment menu. By default it's a full emoji browser with an
- * Emoji / GIFs tab strip at the bottom; the GIFs tab swaps in a masonry grid.
- * Typing a query merges both — matching emojis fill the top two rows and GIF
- * results fill the rest. Fetched GIF pages are cached globally so re-opening
- * (or repeating a search) is instant.
- */
 export function ComposerPicker({
   onEmoji,
   onGif,
@@ -233,7 +225,7 @@ export function ComposerPicker({
           gifs: GifJson[];
           nextOffset: number | null;
         }>(url);
-        if (reqId !== reqIdRef.current) return; // a newer request superseded us
+        if (reqId !== reqIdRef.current) return;
         setCache((prev) => {
           const next = new Map(prev);
           const base = append ? (prev.get(value)?.gifs ?? []) : [];
@@ -263,8 +255,6 @@ export function ComposerPicker({
     [setCache],
   );
 
-  // Load the first GIF page only when GIFs are actually visible (the GIFs tab,
-  // or any active search), and only if it isn't already cached.
   useEffect(() => {
     const value = q.trim();
     const needGifs = value.length > 0 || tab === "gif";

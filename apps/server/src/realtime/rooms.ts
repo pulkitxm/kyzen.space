@@ -17,8 +17,6 @@ export function emitToGame(
   io.to(gameRoom(gameId)).emit(event, payload);
 }
 
-// ---- chat rooms ----
-
 export function convRoom(conversationId: string): string {
   return `conv:${conversationId}`;
 }

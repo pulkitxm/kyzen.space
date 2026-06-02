@@ -54,7 +54,6 @@ export async function sendMessage(input: {
   return ok(message);
 }
 
-/** Insert a `system` message (e.g. "X added Y") and broadcast it like any message. */
 export async function sendSystemMessage(
   conversationId: string,
   meta: SystemMeta,

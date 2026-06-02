@@ -9,7 +9,6 @@ import {
   message,
 } from "../schema";
 
-/** Canonical DM key so a pair maps to a single conversation. */
 export function dmKey(a: string, b: string): string {
   return [a, b].sort().join(":");
 }
@@ -23,7 +22,6 @@ export async function getById(id: string): Promise<ConversationRow | null> {
   return row ?? null;
 }
 
-/** The existing DM for a pair, without creating one. */
 export async function findDm(
   a: string,
   b: string,

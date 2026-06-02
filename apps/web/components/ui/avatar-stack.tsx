@@ -2,7 +2,6 @@ import type { AvatarConfig } from "@gamelobby/avatar";
 import { Character } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
-/** A DiceBear character with an optional online/offline presence dot. */
 export function PresenceAvatar({
   config,
   seed,
@@ -39,7 +38,6 @@ export function PresenceAvatar({
   );
 }
 
-/** Overlapping characters for groups / multiple typers. */
 export function AvatarStack({
   users,
   size = 28,

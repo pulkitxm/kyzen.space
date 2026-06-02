@@ -1,9 +1,3 @@
-// Background pattern catalog (web source of truth for the picker UI + boot).
-// "pattern" is the third appearance axis (alongside theme + colorMode): which
-// doodle tile is masked behind the app. Each tile is theme-tinted via CSS, so
-// only the shape changes here. Keep the id list in sync with
-// apps/server/src/lib/pattern.ts (the server validates the persisted choice).
-
 export const PATTERN_IDS = [
   "doodles",
   "games",
@@ -19,11 +13,8 @@ export const DEFAULT_PATTERN: PatternId = "doodles";
 export interface PatternDef {
   id: PatternId;
   name: string;
-  /** Short blurb shown under the name on the picker card. */
   blurb: string;
-  /** Public asset path for the tile, or null for "none" (solid background). */
   src: string | null;
-  /** Tile size in px for `mask-size` / the preview swatch. */
   tile: number;
 }
 
@@ -74,10 +65,6 @@ export function isValidPattern(value: unknown): value is PatternId {
 export function getPatternDef(id: string): PatternDef | undefined {
   return PATTERNS.find((p) => p.id === id);
 }
-
-// --- Pattern boot (no-flash) -------------------------------------------------
-// Applies the stored pattern to <html data-pattern> before paint, mirroring the
-// palette boot in lib/themes.ts.
 
 export const PATTERN_STORAGE_KEY = "gl-pattern";
 

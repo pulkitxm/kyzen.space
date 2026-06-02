@@ -1,7 +1,5 @@
 import { PageContainer, Skeleton } from "@/components/ui";
 
-// Mirrors app/games/[gameType]/page.tsx: PageContainer + back link + header +
-// the GameLobby setup form (max-w-sm: a couple of field rows + Play button).
 export default function GameLobbyLoading() {
   return (
     <PageContainer>

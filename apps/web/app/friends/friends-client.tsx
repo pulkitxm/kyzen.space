@@ -33,7 +33,6 @@ export function FriendsClient() {
   const { socket } = useSocket();
   const router = useRouter();
 
-  // Navigate to the username-based DM URL; the page resolves/creates the DM.
   const startDm = useCallback(
     (username: string) => {
       router.push(`/chat/${username}`);
@@ -47,8 +46,6 @@ export function FriendsClient() {
         prev.filter((f) => f.id !== requestId),
       );
       try {
-        // The server only broadcasts friend_accepted to the requester; the
-        // accepter learns of the new friendship via this ack, so add it here.
         const res = await emitAck<{ friendship?: FriendshipJson | null }>(
           socket,
           CHAT_EVENTS.friendRespond,

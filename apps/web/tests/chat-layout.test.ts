@@ -21,12 +21,10 @@ describe("clampChatWidth", () => {
   });
 
   it("shrinks chat so the game pane keeps its min width", () => {
-    // container 760 → chat max = min(420, 760 - 360) = 400.
     expect(clampChatWidth(9999, 760)).toBe(400);
   });
 
   it("falls back to MIN_CHAT when the container is too small for both", () => {
-    // container 500 → chat max = min(420, 140) = 140 < MIN_CHAT → MIN_CHAT.
     expect(clampChatWidth(300, 500)).toBe(MIN_CHAT);
   });
 });
@@ -116,15 +114,13 @@ describe("edgeForIcon", () => {
   });
 
   it("detects each edge once the center crosses it", () => {
-    // ICON_SIZE 56 → half 28. center.x = x + 28.
-    expect(edgeForIcon({ x: -40, y: 400 }, 1200, 800)).toBe("left"); // cx = -12
-    expect(edgeForIcon({ x: 1200, y: 400 }, 1200, 800)).toBe("right"); // cx = 1228
-    expect(edgeForIcon({ x: 600, y: -40 }, 1200, 800)).toBe("top"); // cy = -12
-    expect(edgeForIcon({ x: 600, y: 800 }, 1200, 800)).toBe("bottom"); // cy = 828
+    expect(edgeForIcon({ x: -40, y: 400 }, 1200, 800)).toBe("left");
+    expect(edgeForIcon({ x: 1200, y: 400 }, 1200, 800)).toBe("right");
+    expect(edgeForIcon({ x: 600, y: -40 }, 1200, 800)).toBe("top");
+    expect(edgeForIcon({ x: 600, y: 800 }, 1200, 800)).toBe("bottom");
   });
 
   it("on a corner, picks the edge with the larger overshoot", () => {
-    // cx = -72 (left over 72), cy = -32 (top over 32) → left wins.
     expect(edgeForIcon({ x: -100, y: -60 }, 1200, 800)).toBe("left");
   });
 });

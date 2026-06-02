@@ -1,7 +1,3 @@
-// One-off generator: builds a seamless doodle tile from Lucide (ISC) line icons.
-// Fetches each icon's SVG, extracts its inner shapes, and scatters them on a
-// jittered grid kept clear of the tile edges so `repeat` never clips one.
-// Usage: bun gen-doodle-tile.ts <out.svg> <tile> <comma,separated,icon,names>
 export {};
 
 const [, , outPath, tileArg, namesArg] = process.argv;
@@ -38,7 +34,6 @@ if (missing.length) console.warn("skipped (not found):", missing.join(", "));
 if (icons.length < 6)
   throw new Error(`too few icons resolved: ${icons.length}`);
 
-// 5x5 jittered grid (cells of TILE/5), icons re-centred from Lucide's 24x24 box.
 const step = TILE / 5;
 const centers = [0, 1, 2, 3, 4].map((i) => Math.round(step / 2 + i * step));
 const defs: string[] = [];
@@ -51,7 +46,6 @@ let k = 0;
 for (const cy of centers) {
   for (const cx of centers) {
     const ic = k % icons.length;
-    // deterministic-ish pseudo-jitter from the index
     const jx = ((k * 37) % 13) - 6;
     const jy = ((k * 53) % 13) - 6;
     const rot = ((k * 47) % 37) - 18;

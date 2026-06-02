@@ -5,7 +5,6 @@ import {
 import type { Server as IOServer, Socket } from "socket.io";
 import { createGameInConversation } from "../chat/games-in-chat-service";
 
-/** Sockets-first path for "start a game in this conversation" (ack-based). */
 export function attachGameChatHandlers(_io: IOServer, socket: Socket): void {
   socket.on(
     CHAT_EVENTS.createGameInConversation,

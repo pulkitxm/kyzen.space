@@ -27,14 +27,6 @@ async function emitFullState(io: IOServer, gameRow: GameRecord) {
   emitToGame(io, gameRow.id, "game_state", payload);
 }
 
-/**
- * Resolve the caller into a seat or a spectator. Already-seated players rejoin
- * unchanged. With intent "spectate", or when the game is full/active, or when
- * a "challenge" seat is reserved for someone else, the caller joins read-only
- * (no seat) — `make_move` already rejects non-players, so this is the
- * server-side guard against seat theft. Returns `changed: true` only when a new
- * player was actually seated.
- */
 async function ensureSeated(
   gameRow: GameRecord,
   userId: string,
@@ -53,7 +45,6 @@ async function ensureSeated(
     !!gameRow.challengedUserId &&
     userId !== gameRow.challengedUserId;
 
-  // Anything that isn't a free, claimable seat falls through to spectating.
   if (intent === "spectate" || !seatFree || challengeReserved) {
     return { game: gameRow, changed: false };
   }
@@ -145,8 +136,6 @@ export async function handleMakeMove(
   const def = getDefinition(gameRow.gameType);
   if (!def.engine.reduce) return err(socket, "Game does not accept moves");
 
-  // Strict guardrails: validate the inbound move and the stored state against
-  // the game's own schemas before handing them to the engine.
   const parsedMove = def.moveSchema.safeParse(payload.moveData);
   if (!parsedMove.success) return err(socket, "Invalid move");
   const parsedState = def.stateSchema.safeParse(gameRow.gameState);
@@ -178,8 +167,6 @@ export async function handleMakeMove(
 
   if (updated.status === "completed") {
     emitToGame(io, gameRow.id, "game_over", { winner: updated.winner });
-    // The move ended the game: refresh the in-chat card so it shows the result.
-    // Its status is resolved server-side on assembly (see enrichGameCardMeta).
     await broadcastGameCard(io, updated.id);
   }
 }

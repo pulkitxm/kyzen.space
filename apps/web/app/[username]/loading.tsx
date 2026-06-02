@@ -1,7 +1,5 @@
 import { Skeleton } from "@/components/ui";
 
-// Mirrors app/[username]/profile-ui.tsx: banner + avatar/name card, then the
-// Stats and Activity cards in the left aside.
 export default function ProfileLoading() {
   return (
     <div className="min-h-full bg-surface text-card-foreground">

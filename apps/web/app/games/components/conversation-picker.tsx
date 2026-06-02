@@ -11,12 +11,6 @@ import { emitAck, useSocket } from "@/lib/socket/socket-context";
 const ROW =
   "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm outline-none transition hover:bg-surface-overlay disabled:opacity-50";
 
-/**
- * "Play with…" picker: choose an existing DM/group (groups then ask open vs
- * challenge), or a friend to start a fresh DM. Creating posts the game card in
- * that conversation and navigates the creator to the side-by-side /play view.
- * Works for any game — `gameType` + optional setup `config` come from the lobby.
- */
 export function ConversationPicker({
   userId,
   gameType,

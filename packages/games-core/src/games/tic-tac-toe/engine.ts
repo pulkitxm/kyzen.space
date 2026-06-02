@@ -74,8 +74,6 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
     if (state.currentTurn !== ctx.role) {
       return { ok: false, error: "Not your turn" };
     }
-    // Structural validity lives in the schema (defense-in-depth: the driver
-    // also validates before calling reduce). Game rules live below.
     const parsed = ticTacToeMoveSchema.safeParse(input);
     if (!parsed.success) {
       return { ok: false, error: "Invalid move" };

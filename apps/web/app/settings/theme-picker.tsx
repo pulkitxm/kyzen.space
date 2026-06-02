@@ -20,7 +20,6 @@ function useHydrated(): boolean {
   );
 }
 
-/** Set <html data-theme> directly for a non-persisted live palette preview. */
 function previewPalette(id: ThemeId) {
   document.documentElement.setAttribute("data-theme", id);
 }
@@ -36,7 +35,6 @@ export function ThemePicker({ signedIn }: { signedIn: boolean }) {
   const { palette, setPalette } = usePalette();
   const { mode, setMode } = useColorModeSetting(signedIn);
 
-  // Keep the committed palette in a ref so hover-out / unmount can restore it.
   const committedRef = useRef<ThemeId>(DEFAULT_THEME);
   useEffect(() => {
     committedRef.current = palette;

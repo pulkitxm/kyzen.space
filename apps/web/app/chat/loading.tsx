@@ -1,7 +1,5 @@
 import { Skeleton } from "@/components/ui";
 
-// Mirrors app/chat/chat-client.tsx: full-height max-w-4xl column with a bordered
-// header (title + actions) and a list of conversation rows.
 export default function ChatListLoading() {
   return (
     <div className="mx-auto flex h-full w-full max-w-4xl flex-col">

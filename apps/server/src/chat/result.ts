@@ -1,5 +1,3 @@
-// Shared result type for chat services, consumed by both REST routers and
-// socket handlers. `status` maps to an HTTP status for the REST path.
 export type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 500;
 
 export type ServiceResult<T> =
