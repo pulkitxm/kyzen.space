@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { GameDefinition, Seat } from "../src/index";
-import { GAME_CATEGORIES, GAMES } from "../src/index";
+import { GAME_CATEGORIES, GAME_TYPES, GAMES, listGameTypes } from "../src/index";
 
 const CATEGORY_IDS = new Set(GAME_CATEGORIES.map((category) => category.id));
 
@@ -15,6 +15,10 @@ describe("GAMES registry", () => {
     expect(GAMES.length).toBeGreaterThan(0);
     const types = GAMES.map((d) => d.meta.type);
     expect(new Set(types).size).toBe(types.length);
+  });
+
+  test("GAME_TYPES matches the registry exactly", () => {
+    expect([...GAME_TYPES].sort()).toEqual(listGameTypes().sort());
   });
 });
 
