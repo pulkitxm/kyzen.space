@@ -61,24 +61,63 @@ schemas are the guardrails that make that JSON safe and strongly typed:
 ## Worked example: tic-tac-toe
 
 ```
+packages/games-core/src/game-types.ts                     # TIC_TAC_TOE slug + GAME_TYPES tuple + GameType union + gameTypeSchema
 packages/games-core/src/games/tic-tac-toe/
-  schemas.ts   # cell/mark + strict state/move/config schemas, z.infer types, TYPE const
-  engine.ts    # ticTacToeEngine: createInitialState + reduce (rules only)
-  meta.ts      # ticTacToeMeta: GameMeta
+  schemas.ts   # cell/mark + strict state/move/config schemas, z.infer types
+  engine.ts    # ticTacToeEngine: createInitialState + reduce (rules only); imports TIC_TAC_TOE from ../../game-types
+  meta.ts      # ticTacToeMeta: GameMeta; imports TIC_TAC_TOE from ../../game-types
   index.ts     # ticTacToeDefinition: GameDefinition
 packages/games-core/src/games/index.ts   # GAMES array includes ticTacToeDefinition
 packages/games-client/src/games/tic-tac-toe/client.tsx    # board UI
 packages/games-client/src/games/tic-tac-toe/skeleton.tsx  # loading skeleton (optional)
-packages/games-client/src/registry.ts                     # "tic-tac-toe": lazy(client) + skeleton
+packages/games-client/src/registry.ts                     # Record<GameType, ...> maps: board + skeleton keyed by TIC_TAC_TOE
 ```
+
+## The type-safe slug: `game-types.ts`
+
+Every game's string slug lives **only** in
+`packages/games-core/src/game-types.ts`. That file is the single source of
+truth for the `GameType` union, the `gameTypeSchema` Zod validator, and the
+`GAME_TYPES` tuple:
+
+```ts
+export const TIC_TAC_TOE = "tic-tac-toe";
+
+export const GAME_TYPES = [TIC_TAC_TOE] as const;
+
+export type GameType = (typeof GAME_TYPES)[number];
+
+export const gameTypeSchema = z.enum(GAME_TYPES);
+```
+
+When adding a game:
+1. Declare `export const <SLUG> = "<type>";` in `game-types.ts`.
+2. Append it to `GAME_TYPES`: `export const GAME_TYPES = [TIC_TAC_TOE, <SLUG>] as const;`.
+3. Import `<SLUG>` from `../../game-types` in the game's `meta.ts` and
+   `engine.ts` (and anywhere else in the game folder that references the slug).
+   **Never redeclare the string literal in a per-game file.**
+
+`gameTypeSchema` is a `z.enum(GAME_TYPES)` — every wire boundary that carries a
+`gameType` value is validated against it (`gameJsonSchema` in games-core,
+`gameCardMetaSchema` / `clientCreateGameInConversationSchema` in chat-core). The
+conformance suite asserts `GAME_TYPES` matches the `GAMES` registry exactly
+(`"GAME_TYPES matches the registry exactly"` test in
+`packages/games-core/tests/conformance.test.ts`) so the tuple and the array can
+never drift. `GameMeta.type` is `GameType` — not `string` — and the registry
+helpers reflect this: `hasEngine(type: string): type is GameType` narrows the
+type, `listGameTypes(): GameType[]` returns the narrowed list.
 
 ## Steps to add a game
 
-1. **games-core** — create `src/games/<type>/{schemas,engine,meta,index}.ts`,
-   append the definition to `GAMES` (`src/games/index.ts`), and export the public
+1. **game-types.ts** — declare the slug constant and append it to `GAME_TYPES`
+   (see above). Both steps happen in `packages/games-core/src/game-types.ts`.
+2. **games-core** — create `src/games/<type>/{schemas,engine,meta,index}.ts`.
+   In `schemas.ts` write the strict Zod schemas + `z.infer` types (no slug here).
+   In `engine.ts` and `meta.ts` import the slug from `../../game-types`.
+   Append the definition to `GAMES` (`src/games/index.ts`) and export the public
    symbols from `src/index.ts`. Add a category to `src/categories.ts` only if you
    need a new one.
-2. **games-client** — add `src/games/<type>/client.tsx` (`"use client"`, typed
+3. **games-client** — add `src/games/<type>/client.tsx` (`"use client"`, typed
    `GameClientProps`). Model it on `src/games/tic-tac-toe/client.tsx`: the host
    app passes the **one shared Socket.IO connection** plus a `connected` flag via
    props (`props.socket`, `props.connected`) — **never call `io()`** to open your
@@ -86,28 +125,31 @@ packages/games-client/src/registry.ts                     # "tic-tac-toe": lazy(
    move, and `leave_room` on cleanup; render from the `game_state`/`move_made`
    events. On unmount remove your listeners with `socket.off(...)` only — never
    `socket.disconnect()` (that would kill the shared chat lane). Register the board
-   in `src/registry.ts` (`REGISTRY`) by `type`.
+   in `src/registry.ts` (`REGISTRY`) using the imported slug constant as the key —
+   both `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>`, so a missing
+   entry is a **compile error**, not a runtime surprise.
    Then register a **skeleton**: either add `src/games/<type>/skeleton.tsx` — a
    prop-less component that mirrors your board's layout (built from the shared
    `SkeletonBox`, no `"use client"` needed, no import of the board) and add it to
-   `SKELETON_REGISTRY` by `type` — or rely on the generic fallback. Either way
+   `SKELETON_REGISTRY` — or rely on the generic fallback. Either way
    `getGameSkeleton(type)` resolves to your skeleton or `DefaultGameSkeleton`
    (never `null`); it renders as the board's `<Suspense>` fallback while the lazy
    board chunk loads.
-3. **Tests** — the conformance suite (`packages/games-core/tests/conformance.test.ts`)
-   covers your game automatically once it's in `GAMES`. Add a focused engine test
-   `packages/games-core/tests/<type>.test.ts` (turn/role enforcement, every win
-   condition, draws, illegal moves, post-terminal rejection) and schema-strictness
-   cases. The registry parity tests are **enforced**:
-   `packages/games-client/tests/registry.test.ts` fails if a game type has no board
-   or no skeleton, and `packages/games-core/tests/game-docs.test.ts` fails if it
-   has no `docs/games/<type>.md`.
-4. **Document** — add `docs/games/<type>.md`, named after the `type` slug (e.g.
+4. **Tests** — the conformance suite (`packages/games-core/tests/conformance.test.ts`)
+   covers your game automatically once it's in `GAMES`; the `"GAME_TYPES matches
+   the registry exactly"` assertion also catches a missing `GAME_TYPES` entry.
+   Add a focused engine test `packages/games-core/tests/<type>.test.ts`
+   (turn/role enforcement, every win condition, draws, illegal moves, post-terminal
+   rejection) and schema-strictness cases. The registry parity tests are
+   **enforced**: `packages/games-client/tests/registry.test.ts` fails if a game
+   type has no board or no skeleton, and `packages/games-core/tests/game-docs.test.ts`
+   fails if it has no `docs/games/<type>.md`.
+5. **Document** — add `docs/games/<type>.md`, named after the `type` slug (e.g.
    `docs/games/tic-tac-toe.md`): how to play, player count and roles,
    win/draw/illegal-move rules, the state and move shapes (mirroring the Zod
    schemas), any `configFields`, and a link to `packages/games-core/src/games/<type>/`.
    Every new game ships this doc.
-5. **Verify** — `bun run type-check`, `bun test` (games-core incl. conformance),
+6. **Verify** — `bun run type-check`, `bun test` (games-core incl. conformance),
    `bun run check`. Then `bun run dev` and play a full game two-up on `/play/:id`.
    See `docs/architecture/testing.md` for the suites the new game must keep green
    (registry parity, game-docs, conformance).

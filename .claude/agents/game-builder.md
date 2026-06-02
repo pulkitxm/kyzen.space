@@ -47,14 +47,22 @@ canonical guide and this prompt mirrors it.
    win/draw/illegal-move rules, the state shape, the move shape, and any setup
    inputs (→ `configFields`). If anything is ambiguous, ask before coding.
 
-2. **games-core (logic + schemas)** under `packages/games-core/src/games/<type>/`:
-   - `schemas.ts` — strict Zod `state`, `move`, `config` schemas + `z.infer` types
-     + the `TYPE` const.
-   - `engine.ts` — the `GameEngine<State, Move>`: `createInitialState(seats)`,
-     and `reduce` (turn-based) or `step` (realtime). Enforce game *rules* only;
-     `reduce` may `safeParse` the move with `moveSchema` for defense-in-depth.
-   - `meta.ts` — the `GameMeta` (type/name/description/categoryId/coverImage).
-   - `index.ts` — assemble the `GameDefinition`.
+2. **games-core (logic + schemas)**:
+   - **`packages/games-core/src/game-types.ts`** — add the slug constant
+     (`export const <SLUG> = "<type>";`) and append it to `GAME_TYPES`
+     (`export const GAME_TYPES = [TIC_TAC_TOE, <SLUG>] as const;`). This is
+     the **only** place the string literal lives; `GameType`, `gameTypeSchema`,
+     and all wire validators derive from it automatically. Never redeclare the
+     slug in a per-game file.
+   - Under `packages/games-core/src/games/<type>/`:
+     - `schemas.ts` — strict Zod `state`, `move`, `config` schemas + `z.infer`
+       types. No slug constant here.
+     - `engine.ts` — the `GameEngine<State, Move>`: `createInitialState(seats)`,
+       and `reduce` (turn-based) or `step` (realtime); import the slug from
+       `../../game-types`. Enforce game *rules* only; `reduce` may `safeParse`
+       the move with `moveSchema` for defense-in-depth.
+     - `meta.ts` — the `GameMeta`; import the slug from `../../game-types`.
+     - `index.ts` — assemble the `GameDefinition`.
    Then append the definition to the single array in
    `packages/games-core/src/games/index.ts` and export public symbols from
    `packages/games-core/src/index.ts`. Add a new category to `categories.ts`
@@ -70,14 +78,17 @@ canonical guide and this prompt mirrors it.
    render the board from the `game_state`/`move_made` events. On cleanup remove your
    listeners with `socket.off(...)` only — never `socket.disconnect()` (that would
    kill the shared chat lane). Register it in
-   `packages/games-client/src/registry.ts` (`REGISTRY`) keyed by the game `type`.
+   `packages/games-client/src/registry.ts` (`REGISTRY`) using the imported slug
+   constant as the key. `REGISTRY` is typed `Record<GameType, …>` — a missing
+   entry is a **compile error**, not a runtime surprise.
    Tailwind theme tokens (e.g. `bg-surface-raised`, `text-card-foreground`) are
    available.
    Then register a **skeleton** via `getGameSkeleton`: either add
    `packages/games-client/src/games/<type>/skeleton.tsx` — a prop-less,
    `"use client"`-free placeholder built from the shared `SkeletonBox` that mirrors
    the board's layout — and add it to `SKELETON_REGISTRY` (in `registry.ts`) keyed
-   by `type`, or rely on the generic `DefaultGameSkeleton` fallback. Either way
+   by the slug constant (`SKELETON_REGISTRY` is also `Record<GameType, …>`), or
+   rely on the generic `DefaultGameSkeleton` fallback. Either way
    `getGameSkeleton(type)` resolves to a skeleton (never `null`); it renders as the
    board's `<Suspense>` fallback while the lazy chunk loads. Keep any per-game
    skeleton in its own module (never import the board into it) so the heavy
@@ -85,7 +96,9 @@ canonical guide and this prompt mirrors it.
 
 4. **Tests** (`bun:test`):
    - The conformance suite (`packages/games-core/tests/conformance.test.ts`)
-     covers every game automatically — make sure it passes.
+     covers every game automatically — make sure it passes. It also includes a
+     `"GAME_TYPES matches the registry exactly"` assertion that catches a slug
+     added to `GAMES` but missing from `GAME_TYPES`, or vice-versa.
    - Add `packages/games-core/tests/<type>.test.ts` for the engine: turn/role
      enforcement, every win line, draws, illegal/out-of-bounds moves (rejected by
      the schema), and post-terminal rejection. Add schema-strictness cases.
