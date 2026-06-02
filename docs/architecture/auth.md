@@ -19,7 +19,7 @@ A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `
 | `apps/server/src/auth.ts` | The Better Auth instance: secret, base URL, trusted origins, Drizzle adapter, Google provider, first-sign-in profile hook, prod cookie attributes. |
 | `apps/server/src/username.ts` | `ensureUsernameForUser` — slugify display name, find a free username, create the `user_profile` row with a seeded avatar. |
 | `apps/server/src/api/index.ts` | Mounts Better Auth's request handler at `/api/auth/*` inside the Hono app. |
-| `apps/server/src/api/auth-context.ts` | `getUserId(c)` — how REST routes read the session from request headers. |
+| `apps/server/src/api/middleware/auth.ts` | `requireAuth` middleware — how REST routers read the session from request headers and gate on it. |
 | `apps/server/src/api/routes/account.ts` | Session-management REST: list sessions, sign out, revoke a session, revoke all others. |
 | `apps/server/src/db/schema.ts` | The `user` / `session` / `account` / `verification` Drizzle tables the adapter maps onto. |
 | `apps/server/src/db/client.ts` | The Drizzle `db` + `schema` handed to `drizzleAdapter`. |
@@ -173,20 +173,22 @@ How the request reaches Hono in the first place: the top-level server is Express
 
 Two patterns, both reading from the **request headers** (where the cookie lives):
 
-- **Generic helper.** `getUserId(c)` resolves the session and returns just the id (`apps/server/src/api/auth-context.ts:4`):
+- **`requireAuth` middleware.** The standard gate (`apps/server/src/api/middleware/auth.ts`) resolves the session, `401`s when there's no `user.id`, and stashes `userId`/`user`/`session` on the context:
 
 ```ts
-export async function getUserId(c: Context): Promise<string | null> {
-  const session = await getAuth().api.getSession({
-    headers: c.req.raw.headers,
-  });
-  return session?.user?.id ?? null;
-}
+export const requireAuth: MiddlewareHandler<AuthEnv> = async (c, next) => {
+  const result = await getAuth().api.getSession({ headers: c.req.raw.headers });
+  if (!result?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+  c.set("userId", result.user.id);
+  c.set("user", result.user);
+  c.set("session", result.session);
+  await next();
+};
 ```
 
-Feature routers (profiles, friends, conversations, …) call this and `401` when it's `null`. The session is never passed in as a parameter — it's always re-derived from the request, server-side, so a client cannot spoof a `userId`.
+Fully-authed routers (`conversations`, `friends`, `messages`, `notifications`, `gifs`) apply it once with `.use("*", requireAuth)`; `profiles` opts in per-route on `/me*`. Handlers then read `c.get("userId")`. The session is never passed in as a parameter — it's always re-derived from the request, server-side, so a client cannot spoof a `userId`.
 
-- **Session management.** `apps/server/src/api/routes/account.ts` calls the Better Auth server API directly (`auth.api.*`), always passing `c.req.raw.headers`:
+- **Session management.** `apps/server/src/api/routes/account.ts` calls the Better Auth server API directly (`auth.api.*`) rather than `requireAuth`, because the session object is its payload (not just a gate), always passing `c.req.raw.headers`:
   - `GET /api/account/sessions` (`:5`) — guards on `getSession`, then `listSessions`, sorted newest-first by `updatedAt`. Returns `{ current, sessions }`.
   - `POST /api/account/sign-out` (`:22`) — `signOut`.
   - `POST /api/account/revoke-others` (`:26`) — guard, then `revokeOtherSessions` (keeps the current one).
@@ -241,7 +243,7 @@ A full trace from clicking the button to being authenticated on all three lanes:
 6. **Cookie set + redirect.** Better Auth sets the session cookie (in prod: `secure`, `SameSite=Lax`, cross-subdomain per `apps/server/src/auth.ts:48`) and redirects the browser to the `callbackURL` (`/profile`).
 7. **RSC reads the session.** The `/profile` (and root layout) server component calls `getServerSession()` → `serverFetchJson("/api/auth/get-session")` (`apps/web/lib/get-server-session.ts:17`). `serverFetch` forwards the browser's cookies from `next/headers` `cookies()` with `cache: "no-store"` (`apps/web/lib/api-server.ts:13`), so the server resolves the session and returns `{ user, session }`. `getServerSession` is wrapped in `react.cache` so multiple components in one render share a single fetch.
 8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:44`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:44`).
-9. **Browser fetches.** Any subsequent client-side mutation (`SignOutForm`, friend actions, settings) uses `clientFetch(..., { credentials: "include" })` (`apps/web/lib/api-client.ts:11`), and routes read identity via `getUserId(c)` (`apps/server/src/api/auth-context.ts:4`).
+9. **Browser fetches.** Any subsequent client-side mutation (`SignOutForm`, friend actions, settings) uses `clientFetch(..., { credentials: "include" })` (`apps/web/lib/api-client.ts:11`), and the `requireAuth` middleware re-derives identity into `c.get("userId")` (`apps/server/src/api/middleware/auth.ts`).
 
 Arrow summary:
 
@@ -268,7 +270,7 @@ The settings page (`apps/web/app/settings/page.tsx:17`) is an RSC that calls `ge
 ## Gotchas, invariants & conventions
 
 - **Auth lives on the server, not the web app.** `betterAuth` is configured in `apps/server`, `baseURL` is the server URL, and the OAuth callback is `[server]/api/auth/callback/google`. The web app only holds a thin Better Auth *client* (`apps/web/lib/auth-client.ts`) plus cookie-forwarding fetch helpers.
-- **Identity is always re-derived from the cookie, never trusted from the client.** REST → `getUserId(c)` reads `c.req.raw.headers`; sockets → `io.use` reads the handshake cookie. No route accepts a `userId` parameter as proof of identity.
+- **Identity is always re-derived from the cookie, never trusted from the client.** REST → `requireAuth` reads `c.req.raw.headers`; sockets → `io.use` reads the handshake cookie. No route accepts a `userId` parameter as proof of identity.
 - **Always go through `getAuth()`.** Nothing imports the bare `auth` object; the accessor (`apps/server/src/auth.ts:56`) keeps a single instance and is the mock point in tests (`mock.module` per the repo's test conventions).
 - **No Google creds → no sign-in, gracefully.** `googleConfigured()` gates the provider (`apps/server/src/env.ts:54`); the sign-in page independently checks `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and shows setup instructions instead of a broken button (`apps/web/app/auth/page.tsx:10`). `BETTER_AUTH_SECRET` and `DATABASE_URL` are `required()` and crash startup if missing; Google creds are `optional()`.
 - **`user.id` is `text`, not `uuid`.** Better Auth generates the id (`apps/server/src/db/schema.ts:37`). The app's own tables (`game`, `move`, `user_profile`, …) use uuid PKs but still store the auth user id as `text` in FK columns like `userId` / `creator_user_id`.
@@ -284,5 +286,5 @@ The settings page (`apps/web/app/settings/page.tsx:17`) is an RSC that calls `ge
 - [Architecture overview](./README.md) — the monorepo map and the "shared logic imported by both sides" insight.
 - [Database](./database.md) — the Drizzle schema in full, including the `user_profile` and game tables the auth tables sit beside.
 - [Realtime](./realtime.md) — what happens after the socket is authenticated: chat lane vs. game lane, drivers, and authorization per event.
-- [Server API](./server-api.md) — the Hono router-per-feature layout that mounts `/api/auth/*` and reads identity via `getUserId`.
+- [Server API](./server-api.md) — the Hono router-per-feature layout that mounts `/api/auth/*` and reads identity via the `requireAuth` middleware.
 - [Web](./web.md) — the Next.js App Router side, the `serverFetch`/`clientFetch` split, and the socket provider.

@@ -20,7 +20,8 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 | `apps/server/src/env.ts` | Reads/validates env vars into a frozen `env` object; `googleConfigured()` gate for OAuth. |
 | `apps/server/src/api/index.ts` | The Hono app: `basePath("/api")`, request-logger middleware, mounts Better Auth + one router per feature, global `onError`. |
 | `apps/server/src/api/middleware/logger.ts` | Per-request pino child logger with a request id; logs method/path/status/duration at the right level. |
-| `apps/server/src/api/auth-context.ts` | `getUserId(c)` (reads the Better Auth session from request headers) and `readJson(c)` (safe body parse). |
+| `apps/server/src/api/middleware/auth.ts` | `requireAuth` middleware + `AuthEnv`: reads the Better Auth session from request headers, `401`s when absent, and stashes `userId`/`user`/`session` on the context. |
+| `apps/server/src/api/auth-context.ts` | `readJson(c)` (safe body parse). |
 | `apps/server/src/api/serialize.ts` | Pure row -> DTO mappers (`serializeGame`, `serializeMove`, `serializeMessage`, `serializeConversation`, …). The `Date -> ISO string` boundary. |
 | `apps/server/src/api/routes/account.ts` | Session management built on Better Auth: list/sign-out/revoke sessions. |
 | `apps/server/src/api/routes/conversations.ts` | The largest router: list/create DMs & groups, messages, read receipts, members, rename, and `POST /:id/games`. |
@@ -139,18 +140,19 @@ export const requestLogger: MiddlewareHandler<LoggerEnv> = async (c, next) => {
 
 The `LoggerEnv` type (`apps/server/src/api/middleware/logger.ts:6`) is what makes `c.get("log")` type-safe in any router declared `new Hono<LoggerEnv>()`. The base `logger` (`apps/server/src/logger.ts:4`) redacts cookies, auth headers, and any `*.password`/`*.token`/`*.secret` field — so request logs can never spill the session cookie that every route depends on.
 
-## Authentication on the REST surface (`auth-context.ts`)
+## Authentication on the REST surface (`middleware/auth.ts`)
 
-Almost every route's first two lines are the same:
+Auth is a **Hono middleware**, `requireAuth` (`apps/server/src/api/middleware/auth.ts`). It calls `getAuth().api.getSession({ headers: c.req.raw.headers })`, returns `401` when there's no `user.id`, and otherwise stashes the identity on the context — `userId`, the `user`, and the `session` — typed via `AuthEnv` so handlers read `c.get("userId")` (a guaranteed `string`) without repeating the gate:
 
 ```ts
-const userId = await getUserId(c);
-if (!userId) return c.json({ error: "Unauthorized" }, 401);
+const userId = c.get("userId");
 ```
 
-`getUserId` (`apps/server/src/api/auth-context.ts:4`) calls `getAuth().api.getSession({ headers: c.req.raw.headers })` and returns `session?.user?.id ?? null`. There is no shared auth *middleware* guarding routes — each handler explicitly opts in by calling `getUserId`. Why? It keeps the few genuinely public routes (e.g. `GET /api/profiles/:username`, `apps/server/src/api/routes/profiles.ts:184`, which intentionally does not call `getUserId`) trivially expressible without a per-route exclusion list. The cost is a one-line repetition you'll see everywhere.
+Routers whose every route needs a session apply it once at the top — `new Hono<AuthEnv>().use("*", requireAuth)` — covering `conversations`, `friends`, `messages`, `notifications`, and `gifs`. `profiles` is **mixed**: the authenticated `/me*` routes opt in per-route (`.put("/me/avatar", requireAuth, …)`) while the public ones (`GET /api/profiles/:username`, `apps/server/src/api/routes/profiles.ts`) stay open. `games` (`GET /api/games/:gameId`) is intentionally public and applies nothing.
 
-`readJson(c)` (`apps/server/src/api/auth-context.ts:11`) is the matching body helper: it `try/catch`-parses the JSON body and returns `null` on failure or a non-object, so routes can write `const body = await readJson(c)` and then defensively pull fields. Note that some routes (profiles, account) inline their own `c.req.json()` + `try/catch` instead — both styles coexist.
+Two surfaces deliberately keep their own `getSession` calls instead of `requireAuth`: Better Auth owns `/api/auth/*` end-to-end, and `account` (`apps/server/src/api/routes/account.ts`) is session-management itself — it reads the `session` token, calls `listSessions`/`revokeSession`, and signs out, so the session object is its domain payload, not just a gate.
+
+`readJson(c)` (`apps/server/src/api/auth-context.ts`) is the body helper: it `try/catch`-parses the JSON body and returns `null` on failure or a non-object, so routes write `const body = await readJson(c)` and then defensively pull fields. `isUuid(value)` (`apps/server/src/lib/uuid.ts`) is the shared UUID guard used by the conversation/game routes and the realtime game lane.
 
 ## Row -> DTO serialization (`serialize.ts`)
 
@@ -209,7 +211,7 @@ export function fail(
 
 The division of labor:
 
-- **Routes (`api/routes/*`) are thin adapters.** They authenticate (`getUserId`), pull/validate the request shape into primitives, call exactly one service function, and translate the `ServiceResult` into an HTTP response. The translation is mechanical and identical everywhere:
+- **Routes (`api/routes/*`) are thin adapters.** The `requireAuth` middleware has already authenticated; the handler reads `c.get("userId")`, pulls/validates the request shape into primitives, calls exactly one service function, and translates the `ServiceResult` into an HTTP response. The translation is mechanical and identical everywhere:
 
   ```ts
   const res = await conversationsService.createDm(userId, targetId);
@@ -304,9 +306,9 @@ A concrete trace from HTTP request to broadcast, showing every layer:
 1. Browser `POST /api/conversations/<uuid>/messages` with `{ body: "hi" }` and the session cookie.
 2. Express CORS + the `/api/*` regex forward it to Hono — `apps/server/src/index.ts:24`.
 3. `requestLogger` mints a request id and attaches the child logger — `apps/server/src/api/middleware/logger.ts:13`.
-4. Hono matches `conversationsRouter`'s `POST /:id/messages` handler — `apps/server/src/api/routes/conversations.ts:98`.
-5. Handler authenticates: `getUserId(c)` reads the Better Auth session from the cookie — `apps/server/src/api/auth-context.ts:4`. (`401` if absent.)
-6. Handler validates the path id is a UUID and parses the body with `readJson` — `apps/server/src/api/routes/conversations.ts:101`.
+4. `conversationsRouter`'s `requireAuth` middleware reads the Better Auth session from the cookie and stashes `userId` on the context — `apps/server/src/api/middleware/auth.ts`. (`401` if absent.)
+5. Hono matches the `POST /:id/messages` handler, which reads `c.get("userId")` — `apps/server/src/api/routes/conversations.ts`.
+6. Handler validates the path id is a UUID (`isUuid`) and parses the body with `readJson` — `apps/server/src/api/routes/conversations.ts`.
 7. Handler calls the service: `messagesService.sendMessage({ conversationId, senderId, kind, body, ... })` — `apps/server/src/chat/messages-service.ts:14`.
 8. Service enforces the rule (`conversations.isMember` -> `403` if not a member), rejects empty text, then inserts via the `messages` repository and `conversations.touchLastMessage` — `apps/server/src/chat/messages-service.ts:24`.
 9. Service hydrates the row into a DTO via `assembleMessage` (resolves sender, applies game-card status) — `apps/server/src/chat/assemble.ts:45`.
@@ -320,8 +322,8 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 ## Gotchas, invariants & conventions
 
 - **`/api` prefix lives in two places that must agree.** Express forwards `^/api(/.*)?$` (`apps/server/src/index.ts:24`) and Hono declares `basePath("/api")` (`apps/server/src/api/index.ts:17`). Route files use *un-prefixed* paths (`.get("/")`, `.get("/:id")`) — the prefix is added by the basePath, not by the router.
-- **Auth is opt-in per route, not middleware.** A route that forgets `const userId = await getUserId(c); if (!userId) return c.json({ error: "Unauthorized" }, 401);` is silently public. The public profile routes (`apps/server/src/api/routes/profiles.ts:155`, `:184`) rely on this intentionally; everything else must remember the two lines.
-- **Better Auth owns `/api/auth/*` entirely.** Don't add routes under that prefix — `authApp` (`apps/server/src/api/index.ts:14`) swallows all methods/paths there. To read the session elsewhere, go through `getUserId`/`getSession`, never re-implement cookie parsing.
+- **Auth is `requireAuth` middleware, applied per router.** Fully-authed routers call `.use("*", requireAuth)` once at the top (so any route added to them is guarded by default); `profiles` opts in per-route on `/me*` and leaves its public routes open; `games` is public. A *new* router is only protected if it applies the middleware — declaring `Hono<AuthEnv>` types `c.get("userId")` as `string`, but the runtime guarantee comes from the `.use`/per-route `requireAuth`, so the two must go together.
+- **Better Auth owns `/api/auth/*` entirely.** Don't add routes under that prefix — `authApp` (`apps/server/src/api/index.ts`) swallows all methods/paths there. To read the session elsewhere, go through `requireAuth` (or `getSession` directly, as `account` does for session management), never re-implement cookie parsing.
 - **`fail()`'s status is the HTTP status.** The route does `c.json({ error: res.error }, res.status)` verbatim, so a service returning the wrong `ErrorStatus` produces the wrong HTTP code. Statuses are constrained to the `ErrorStatus` union (`apps/server/src/chat/result.ts:1`) — you can't return a 418.
 - **`serialize*` must stay pure (no I/O).** They're imported by both routes and assemblers; adding a DB call inside one would create hidden N+1s and break the read-side batching the assemblers rely on.
 - **All dates cross the wire as ISO strings via `iso()`.** Never put a raw `Date` in a DTO; `iso()` (`apps/server/src/api/serialize.ts:21`) returns `null` for nullish inputs.

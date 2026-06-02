@@ -1,6 +1,5 @@
 import { seedAvatarConfig, validateAvatarConfig } from "@gamelobby/avatar";
 import { Hono } from "hono";
-import { getAuth } from "../../auth";
 import { games, profiles } from "../../db";
 import { validateChatModePref } from "../../lib/chat-layout";
 import {
@@ -16,6 +15,8 @@ import {
   isValidTheme,
   type ThemeId,
 } from "../../lib/theme";
+import { readJson } from "../auth-context";
+import { type AuthEnv, requireAuth } from "../middleware/auth";
 
 const RESERVED = new Set(["api", "auth", "games", "profile", "account"]);
 const RECENT_PAGE_SIZE = 5;
@@ -36,14 +37,11 @@ function activityRow(g: {
   };
 }
 
-export const profilesRouter = new Hono()
-  .get("/me", async (c) => {
-    const session = await getAuth().api.getSession({
-      headers: c.req.raw.headers,
-    });
-    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+export const profilesRouter = new Hono<AuthEnv>()
+  .get("/me", requireAuth, async (c) => {
+    const user = c.get("user");
 
-    const profile = await profiles.getProfileByUserId(session.user.id);
+    const profile = await profiles.getProfileByUserId(user.id);
     if (!profile) return c.json({ error: "Profile not found" }, 404);
 
     return c.json({
@@ -59,25 +57,15 @@ export const profilesRouter = new Hono()
         createdAt: new Date(profile.createdAt).toISOString(),
       },
       user: {
-        id: session.user.id,
-        name: session.user.name ?? null,
-        email: session.user.email ?? null,
+        id: user.id,
+        name: user.name ?? null,
+        email: user.email ?? null,
       },
     });
   })
-  .put("/me/appearance", async (c) => {
-    const session = await getAuth().api.getSession({
-      headers: c.req.raw.headers,
-    });
-    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
-
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid JSON" }, 400);
-    }
-
+  .put("/me/appearance", requireAuth, async (c) => {
+    const userId = c.get("userId");
+    const body = await readJson(c);
     const raw = (body ?? {}) as {
       theme?: unknown;
       colorMode?: unknown;
@@ -111,45 +99,25 @@ export const profilesRouter = new Hono()
     )
       return c.json({ error: "Nothing to update" }, 400);
 
-    await profiles.updateAppearance(session.user.id, patch);
+    await profiles.updateAppearance(userId, patch);
     return c.json(patch);
   })
-  .put("/me/chat-layout", async (c) => {
-    const session = await getAuth().api.getSession({
-      headers: c.req.raw.headers,
-    });
-    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
-
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid JSON" }, 400);
-    }
-
+  .put("/me/chat-layout", requireAuth, async (c) => {
+    const userId = c.get("userId");
+    const body = await readJson(c);
     const pref = validateChatModePref(body);
     if (!pref) return c.json({ error: "Invalid layout" }, 400);
 
-    await profiles.updateChatLayout(session.user.id, pref);
+    await profiles.updateChatLayout(userId, pref);
     return c.json(pref);
   })
-  .put("/me/avatar", async (c) => {
-    const session = await getAuth().api.getSession({
-      headers: c.req.raw.headers,
-    });
-    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
-
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid JSON" }, 400);
-    }
-
+  .put("/me/avatar", requireAuth, async (c) => {
+    const userId = c.get("userId");
+    const body = await readJson(c);
     const avatar = validateAvatarConfig(body);
     if (!avatar) return c.json({ error: "Invalid avatar" }, 400);
 
-    await profiles.updateAvatar(session.user.id, avatar);
+    await profiles.updateAvatar(userId, avatar);
     return c.json({ avatar });
   })
   .get("/:username/recent-games", async (c) => {

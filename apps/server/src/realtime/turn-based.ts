@@ -9,10 +9,8 @@ import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
 import { broadcastGameCard } from "../chat/game-card-broadcast";
 import { type GamePlayer, type GameRecord, games, profiles } from "../db";
+import { isUuid } from "../lib/uuid";
 import { emitToGame, joinGameRoom } from "./rooms";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function err(socket: Socket, message: string) {
   socket.emit("game_error", { message });
@@ -103,7 +101,7 @@ export async function handleJoinRoom(
   payload: ClientJoinRoom,
 ): Promise<void> {
   const userId = socket.data.userId;
-  if (!UUID_RE.test(payload.gameId)) return err(socket, "Invalid game id");
+  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
 
   const gameRow = await games.getGameById(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
@@ -125,7 +123,7 @@ export async function handleMakeMove(
   payload: ClientMakeMove,
 ): Promise<void> {
   const userId = socket.data.userId;
-  if (!UUID_RE.test(payload.gameId)) return err(socket, "Invalid game id");
+  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
 
   const gameRow = await games.getGameById(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
