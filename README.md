@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GameLobby
 
-## Getting Started
+A real-time multiplayer **game and chat lobby** — sign in, message friends, and play turn-based games together inside live conversations.
 
-First, run the development server:
+GameLobby is a [Bun](https://bun.sh) + [Turborepo](https://turbo.build) monorepo. A Next.js web app and an Express + Hono + Socket.IO server sit on top of shared, framework-agnostic game and chat logic. The single most important idea: **the game/chat domain logic lives in `packages/` and is imported by both the frontend and the backend**, so the same engine and Zod schemas that render a game in the browser also _authoritatively_ validate every move on the server. The client is never trusted.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Features
+
+- **Live games** over Socket.IO — a generic, schema-driven engine; adding a game needs no new routes, tables, or socket events.
+- **Chat & social** — DMs and group conversations, friends, presence, typing indicators, and notifications, all realtime.
+- **Games in chat** — start a match from a conversation; it appears as a live game card that updates as the game progresses.
+- **Auth** — Google sign-in via [Better Auth](https://better-auth.com), with a profile (username, avatar, stats, theme) provisioned on first sign-in.
+
+## Tech stack
+
+- **Web** — Next.js 16, React 19 (App Router), Tailwind CSS v4, Jotai
+- **Server** — Bun, Express + Hono (REST under `/api/*`), Socket.IO (realtime)
+- **Data** — Postgres via Drizzle ORM; optional Redis adapter for multi-node scale-out
+- **Shared packages** — strict Zod schemas as the single source of truth; [Biome](https://biomejs.dev) for format + lint
+
+## Monorepo layout
+
+```text
+apps/
+  web/      Next.js frontend (lobby, chat, profiles, game boards)
+  server/   Express + Hono + Socket.IO backend (REST, realtime, DB)
+packages/
+  games-core/    framework-agnostic game logic + Zod schemas (no React)
+  games-client/  React game board UIs (web-only)
+  chat-core/     chat/social DTOs + the socket event contract
+  avatar/        DiceBear avataaars config
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Getting started
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Prerequisites: [Bun](https://bun.sh) `1.3.11+` and Docker (for Postgres).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+bun install                 # install all workspace deps
+cp .env.example .env        # configure env (a single root .env feeds every app)
+bun run db:start            # start Postgres in Docker
+bun run db:push             # apply the Drizzle schema to the dev DB
+bun run dev                 # web on :3000 + server on :4000 (watch mode)
+```
 
-## Learn More
+Open [http://localhost:3000](http://localhost:3000).
 
-To learn more about Next.js, take a look at the following resources:
+## Common commands
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+bun run type-check          # tsc --noEmit across all workspaces (fast, Turbo-cached)
+bun run check               # Biome: format + import-organize + lint (the CI gate, read-only)
+bun run fix                 # Biome autofix + Tailwind class sorting
+bun run test                # run every workspace's tests
+bun run db:studio           # Postgres + Adminer at http://127.0.0.1:18081
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Documentation
 
-## Deploy on Vercel
+- **[`docs/architecture/`](docs/architecture/README.md)** — in-depth, code-referenced guide to every subsystem (auth, database, the game engine and schemas, realtime, the web app, and more).
+- **[`docs/adding-a-game.md`](docs/adding-a-game.md)** — add a new game with one `GameDefinition` + one board component.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Conventions
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This codebase is intentionally **comment-free** — write self-documenting code and put prose in commit messages, PR descriptions, or `docs/`. Run `bun run type-check` and `bun run check` before opening a PR; CI enforces both plus the no-comments rule. See [`CLAUDE.md`](CLAUDE.md) for the full contributor guide.
