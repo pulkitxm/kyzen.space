@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { GameCardMeta } from "@gamelobby/chat-core";
 import { enrichGameCardMeta } from "../src/chat/game-card";
+import * as rooms from "../src/realtime/rooms";
+
+const realRooms = { ...rooms };
 
 const BASE: GameCardMeta = {
   gameId: "g1",
@@ -90,6 +93,7 @@ mock.module("../src/chat/assemble", () => ({
   assembleMessage: async (row: any) => ({ id: row.id, kind: "game_card" }),
 }));
 mock.module("../src/realtime/rooms", () => ({
+  ...realRooms,
   // biome-ignore lint/suspicious/noExplicitAny: test stub
   emitToConv: (_io: any, _cid: string, event: string, payload: unknown) => {
     emitted.push({ event, payload });
