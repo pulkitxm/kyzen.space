@@ -1,4 +1,5 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
+import type { GameType } from "@gamelobby/games-core";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import type { ChatMode } from "../../lib/chat-layout";
 import type { PatternId } from "../../lib/pattern";
@@ -112,7 +113,7 @@ const EMPTY_STAT: GameStat = { played: 0, won: 0, lost: 0, drawn: 0 };
 
 export async function bumpStats(
   userId: string,
-  gameType: string,
+  gameType: GameType,
   outcome: "won" | "lost" | "drawn",
 ): Promise<void> {
   const profile = await getProfileByUserId(userId);
