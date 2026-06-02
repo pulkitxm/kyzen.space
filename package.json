@@ -7,14 +7,13 @@
     "packages/*"
   ],
   "scripts": {
+    "cloc": "cloc --vcs=git --not-match-f='(bun\\.lock|package-lock\\.json|\\.snap$)'",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "start": "turbo run start",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "type-check": "turbo run type-check",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
     "fix": "biome check --write . && biome check --write --unsafe --only=nursery/useSortedClasses .",
     "check": "biome check .",
     "strip-comments": "bun scripts/strip-comments.mjs",
