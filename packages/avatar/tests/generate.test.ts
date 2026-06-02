@@ -6,7 +6,6 @@ import {
   applyStyleToConfig,
   randomAvatarConfig,
   seedAvatarConfig,
-  toDicebearOptions,
   topsForStyle,
   validateAvatarConfig,
 } from "../src";

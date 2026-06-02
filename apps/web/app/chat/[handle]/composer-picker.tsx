@@ -52,9 +52,9 @@ function EmojiGrid({
 }) {
   return (
     <div className="grid grid-cols-8 gap-0.5">
-      {emojis.map((e, i) => (
+      {emojis.map((e) => (
         <button
-          key={`${e.id}-${i}`}
+          key={e.id}
           type="button"
           title={e.id}
           onClick={() => onPick(e.native)}

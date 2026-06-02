@@ -50,10 +50,13 @@ describe("enrichGameCardMeta", () => {
   });
 
   test("preserves the base fields", () => {
+    const [firstPlayer] = PLAYERS;
+    expect(firstPlayer).toBeDefined();
+    if (!firstPlayer) throw new Error("expected a player");
     const meta = enrichGameCardMeta(BASE, {
       status: "waiting",
       winner: null,
-      players: [PLAYERS[0]!],
+      players: [firstPlayer],
     });
     expect(meta.gameType).toBe("tic-tac-toe");
     expect(meta.creatorUsername).toBe("alice");
@@ -105,8 +108,8 @@ describe("broadcastGameCard", () => {
     gameCard = { id: "msg-1", conversationId: "c1" };
     await broadcastGameCard({} as never, "g1");
     expect(emitted).toHaveLength(1);
-    expect(emitted[0]!.event).toBe("message_updated");
-    expect(emitted[0]!.payload).toEqual({
+    expect(emitted[0]?.event).toBe("message_updated");
+    expect(emitted[0]?.payload).toEqual({
       message: { id: "msg-1", kind: "game_card" },
     });
   });

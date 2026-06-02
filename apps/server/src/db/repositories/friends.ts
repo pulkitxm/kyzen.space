@@ -46,7 +46,8 @@ export async function createRequest(
       status: "pending",
     })
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to create friend request");
+  return row;
 }
 
 export async function reopenRequest(
@@ -65,7 +66,8 @@ export async function reopenRequest(
     })
     .where(eq(friendship.id, id))
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to reopen friend request");
+  return row;
 }
 
 export async function setStatus(

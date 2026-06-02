@@ -40,7 +40,7 @@ function RecentGameThumb({
       {cover ? (
         <Image src={cover} alt="" fill className="object-cover" sizes="56px" />
       ) : (
-        <div className="flex h-full items-center justify-center text-xs font-semibold uppercase text-muted-foreground">
+        <div className="flex h-full items-center justify-center font-semibold text-muted-foreground text-xs uppercase">
           {name.slice(0, 2)}
         </div>
       )}
@@ -94,7 +94,7 @@ export function PaginatedRecentGames({
 
   return (
     <div className="mt-4">
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+      <h3 className="font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.12em]">
         Recent games
       </h3>
       <ul className="mt-2 space-y-2">
@@ -109,7 +109,7 @@ export function PaginatedRecentGames({
                 <p className="truncate font-medium text-card-foreground">
                   {row.name}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{when}</p>
+                <p className="mt-0.5 text-muted-foreground text-xs">{when}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {statusLabel(row.status)}
                 </p>
@@ -121,7 +121,7 @@ export function PaginatedRecentGames({
       {hasMore ? (
         <button
           type="button"
-          className="mt-3 w-full rounded-xl border border-border bg-surface-overlay/50 py-2.5 text-sm font-medium text-muted-foreground transition hover:border-border/60 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-3 w-full rounded-xl border border-border bg-surface-overlay/50 py-2.5 font-medium text-muted-foreground text-sm transition hover:border-border/60 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => void loadMore()}
           disabled={loading}
         >

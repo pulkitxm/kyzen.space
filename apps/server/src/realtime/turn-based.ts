@@ -51,6 +51,7 @@ async function ensureSeated(
 
   const profile = await profiles.getProfileByUserId(userId);
   const username = profile?.username ?? "player";
+  // biome-ignore lint/style/noNonNullAssertion: seatFree guarantees players.length < maxPlayers, so a role exists for the next seat
   const role = engine.roles[players.length]!;
   const newPlayer: GamePlayer = { userId, username, role };
   const nextPlayers = [...players, newPlayer];

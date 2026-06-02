@@ -12,7 +12,11 @@ function makePending<T>(result: T): Pending<T> {
     values() {
       return this;
     },
-    then(onFulfilled?: any, onRejected?: any) {
+    // biome-ignore lint/suspicious/noThenProperty: intentional thenable fake mimicking drizzle's lazy query
+    then(
+      onFulfilled?: ((value: T) => unknown) | null,
+      onRejected?: ((reason: unknown) => unknown) | null,
+    ) {
       pending.executed = true;
       return Promise.resolve(result).then(onFulfilled, onRejected);
     },
@@ -105,9 +109,9 @@ describe("withLatency — enabled", () => {
     const slow = withLatency(sql, DELAY);
     const pending = slow.unsafe("SELECT 1");
 
-    expect(sql.lastPending!.executed).toBe(false);
+    expect(sql.lastPending?.executed).toBe(false);
     await pending;
-    expect(sql.lastPending!.executed).toBe(true);
+    expect(sql.lastPending?.executed).toBe(true);
   });
 
   it("delays queries run inside a transaction (`begin`)", async () => {

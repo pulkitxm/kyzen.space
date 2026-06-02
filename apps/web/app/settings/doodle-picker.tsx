@@ -19,7 +19,7 @@ function previewPattern(id: PatternId) {
   document.documentElement.setAttribute("data-pattern", id);
 }
 
-export function DoodlePicker({ signedIn }: { signedIn: boolean }) {
+export function DoodlePicker({ signedIn: _signedIn }: { signedIn: boolean }) {
   const mounted = useHydrated();
   const { pattern, setPattern } = usePattern();
 
@@ -35,6 +35,7 @@ export function DoodlePicker({ signedIn }: { signedIn: boolean }) {
   const restore = useCallback(() => previewPattern(committedRef.current), []);
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover-only preview restore on a non-interactive grid of buttons; keyboard users get the same behavior via each button's onBlur
     <div
       className="grid grid-cols-2 gap-4 sm:grid-cols-4"
       onMouseLeave={restore}

@@ -51,6 +51,7 @@ export function MessageComposer({
     });
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: text is the intended trigger to recompute the textarea height even though the body reads it via the ref
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;

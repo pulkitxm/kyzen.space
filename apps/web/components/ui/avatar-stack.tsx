@@ -65,7 +65,7 @@ export function AvatarStack({
       ))}
       {extra > 0 ? (
         <span
-          className="-ml-2 flex items-center justify-center rounded-full border-2 border-card bg-surface-overlay text-[10px] font-medium text-muted-foreground"
+          className="-ml-2 flex items-center justify-center rounded-full border-2 border-card bg-surface-overlay font-medium text-[10px] text-muted-foreground"
           style={{ width: size, height: size }}
         >
           +{extra}

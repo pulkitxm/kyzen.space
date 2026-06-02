@@ -47,7 +47,7 @@ export function GameCard({
           aria-hidden
         />
         <div className="relative p-5">
-          <h3 className="font-semibold text-white text-lg tracking-tight drop-shadow-sm">
+          <h3 className="font-semibold text-lg text-white tracking-tight drop-shadow-sm">
             {game.name}
           </h3>
           <p className="mt-0 max-h-0 overflow-hidden text-sm text-white/75 leading-snug opacity-0 transition-all duration-300 group-hover:mt-1.5 group-hover:max-h-24 group-hover:opacity-100 group-focus-visible:mt-1.5 group-focus-visible:max-h-24 group-focus-visible:opacity-100">

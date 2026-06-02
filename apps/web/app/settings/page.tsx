@@ -70,7 +70,7 @@ export default async function SettingsPage() {
             </p>
           </div>
 
-          <div aria-labelledby="sessions-heading">
+          <section aria-labelledby="sessions-heading">
             <h3
               id="sessions-heading"
               className="font-medium text-foreground text-sm"
@@ -96,7 +96,7 @@ export default async function SettingsPage() {
                     <li
                       key={session.id}
                       className={
-                        "rounded-xl border px-4 py-3 text-left text-sm shadow-sm " +
+                        "rounded-xl border px-4 py-3 text-left text-sm shadow-sm" +
                         (isCurrent
                           ? "border-success-border bg-success-bg"
                           : "border-border bg-card")
@@ -152,7 +152,7 @@ export default async function SettingsPage() {
                 })
               )}
             </ul>
-          </div>
+          </section>
 
           <div className="mt-6 border-border border-t pt-6">
             <SignOutForm />

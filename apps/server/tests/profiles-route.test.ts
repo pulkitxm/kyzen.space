@@ -131,7 +131,7 @@ describe("PUT /me/appearance", () => {
       const res = await putAppearance({ pattern: "games" });
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ pattern: "games" });
-      expect(updateAppearanceCalls[0]!.patch).toEqual({ pattern: "games" });
+      expect(updateAppearanceCalls[0]?.patch).toEqual({ pattern: "games" });
     });
 
     it("returns 400 when nothing is provided", async () => {
@@ -145,8 +145,8 @@ describe("PUT /me/appearance", () => {
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ theme: "midnight-blue" });
       expect(updateAppearanceCalls).toHaveLength(1);
-      expect(updateAppearanceCalls[0]!.userId).toBe("user-9");
-      expect(updateAppearanceCalls[0]!.patch).toEqual({
+      expect(updateAppearanceCalls[0]?.userId).toBe("user-9");
+      expect(updateAppearanceCalls[0]?.patch).toEqual({
         theme: "midnight-blue",
       });
     });
@@ -157,7 +157,7 @@ describe("PUT /me/appearance", () => {
         colorMode: "light",
       });
       expect(res.status).toBe(200);
-      expect(updateAppearanceCalls[0]!.patch).toEqual({
+      expect(updateAppearanceCalls[0]?.patch).toEqual({
         theme: "royal-ember",
         colorMode: "light",
       });
@@ -165,7 +165,7 @@ describe("PUT /me/appearance", () => {
 
     it("ignores a client-supplied userId", async () => {
       await putAppearance({ theme: "sangria", userId: "attacker" });
-      expect(updateAppearanceCalls[0]!.userId).toBe("user-9");
+      expect(updateAppearanceCalls[0]?.userId).toBe("user-9");
     });
   });
 });
@@ -224,23 +224,23 @@ describe("PUT /me/avatar — success", () => {
   it("calls updateAvatar with the session user id (not a client-supplied id)", async () => {
     await put({ ...VALID_AVATAR, userId: "attacker-controlled" });
     expect(updateAvatarCalls).toHaveLength(1);
-    expect(updateAvatarCalls[0]!.userId).toBe("user-42");
+    expect(updateAvatarCalls[0]?.userId).toBe("user-42");
   });
 
   it("strips unknown keys before persisting", async () => {
     await put({ ...VALID_AVATAR, injected: "x" });
-    expect(updateAvatarCalls[0]!.avatar).toEqual(VALID_AVATAR);
-    expect(updateAvatarCalls[0]!.avatar).not.toHaveProperty("injected");
+    expect(updateAvatarCalls[0]?.avatar).toEqual(VALID_AVATAR);
+    expect(updateAvatarCalls[0]?.avatar).not.toHaveProperty("injected");
   });
 
   it("accepts a valid style and persists it", async () => {
     await put({ ...VALID_AVATAR, style: "feminine" });
-    expect(updateAvatarCalls[0]!.avatar.style).toBe("feminine");
+    expect(updateAvatarCalls[0]?.avatar.style).toBe("feminine");
   });
 
   it("coerces an invalid style to 'any'", async () => {
     await put({ ...VALID_AVATAR, style: "nonsense" });
-    expect(updateAvatarCalls[0]!.avatar.style).toBe("any");
+    expect(updateAvatarCalls[0]?.avatar.style).toBe("any");
   });
 });
 

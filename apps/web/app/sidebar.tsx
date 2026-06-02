@@ -217,7 +217,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "relative flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar",
+        "relative flex shrink-0 flex-col border-sidebar-border border-r bg-sidebar",
         "fixed inset-y-0 left-0 z-50 w-64 md:relative md:z-auto md:w-(--sidebar-width)",
         !mobileOpen && "hidden md:flex",
       )}
@@ -255,7 +255,7 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="flex items-center gap-2 overflow-hidden border-b border-sidebar-border px-3 py-3.5">
+      <div className="flex items-center gap-2 overflow-hidden border-sidebar-border border-b px-3 py-3.5">
         <Link
           href="/"
           onClick={onCloseMobile}
@@ -265,7 +265,7 @@ export function Sidebar({
             paddingLeft: displayCollapsed ? 8 : 0,
           }}
         >
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-sm font-bold select-none">
+          <span className="flex size-7 shrink-0 select-none items-center justify-center rounded-lg bg-sidebar-primary font-bold text-sidebar-primary-foreground text-sm">
             GL
           </span>
           <span
@@ -324,9 +324,9 @@ export function Sidebar({
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                       !displayCollapsed &&
                         isActive &&
-                        "border-l-2 border-sidebar-primary",
+                        "border-sidebar-primary border-l-2",
                       !(displayCollapsed || isActive) &&
-                        "border-l-2 border-transparent",
+                        "border-transparent border-l-2",
                     )}
                     style={{
                       paddingLeft: displayCollapsed
@@ -366,7 +366,7 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="border-t border-sidebar-border px-2 py-3">
+      <div className="border-sidebar-border border-t px-2 py-3">
         {signedIn ? (
           <div className="mb-2">
             <NotificationsPopover
@@ -435,7 +435,7 @@ export function Sidebar({
             >
               <div
                 className={cn(
-                  "flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-medium",
+                  "flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full font-medium text-xs",
                   signedIn
                     ? "bg-sidebar-primary/15 text-sidebar-primary"
                     : "bg-sidebar-accent text-sidebar-foreground/60",

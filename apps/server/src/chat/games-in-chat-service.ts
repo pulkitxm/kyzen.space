@@ -50,6 +50,8 @@ export async function createGameInConversation(input: {
   }
 
   const { engine } = definition;
+  const [firstRole] = engine.roles;
+  if (!firstRole) return fail("Game has no roles", 400);
   const created = await games.createGame({
     gameType: input.gameType,
     status: "waiting",
@@ -57,10 +59,10 @@ export async function createGameInConversation(input: {
       {
         userId: input.userId,
         username: profile.username,
-        role: engine.roles[0]!,
+        role: firstRole,
       },
     ],
-    gameState: engine.createInitialState([{ role: engine.roles[0]! }]),
+    gameState: engine.createInitialState([{ role: firstRole }]),
     config: parsedConfig.data,
     conversationId: input.conversationId,
     creatorUserId: input.userId,

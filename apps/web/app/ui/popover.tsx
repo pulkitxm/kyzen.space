@@ -28,7 +28,7 @@ const PopoverContent = forwardRef<
         align={align}
         side={side}
         sideOffset={sideOffset}
-        className={`z-50 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-lg outline-none animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 ${className}`}
+        className={`fade-in-0 zoom-in-95 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 z-50 animate-in overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-lg outline-none data-[state=closed]:animate-out ${className}`}
         {...props}
       />
     </PopoverPrimitive.Portal>

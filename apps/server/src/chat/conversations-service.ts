@@ -87,7 +87,7 @@ export async function addMembers(
   userIds: string[],
 ): Promise<ServiceResult<ConversationJson>> {
   const conv = await conversations.getById(conversationId);
-  if (!conv || conv.kind !== "group") return fail("Group not found", 404);
+  if (conv?.kind !== "group") return fail("Group not found", 404);
   const role = await conversations.getMemberRole(conversationId, userId);
   if (role !== "owner" && role !== "admin") {
     return fail("Only group admins can add members", 403);
@@ -120,7 +120,7 @@ export async function removeMember(
   targetUserId: string,
 ): Promise<ServiceResult<null>> {
   const conv = await conversations.getById(conversationId);
-  if (!conv || conv.kind !== "group") return fail("Group not found", 404);
+  if (conv?.kind !== "group") return fail("Group not found", 404);
 
   const isSelf = targetUserId === userId;
   if (!isSelf) {
@@ -153,7 +153,7 @@ export async function renameGroup(
   name: string,
 ): Promise<ServiceResult<ConversationJson>> {
   const conv = await conversations.getById(conversationId);
-  if (!conv || conv.kind !== "group") return fail("Group not found", 404);
+  if (conv?.kind !== "group") return fail("Group not found", 404);
   const role = await conversations.getMemberRole(conversationId, userId);
   if (role !== "owner" && role !== "admin") {
     return fail("Only group admins can rename the group", 403);
@@ -174,5 +174,6 @@ export async function renameGroup(
     meta: { name: trimmed },
   });
   const updated = await conversations.getById(conversationId);
-  return ok(await assembleConversation(updated!, userId));
+  if (!updated) return fail("Group not found", 404);
+  return ok(await assembleConversation(updated, userId));
 }

@@ -76,7 +76,7 @@ export function SidebarSocialNav({
               >
                 <Icon className="size-4" />
                 {badge > 0 && collapsed ? (
-                  <span className="-right-1.5 -top-1.5 absolute size-2 rounded-full bg-primary" />
+                  <span className="absolute -top-1.5 -right-1.5 size-2 rounded-full bg-primary" />
                 ) : null}
               </span>
               <span

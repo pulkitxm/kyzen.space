@@ -144,8 +144,10 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
     ];
 
     let state = (await games.getGameById(game.id))?.gameState as TicTacToeState;
+    const reduce = ticTacToeEngine.reduce;
+    if (!reduce) throw new Error("ticTacToeEngine.reduce is undefined");
     for (const [uid, role, row, col] of seq) {
-      const res = ticTacToeEngine.reduce!(state, { role }, { row, col });
+      const res = reduce(state, { role }, { row, col });
       if (!res.ok) throw new Error(res.error);
       state = res.state;
       const moveNumber = await games.nextMoveNumber(game.id);
