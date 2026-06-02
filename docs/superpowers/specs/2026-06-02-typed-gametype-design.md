@@ -13,6 +13,7 @@ Because the schemas only validate "is a string", props and arguments downstream 
 ## Goals
 
 - One exported `GameType` literal union and one `gameTypeSchema`, derived from a single source.
+- The slug literal (`"tic-tac-toe"`) declared exactly once and reused everywhere — no raw slug strings in production code.
 - Parse-time rejection of unknown game types on input paths (not just registry lookup).
 - Propagate `GameType` to hand-written props, parameters, and service inputs so they get the narrowed type.
 - Collapse the `games-client` registries to the single source so a missing board/skeleton is a compile error.
@@ -21,23 +22,33 @@ Because the schemas only validate "is a string", props and arguments downstream 
 
 - No DB migration: the `game.game_type` column stays `text`.
 - No change to the registry's defensive lookup contract: `getDefinition` / `hasEngine` / `getEngine` / `getDriver` keep accepting `string` (the DB is an untrusted boundary that may hold a stale type) and continue to throw / return `null` on a miss.
-- Not folding the `TIC_TAC_TOE` constant or fully deriving the tuple from `GAMES` (that is the heavier "unify registries" variant; explicitly out of scope).
+- Not deriving the `GAME_TYPES` tuple from the `GAMES` array (that reintroduces a circular import — see below). The tuple is hand-listed from the slug constants and kept honest by a drift test.
+- Test assertions that pin the wire value (e.g. `expect(...).toBe("tic-tac-toe")`) keep their raw literal — they are deliberate contract checks, not duplication.
 
 ## Design
 
-### Source of truth — `packages/games-core/src/game-types.ts` (new leaf)
+### Source of truth — `packages/games-core/src/game-types.ts` (new leaf, the slug constants file)
 
-Imports only `zod`, so any module may depend on it without creating a cycle:
+This file is the single home for every game slug and the type/schema derived from them. It imports only `zod`, so any module may depend on it without creating a cycle:
 
 ```ts
-export const GAME_TYPES = ["tic-tac-toe"] as const;
+export const TIC_TAC_TOE = "tic-tac-toe";
+
+export const GAME_TYPES = [TIC_TAC_TOE] as const;
 export type GameType = (typeof GAME_TYPES)[number];
 export const gameTypeSchema = z.enum(GAME_TYPES);
 ```
 
-Re-export all three from `packages/games-core/src/index.ts`.
+The raw `"tic-tac-toe"` literal is written exactly once (the slug constant); the tuple references the constant, and `GameType` + `gameTypeSchema` derive from the tuple. Re-export the slug constant(s), `GAME_TYPES`, `GameType`, and `gameTypeSchema` from `packages/games-core/src/index.ts`.
 
 `z.enum` gives both parse-time rejection of unknown values *and* a narrowed `z.infer`, so the schema and the type stay in lockstep by construction.
+
+The existing `TIC_TAC_TOE` constant **moves here** from `games/tic-tac-toe/schemas.ts`. Its current consumers — `games/tic-tac-toe/engine.ts` and `games/tic-tac-toe/meta.ts` — import it from `../../game-types` instead of `./schemas`.
+
+### Reuse the slug constant (kill the remaining raw literals)
+
+- **games-client** (`registry.ts`): switch the hardcoded keys to computed keys — `{ [TIC_TAC_TOE]: ... }` — importing `TIC_TAC_TOE` from `@gamelobby/games-core`. Combined with the `Record<GameType, …>` annotation below, the registries are now driven entirely by the single source.
+- **Tests**: replace fixture/setup usages (`{ gameType: "tic-tac-toe" }`) with the imported `TIC_TAC_TOE` constant. Leave assertions that check the literal wire value (`expect(...).toBe("tic-tac-toe")`, `.toContain("tic-tac-toe")`) as raw strings — they intentionally pin the contract.
 
 ### Why a leaf module, not derivation from `GAMES`
 
@@ -98,11 +109,11 @@ The `Record<GameType, …>` annotation makes a missing entry a compile error (co
 
 ## Cost / trade-off
 
-Adding a game becomes two appends — the `GAMES` array and the `GAME_TYPES` tuple — instead of one. Both the compiler (`GameMeta.type: GameType`) and the drift test make a mismatch impossible to ship silently. This is the deliberate price of typing the wire layer against the closed game set.
+Adding a game means: declare its slug constant and append it to `GAME_TYPES` (both in `game-types.ts`), then add the definition to the `GAMES` array. Both the compiler (`GameMeta.type: GameType`, `Record<GameType, …>` in games-client) and the drift test make a mismatch impossible to ship silently. This is the deliberate price of typing the wire layer against the closed game set — and the slug string itself is still declared only once.
 
 ## Docs / agents sync (repo rule)
 
-- `docs/adding-a-game.md` and `.claude/agents/game-builder.md`: add the "append your type to `GAME_TYPES`" step.
+- `docs/adding-a-game.md` and `.claude/agents/game-builder.md`: the slug now lives in `game-types.ts` (declare the constant + append to `GAME_TYPES`), not in the game's `schemas.ts`; the game's `meta.ts`/`engine.ts` import it from there.
 - `docs/architecture/*` pages that describe the `gameType` field / schemas / realtime payloads: note that `gameType` is the `GameType` union.
 
 ## Testing / verification
@@ -114,4 +125,12 @@ Adding a game becomes two appends — the `GAMES` array and the `GAME_TYPES` tup
 ## File inventory
 
 New: `packages/games-core/src/game-types.ts`.
-Edited (~15): `games-core` (`index.ts`, `definition.ts`, `schemas.ts`, `registry.ts`, `tests/conformance.test.ts`); `chat-core` (`package.json`, `schemas.ts`); `games-client` (`registry.ts`); `apps/server` (`db/repositories/games.ts`, `db/repositories/profiles.ts`, `chat/games-in-chat-service.ts`, `api/routes/profiles.ts`, `api/routes/conversations.ts`); `apps/web` (`play-client.tsx`, `conversation-picker.tsx`, `game-launcher.tsx`, `profile-activity-games.ts`, `game-card-message.tsx`); docs (`adding-a-game.md`, relevant `architecture/*`) and `.claude/agents/game-builder.md`.
+
+Edited:
+- `games-core`: `index.ts`, `definition.ts`, `schemas.ts`, `registry.ts`, `games/tic-tac-toe/schemas.ts` (remove the moved constant), `games/tic-tac-toe/meta.ts`, `games/tic-tac-toe/engine.ts`, `tests/conformance.test.ts`.
+- `chat-core`: `package.json` (add dep), `schemas.ts`.
+- `games-client`: `registry.ts` (computed keys + `Record<GameType, …>`).
+- `apps/server`: `db/repositories/games.ts`, `db/repositories/profiles.ts`, `chat/games-in-chat-service.ts`, `api/routes/profiles.ts`, `api/routes/conversations.ts`.
+- `apps/web`: `play-client.tsx`, `conversation-picker.tsx`, `game-launcher.tsx`, `lib/profile-activity-games.ts`, `game-card-message.tsx`.
+- Test fixtures (slug constant, not assertions): `games-core/tests/schemas.test.ts`; `apps/web/tests/game-skeletons.test.tsx`; `apps/server` unit (`serialize.test.ts`, `games-in-chat.test.ts`, `turn-based.test.ts`, `game-card.test.ts`) and integration (`game-flows.test.ts`, `games-in-chat-edge.test.ts`, `game-driver.test.ts`).
+- Docs/agents: `docs/adding-a-game.md`, relevant `docs/architecture/*`, `.claude/agents/game-builder.md`.
