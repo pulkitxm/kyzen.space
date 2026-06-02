@@ -45,3 +45,6 @@ yarn-error.log*
 
 # Next.js generated
 next-env.d.ts
+
+# Claude Code worktrees (full repo copies; keeps Biome from seeing a nested root config)
+.claude/worktrees/

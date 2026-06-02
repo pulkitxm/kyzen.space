@@ -1,5 +1,5 @@
-import { type ComponentType, lazy } from "react";
 import { type GameType, TIC_TAC_TOE } from "@gamelobby/games-core";
+import { type ComponentType, lazy } from "react";
 import { TicTacToeSkeleton } from "./games/tic-tac-toe/skeleton";
 import { DefaultGameSkeleton } from "./skeletons";
 import type { GameClientProps } from "./types";

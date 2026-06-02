@@ -1,5 +1,5 @@
-import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import type { GameType } from "@gamelobby/games-core";
+import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { db } from "../client";
 import {
   type GamePlayer,

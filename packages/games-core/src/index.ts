@@ -14,15 +14,14 @@ export type {
   Seat,
   StepResult,
 } from "./engine";
-
-export { GAMES } from "./games";
-export { ticTacToeDefinition } from "./games/tic-tac-toe";
 export {
   GAME_TYPES,
   type GameType,
   gameTypeSchema,
   TIC_TAC_TOE,
 } from "./game-types";
+export { GAMES } from "./games";
+export { ticTacToeDefinition } from "./games/tic-tac-toe";
 export {
   emptyBoard,
   isBoardFull,

@@ -1,7 +1,11 @@
 "use client";
 
 import { CHAT_EVENTS, type ConversationJson } from "@gamelobby/chat-core";
-import { type GameType, listGameMeta, TIC_TAC_TOE } from "@gamelobby/games-core";
+import {
+  type GameType,
+  listGameMeta,
+  TIC_TAC_TOE,
+} from "@gamelobby/games-core";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FaGamepad } from "react-icons/fa6";

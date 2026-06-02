@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
-  TIC_TAC_TOE,
   clientJoinRoomSchema,
   clientMakeMoveSchema,
   gameJsonSchema,
   gamePlayerSchema,
+  TIC_TAC_TOE,
   ticTacToeMoveSchema,
   ticTacToeStateSchema,
 } from "../src/index";
