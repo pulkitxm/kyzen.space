@@ -204,6 +204,7 @@ export function persistChatLayout(layout: ChatLayout): void {
     localStorage.setItem(CHAT_LAYOUT_KEY, json);
   } catch {}
   try {
+    // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API is not universally supported; SSR reads this cookie for layout hydration
     document.cookie = `${CHAT_LAYOUT_COOKIE}=${encodeURIComponent(json)}; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
   } catch {}
 }

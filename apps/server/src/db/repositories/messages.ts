@@ -27,7 +27,8 @@ export async function insertMessage(
       gameId: input.gameId ?? null,
     })
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to insert message");
+  return row;
 }
 
 export async function getById(id: string): Promise<MessageRow | null> {
@@ -66,6 +67,7 @@ export async function listMessages(
     const c = decodeCursor(opts.cursor);
     if (c) {
       conds.push(
+        // biome-ignore lint/style/noNonNullAssertion: drizzle or() returns SQL given non-empty args
         or(
           lt(message.createdAt, c.createdAt),
           and(eq(message.createdAt, c.createdAt), lt(message.id, c.id)),

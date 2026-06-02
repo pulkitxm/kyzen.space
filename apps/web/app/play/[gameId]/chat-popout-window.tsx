@@ -131,9 +131,9 @@ export function ChatPopoutWindow({
         minimized
           ? "hidden"
           : isPopout
-            ? "flex fixed z-50 rounded-xl border border-border shadow-2xl"
+            ? "fixed z-50 flex rounded-xl border border-border shadow-2xl"
             : cn(
-                "relative border-border md:shrink-0 md:border-l max-md:!w-full",
+                "max-md:!w-full relative border-border md:shrink-0 md:border-l",
                 mountedVisible ? "flex" : "hidden md:flex",
               ),
       )}
@@ -143,7 +143,7 @@ export function ChatPopoutWindow({
       <div
         onMouseDown={startDrag}
         className={cn(
-          "shrink-0 select-none cursor-move items-center justify-between rounded-t-xl border-border border-b bg-muted/40 px-3 py-2",
+          "shrink-0 cursor-move select-none items-center justify-between rounded-t-xl border-border border-b bg-muted/40 px-3 py-2",
           isPopout ? "flex" : "hidden",
         )}
       >
@@ -197,7 +197,6 @@ export function ChatPopoutWindow({
       <div className="relative flex min-h-0 flex-1">{children}</div>
 
       {}
-      {/** biome-ignore lint/a11y/noStaticElementInteractions: resize surface */}
       <div
         onMouseDown={startResize}
         aria-hidden

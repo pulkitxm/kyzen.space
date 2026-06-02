@@ -228,7 +228,6 @@ html.dark {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: var(--font-game-paused-face), var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-game-paused: var(--font-game-paused-face);
 }

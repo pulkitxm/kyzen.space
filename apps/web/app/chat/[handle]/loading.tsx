@@ -23,6 +23,7 @@ export default function ConversationLoading() {
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
         {bubbles.map((b, i) => (
           <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder list
             key={i}
             className={b.mine ? "flex justify-end" : "flex justify-start"}
           >

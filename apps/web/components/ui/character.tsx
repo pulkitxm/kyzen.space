@@ -29,6 +29,7 @@ export function Character({
   ).toDataUri();
 
   return (
+    // biome-ignore lint/performance/noImgElement: inline DiceBear data-URI avatar, not a next/image static asset
     <img
       src={dataUri}
       alt={alt}

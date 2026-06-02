@@ -81,7 +81,7 @@ export function NotificationsPopover({
           <span className="relative flex size-7 shrink-0 items-center justify-center">
             <FaBell className="size-4 shrink-0" aria-hidden />
             {count > 0 && collapsed ? (
-              <span className="-right-0.5 -top-0.5 absolute flex min-w-4 items-center justify-center rounded-full bg-primary px-1 font-semibold text-[9px] text-primary-foreground leading-none">
+              <span className="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 font-semibold text-[9px] text-primary-foreground leading-none">
                 {count > 99 ? "99+" : count}
               </span>
             ) : null}

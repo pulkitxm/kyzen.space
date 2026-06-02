@@ -87,8 +87,8 @@ export function ChatSocketBridge({
       const activeId = store.get(activeConversationIdAtom);
       store.set(conversationsAtom, (prev) => {
         const idx = prev.findIndex((c) => c.id === message.conversationId);
-        if (idx < 0) return prev;
-        const cur = prev[idx]!;
+        const cur = idx < 0 ? undefined : prev[idx];
+        if (!cur) return prev;
         const fromMe = message.sender?.id === userId;
         const isActive = activeId === message.conversationId;
         const updated: ConversationJson = {

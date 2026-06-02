@@ -66,7 +66,8 @@ export async function createProfile(input: {
       avatar: input.avatar ?? null,
     })
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to create profile");
+  return row;
 }
 
 export async function updateAvatar(

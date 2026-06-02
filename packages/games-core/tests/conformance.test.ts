@@ -71,7 +71,10 @@ for (const def of GAMES) {
       if (def.engine.mode !== "turn-based" || !def.engine.reduce) return;
       const state = def.engine.createInitialState(minSeats(def));
       const snapshot = JSON.parse(JSON.stringify(state));
-      def.engine.reduce(state, { role: def.engine.roles[0]! }, {} as never);
+      const role = def.engine.roles[0];
+      expect(role).toBeDefined();
+      if (role === undefined) throw new Error("engine must declare a role");
+      def.engine.reduce(state, { role }, {} as never);
       expect(state).toEqual(snapshot);
     });
   });

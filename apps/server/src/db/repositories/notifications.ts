@@ -26,7 +26,8 @@ export async function create(
       payload: input.payload ?? {},
     })
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to create notification");
+  return row;
 }
 
 export async function getById(id: string): Promise<NotificationRow | null> {
@@ -50,6 +51,7 @@ export async function listForUser(
     const c = decodeCursor(opts.cursor);
     if (c) {
       conds.push(
+        // biome-ignore lint/style/noNonNullAssertion: drizzle or() returns SQL given non-empty args
         or(
           lt(notification.createdAt, c.createdAt),
           and(

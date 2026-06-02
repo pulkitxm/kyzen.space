@@ -2,7 +2,7 @@ import { resolveDbLatencyMs } from "./db/latency";
 
 function required(name: string): string {
   const v = process.env[name];
-  if (!v || !v.trim()) {
+  if (!v?.trim()) {
     throw new Error(`Missing required env var: ${name}`);
   }
   return v.trim();

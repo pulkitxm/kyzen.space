@@ -58,11 +58,12 @@ export async function getOrCreateDm(
       .insert(conversation)
       .values({ kind: "dm", dmKey: key, createdBy: a })
       .returning();
+    if (!conv) throw new Error("Failed to create conversation");
     await tx.insert(conversationMember).values([
-      { conversationId: conv!.id, userId: a, role: "member" },
-      { conversationId: conv!.id, userId: b, role: "member" },
+      { conversationId: conv.id, userId: a, role: "member" },
+      { conversationId: conv.id, userId: b, role: "member" },
     ]);
-    return { conversation: conv!, created: true };
+    return { conversation: conv, created: true };
   });
 }
 
@@ -77,14 +78,15 @@ export async function createGroup(input: {
       .insert(conversation)
       .values({ kind: "group", name: input.name, createdBy: input.createdBy })
       .returning();
+    if (!conv) throw new Error("Failed to create conversation");
     await tx.insert(conversationMember).values(
       members.map((userId) => ({
-        conversationId: conv!.id,
+        conversationId: conv.id,
         userId,
         role: (userId === input.createdBy ? "owner" : "member") as MemberRole,
       })),
     );
-    return conv!;
+    return conv;
   });
 }
 
@@ -207,7 +209,8 @@ export async function renameGroup(
     .set({ name, updatedAt: new Date() })
     .where(eq(conversation.id, conversationId))
     .returning();
-  return row!;
+  if (!row) throw new Error("Failed to rename conversation");
+  return row;
 }
 
 export async function touchLastMessage(

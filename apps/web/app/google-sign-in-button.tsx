@@ -33,14 +33,14 @@ export function GoogleSignInButton({ googleOAuthReady }: Props) {
         type="button"
         disabled={busy || !googleOAuthReady}
         onClick={continueWithGoogle}
-        className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm font-medium text-card-foreground shadow-sm outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
+        className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface-raised px-4 py-3 font-medium text-card-foreground text-sm shadow-sm outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
       >
         <GoogleGlyph />
         {busy ? "Redirecting…" : "Continue with Google"}
       </button>
 
       {error ? (
-        <p className="mt-4 text-center text-xs text-danger">{error}</p>
+        <p className="mt-4 text-center text-danger text-xs">{error}</p>
       ) : null}
     </>
   );
@@ -52,7 +52,7 @@ function GoogleGlyph() {
       width="18"
       height="18"
       viewBox="0 0 24 24"
-      aria-hidden
+      aria-hidden="true"
       className="shrink-0"
     >
       <path

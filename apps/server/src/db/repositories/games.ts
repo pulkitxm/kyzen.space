@@ -41,7 +41,8 @@ export async function createGame(input: CreateGameInput): Promise<GameRecord> {
         challengedUserId: input.challengedUserId ?? null,
       })
       .returning();
-    const created = row!;
+    if (!row) throw new Error("Failed to create game");
+    const created = row;
     if (input.players.length) {
       await tx.insert(gamePlayer).values(
         input.players.map((p, i) => ({
@@ -104,8 +105,9 @@ export async function updateGame(
     .set({ ...patch, updatedAt: new Date() })
     .where(eq(game.id, id))
     .returning();
+  if (!row) throw new Error("Failed to update game");
   const players = await getPlayers(id);
-  return { ...row!, players };
+  return { ...row, players };
 }
 
 export async function gamesForUser(
@@ -145,5 +147,6 @@ export async function addMove(input: {
   moveData: unknown;
 }): Promise<MoveRow> {
   const [row] = await db.insert(move).values(input).returning();
-  return row!;
+  if (!row) throw new Error("Failed to add move");
+  return row;
 }

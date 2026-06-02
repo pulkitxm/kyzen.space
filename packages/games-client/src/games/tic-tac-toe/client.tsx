@@ -151,7 +151,7 @@ function IconFirst() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden
+      aria-hidden="true"
     >
       <polyline points="11 18 6 12 11 6" />
       <polyline points="18 18 13 12 18 6" />
@@ -171,7 +171,7 @@ function IconPrev() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden
+      aria-hidden="true"
     >
       <polyline points="15 18 9 12 15 6" />
     </svg>
@@ -189,7 +189,7 @@ function IconNext() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden
+      aria-hidden="true"
     >
       <polyline points="9 18 15 12 9 6" />
     </svg>
@@ -207,7 +207,7 @@ function IconLast() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden
+      aria-hidden="true"
     >
       <polyline points="13 18 18 12 13 6" />
       <polyline points="6 18 11 12 6 6" />
@@ -223,7 +223,7 @@ function IconPlay() {
       height="20"
       viewBox="0 0 24 24"
       fill="currentColor"
-      aria-hidden
+      aria-hidden="true"
     >
       <polygon points="8 5 19 12 8 19 8 5" />
     </svg>
@@ -237,7 +237,7 @@ function IconPause() {
       height="20"
       viewBox="0 0 24 24"
       fill="currentColor"
-      aria-hidden
+      aria-hidden="true"
     >
       <rect x="6" y="5" width="4" height="14" rx="1" />
       <rect x="14" y="5" width="4" height="14" rx="1" />
@@ -501,10 +501,10 @@ export function TicTacToeGameClient({
         </div>
       )}
 
-      {error ? <p className="mb-4 text-sm text-danger">{error}</p> : null}
+      {error ? <p className="mb-4 text-danger text-sm">{error}</p> : null}
 
       {winnerLabel ? (
-        <p className="mb-4 text-sm font-medium text-primary">{winnerLabel}</p>
+        <p className="mb-4 font-medium text-primary text-sm">{winnerLabel}</p>
       ) : null}
 
       <div className="grid w-fit grid-cols-3 gap-3">
@@ -520,7 +520,7 @@ export function TicTacToeGameClient({
                 isPast || !canMove || mark !== null || game.status !== "active"
               }
               onClick={() => makeMove(row, col)}
-              className="flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised text-5xl font-semibold text-card-foreground outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60 sm:size-28"
+              className="flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised font-semibold text-5xl text-card-foreground outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60 sm:size-28"
             >
               {mark ?? ""}
             </button>
@@ -540,13 +540,13 @@ export function TicTacToeGameClient({
             onNext={goNext}
             onLast={goLast}
           />
-          <p className="mt-3 text-xs text-muted-foreground">
+          <p className="mt-3 text-muted-foreground text-xs">
             Position after {Math.min(replayStep, sortedLen)} of {sortedLen}{" "}
             moves
           </p>
         </>
       ) : (
-        <p className="mt-6 text-xs text-muted-foreground">
+        <p className="mt-6 text-muted-foreground text-xs">
           Moves logged: {moves.length}
         </p>
       )}

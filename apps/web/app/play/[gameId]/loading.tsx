@@ -30,6 +30,7 @@ export default function PlayLoading() {
             { mine: true, w: "40%" },
           ].map((b, i) => (
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder list
               key={i}
               className={b.mine ? "flex justify-end" : "flex justify-start"}
             >

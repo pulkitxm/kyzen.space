@@ -25,7 +25,7 @@ export const DEFAULT_POPOUT: PopoutGeometry = {
   h: 520,
 };
 
-function clampNum(
+function _clampNum(
   n: unknown,
   min: number,
   max: number,
@@ -36,7 +36,7 @@ function clampNum(
   return Math.min(max, Math.max(min, base));
 }
 
-function finiteOr(n: unknown, fallback: number): number {
+function _finiteOr(n: unknown, fallback: number): number {
   const v = typeof n === "number" ? n : Number(n);
   return Number.isFinite(v) ? v : fallback;
 }

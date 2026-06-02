@@ -167,7 +167,7 @@ export function ChatFloatingIcon({
     >
       <FaCommentDots className="size-6" />
       {unread > 0 && (
-        <span className="-right-1 -top-1 absolute flex min-w-5 items-center justify-center rounded-full bg-danger px-1 font-semibold text-[11px] text-danger-foreground">
+        <span className="absolute -top-1 -right-1 flex min-w-5 items-center justify-center rounded-full bg-danger px-1 font-semibold text-[11px] text-danger-foreground">
           {unread > 99 ? "99+" : unread}
         </span>
       )}

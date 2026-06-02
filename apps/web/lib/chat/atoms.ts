@@ -80,8 +80,9 @@ export function bumpConversation(
   patch: Partial<ConversationJson>,
 ): ConversationJson[] {
   const idx = list.findIndex((c) => c.id === conversationId);
-  if (idx < 0) return list;
-  const updated = { ...list[idx]!, ...patch };
+  const existing = idx < 0 ? undefined : list[idx];
+  if (!existing) return list;
+  const updated = { ...existing, ...patch };
   return [updated, ...list.filter((_, i) => i !== idx)];
 }
 

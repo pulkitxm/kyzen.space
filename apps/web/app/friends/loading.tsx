@@ -8,6 +8,7 @@ export default function FriendsLoading() {
         <div className="flex gap-1">
           {[16, 20, 12].map((w, i) => (
             <Skeleton
+              // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder list
               key={i}
               className="h-9 rounded-t-lg"
               style={{ width: `${w * 4}px` }}

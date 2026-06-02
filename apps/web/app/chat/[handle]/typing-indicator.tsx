@@ -30,11 +30,12 @@ export function TypingIndicator({
   );
   if (typers.length === 0) return null;
 
+  const [first, second] = typers;
   const label =
-    typers.length === 1
-      ? `${typers[0]!.username} is typing`
-      : typers.length === 2
-        ? `${typers[0]!.username} and ${typers[1]!.username} are typing`
+    typers.length === 1 && first
+      ? `${first.username} is typing`
+      : typers.length === 2 && first && second
+        ? `${first.username} and ${second.username} are typing`
         : `${typers.length} people are typing`;
 
   return (

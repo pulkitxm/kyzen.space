@@ -22,8 +22,8 @@ bun run dev                 # turbo: run web (:3000) + server (:4000) in watch m
 bun run build               # turbo: build all (^build ordering: packages before apps)
 bun run test                # turbo: run every workspace's tests
 bun run type-check          # tsc --noEmit across all workspaces (no build step; Turbo-cached)
-bun run check               # biome check (format + import organize, lint disabled)
-bun run fix                 # biome check --write (autofix formatting/imports)
+bun run check               # biome: format + import-organize + lint (the CI gate; read-only)
+bun run fix                 # biome --write: autofix format/imports/lint AND sort Tailwind classes
 ```
 
 **Always run `bun run type-check` after making code changes and before declaring work done, committing, or opening a PR.** It's fast (no build step, Turbo-cached) and catches type errors that tests may miss. Fix any errors it reports before finishing.
@@ -48,7 +48,7 @@ bun run db:push             # push schema directly (dev)
 bun run db:reset            # drop volumes and recreate
 ```
 
-Lint note: `apps/web` lints with ESLint (`eslint-config-next`); every other workspace's `lint` script is just `tsc --noEmit`. Biome handles formatting only — its linter is disabled, CSS files are excluded.
+Lint note: Biome is the only linter (ESLint was removed). `bun run check` runs format + import-organize + lint (strict: recommended plus curated rules as errors, with `useSortedClasses` enforcing Tailwind class order); `bun run fix` autofixes everything safe **and** sorts Tailwind classes. Every workspace's `lint` script is `tsc --noEmit` (type-only). Biome covers all code files including CSS — Tailwind v4 at-rules (`@theme`, `@apply`, `@source`, …) parse via the `tailwindDirectives` CSS parser option in `biome.json`.
 
 ## Environment
 
