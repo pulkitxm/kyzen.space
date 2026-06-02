@@ -33,9 +33,6 @@
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
-    "lint": {
-      "dependsOn": ["^build"]
-    },
     "type-check": {},
     "test": {
       "dependsOn": ["^build"]

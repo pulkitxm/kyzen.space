@@ -8,8 +8,7 @@
   },
   "scripts": {
     "test": "bun test",
-    "type-check": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "^3.24.1"
