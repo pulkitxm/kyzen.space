@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import ts from "typescript";
 
 const args = process.argv.slice(2);
@@ -223,6 +223,61 @@ function snippet(text, r) {
   return first.length > 80 ? `${first.slice(0, 77)}...` : first;
 }
 
+function buildSummary(findings, { totalRemoved, changedFiles, totalKept }) {
+  const server = process.env.GITHUB_SERVER_URL || "https://github.com";
+  const repo = process.env.GITHUB_REPOSITORY;
+  const sha = process.env.GITHUB_SHA;
+  const fileCell = (f, line) => {
+    if (!repo || !sha) return `\`${f}\``;
+    const href = `${server}/${repo}/blob/${sha}/${f.split("/").map(encodeURIComponent).join("/")}#L${line}`;
+    return `[\`${f}\`](${href})`;
+  };
+  const codeCell = (s) =>
+    s
+      .replace(/[\\|]/g, "\\$&")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  const rows = findings
+    .map(
+      (x) =>
+        `| ${fileCell(x.file, x.line)} | ${x.line} | <code>${codeCell(x.text)}</code> |`,
+    )
+    .join("\n");
+  return [
+    `## ❌ ${totalRemoved} disallowed code comment${totalRemoved === 1 ? "" : "s"}`,
+    "",
+    `Comments are not allowed in code — found in **${changedFiles}** file${changedFiles === 1 ? "" : "s"} (**${totalKept}** functional directive${totalKept === 1 ? "" : "s"} like \`biome-ignore\` were ignored). Remove them locally with:`,
+    "",
+    "```bash",
+    "bun run strip-comments",
+    "```",
+    "",
+    "| File | Line | Comment |",
+    "| --- | --- | --- |",
+    rows,
+    "",
+  ].join("\n");
+}
+
+function reportGithub(findings, stats) {
+  if (process.env.GITHUB_ACTIONS !== "true") return;
+  const escData = (s) =>
+    s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  const escProp = (s) => escData(s).replace(/,/g, "%2C").replace(/:/g, "%3A");
+  for (const x of findings) {
+    console.log(
+      `::error file=${escProp(x.file)},line=${x.line},title=Disallowed comment::${escData(x.text)}`,
+    );
+  }
+  const out = process.env.GITHUB_STEP_SUMMARY;
+  if (!out) return;
+  const md = findings.length
+    ? buildSummary(findings, stats)
+    : "## ✅ No disallowed code comments\n\nEvery tracked file is comment-free (functional directives ignored).\n";
+  appendFileSync(out, `${md}\n`);
+}
+
 const files = execSync(
   "git ls-files '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.css' '*.json' '*.jsonc'",
   {
@@ -254,7 +309,11 @@ for (const f of files) {
   totalRemoved += remove.length;
   if (CHECK) {
     for (const r of remove)
-      findings.push(`${f}:${lineOf(text, r.pos)}: ${snippet(text, r)}`);
+      findings.push({
+        file: f,
+        line: lineOf(text, r.pos),
+        text: snippet(text, r),
+      });
     continue;
   }
   let out = build(text, remove);
@@ -263,7 +322,8 @@ for (const f of files) {
 }
 
 if (CHECK) {
-  for (const line of findings) console.log(line);
+  for (const x of findings) console.log(`${x.file}:${x.line}: ${x.text}`);
+  reportGithub(findings, { totalRemoved, changedFiles, totalKept });
   console.log(
     `\n${totalRemoved} disallowed comment(s) in ${changedFiles} file(s) (${totalKept} directive(s) ignored).`,
   );
