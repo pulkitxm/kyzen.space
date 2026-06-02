@@ -98,7 +98,7 @@ Realtime client lives in `lib/socket/`. **State management is Jotai-first**: sta
 A game is one `GameDefinition` (games-core) + one client component (games-client) — **no new routes, endpoints, DB tables, socket events, or drivers**. See **`docs/adding-a-game.md`** for the full guide, or use the **`game-builder`** agent (`.claude/agents/game-builder.md`) to implement one from a spec. In short:
 
 1. Add `packages/games-core/src/games/<type>/{schemas,engine,meta,index}.ts` (strict Zod schemas + engine), append the definition to the `GAMES` array, and export from `src/index.ts`.
-2. Add the `"use client"` board to `packages/games-client/src/games/<type>/client.tsx` and register it by `type` in `src/registry.ts`.
+2. Add the `"use client"` board to `packages/games-client/src/games/<type>/client.tsx` and register it by `type` in `src/registry.ts`. Optionally add a `skeleton.tsx` placeholder beside it and register it in `SKELETON_REGISTRY` (it renders as the board's `<Suspense>` fallback; otherwise `getGameSkeleton` falls back to `DefaultGameSkeleton`).
 3. The conformance suite (`packages/games-core/tests/conformance.test.ts`) covers it automatically; add a focused engine test too.
 
 ## Tests

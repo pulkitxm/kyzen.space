@@ -1,7 +1,11 @@
 "use client";
 
 import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
-import { type GameClientProps, getGameClient } from "@gamelobby/games-client";
+import {
+  type GameClientProps,
+  getGameClient,
+  getGameSkeleton,
+} from "@gamelobby/games-client";
 import { Suspense } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import type { ChatLayout } from "@/lib/chat-layout";
@@ -31,10 +35,11 @@ export function PlayClient({
   layoutTrusted: boolean;
 }) {
   const GameClient = getGameClient(gameType);
+  const GameSkeleton = getGameSkeleton(gameType);
 
   const gameNode = GameClient ? (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
-      <Suspense fallback={null}>
+      <Suspense fallback={<GameSkeleton />}>
         <GameClient
           gameId={gameId}
           userId={userId}
