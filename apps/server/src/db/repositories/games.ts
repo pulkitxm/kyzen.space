@@ -22,7 +22,7 @@ function toGameRecord(row: GameRow, players: GamePlayer[]): GameRecord {
 }
 
 export type CreateGameInput = {
-  gameType: string;
+  gameType: GameType;
   players: GamePlayer[];
   gameState: unknown;
   config?: unknown;

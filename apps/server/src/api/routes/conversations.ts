@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { gameTypeSchema } from "@gamelobby/games-core";
 import {
   assembleConversation,
   assembleConversations,
@@ -121,10 +122,14 @@ export const conversationsRouter = new Hono()
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) return c.json({ error: "Not found" }, 404);
     const body = await readJson(c);
+    const parsedType = gameTypeSchema.safeParse(body?.gameType);
+    if (!parsedType.success) {
+      return c.json({ error: "Unsupported game type" }, 400);
+    }
     const res = await createGameInConversation({
       userId,
       conversationId: id,
-      gameType: typeof body?.gameType === "string" ? body.gameType : "",
+      gameType: parsedType.data,
       seatingMode:
         body?.seatingMode === "open" || body?.seatingMode === "challenge"
           ? body.seatingMode
