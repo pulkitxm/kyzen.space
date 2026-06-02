@@ -18,6 +18,12 @@ export type {
 export { GAMES } from "./games";
 export { ticTacToeDefinition } from "./games/tic-tac-toe";
 export {
+  GAME_TYPES,
+  type GameType,
+  gameTypeSchema,
+  TIC_TAC_TOE,
+} from "./game-types";
+export {
   emptyBoard,
   isBoardFull,
   isTerminal,
@@ -28,7 +34,6 @@ export {
 export {
   type Cell,
   type Mark,
-  TIC_TAC_TOE,
   type TicTacToeConfig,
   type TicTacToeMove,
   type TicTacToeState,

@@ -1,8 +1,8 @@
 import type { GameEngine, Outcome, ReduceResult, Seat } from "../../engine";
+import { TIC_TAC_TOE } from "../../game-types";
 import {
   type Cell,
   type Mark,
-  TIC_TAC_TOE,
   type TicTacToeMove,
   type TicTacToeState,
   ticTacToeMoveSchema,
