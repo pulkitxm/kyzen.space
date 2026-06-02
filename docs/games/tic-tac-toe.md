@@ -66,7 +66,34 @@ The initial state is an all-`null` board with `currentTurn` set to `"X"`.
 None. The config schema is an empty **strict** object (`{}`), so any extra
 fields are rejected.
 
+## Board UI
+
+`TicTacToeGameClient` (`packages/games-client/src/games/tic-tac-toe/client.tsx`)
+receives a `GameClientProps` (`packages/games-client/src/types.ts`) — including
+`gameId`, `userId`, the **shared** `socket`, `connected`, `initialGame`, and
+`initialMoves`. It does **not** open its own socket connection; it rides the same
+Socket.IO connection the chat lane uses, passed down as a prop.
+
+- **Live play** (status `waiting`/`active`): the board emits `join_room` on the
+  shared socket, then listens for `game_state`, `move_made`, and `game_error`.
+  Tapping an empty cell emits `make_move` with `{ gameId, moveData: { row, col } }`
+  (only when it is your turn and the socket is connected). It emits `leave_room`
+  on cleanup. A `StatusDot` reflects `connected`.
+- **Replay** (status `completed`/`abandoned`): live socket wiring is skipped and a
+  `ReplayToolbar` lets you scrub the game. `buildStateAtStep` replays
+  `initialMoves` (sorted by `moveNumber`) up to the chosen step to reconstruct the
+  board. Arrow keys step prev/next and Space toggles autoplay (`REPLAY_MS` = 850ms
+  per step).
+- **Icons** come from `react-icons/fa6` (`FaBackwardStep`, `FaChevronLeft`,
+  `FaPlay`/`FaPause`, `FaChevronRight`, `FaForwardStep`) — no hand-written SVG.
+
+A loading placeholder, `TicTacToeSkeleton`
+(`packages/games-client/src/games/tic-tac-toe/skeleton.tsx`), is registered in
+`SKELETON_REGISTRY` and renders as the board's `<Suspense>` fallback.
+
 ## Source
 
 - Engine, schemas, and meta: `packages/games-core/src/games/tic-tac-toe/`
-- Board UI: `packages/games-client/src/games/tic-tac-toe/client.tsx`
+- Type slug constant `TIC_TAC_TOE`: `packages/games-core/src/game-types.ts`
+- Board UI + skeleton: `packages/games-client/src/games/tic-tac-toe/`
+- Client + skeleton registration: `packages/games-client/src/registry.ts`

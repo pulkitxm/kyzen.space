@@ -109,7 +109,7 @@ This is the most load-bearing piece of the config. Better Auth's Drizzle adapter
   },
 ```
 
-Note the **catch-and-log**: provisioning failure does not abort account creation. The hook is best-effort; the auth row is the source of truth, and a profile can be (re-)created later because `ensureUsernameForUser` is idempotent (it early-returns an existing profile). The split is deliberate — Better Auth owns the `user`/`session`/`account` tables; the app owns `user_profile` (username, avatar, stats, theme), which is keyed by `userId` with a unique constraint (`apps/server/src/db/schema.ts:165`).
+Note the **catch-and-log**: provisioning failure does not abort account creation. The hook is best-effort; the auth row is the source of truth, and a profile can be (re-)created later because `ensureUsernameForUser` is idempotent (it early-returns an existing profile). The split is deliberate — Better Auth owns the `user`/`session`/`account` tables; the app owns `user_profile` (username, avatar, stats, theme), which is keyed by `userId` with a unique constraint (`apps/server/src/db/schema.ts:169`).
 
 ## Username generation
 
@@ -118,7 +118,7 @@ Note the **catch-and-log**: provisioning failure does not abort account creation
 1. **Idempotency guard** — `getProfileByUserId` first; if a profile exists, return its username (`apps/server/src/username.ts:27`). This is why the hook is safe to retry.
 2. **Seeded avatar** — `randomAvatarConfig(userId)` produces a deterministic DiceBear avataaars config seeded by the user id (`apps/server/src/username.ts:30`). Same user → same starting avatar. (See `./README.md` for the avatar package; the repo uses ready-made DiceBear assets rather than hand-drawn art.)
 3. **Slugify** — `slugifyBase` lowercases, collapses whitespace to `_`, strips anything outside `[a-z0-9_]`, caps at 30 chars, and falls back to `"player"` if nothing survives (`apps/server/src/username.ts:8`).
-4. **Collision retry loop** — try the base, then `base_<random6>` up to 20 times, checking `isUsernameTaken` (a case-insensitive `lower(username)` lookup, `apps/server/src/db/repositories/profiles.ts:46`) before each insert:
+4. **Collision retry loop** — try the base, then `base_<random6>` up to 20 times, checking `isUsernameTaken` (a case-insensitive `lower(username)` lookup, `apps/server/src/db/repositories/profiles.ts:47`) before each insert:
 
 ```ts
   let candidate = base;
@@ -190,9 +190,9 @@ Fully-authed routers (`conversations`, `friends`, `messages`, `notifications`, `
 
 - **Session management.** `apps/server/src/api/routes/account.ts` calls the Better Auth server API directly (`auth.api.*`) rather than `requireAuth`, because the session object is its payload (not just a gate), always passing `c.req.raw.headers`:
   - `GET /api/account/sessions` (`:5`) — guards on `getSession`, then `listSessions`, sorted newest-first by `updatedAt`. Returns `{ current, sessions }`.
-  - `POST /api/account/sign-out` (`:22`) — `signOut`.
-  - `POST /api/account/revoke-others` (`:26`) — guard, then `revokeOtherSessions` (keeps the current one).
-  - `POST /api/account/revoke-session` (`:34`) — revoke a session by `token`. There's a subtlety here worth internalizing: if the supplied token *is* the current session's token, it calls `signOut` and returns `{ ok: true, signedOut: true }` instead of `revokeSession`, so the UI knows to redirect to `/auth`:
+  - `POST /api/account/sign-out` (`:23`) — `signOut`.
+  - `POST /api/account/revoke-others` (`:28`) — guard, then `revokeOtherSessions` (keeps the current one).
+  - `POST /api/account/revoke-session` (`:37`) — revoke a session by `token`. There's a subtlety here worth internalizing: if the supplied token *is* the current session's token, it calls `signOut` and returns `{ ok: true, signedOut: true }` instead of `revokeSession`, so the UI knows to redirect to `/auth`:
 
 ```ts
     if (current.session.token === token) {
@@ -239,11 +239,11 @@ A full trace from clicking the button to being authenticated on all three lanes:
 2. **Browser → server.** The client hits `POST /api/auth/sign-in/social` on the **server**, which Better Auth handles via the catch-all (`apps/server/src/api/index.ts:14`) and responds with a redirect to Google's consent screen.
 3. **Google OAuth.** User authenticates with Google; Google redirects back to `GET /api/auth/callback/google` on the server.
 4. **Better Auth callback.** Better Auth exchanges the code, and via the Drizzle adapter upserts the `user` (`apps/server/src/db/schema.ts:36`) and `account` (`:65`) rows and creates a `session` row (`:52`).
-5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:26`) → `ensureUsernameForUser(id, name)` (`apps/server/src/username.ts:23`) → slugify + collision loop → `createProfile` inserts the `user_profile` row with a seeded avatar (`apps/server/src/db/repositories/profiles.ts:55`).
+5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:26`) → `ensureUsernameForUser(id, name)` (`apps/server/src/username.ts:23`) → slugify + collision loop → `createProfile` inserts the `user_profile` row with a seeded avatar (`apps/server/src/db/repositories/profiles.ts:56`).
 6. **Cookie set + redirect.** Better Auth sets the session cookie (in prod: `secure`, `SameSite=Lax`, cross-subdomain per `apps/server/src/auth.ts:48`) and redirects the browser to the `callbackURL` (`/profile`).
 7. **RSC reads the session.** The `/profile` (and root layout) server component calls `getServerSession()` → `serverFetchJson("/api/auth/get-session")` (`apps/web/lib/get-server-session.ts:17`). `serverFetch` forwards the browser's cookies from `next/headers` `cookies()` with `cache: "no-store"` (`apps/web/lib/api-server.ts:13`), so the server resolves the session and returns `{ user, session }`. `getServerSession` is wrapped in `react.cache` so multiple components in one render share a single fetch.
 8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:44`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:44`).
-9. **Browser fetches.** Any subsequent client-side mutation (`SignOutForm`, friend actions, settings) uses `clientFetch(..., { credentials: "include" })` (`apps/web/lib/api-client.ts:11`), and the `requireAuth` middleware re-derives identity into `c.get("userId")` (`apps/server/src/api/middleware/auth.ts`).
+9. **Browser fetches.** Any subsequent client-side mutation (`SignOutForm`, friend actions, settings) uses `clientFetch(..., { credentials: "include" })` (`apps/web/lib/api-client.ts:12`), and the `requireAuth` middleware re-derives identity into `c.get("userId")` (`apps/server/src/api/middleware/auth.ts:16`).
 
 Arrow summary:
 

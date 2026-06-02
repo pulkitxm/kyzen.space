@@ -19,7 +19,7 @@ The design decision worth internalizing up front is the **generic game schema**.
 | `apps/server/src/db/index.ts` | The public facade: re-exports each repository as a namespace (`games`, `messages`, `conversations`, `friends`, `notifications`, `profiles`) plus the row/`GameRecord` types. |
 | `apps/server/src/db/latency.ts` | `withLatency` Proxy that injects an artificial per-query delay (`DB_LATENCY_MS`) in non-production, for exercising loading states. |
 | `apps/server/src/db/migrate.ts` | Standalone script that applies the SQL migrations in `apps/server/drizzle/` via the Drizzle migrator. |
-| `apps/server/src/db/repositories/games.ts` | Game/move/seat CRUD; defines `GameRecord = GameRow & { players }` and the `getGameById` join. |
+| `apps/server/src/db/repositories/games.ts` | Game/move/seat CRUD; defines `GameRecord` (the `game` row with `players` attached and `gameType` narrowed to the registry `GameType`) and the `getGameById` join. |
 | `apps/server/src/db/repositories/messages.ts` | Message insert/read/soft-delete + keyset-paginated `listMessages`. |
 | `apps/server/src/db/repositories/conversations.ts` | DM/group create, membership, read-state, unread counts, last-message bookkeeping. |
 | `apps/server/src/db/repositories/friends.ts` | Friendship requests/status keyed by a sorted `pairKey`. |
@@ -133,7 +133,7 @@ export const gamePlayer = pgTable(
 );
 ```
 
-This table is a **normalization** of what used to be a `players` JSONB array on `game`. (The history is visible in the first migration, `apps/server/drizzle/0000_faithful_dragon_lord.sql`, where `game` had a `"players" jsonb DEFAULT '[]'`.) Splitting seats into their own rows pays off in two ways: `unique("game_player_uq").on(gameId, userId)` makes it impossible to seat the same user twice in one game, and `index("game_player_user_idx").on(userId)` makes "all games for this user" a fast indexed join instead of a JSONB scan — that's exactly what `gamesForUser` uses (`apps/server/src/db/repositories/games.ts:113`). `seatOrder` preserves turn order, and `role` is the per-seat role string the engine assigns (e.g. `"X"` / `"O"`).
+This table is a **normalization** of what used to be a `players` JSONB array on `game`. (The history is visible in the first migration, `apps/server/drizzle/0000_faithful_dragon_lord.sql`, where `game` had a `"players" jsonb DEFAULT '[]'`.) Splitting seats into their own rows pays off in two ways: `unique("game_player_uq").on(gameId, userId)` makes it impossible to seat the same user twice in one game, and `index("game_player_user_idx").on(userId)` makes "all games for this user" a fast indexed join instead of a JSONB scan — that's exactly what `gamesForUser` uses (`apps/server/src/db/repositories/games.ts:121`). `seatOrder` preserves turn order, and `role` is the per-seat role string the engine assigns (e.g. `"X"` / `"O"`).
 
 > **Why JSONB + per-game Zod instead of per-game tables?** A relational table per game would force a migration for every new game and a schema change for every rule tweak — and it would split the validation logic away from the engine. By storing opaque JSONB and validating with the game's own Zod schemas, the *same* `GameDefinition` that the React client imports to render the board is the one the server imports to validate and reduce moves. Adding a game touches `packages/games-core` and `packages/games-client` only; the database layer never changes. See `docs/architecture/games-core-engine.md`.
 
@@ -166,26 +166,29 @@ So callers write `import { games, profiles } from "../db"` and then `games.getGa
 
 ### `GameRecord` and the seat join
 
-The single most important repository type is `GameRecord` (`apps/server/src/db/repositories/games.ts:14`):
+The single most important repository type is `GameRecord` (`apps/server/src/db/repositories/games.ts:15`):
 
 ```ts
-export type GameRecord = GameRow & { players: GamePlayer[] };
+export type GameRecord = Omit<GameRow, "gameType"> & {
+  gameType: GameType;
+  players: GamePlayer[];
+};
 ```
 
-A raw `GameRow` (straight from the `game` table) has no players — seats live in the separate `game_player` table. `GameRecord` is the **assembled aggregate**: the game row with its seats attached, in `seatOrder`. Any repository function that returns a game returns a `GameRecord`, so callers can treat "the game and who's in it" as one object. The assembly happens in `getGameById` (`apps/server/src/db/repositories/games.ts:74`):
+A raw `GameRow` (straight from the `game` table) has no players — seats live in the separate `game_player` table — and its `gameType` is just free-text `string`. `GameRecord` is the **assembled aggregate**: the game row with its seats attached (in `seatOrder`) *and* `gameType` re-typed from `string` to the registry's `GameType` union (`@gamelobby/games-core`, see `docs/architecture/games-core-schemas.md`). That narrowing lets callers pass `record.gameType` straight to `getDefinition(...)`/`getEngine(...)` without a re-validation cast. Any repository function that returns a game returns a `GameRecord`, so callers can treat "the game and who's in it" as one object. The narrowing happens through a private `toGameRecord(row, players)` helper (`apps/server/src/db/repositories/games.ts:20`) that every game-returning function funnels through; `getGameById` (`apps/server/src/db/repositories/games.ts:82`) is the canonical assembler:
 
 ```ts
 export async function getGameById(id: string): Promise<GameRecord | null> {
   const [row] = await db.select().from(game).where(eq(game.id, id)).limit(1);
   if (!row) return null;
   const players = await getPlayers(id);
-  return { ...row, players };
+  return toGameRecord(row, players);
 }
 ```
 
-`getPlayers` (`apps/server/src/db/repositories/games.ts:61`) does the second query, ordered by `seatOrder`, and projects each row down to the `GamePlayer` shape (`{ userId, username, role }`). `updateGame` (`apps/server/src/db/repositories/games.ts:99`) re-fetches players the same way after writing, so an updated `GameRecord` always carries fresh seats. The `gameState ?? createInitialState(...)` decision and turn/role logic do **not** live here — that's the realtime driver's job (see below); the repository only persists what it's told.
+`getPlayers` (`apps/server/src/db/repositories/games.ts:69`) does the second query, ordered by `seatOrder`, and projects each row down to the `GamePlayer` shape (`{ userId, username, role }`). `updateGame` (`apps/server/src/db/repositories/games.ts:107`) re-fetches players the same way after writing, so an updated `GameRecord` always carries fresh seats. The `gameState ?? createInitialState(...)` decision and turn/role logic do **not** live here — that's the realtime driver's job (see below); the repository only persists what it's told.
 
-`createGame` (`apps/server/src/db/repositories/games.ts:28`) is the clearest example of a **transaction**: it inserts the `game` row and then the `game_player` rows inside `db.transaction(...)`, so a game can never exist with a half-written seat list. `conversations.getOrCreateDm` and `createGroup` (`apps/server/src/db/repositories/conversations.ts:37`, `70`) use the same pattern — and `getOrCreateDm` additionally re-checks for an existing DM *inside* the transaction (`apps/server/src/db/repositories/conversations.ts:50`) to dodge a create-create race.
+`createGame` (`apps/server/src/db/repositories/games.ts:36`) is the clearest example of a **transaction**: it inserts the `game` row and then the `game_player` rows inside `db.transaction(...)`, so a game can never exist with a half-written seat list. `conversations.getOrCreateDm` and `createGroup` (`apps/server/src/db/repositories/conversations.ts:37`, `70`) use the same pattern — and `getOrCreateDm` additionally re-checks for an existing DM *inside* the transaction (`apps/server/src/db/repositories/conversations.ts:50`) to dodge a create-create race.
 
 ### Keyset (cursor) pagination
 
@@ -220,27 +223,27 @@ It then fetches `limit + 1` rows ordered `desc(createdAt), desc(id)`, uses the e
 
 ### Raw SQL fragments stay inside repositories
 
-Repositories occasionally need a SQL expression Drizzle's builder doesn't model — but it's always the `sql` *template tag*, which parameterizes inputs (no string concatenation), and it never leaks past the repository. Examples: the per-game max move number, `nextMoveNumber` (`apps/server/src/db/repositories/games.ts:135`) uses `` sql<number>`coalesce(max(${move.moveNumber}), 0)` ``; case-insensitive username lookups in `profiles.getProfileByUsername` (`apps/server/src/db/repositories/profiles.ts:35`) use `` sql`lower(${userProfile.username}) = lower(${username})` ``; and `notifications.resolveByRequestId` (`apps/server/src/db/repositories/notifications.ts:114`) matches a JSONB field with `` sql`${notification.payload} ->> 'requestId' = ${requestId}` ``. The takeaway: "no raw SQL in routes" doesn't mean "no SQL anywhere" — it means the SQL is *encapsulated* behind a typed repository function.
+Repositories occasionally need a SQL expression Drizzle's builder doesn't model — but it's always the `sql` *template tag*, which parameterizes inputs (no string concatenation), and it never leaks past the repository. Examples: the per-game max move number, `nextMoveNumber` (`apps/server/src/db/repositories/games.ts:143`) uses `` sql<number>`coalesce(max(${move.moveNumber}), 0)` ``; case-insensitive username lookups in `profiles.getProfileByUsername` (`apps/server/src/db/repositories/profiles.ts:36`) use `` sql`lower(${userProfile.username}) = lower(${username})` ``; and `notifications.resolveByRequestId` (`apps/server/src/db/repositories/notifications.ts:114`) matches a JSONB field with `` sql`${notification.payload} ->> 'requestId' = ${requestId}` ``. The takeaway: "no raw SQL in routes" doesn't mean "no SQL anywhere" — it means the SQL is *encapsulated* behind a typed repository function.
 
 ### `profiles.bumpStats` — read-modify-write of JSONB
 
-`bumpStats` (`apps/server/src/db/repositories/profiles.ts:113`) is worth flagging because it's a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime driver when a game completes (`apps/server/src/realtime/turn-based.ts:90`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice — but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
+`bumpStats` (`apps/server/src/db/repositories/profiles.ts:114`) is worth flagging because it's a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime driver when a game completes (`apps/server/src/realtime/turn-based.ts:90`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice — but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
 
 ## Data-flow walkthrough: persisting a move
 
-This is the database layer's busiest path, and it's where the "client is never trusted" insight becomes concrete. A player taps the board, the client emits `make_move`, and the server's turn-based driver runs `handleMakeMove` (`apps/server/src/realtime/turn-based.ts:122`):
+This is the database layer's busiest path, and it's where the "client is never trusted" insight becomes concrete. A player taps the board, the client emits `make_move`, and the server's turn-based driver runs `handleMakeMove` (`apps/server/src/realtime/turn-based.ts:120`):
 
-1. **Load the aggregate.** `games.getGameById(payload.gameId)` (`apps/server/src/db/repositories/games.ts:74`) returns the `GameRecord` — game row + seats. The handler checks `status === "active"` and that the socket's `userId` is actually a seated `player` (`turn-based.ts:132`–`135`). The DB join is what makes the seat check possible.
-2. **Validate with the shared schemas.** `def.moveSchema.safeParse(payload.moveData)` validates the *client's* input, and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB (`turn-based.ts:140`–`143`). Both schemas come from the same `GameDefinition` the client imports. A bad move or corrupt state is rejected with `game_error` before any write.
-3. **Reduce — authoritatively.** `def.engine.reduce(parsedState.data, { role: player.role }, parsedMove.data)` (`turn-based.ts:145`) computes the next state on the server. The client's opinion about legality is irrelevant; `result.ok === false` ends the request.
-4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`apps/server/src/db/repositories/games.ts:135`) returns `max(moveNumber) + 1`. The `move_game_number_uq` unique constraint is the backstop if two moves race to the same number.
-5. **Append the move.** `games.addMove({ gameId, moveNumber, playerId, moveData: parsedMove.data })` (`apps/server/src/db/repositories/games.ts:143`) inserts the validated move into the append-only `move` table.
-6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`apps/server/src/db/repositories/games.ts:99`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
-7. **Finalize on game over.** If the engine's `outcome.status === "completed"`, `finalize` (`turn-based.ts:71`) calls `games.updateGame` again (status/`completedAt`/`winner`) and `profiles.bumpStats` (`apps/server/src/db/repositories/profiles.ts:113`) once per seat.
+1. **Load the aggregate.** `games.getGameById(payload.gameId)` (`apps/server/src/db/repositories/games.ts:82`) returns the `GameRecord` — game row + seats. The handler checks `status === "active"` and that the socket's `userId` is actually a seated `player` (`turn-based.ts:130`–`133`). The DB join is what makes the seat check possible.
+2. **Validate with the shared schemas.** `def.moveSchema.safeParse(payload.moveData)` validates the *client's* input, and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB (`turn-based.ts:138`–`140`). Both schemas come from the same `GameDefinition` the client imports. A bad move or corrupt state is rejected with `game_error` before any write.
+3. **Reduce — authoritatively.** `def.engine.reduce(parsedState.data, { role: player.role }, parsedMove.data)` (`turn-based.ts:143`) computes the next state on the server. The client's opinion about legality is irrelevant; `result.ok === false` ends the request.
+4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`apps/server/src/db/repositories/games.ts:143`) returns `max(moveNumber) + 1`. The `move_game_number_uq` unique constraint is the backstop if two moves race to the same number.
+5. **Append the move.** `games.addMove({ gameId, moveNumber, playerId, moveData: parsedMove.data })` (`apps/server/src/db/repositories/games.ts:151`) inserts the validated move into the append-only `move` table.
+6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`apps/server/src/db/repositories/games.ts:107`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
+7. **Finalize on game over.** If the engine's `outcome.status === "completed"`, `finalize` (`turn-based.ts:69`) calls `games.updateGame` again (status/`completedAt`/`winner`) and `profiles.bumpStats` (`apps/server/src/db/repositories/profiles.ts:114`) once per seat.
 
 In arrows:
 
-`make_move` → `handleMakeMove` (`turn-based.ts:122`) → `games.getGameById` (`games.ts:74`) → `moveSchema/stateSchema.safeParse` (`turn-based.ts:140`) → `engine.reduce` (`turn-based.ts:145`) → `games.nextMoveNumber` (`games.ts:135`) → `games.addMove` (`games.ts:143`) → `games.updateGame` (`games.ts:99`) → `finalize` → `profiles.bumpStats` (`profiles.ts:113`) → broadcast `move_made` + `game_state`.
+`make_move` → `handleMakeMove` (`turn-based.ts:120`) → `games.getGameById` (`games.ts:82`) → `moveSchema/stateSchema.safeParse` (`turn-based.ts:138`) → `engine.reduce` (`turn-based.ts:143`) → `games.nextMoveNumber` (`games.ts:143`) → `games.addMove` (`games.ts:151`) → `games.updateGame` (`games.ts:107`) → `finalize` → `profiles.bumpStats` (`profiles.ts:114`) → broadcast `move_made` + `game_state`.
 
 Notice that no SQL appears anywhere in `turn-based.ts` — only `games.*` and `profiles.*` calls. That's the layering working as intended. The full realtime side of this story is in `docs/architecture/realtime.md`.
 
@@ -255,14 +258,14 @@ Notice that no SQL appears anywhere in `turn-based.ts` — only `games.*` and `p
 ## Gotchas, invariants & conventions
 
 - **Never write SQL outside `db/repositories/*`.** Routes and realtime handlers import the namespaces from `apps/server/src/db/index.ts` (`games`, `messages`, …) and call functions. If you need a new query, add a repository function — don't reach for `db` in a route.
-- **`game_state` / `config` / `move_data` are `unknown` by design.** The DB does not know or check their shape. Validity is owned by the game's Zod schemas in `packages/games-core` and enforced at the realtime boundary (`apps/server/src/realtime/turn-based.ts:140`). Treat any `gameState` you read as untrusted until `stateSchema.safeParse`'d.
+- **`game_state` / `config` / `move_data` are `unknown` by design.** The DB does not know or check their shape. Validity is owned by the game's Zod schemas in `packages/games-core` and enforced at the realtime boundary (`apps/server/src/realtime/turn-based.ts:138`). Treat any `gameState` you read as untrusted until `stateSchema.safeParse`'d.
 - **`$type<...>()` is a compile-time cast, not a runtime check.** `status`, `seatingMode`, `kind`, `role`, etc. are stored as plain `text`. The repository is responsible for only inserting values in the declared union; Postgres won't stop you from writing garbage.
 - **`GameRecord` always carries `players`; `GameRow` never does.** Seats live in `game_player`. Functions that return a game (`getGameById`, `createGame`, `updateGame`) return the assembled `GameRecord`; `gamesForUser` returns bare `GameRow[]` (it's a list view that doesn't need seats).
 - **`game_player` replaced an old `players` JSONB array.** The first migration (`apps/server/drizzle/0000_faithful_dragon_lord.sql`) shows `game` once had a `players jsonb`. Don't reintroduce per-game arrays; one indexed row per seat is the convention (it powers `game_player_uq` and the `userId` index).
-- **Move numbers are dense, unique, and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` plus `nextMoveNumber = max + 1` (`apps/server/src/db/repositories/games.ts:135`). A duplicate is a hard insert failure, which is the intended double-submit guard.
+- **Move numbers are dense, unique, and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` plus `nextMoveNumber = max + 1` (`apps/server/src/db/repositories/games.ts:143`). A duplicate is a hard insert failure, which is the intended double-submit guard.
 - **Cursors are opaque and tolerant.** `decodeCursor` returns `null` (rather than throwing) on a malformed or non-base64 cursor (`apps/server/src/db/repositories/cursor.ts:7`); callers then simply page from the start. Keyset pagination relies on the composite `createdAt`-leading indexes — keep them if you add new paginated lists.
 - **DMs and friendships are keyed by a *sorted* pair.** `conversations.dmKey(a, b)` and `friends.pairKey(a, b)` both `[a, b].sort().join(":")` (`apps/server/src/db/repositories/conversations.ts:12`, `apps/server/src/db/repositories/friends.ts:6`), so the relationship is direction-independent and the unique constraint actually prevents duplicates.
-- **`bumpStats` is read-modify-write on JSONB.** Not an atomic increment (`apps/server/src/db/repositories/profiles.ts:113`). Fine for the current serialized call site in the move handler; be careful if you ever bump stats from concurrent paths.
+- **`bumpStats` is read-modify-write on JSONB.** Not an atomic increment (`apps/server/src/db/repositories/profiles.ts:114`). Fine for the current serialized call site in the move handler; be careful if you ever bump stats from concurrent paths.
 - **Dev DB is push-managed.** Use `db:push` (or direct SQL) for local schema/enum changes; `db:migrate` expects a migration baseline the local push-managed DB doesn't have.
 - **`DB_LATENCY_MS` is dev-only.** Forced to 0 in production by `resolveDbLatencyMs` (`apps/server/src/db/latency.ts:63`). New vars like this must be added to `turbo.json` `globalEnv` (see `CLAUDE.md`) or builds won't see them.
 - **No comments in code.** Per the repo-wide rule, the only comment you'll find in this layer is the single `biome-ignore` on the `or(...)!` non-null assertions in the paginated repositories.

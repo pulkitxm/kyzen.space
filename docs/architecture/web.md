@@ -131,7 +131,7 @@ The layout also sets appearance state on `<html>` from the server-known profile 
 >
 ```
 
-See `apps/web/app/layout.tsx:121`. For *signed-out* users (whose preference lives only in `localStorage`, not on the server), four inline `dangerouslySetInnerHTML` boot scripts run before first paint to apply the stored theme/pattern/sidebar prefs synchronously (`apps/web/app/layout.tsx:130`). `suppressHydrationWarning` is set because these scripts intentionally mutate the DOM before React hydrates. The cookie path (`SIDEBAR_PREFS_COOKIE`, `apps/web/app/layout.tsx:114`) lets the server pre-trust sidebar prefs it can read from the request.
+See `apps/web/app/layout.tsx:121`. For *signed-out* users (whose preference lives only in `localStorage`, not on the server), four inline `dangerouslySetInnerHTML` boot scripts run before first paint to apply the stored theme/pattern/sidebar prefs synchronously (`apps/web/app/layout.tsx:130`). `suppressHydrationWarning` is set because these scripts intentionally mutate the DOM before React hydrates. The cookie path (`SIDEBAR_PREFS_COOKIE`, `apps/web/app/layout.tsx:115`) lets the server pre-trust sidebar prefs it can read from the request.
 
 ### Provider stack
 
@@ -319,7 +319,7 @@ onClose();
 router.push(`/play/${res.game.id}`);
 ```
 
-See `apps/web/app/games/components/conversation-picker.tsx:40`. Games are created **over the socket**, never via a REST POST — the only game REST endpoint is the read at `GET /api/games/:gameId`.
+See `apps/web/app/games/components/conversation-picker.tsx:41`. Games are created **over the socket**, never via a REST POST — the only game REST endpoint is the read at `GET /api/games/:gameId`.
 
 ### The play route
 
@@ -359,15 +359,15 @@ const gameNode = GameClient ? (
 );
 ```
 
-See `apps/web/app/play/[gameId]/play-client.tsx:38`. If the game belongs to a conversation it wraps the board and a `ConversationView` in a `GameChatSplit`; otherwise it renders the board alone (`apps/web/app/play/[gameId]/play-client.tsx:61`).
+See `apps/web/app/play/[gameId]/play-client.tsx:43`. If the game belongs to a conversation it wraps the board and a `ConversationView` in a `GameChatSplit`; otherwise it renders the board alone (`apps/web/app/play/[gameId]/play-client.tsx:62`).
 
-`getGameClient` (`packages/games-client/src/registry.ts:18`) is just a lookup table of lazy imports, and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`). `play-client.tsx` pulls `socket`/`status` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx:40`) and passes them down so the board rides the app's single connection. `getGameSkeleton(type)` (`packages/games-client/src/registry.ts:24`) returns the board's `<Suspense>` fallback, falling back to `DefaultGameSkeleton` when a game registers no skeleton (it never returns `null`). Adding a game means adding one row each to `REGISTRY` / `SKELETON_REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, socket event, or driver.**
+`getGameClient` (`packages/games-client/src/registry.ts:19`) is just a lookup table of lazy imports, and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`). `play-client.tsx` pulls `socket`/`status` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx:41`) and passes them down so the board rides the app's single connection. `getGameSkeleton(type)` (`packages/games-client/src/registry.ts:26`) returns the board's `<Suspense>` fallback, falling back to `DefaultGameSkeleton` when a game registers no skeleton (it never returns `null`). Adding a game means adding one row each to `REGISTRY` / `SKELETON_REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, socket event, or driver.**
 
 ### Two skeletons: the board fallback vs. the route loading
 
 There are two distinct skeletons, at two different boundaries — don't conflate them:
 
-- **Board fallback** — `getGameSkeleton(gameType)` is the `<Suspense fallback>` for the `React.lazy` board *inside* `PlayClient` (`apps/web/app/play/[gameId]/play-client.tsx:39`). It covers the gap while the board chunk loads, after the page's data has already arrived.
+- **Board fallback** — `getGameSkeleton(gameType)` is the `<Suspense fallback>` for the `React.lazy` board *inside* `PlayClient` (`apps/web/app/play/[gameId]/play-client.tsx:45`). It covers the gap while the board chunk loads, after the page's data has already arrived.
 - **Route loading** — `app/play/[gameId]/loading.tsx` is the App Router `loading.tsx`; Next.js shows it while the `page.tsx` Server Component is still awaiting its SSR fetch. It reads the chat-layout cookie and renders `<PlaySkeleton layout={parseChatLayoutCookie(cookie)} />` (`apps/web/app/play/[gameId]/loading.tsx:7`).
 
 `PlaySkeleton` (`apps/web/app/play/[gameId]/play-skeleton.tsx:132`) is **layout-aware**: it mirrors the real `GameChatSplit` so the loading shell matches where the chat will actually land. It branches on the parsed `ChatLayout` — a **docked** sidebar (`mode === "mounted"`, sized to `layout.chatWidth`), a fixed **popout** window (`mode === "popout"`, positioned via `popoutStyle` clamped to the viewport), or a **minimized** floating icon / edge tab (`MinimizedSkeleton`, honoring `layout.stashEdge`) — all driven by the same geometry constants from `lib/chat-layout.ts` (`ICON_SIZE`, `EDGE_TAB_*`, `POPOUT_MARGIN`). Because the cookie is mirrored from `localStorage` by `CHAT_LAYOUT_BOOT_SCRIPT` (`apps/web/lib/chat-layout.ts:212`), the server can read the user's last layout and the skeleton lands in the right place without a flash.

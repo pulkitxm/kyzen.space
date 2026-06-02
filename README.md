@@ -57,8 +57,9 @@ bun run db:studio           # Postgres + Adminer at http://127.0.0.1:18081
 
 ## Documentation
 
-- **[`docs/architecture/`](docs/architecture/README.md)** — in-depth, code-referenced guide to every subsystem (auth, database, the game engine and schemas, realtime, the web app, and more).
+- **[`docs/architecture/`](docs/architecture/README.md)** — in-depth, code-referenced guide to every subsystem (auth, database, the game engine and schemas, realtime, the server, the web app, and testing).
 - **[`docs/adding-a-game.md`](docs/adding-a-game.md)** — add a new game with one `GameDefinition` + one board component.
+- **[`docs/games/`](docs/games/README.md)** — per-game rules and how-to-play, one page per game.
 
 ## Conventions
 

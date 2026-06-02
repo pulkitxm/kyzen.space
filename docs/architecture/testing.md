@@ -1,6 +1,6 @@
 # Testing
 
-The runner is **`bun:test`** (no Jest/Vitest). Every workspace keeps its tests in a `tests/` directory; `apps/server` additionally has an `integration/` suite (8 files, ~122 DB-backed tests) that needs a live database. Tests are mostly fast, dependency-free unit tests over pure helpers, plus a set of **structural** suites that enforce the platform contract — every registered game must ship an engine, schemas, a board, a skeleton, and a doc, or a test fails.
+The runner is **`bun:test`** (no Jest/Vitest). Every workspace keeps its tests in a `tests/` directory; `apps/server` additionally has an `integration/` suite (9 files, ~123 DB-backed tests) that needs a live database. Tests are mostly fast, dependency-free unit tests over pure helpers, plus a set of **structural** suites that enforce the platform contract — every registered game must ship an engine, schemas, a board, a skeleton, and a doc, or a test fails.
 
 ## How to run
 
@@ -22,20 +22,22 @@ The server's default `test` script runs only `tests/` (`apps/server/package.json
 cd apps/server && bun run test:integration     # runs integration/ with --env-file=../../.env
 ```
 
-Integration tests **self-skip without a DB**: each file probes `select 1` and gates with `describe.skipIf(!DB_UP)`, so they pass cleanly when Postgres is down — but to actually exercise them, start the DB (`bun run db:start`) and provide `.env`. The two original files keep the probe inline (`apps/server/integration/game-flows.test.ts:10`, `apps/server/integration/chat-flows.test.ts:16`); the six newer files import a shared `DB_UP` from `apps/server/integration/harness.ts:8`.
+Integration tests **self-skip without a DB**: each file probes `select 1` and gates with `describe.skipIf(!DB_UP)`, so they pass cleanly when Postgres is down — but to actually exercise them, start the DB (`bun run db:start`) and provide `.env`. The two original files keep the probe inline (`apps/server/integration/game-flows.test.ts:15`, `apps/server/integration/chat-flows.test.ts:17`); the seven newer files import a shared `DB_UP` from `apps/server/integration/harness.ts:8`. One of those, `apps/server/integration/_preflight.test.ts`, is the **opt-out** of the skip: it *throws* when `DB_UP` is false (with a setup checklist) instead of skipping, so a misconfigured environment fails loudly rather than passing on a silently-empty suite.
 
-`harness.ts` factors out the boilerplate: `createHarness(prefix)` returns `makeUser`/`befriend`/`makeDm`/`makeGroup`/`trackGame`/`cleanup` over UUID-namespaced fixtures (so parallel files never collide), plus `unwrap`/`expectErr`/`TestUser`. Each newer file does `const h = createHarness("…")` and `afterAll(h.cleanup)`, which deletes its tracked games/conversations/users. The two original files still carry their own copy of this harness inline.
+`harness.ts` factors out the boilerplate: `createHarness(prefix)` returns `makeUser`/`befriend`/`makeDm`/`makeGroup`/`trackGame`/`cleanup` over UUID-namespaced fixtures (so parallel files never collide), plus `unwrap`/`expectErr`/`TestUser`. Each edge/driver file does `const h = createHarness("…")` and `afterAll(h.cleanup)`, which deletes its tracked games/conversations/users. The two original files still carry their own copy of this harness inline.
 
 ## Files at a glance
 
 | Suite | Guarantees |
 | --- | --- |
-| `packages/games-core/tests/conformance.test.ts` | Runs per-game invariants over the whole `GAMES` array: `meta.type` matches `engine.type`, coherent player bounds, the right handler (`reduce`/`step`) for the mode, initial state validates against `stateSchema`, `createInitialState` is fresh + non-mutating, `moveSchema` rejects junk, `configSchema` accepts declared defaults, `categoryId` is a known category, `roles` are unique, `coverImage` is a `/games/` path. |
-| `packages/games-core/tests/registry.test.ts` | The derived registry API: `getDefinition`/`getEngine`/`hasEngine` for every type (and throw/false for unknown), `listGameTypes`/`listGameMeta` stay consistent with `GAMES`, `getCategoryGroups` only yields non-empty real categories covering every game. |
-| `packages/games-core/tests/schemas.test.ts` | The strict Zod contract: in-range vs out-of-range/non-integer coordinates, exact board shape, and `.strict()` rejecting unknown keys, plus the wire payloads (`clientJoinRoomSchema`, `clientMakeMoveSchema`, `gameJsonSchema`, `gamePlayerSchema`). |
-| `packages/games-core/tests/game-docs.test.ts` | Every `listGameTypes()` entry has a `docs/games/<type>.md` on disk. |
+| `packages/games-core/tests/conformance.test.ts` | A `GAMES registry` block (`GAMES` non-empty + unique types, `GAME_TYPES` matches the registry exactly) plus per-game invariants over the whole `GAMES` array: `meta.type` matches `engine.type`, coherent player bounds, the right handler (`reduce`/`step`) for the mode, initial state validates against `stateSchema`, `createInitialState` is fresh, `reduce` doesn't mutate the input state, `moveSchema` rejects junk, `configSchema` accepts declared `configFields` defaults, `categoryId` is a known category, `roles` are unique, `coverImage` (when set) is a `/games/` path. |
+| `packages/games-core/tests/registry.test.ts` | The derived registry API: `getDefinition`/`getEngine`/`hasEngine` for every type (and throw `Unknown game type: …`/false for unknown), `listGameTypes`/`listGameMeta` stay consistent with `GAMES` (and `listGameMeta` returns the definition `meta` objects), `getCategoryGroups` only yields non-empty real categories covering every game. |
+| `packages/games-core/tests/game-types.test.ts` | The registry-typed `gameType` parse layer (`src/game-types.ts`): the `TIC_TAC_TOE` slug constant is canonical, `GAME_TYPES` contains it, and `gameTypeSchema` accepts a registered slug but rejects an unknown one (e.g. `"chess"`). |
+| `packages/games-core/tests/schemas.test.ts` | The strict Zod contract: in-range vs out-of-range/non-integer coordinates, exact board shape, and `.strict()` rejecting unknown keys, plus the wire payloads (`clientJoinRoomSchema`, `clientMakeMoveSchema`, `gameJsonSchema`, `gamePlayerSchema`) — including `gameJsonSchema` rejecting an unknown `gameType`, since `gameType` is validated against the registry. |
+| `packages/games-core/tests/game-docs.test.ts` | Every `listGameTypes()` entry has a `docs/games/<type>.md` on disk (also checks `docs/games/README.md` exists). |
 | `packages/games-core/tests/tic-tac-toe.test.ts` | Focused engine test for tic-tac-toe's pure `reduce` + helpers (`lineWinner`, `isBoardFull`, `isTerminal`, …). |
 | `packages/games-client/tests/registry.test.ts` | Registry parity: every game type from games-core has a non-null board (`getGameClient`) **and** a skeleton (`getGameSkeleton`); unknown type → `null` client, `DefaultGameSkeleton` skeleton. |
+| `packages/chat-core/tests/schemas.test.ts` | `clientCreateGameInConversationSchema` accepts a registered `gameType` (`"tic-tac-toe"`) and rejects an unknown one (`"chess"`), exercising the shared registry-typed `gameType` at the chat layer. |
 | `apps/web/tests/game-skeletons.test.tsx` | Renders `DefaultGameSkeleton`, the per-game skeleton, and `PlaySkeleton` (across every `ChatLayout` variant) via `renderToStaticMarkup` and asserts on the HTML — no DOM. |
 | `apps/web/tests/route-loading.test.ts` | Key route directories each ship a `loading.tsx` (play, chat, games, friends, settings, profile, …). |
 | `apps/web/tests/avatar-render.test.ts` | Every avatar option value + palette color renders a real DiceBear `<svg>`; rendering is deterministic for a fixed config. |
@@ -43,7 +45,9 @@ Integration tests **self-skip without a DB**: each file probes `select 1` and ga
 | `apps/server/tests/rooms.test.ts` | Socket room helpers: `gameRoom`/`convRoom`/`userRoom` key builders and `join*`/`leave*`/`emitTo*` against a fake io/socket. |
 | `apps/server/tests/turn-based.test.ts` | The game-lane driver as a **unit**: `handleJoinRoom` seating/spectate/challenge rules and `handleMakeMove` validation (non-player, inactive game, bad move via Zod, corrupt stored state) + applying moves, broadcasting, and stat bumps. **DB layer mocked** with `mock.module("../src/db", …)` — no Postgres. (Its DB-backed twin is `integration/game-driver.test.ts`, which runs the same driver against a live DB with only io/socket faked.) |
 | `apps/server/tests/games-in-chat.test.ts` | Creating a game inside a conversation, again with the repos mocked. |
+| `apps/server/tests/require-auth.test.ts` | The shared `requireAuth` Hono middleware (`src/api/middleware/auth.ts`): with `../src/auth` mocked, a missing session → `401 {"error":"Unauthorized"}`, an authenticated session passes through and exposes `c.get("userId")`/`c.get("user")`. |
 | `apps/server/tests/*` (others) | Pure helpers and serializers: `serialize` (`serializeGame`/`serializeMove`), `chat-cursor`, `db-latency`, `game-card`, `profiles-route`, `theme`, `pattern`, `chat-layout`. |
+| `apps/server/integration/_preflight.test.ts` | The skip opt-out: a single test that **throws** (with a setup checklist) when `DB_UP` is false, so a misconfigured DB fails the run loudly instead of silently skipping the whole `integration/` suite. |
 | `apps/server/integration/chat-flows.test.ts` | DB-backed chat basics: friend requests (send/accept/decline/duplicate/auto-accept/canonical pairKey), DM open + friends-only gate, messaging member gates + unread/read + delete, group ownership/membership/rename, and notification fan-out basics. |
 | `apps/server/integration/game-flows.test.ts` | DB-backed game lifecycle over the normalized `game_player` join: create-in-DM seats the creator + posts a card, a second seat lists the game for both via the indexed join, and a full move sequence persists moves and completes with a winner. |
 | `apps/server/integration/friends-edge.test.ts` | Friends service edge matrix: already-friends 409, respond 404/403/409 (ownership-before-status), idempotent `removeFriend`, pending lists both directions, canonical pairKey across pairs, reverse-request auto-accept. |
@@ -56,9 +60,9 @@ Integration tests **self-skip without a DB**: each file probes `select 1` and ga
 
 ## Patterns to know
 
-**`renderToStaticMarkup` without a DOM.** Web component tests import `renderToStaticMarkup` from `react-dom/server` and assert on the returned HTML string — no jsdom, no DOM globals. `apps/web/tests/game-skeletons.test.tsx:19` renders `<DefaultGameSkeleton />` and checks `html.includes("animate-pulse")`; the tic-tac-toe skeleton test counts `size-24` cells to confirm a 9-cell board; `PlaySkeleton` is rendered for each `ChatLayout` variant and probed for layout markers (`border-l`, `360px`, `shadow-2xl`, `rounded-r-lg`). The avatar tests do the same with the real DiceBear engine, asserting the output starts with `<svg`.
+**`renderToStaticMarkup` without a DOM.** Web component tests import `renderToStaticMarkup` from `react-dom/server` and assert on the returned HTML string — no jsdom, no DOM globals. `apps/web/tests/game-skeletons.test.tsx:20` renders `<DefaultGameSkeleton />` and asserts `expect(html).toContain("animate-pulse")`; the tic-tac-toe skeleton test resolves the board via `getGameSkeleton(TIC_TAC_TOE)` and counts `size-24` cells to confirm a 9-cell board; `PlaySkeleton` is rendered for each `ChatLayout` variant and probed for layout markers (`border-l`, `360px`, `shadow-2xl`, `rounded-r-lg`). The avatar tests do the same with the real DiceBear engine, asserting the output starts with `<svg`.
 
-**`mock.module` for server plumbing.** Server route/driver tests stub the data layer instead of touching Postgres: `mock.module("../src/db", () => ({ games, profiles, … }))` then `await import("../src/realtime/turn-based")` (`apps/server/tests/turn-based.test.ts:58`). Pure helpers are exported so they're unit-testable independent of HTTP/socket plumbing. See `docs/architecture/server-api.md` for the routes → services → repositories layering this leans on.
+**`mock.module` for server plumbing.** Server route/driver tests stub the data layer instead of touching Postgres: `mock.module("../src/db", () => ({ games, profiles, … }))` (`apps/server/tests/turn-based.test.ts:59`) then `await import("../src/realtime/turn-based")` (`:73`). The `requireAuth` test follows the same shape, mocking `../src/auth` before importing the middleware. Pure helpers are exported so they're unit-testable independent of HTTP/socket plumbing. See `docs/architecture/server-api.md` for the routes → services → repositories layering this leans on.
 
 **Structural contract suites.** Several suites iterate `GAMES`/`listGameTypes()` rather than hard-coding a game, so adding a `GameDefinition` automatically extends coverage — and forgetting any required artifact fails CI:
 
@@ -70,7 +74,12 @@ This is the testing half of the "adding a game needs no new routes, endpoints, o
 
 ## CI
 
-`.github/workflows/test.yml` runs on every push to `main` and every pull request: it checks out, installs Bun `1.3.11`, `bun install --frozen-lockfile`, then `bun run test`. No database is provisioned, so the `integration/` suites self-skip in CI; they're meant for local runs against a real DB. Separate workflows cover the other gates — `lint.yml` (Biome `bun run check`), `build.yml`, and `no-comments.yml`.
+`.github/workflows/test.yml` runs on every push to `main` and every pull request, and defines **two jobs**:
+
+- **`test`** — checks out, installs Bun `1.3.11`, `bun install --frozen-lockfile`, then `bun run test` (the unit suites; no DB, so any `integration/` files it touches self-skip).
+- **`integration`** — spins up a `postgres:16` service (health-checked, on `localhost:5432`), sets `DATABASE_URL`, copies `.env.example` to `.env`, applies the schema non-interactively with `bun run db:push -- --force`, then runs `cd apps/server && bun run test:integration`. Because the DB is reachable, `_preflight.test.ts` does **not** skip — a broken setup fails the job.
+
+Separate workflows cover the other gates — `lint.yml` (Biome `bun run check`), `build.yml`, and `no-comments.yml`.
 
 ## Where to go next
 
