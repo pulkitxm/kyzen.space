@@ -1,9 +1,5 @@
-import { Spinner } from "@/components/ui";
+import { ProfileSkeleton } from "@/app/[username]/profile-skeleton";
 
 export default function ProfileRedirectLoading() {
-  return (
-    <div className="flex min-h-full items-center justify-center p-10">
-      <Spinner className="size-6 text-muted-foreground" />
-    </div>
-  );
+  return <ProfileSkeleton />;
 }
