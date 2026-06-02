@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { GameDefinition, Seat } from "../src/index";
-import { GAMES } from "../src/index";
+import { GAME_CATEGORIES, GAMES } from "../src/index";
+
+const CATEGORY_IDS = new Set(GAME_CATEGORIES.map((category) => category.id));
 
 function minSeats(def: GameDefinition): Seat[] {
   return def.engine.roles
@@ -76,6 +78,20 @@ for (const def of GAMES) {
       if (role === undefined) throw new Error("engine must declare a role");
       def.engine.reduce(state, { role }, {} as never);
       expect(state).toEqual(snapshot);
+    });
+
+    test("meta.categoryId is a known category", () => {
+      expect(CATEGORY_IDS.has(def.meta.categoryId)).toBe(true);
+    });
+
+    test("engine.roles has no duplicates", () => {
+      expect(new Set(def.engine.roles).size).toBe(def.engine.roles.length);
+    });
+
+    test("coverImage, when set, is a /games/ path", () => {
+      if (def.meta.coverImage === undefined) return;
+      expect(typeof def.meta.coverImage).toBe("string");
+      expect(def.meta.coverImage.startsWith("/games/")).toBe(true);
     });
   });
 }

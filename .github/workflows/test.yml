@@ -16,3 +16,34 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Run tests
         run: bun run test
+
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/gamelobby
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gamelobby
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - run: bun install --frozen-lockfile
+      - name: Provide env for integration run
+        run: cp .env.example .env
+      - name: Apply database schema
+        run: bun run db:push -- --force
+      - name: Run integration tests
+        run: cd apps/server && bun run test:integration

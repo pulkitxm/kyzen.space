@@ -61,23 +61,27 @@ canonical guide and this prompt mirrors it.
    only if needed.
 
 3. **games-client (UI)** under `packages/games-client/src/games/<type>/client.tsx`
-   — a `"use client"` component typed `GameClientProps` that renders the board
-   and emits `make_move`/listens to `game_state`/`move_made` over the **shared
-   socket** it receives via `props.socket` (model it on the tic-tac-toe client).
-   **Never call `io()` to open your own connection** — the host app supplies the
-   one shared Socket.IO connection through `GameClientProps`; emit `join_room` on
-   mount/`connect` and `leave_room` on cleanup, and remove your listeners with
-   `socket.off(...)` — never `socket.disconnect()` (that would kill the shared
-   chat connection). Register it in
-   `packages/games-client/src/registry.ts` keyed by the game `type`. Tailwind
-   theme tokens (e.g. `bg-surface-raised`, `text-card-foreground`) are available.
-   Also add `packages/games-client/src/games/<type>/skeleton.tsx` — a prop-less,
-   `"use client"`-free placeholder built from the shared `SkeletonBox` that
-   mirrors the board's layout — and register it in `SKELETON_REGISTRY` (same
-   file) keyed by `type`. It renders as the board's `<Suspense>` fallback while
-   the lazy chunk loads; without it, `getGameSkeleton(type)` falls back to
-   `DefaultGameSkeleton`. Keep it in its own module (never import the board into
-   it) so the heavy `client.tsx` stays out of the main bundle.
+   — a `"use client"` component typed `GameClientProps`, **modeled on the current
+   tic-tac-toe client** (`packages/games-client/src/games/tic-tac-toe/client.tsx`).
+   The host app supplies the **one shared Socket.IO connection** plus a `connected`
+   flag through `GameClientProps` (`props.socket`, `props.connected`) — **never
+   call `io()` to open your own connection.** Emit `join_room` on mount and on the
+   socket's `connect`, `make_move` on a move, and `leave_room` on cleanup (unmount);
+   render the board from the `game_state`/`move_made` events. On cleanup remove your
+   listeners with `socket.off(...)` only — never `socket.disconnect()` (that would
+   kill the shared chat lane). Register it in
+   `packages/games-client/src/registry.ts` (`REGISTRY`) keyed by the game `type`.
+   Tailwind theme tokens (e.g. `bg-surface-raised`, `text-card-foreground`) are
+   available.
+   Then register a **skeleton** via `getGameSkeleton`: either add
+   `packages/games-client/src/games/<type>/skeleton.tsx` — a prop-less,
+   `"use client"`-free placeholder built from the shared `SkeletonBox` that mirrors
+   the board's layout — and add it to `SKELETON_REGISTRY` (in `registry.ts`) keyed
+   by `type`, or rely on the generic `DefaultGameSkeleton` fallback. Either way
+   `getGameSkeleton(type)` resolves to a skeleton (never `null`); it renders as the
+   board's `<Suspense>` fallback while the lazy chunk loads. Keep any per-game
+   skeleton in its own module (never import the board into it) so the heavy
+   `client.tsx` stays out of the main bundle.
 
 4. **Tests** (`bun:test`):
    - The conformance suite (`packages/games-core/tests/conformance.test.ts`)
@@ -85,6 +89,11 @@ canonical guide and this prompt mirrors it.
    - Add `packages/games-core/tests/<type>.test.ts` for the engine: turn/role
      enforcement, every win line, draws, illegal/out-of-bounds moves (rejected by
      the schema), and post-terminal rejection. Add schema-strictness cases.
+   - Registry parity is **enforced**:
+     `packages/games-client/tests/registry.test.ts` fails if the game type has no
+     board or no skeleton, and `packages/games-core/tests/game-docs.test.ts` fails
+     if it has no `docs/games/<type>.md` (step 5). All three — board, skeleton, doc
+     — must exist or these suites go red.
 
 5. **Document the game (required).** Write `docs/games/<type>.md` — create the
    `docs/games/` folder if it doesn't exist, and name the file exactly after the
@@ -107,10 +116,11 @@ canonical guide and this prompt mirrors it.
    - `bun run check` (Biome; run `bun run fix` to autoformat)
    Then explicitly confirm the rules hold via the tests you wrote (a real win, a
    draw, an illegal move rejected, no moves after game over), and confirm
-   `docs/games/<type>.md` exists and matches the shipped rules + schemas. Report
-   exactly what you validated, the commands you ran with their results, and any
-   edge cases or open questions. Never claim it works without showing passing
-   output.
+   `docs/games/<type>.md` exists and matches the shipped rules + schemas. See
+   `docs/architecture/testing.md` for the suites the new game must keep green
+   (registry parity, game-docs, conformance). Report exactly what you validated,
+   the commands you ran with their results, and any edge cases or open questions.
+   Never claim it works without showing passing output.
 
 You do not need a database or the dev server to build/verify a game — the engine,
 schemas, and conformance tests run purely. Mention manual two-player `/play`

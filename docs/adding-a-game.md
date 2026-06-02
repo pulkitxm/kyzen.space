@@ -79,20 +79,29 @@ packages/games-client/src/registry.ts                     # "tic-tac-toe": lazy(
    symbols from `src/index.ts`. Add a category to `src/categories.ts` only if you
    need a new one.
 2. **games-client** — add `src/games/<type>/client.tsx` (`"use client"`, typed
-   `GameClientProps`; emit `join_room`/`make_move`/`leave_room` over the **shared
-   `props.socket`** — never call `io()` — and render from
-   `game_state`/`move_made`) and register it in `src/registry.ts` by `type`.
-   Optionally add
-   `src/games/<type>/skeleton.tsx` — a prop-less component that mirrors your
-   board's layout (built from the shared `SkeletonBox`, no `"use client"` needed)
-   — and register it in `SKELETON_REGISTRY` by `type`. It renders as the board's
-   `<Suspense>` fallback while the lazy board chunk loads. If you skip it,
-   `getGameSkeleton(type)` falls back to the generic `DefaultGameSkeleton`.
+   `GameClientProps`). Model it on `src/games/tic-tac-toe/client.tsx`: the host
+   app passes the **one shared Socket.IO connection** plus a `connected` flag via
+   props (`props.socket`, `props.connected`) — **never call `io()`** to open your
+   own. Emit `join_room` on mount and on the socket's `connect`, `make_move` on a
+   move, and `leave_room` on cleanup; render from the `game_state`/`move_made`
+   events. On unmount remove your listeners with `socket.off(...)` only — never
+   `socket.disconnect()` (that would kill the shared chat lane). Register the board
+   in `src/registry.ts` (`REGISTRY`) by `type`.
+   Then register a **skeleton**: either add `src/games/<type>/skeleton.tsx` — a
+   prop-less component that mirrors your board's layout (built from the shared
+   `SkeletonBox`, no `"use client"` needed, no import of the board) and add it to
+   `SKELETON_REGISTRY` by `type` — or rely on the generic fallback. Either way
+   `getGameSkeleton(type)` resolves to your skeleton or `DefaultGameSkeleton`
+   (never `null`); it renders as the board's `<Suspense>` fallback while the lazy
+   board chunk loads.
 3. **Tests** — the conformance suite (`packages/games-core/tests/conformance.test.ts`)
    covers your game automatically once it's in `GAMES`. Add a focused engine test
    `packages/games-core/tests/<type>.test.ts` (turn/role enforcement, every win
    condition, draws, illegal moves, post-terminal rejection) and schema-strictness
-   cases.
+   cases. The registry parity tests are **enforced**:
+   `packages/games-client/tests/registry.test.ts` fails if a game type has no board
+   or no skeleton, and `packages/games-core/tests/game-docs.test.ts` fails if it
+   has no `docs/games/<type>.md`.
 4. **Document** — add `docs/games/<type>.md`, named after the `type` slug (e.g.
    `docs/games/tic-tac-toe.md`): how to play, player count and roles,
    win/draw/illegal-move rules, the state and move shapes (mirroring the Zod
@@ -100,6 +109,8 @@ packages/games-client/src/registry.ts                     # "tic-tac-toe": lazy(
    Every new game ships this doc.
 5. **Verify** — `bun run type-check`, `bun test` (games-core incl. conformance),
    `bun run check`. Then `bun run dev` and play a full game two-up on `/play/:id`.
+   See `docs/architecture/testing.md` for the suites the new game must keep green
+   (registry parity, game-docs, conformance).
 
 ## What you reuse (never recreate)
 

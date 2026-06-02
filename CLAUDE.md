@@ -101,6 +101,19 @@ A game is one `GameDefinition` (games-core) + one client component (games-client
 2. Add the `"use client"` board to `packages/games-client/src/games/<type>/client.tsx` and register it by `type` in `src/registry.ts`. Optionally add a `skeleton.tsx` placeholder beside it and register it in `SKELETON_REGISTRY` (it renders as the board's `<Suspense>` fallback; otherwise `getGameSkeleton` falls back to `DefaultGameSkeleton`).
 3. The conformance suite (`packages/games-core/tests/conformance.test.ts`) covers it automatically; add a focused engine test too.
 
+## Keep docs and agents in sync
+
+**A change is not done until the relevant docs and agents reflect it.** Code and prose drift apart silently, so update them in the same change:
+
+- **Subsystem/behavior change** → the matching page under `docs/architecture/*` (e.g. `realtime.md`, `database.md`, `web.md`).
+- **Game-authoring flow change** → `docs/adding-a-game.md` **and** `.claude/agents/game-builder.md`.
+- **New or changed game** → its `docs/games/<type>.md`.
+- **Convention change** (style, tooling, structure) → this file (`CLAUDE.md`) **and** `AGENTS.md`.
+
+Start from `docs/architecture/README.md` (the architecture index) and `docs/architecture/testing.md` (the test guide) to find the right page.
+
 ## Tests
 
 `bun test`, with tests in each workspace's `tests/` directory (server also has `integration/`). Mock server route dependencies with `mock.module`; keep pure helpers exported so they're unit-testable independent of HTTP/socket plumbing.
+
+Structural suites enforce the platform contract: every registered game must ship a board (`getGameClient`), a skeleton (`getGameSkeleton`), and a `docs/games/<type>.md` — a missing one fails a test. See `docs/architecture/testing.md`.

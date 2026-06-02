@@ -33,15 +33,18 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/games/[gameType]/page.tsx` | The single dynamic game-lobby route; `hasEngine` gate + `getDefinition` drive `GameLobby`. |
 | `apps/web/app/games/_shared/game-lobby.tsx` | Renders `configFields` form + "Play with a friend" button → `ConversationPicker`. |
 | `apps/web/app/games/components/conversation-picker.tsx` | "Play with…" modal: picks a conversation/friend, emits `createGameInConversation`, routes to `/play/:id`. |
-| `apps/web/app/play/[gameId]/page.tsx` | SSR-fetches game + moves (+ conversation + messages), gates on auth/UUID, renders `PlayClient`. |
-| `apps/web/app/play/[gameId]/play-client.tsx` | Resolves `getGameClient(gameType)`, renders it in `<Suspense>`, optionally side-by-side with chat. |
+| `apps/web/app/play/[gameId]/page.tsx` | SSR-fetches game + moves (+ conversation + messages), gates on auth/UUID, resolves the chat layout, renders `PlayClient`. |
+| `apps/web/app/play/[gameId]/play-client.tsx` | Resolves `getGameClient` / `getGameSkeleton`, renders the board in `<Suspense>` over the shared socket, optionally side-by-side with chat via `GameChatSplit`. |
+| `apps/web/app/play/[gameId]/loading.tsx` | Route `loading.tsx`: reads the chat-layout cookie and renders `<PlaySkeleton layout={…} />` during the SSR fetch. |
+| `apps/web/app/play/[gameId]/play-skeleton.tsx` | Layout-aware skeleton mirroring `GameChatSplit` (docked / popout / minimized). |
+| `apps/web/lib/chat-layout.ts` | `ChatLayout` type + `parseChatLayoutCookie` / `normalizeChatLayout` + layout geometry constants; the layout cookie/localStorage contract shared by page, loading, and `GameChatSplit`. |
 | `apps/web/app/chat/[handle]/page.tsx` | SSR conversation page; resolves handle (UUID or username) → conversation + messages. |
 | `apps/web/app/chat/[handle]/conversation-view.tsx` | Client conversation UI: hydrates messages atom, marks read, renders list/composer/typing. |
 | `apps/web/app/settings/page.tsx` | Settings Server Component: appearance section + account/session management. |
 | `apps/web/app/settings/theme-picker.tsx` | Hover-preview palette/color-mode picker driven by the appearance context. |
 | `apps/web/next.config.ts` | `transpilePackages` for both shared packages. |
 | `apps/web/app/globals.css` | Tailwind v4 entry; `@source` so Tailwind scans games-client classes. |
-| `packages/games-client/src/registry.ts` | `getGameClient(type)`: maps a game type to a `React.lazy` board component. |
+| `packages/games-client/src/registry.ts` | `getGameClient(type)` maps a game type to a `React.lazy` board; `getGameSkeleton(type)` returns its `<Suspense>` fallback (or `DefaultGameSkeleton`). |
 | `packages/games-client/src/types.ts` | `GameClientProps`: the contract every game board receives. |
 
 ---
@@ -329,7 +332,7 @@ const data = await serverFetchJson<{ game: GameJson; moves: MoveJson[] }>(
 if (!data) notFound();
 ```
 
-See `apps/web/app/play/[gameId]/page.tsx:31`. All of that becomes props on `PlayClient`.
+See `apps/web/app/play/[gameId]/page.tsx:31`. It also resolves the **chat layout**: it reads the `CHAT_LAYOUT_COOKIE` and, when the cookie is missing/untrusted, falls back to the profile's saved `chatLayout` — passing `initialLayout` + `layoutTrusted` down so `GameChatSplit` can render docked/popout without a flash (`apps/web/app/play/[gameId]/page.tsx:54`). All of that becomes props on `PlayClient`.
 
 `PlayClient` (`apps/web/app/play/[gameId]/play-client.tsx`) is where the data-driven rendering happens. It resolves the board component **by string** and renders it inside `<Suspense>` (because `getGameClient` returns a `React.lazy` component):
 
@@ -358,7 +361,16 @@ const gameNode = GameClient ? (
 
 See `apps/web/app/play/[gameId]/play-client.tsx:38`. If the game belongs to a conversation it wraps the board and a `ConversationView` in a `GameChatSplit`; otherwise it renders the board alone (`apps/web/app/play/[gameId]/play-client.tsx:61`).
 
-`getGameClient` (`packages/games-client/src/registry.ts`) is just a lookup table of lazy imports, and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`). `play-client.tsx` pulls `socket`/`status` from `useSocket()` and passes them down so the board rides the app's single connection. `getGameSkeleton(type)` (same `registry.ts`) returns the board's `<Suspense>` fallback, falling back to `DefaultGameSkeleton` when a game registers no skeleton. Adding a game means adding one row to the `REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, socket event, or driver.**
+`getGameClient` (`packages/games-client/src/registry.ts:18`) is just a lookup table of lazy imports, and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`). `play-client.tsx` pulls `socket`/`status` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx:40`) and passes them down so the board rides the app's single connection. `getGameSkeleton(type)` (`packages/games-client/src/registry.ts:24`) returns the board's `<Suspense>` fallback, falling back to `DefaultGameSkeleton` when a game registers no skeleton (it never returns `null`). Adding a game means adding one row each to `REGISTRY` / `SKELETON_REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, socket event, or driver.**
+
+### Two skeletons: the board fallback vs. the route loading
+
+There are two distinct skeletons, at two different boundaries — don't conflate them:
+
+- **Board fallback** — `getGameSkeleton(gameType)` is the `<Suspense fallback>` for the `React.lazy` board *inside* `PlayClient` (`apps/web/app/play/[gameId]/play-client.tsx:39`). It covers the gap while the board chunk loads, after the page's data has already arrived.
+- **Route loading** — `app/play/[gameId]/loading.tsx` is the App Router `loading.tsx`; Next.js shows it while the `page.tsx` Server Component is still awaiting its SSR fetch. It reads the chat-layout cookie and renders `<PlaySkeleton layout={parseChatLayoutCookie(cookie)} />` (`apps/web/app/play/[gameId]/loading.tsx:7`).
+
+`PlaySkeleton` (`apps/web/app/play/[gameId]/play-skeleton.tsx:132`) is **layout-aware**: it mirrors the real `GameChatSplit` so the loading shell matches where the chat will actually land. It branches on the parsed `ChatLayout` — a **docked** sidebar (`mode === "mounted"`, sized to `layout.chatWidth`), a fixed **popout** window (`mode === "popout"`, positioned via `popoutStyle` clamped to the viewport), or a **minimized** floating icon / edge tab (`MinimizedSkeleton`, honoring `layout.stashEdge`) — all driven by the same geometry constants from `lib/chat-layout.ts` (`ICON_SIZE`, `EDGE_TAB_*`, `POPOUT_MARGIN`). Because the cookie is mirrored from `localStorage` by `CHAT_LAYOUT_BOOT_SCRIPT` (`apps/web/lib/chat-layout.ts:212`), the server can read the user's last layout and the skeleton lands in the right place without a flash.
 
 ### Why this design
 
@@ -374,9 +386,9 @@ This traces a single move from click to confirmed render, and shows exactly wher
 2. **Client emits.** `makeMove` emits over the **shared** socket (`props.socket`) — `socket.emit("make_move", { gameId, moveData: { row, col } })`. The client does **not** mutate its board itself here; it waits for the server.
 3. **Server validates against the shared schema + engine.** The game lane's `make_move` handler validates the payload with the `games-core` Zod `moveSchema`, loads the stored state, re-runs the engine's `reduce`, and rejects illegal moves. This is the trust boundary: the same engine that told the client `canMove` is the one that *decides*, and it would reject a forged move from a tampered client. (See `./realtime.md` and `./games-core-engine.md`.)
 4. **Server persists + broadcasts.** It persists the move and broadcasts the new canonical state to the game room.
-5. **Client receives `game_state` / `move_made`.** The board listens for `"game_state"` (full state + moves) and `"move_made"` (just the new `gameState`) and `setGame` / `setMoves` from the payload (`packages/games-client/src/games/tic-tac-toe/client.tsx:240` and `:244`). This overwrites whatever the client believed.
+5. **Client receives `game_state` / `move_made`.** The board listens for `"game_state"` (full state + moves) and `"move_made"` (just the new `gameState`) and `setGame` / `setMoves` from the payload (`packages/games-client/src/games/tic-tac-toe/client.tsx:241` and `:245`). This overwrites whatever the client believed.
 
-So the arrow is: **cell click → `client.tsx:291` `socket.emit("make_move")` → server game lane (Zod-validate + engine `reduce` + persist) → broadcast `game_state` → `client.tsx:240` `setGame`/`setMoves` → React re-renders the board.** The web app never decides the outcome; it requests one and renders the answer.
+So the arrow is: **cell click → `client.tsx:291` `socket.emit("make_move")` → server game lane (Zod-validate + engine `reduce` + persist) → broadcast `game_state` → `client.tsx:241` `setGame`/`setMoves` → React re-renders the board.** The web app never decides the outcome; it requests one and renders the answer.
 
 The same shape governs chat: composer optimistically inserts a `pending` message with a `clientId` → emits → server validates/persists → broadcasts `messageNew` → `ChatSocketBridge` calls `upsertMessage`, which finds the pending row by `clientId` and swaps in the confirmed one.
 
@@ -429,6 +441,8 @@ Two small but easy-to-trip-over config facts let the shared packages work in the
 - **`params` and `cookies()` are awaited.** This Next.js version treats route `params` as a `Promise` and `cookies()` as async (`apps/web/app/play/[gameId]/page.tsx:25`, `apps/web/lib/api-server.ts:13`). Per AGENTS.md, consult `node_modules/next/dist/docs/` before writing Next-specific code rather than assuming older-version behavior.
 - **`suppressHydrationWarning` on `<html>` is intentional.** The boot scripts mutate the DOM before hydration; the attribute prevents false hydration mismatch warnings. Don't remove it.
 - **The game board reuses the *shared* socket.** `play-client.tsx` reads `socket`/`status` from `useSocket()` and passes them into the board as `GameClientProps.socket`/`connected`; `TicTacToeGameClient` rides that one connection for the game lane (`join_room`/`make_move`/`leave_room`) instead of opening its own `io()`. A board must never call `io()` or `socket.disconnect()` — the host's `SocketProvider` owns the connection's lifecycle.
+- **Two skeletons, two boundaries.** `getGameSkeleton(type)` is the board's `<Suspense>` fallback inside `PlayClient` (lazy chunk load); `app/play/[gameId]/loading.tsx` is the route-level App Router loading UI (SSR fetch in flight) and renders the layout-aware `PlaySkeleton`. Don't reach for one when you mean the other. `getGameSkeleton` never returns `null` (falls back to `DefaultGameSkeleton`).
+- **The play loading skeleton mirrors `GameChatSplit` via the layout cookie.** `loading.tsx` reads `CHAT_LAYOUT_COOKIE` (mirrored from `localStorage` by `CHAT_LAYOUT_BOOT_SCRIPT`) and `PlaySkeleton` branches on docked/popout/minimized so the shell lands where the chat will. If you change `GameChatSplit`'s layout modes or the geometry constants in `lib/chat-layout.ts`, update `play-skeleton.tsx` to match or the loading state will visibly jump.
 
 ---
 

@@ -8,7 +8,7 @@ This matters because of the repo's core architectural principle: **the client is
 
 1. **RSC / SSR** — Next.js server components call the server over HTTP, forwarding the browser's cookies (`apps/web/lib/get-server-session.ts:16`).
 2. **Browser fetches** — `"use client"` components call the server with `credentials: "include"` (`apps/web/lib/api-client.ts:6`).
-3. **Socket.IO handshake** — the realtime middleware reads the cookie off the WebSocket handshake and resolves the session before any game/chat event is allowed (`apps/server/src/realtime/index.ts:32`).
+3. **Socket.IO handshake** — the realtime middleware reads the cookie off the WebSocket handshake and resolves the session before any game/chat event is allowed (`apps/server/src/realtime/index.ts:33`).
 
 A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `databaseHooks.user.create.after` hook that provisions a `user_profile` row (username + random DiceBear avatar). So "auth" and "profile bootstrap" are a single atomic flow — by the time a session cookie exists, the user already has a username.
 
@@ -202,7 +202,7 @@ Feature routers (profiles, friends, conversations, …) call this and `401` when
 
 ## How the socket reads the session (realtime)
 
-The realtime layer authenticates **once, at connection time**, before any handler is attached. Socket.IO middleware (`io.use`) reads the raw `cookie` header from the handshake, hands it to the same `getSession`, and either attaches `socket.data.userId` or rejects the connection (`apps/server/src/realtime/index.ts:32`):
+The realtime layer authenticates **once, at connection time**, before any handler is attached. Socket.IO middleware (`io.use`) reads the raw `cookie` header from the handshake, hands it to the same `getSession`, and either attaches `socket.data.userId` or rejects the connection (`apps/server/src/realtime/index.ts:33`):
 
 ```ts
   io.use(async (socket, next) => {
@@ -225,9 +225,9 @@ The realtime layer authenticates **once, at connection time**, before any handle
   });
 ```
 
-The cookie reaches the handshake because the web client opens the socket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:46`) and the server enables `cors: { origin: env.webUrl, credentials: true }` on the IO server (`apps/server/src/realtime/index.ts:26`).
+The cookie reaches the handshake because the web client opens the socket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:46`) and the server enables `cors: { origin: env.webUrl, credentials: true }` on the IO server (`apps/server/src/realtime/index.ts:27`).
 
-After this point, **every** chat and game handler trusts `socket.data.userId` as the authenticated identity for the lifetime of the connection — `join_room`, `make_move`, chat sends, friend requests, presence, etc. (`apps/server/src/realtime/index.ts:51`). Note the layering: this middleware only proves *who you are*; per-move/per-room authorization (are you a player in this game? a member of this conversation?) happens later in the game driver and chat handlers. See `./realtime.md`.
+After this point, **every** chat and game handler trusts `socket.data.userId` as the authenticated identity for the lifetime of the connection — `join_room`, `make_move`, chat sends, friend requests, presence, etc. (`apps/server/src/realtime/index.ts:57`). Note the layering: this middleware only proves *who you are*; per-move/per-room authorization (are you a player in this game? a member of this conversation?) happens later in the game driver and chat handlers. See `./realtime.md`.
 
 ## End-to-end sign-in flow
 
@@ -240,7 +240,7 @@ A full trace from clicking the button to being authenticated on all three lanes:
 5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:26`) → `ensureUsernameForUser(id, name)` (`apps/server/src/username.ts:23`) → slugify + collision loop → `createProfile` inserts the `user_profile` row with a seeded avatar (`apps/server/src/db/repositories/profiles.ts:55`).
 6. **Cookie set + redirect.** Better Auth sets the session cookie (in prod: `secure`, `SameSite=Lax`, cross-subdomain per `apps/server/src/auth.ts:48`) and redirects the browser to the `callbackURL` (`/profile`).
 7. **RSC reads the session.** The `/profile` (and root layout) server component calls `getServerSession()` → `serverFetchJson("/api/auth/get-session")` (`apps/web/lib/get-server-session.ts:17`). `serverFetch` forwards the browser's cookies from `next/headers` `cookies()` with `cache: "no-store"` (`apps/web/lib/api-server.ts:13`), so the server resolves the session and returns `{ user, session }`. `getServerSession` is wrapped in `react.cache` so multiple components in one render share a single fetch.
-8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:44`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:43`).
+8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:44`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:44`).
 9. **Browser fetches.** Any subsequent client-side mutation (`SignOutForm`, friend actions, settings) uses `clientFetch(..., { credentials: "include" })` (`apps/web/lib/api-client.ts:11`), and routes read identity via `getUserId(c)` (`apps/server/src/api/auth-context.ts:4`).
 
 Arrow summary:
@@ -277,7 +277,7 @@ The settings page (`apps/web/app/settings/page.tsx:17`) is an RSC that calls `ge
 - **Two web fetch paths, two env vars.** RSC uses `serverFetch` (`API_URL`, forwards `next/headers` cookies, `cache: "no-store"`); the browser uses `clientFetch` (`NEXT_PUBLIC_API_URL`, `credentials: "include"`). Use the server path inside RSCs and the client path inside `"use client"` components — they read the cookie from different places.
 - **Auth-dependent pages set `export const dynamic = "force-dynamic"`** (e.g. `apps/web/app/auth/page.tsx:7`, `apps/web/app/settings/page.tsx:14`) because they depend on per-request cookies and must not be statically cached.
 - **`getServerSession`/`getAccountSessions` are `react.cache`-wrapped** so the layout and a page in the same render share one network round-trip; don't reach for module-level memoization.
-- **Cookies cross origins only because CORS allows it.** Both the Express HTTP layer (`apps/server/src/index.ts:12`) and the Socket.IO server (`apps/server/src/realtime/index.ts:26`) set `origin: env.webUrl, credentials: true`; the client mirrors this with `credentials: "include"` / `withCredentials: true`. Change the web origin and you must update `WEB_URL`.
+- **Cookies cross origins only because CORS allows it.** Both the Express HTTP layer (`apps/server/src/index.ts:12`) and the Socket.IO server (`apps/server/src/realtime/index.ts:27`) set `origin: env.webUrl, credentials: true`; the client mirrors this with `credentials: "include"` / `withCredentials: true`. Change the web origin and you must update `WEB_URL`.
 
 ## Where to go next
 
