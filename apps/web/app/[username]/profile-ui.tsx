@@ -1,6 +1,7 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
 import Image from "next/image";
 import Link from "next/link";
+import { FaEllipsis, FaGamepad, FaHeart, FaRegCalendar } from "react-icons/fa6";
 
 import { EditableAvatar } from "@/app/[username]/avatar-editor";
 import { PaginatedRecentGames } from "@/app/[username]/profile-activity-client";
@@ -152,17 +153,7 @@ function ProfileOverflowMenu() {
     <details className="group relative">
       <summary className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full border border-border bg-surface-overlay text-muted-foreground transition hover:border-border/80 hover:bg-surface-hover [&::-webkit-details-marker]:hidden">
         <span className="sr-only">More options</span>
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <circle cx="5" cy="12" r="2" />
-          <circle cx="12" cy="12" r="2" />
-          <circle cx="19" cy="12" r="2" />
-        </svg>
+        <FaEllipsis size={18} aria-hidden="true" />
       </summary>
       <div className="absolute right-0 z-30 mt-2 min-w-44 overflow-hidden rounded-xl border border-border bg-card py-1 text-sm shadow-2xl ring-1 ring-black/10">
         <Link
@@ -197,7 +188,7 @@ function StatsCard({
       <ul className="mt-4 space-y-4">
         <li className="flex gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-overlay text-muted-foreground">
-            <IconController />
+            <FaGamepad size={18} aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <p className="text-muted-foreground text-sm">Games played</p>
@@ -208,7 +199,7 @@ function StatsCard({
         </li>
         <li className="flex gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-overlay text-muted-foreground">
-            <IconCalendar />
+            <FaRegCalendar size={18} aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <p className="text-muted-foreground text-sm">Member for</p>
@@ -255,7 +246,11 @@ function ActivitySection({
               />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 font-medium text-muted-foreground text-xs">
-                  <IconHeart className="text-primary" />
+                  <FaHeart
+                    className="text-primary"
+                    size={14}
+                    aria-hidden="true"
+                  />
                   Most played
                 </p>
                 <p className="mt-1 truncate font-medium text-card-foreground">
@@ -295,67 +290,5 @@ function ActivityThumb({
         </div>
       )}
     </div>
-  );
-}
-
-function IconController() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M8 12h2m0 0h2m-2 0v2m0-2v-2M6 7h12a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V9a2 2 0 012-2z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function IconCalendar() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <rect
-        x="3"
-        y="5"
-        width="18"
-        height="16"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M3 9h18M8 3v4M16 3v4"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function IconHeart({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <path d="M12 21s-6.716-4.11-9-8.5C.5 8.5 2.5 5 7 5c2.5 0 5 2 5 2s2.5-2 5-2c4.5 0 6.5 3.5 4 7.5-2.284 4.39-9 8.5-9 8.5z" />
-    </svg>
   );
 }

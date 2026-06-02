@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { FaMoon, FaSun } from "react-icons/fa";
+import { FaMoon, FaSun } from "react-icons/fa6";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { useColorModeSetting } from "@/lib/appearance";

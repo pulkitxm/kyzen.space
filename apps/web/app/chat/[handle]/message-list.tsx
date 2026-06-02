@@ -3,7 +3,7 @@
 import type { MemberJson, MessageJson } from "@gamelobby/chat-core";
 import { useStore } from "jotai";
 import { useCallback, useRef, useState } from "react";
-import { FaArrowDown } from "react-icons/fa";
+import { FaArrowDown } from "react-icons/fa6";
 import { clientFetchJson } from "@/lib/api-client";
 import { type ChatMessage, messagesAtomFamily } from "@/lib/chat/atoms";
 import { MessageBubble } from "./message-bubble";

@@ -2,6 +2,14 @@
 
 import type { Cell, TicTacToeState as TicState } from "@gamelobby/games-core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FaBackwardStep,
+  FaChevronLeft,
+  FaChevronRight,
+  FaForwardStep,
+  FaPause,
+  FaPlay,
+} from "react-icons/fa6";
 import { io, type Socket } from "socket.io-client";
 import type { GameClientProps } from "../../types";
 
@@ -98,7 +106,7 @@ function ReplayToolbar({
         disabled={step <= 0}
         title="First"
       >
-        <IconFirst />
+        <FaBackwardStep size={20} aria-hidden="true" />
       </button>
       <button
         type="button"
@@ -107,7 +115,7 @@ function ReplayToolbar({
         disabled={step <= 0}
         title="Previous move (←)"
       >
-        <IconPrev />
+        <FaChevronLeft size={20} aria-hidden="true" />
       </button>
       <button
         type="button"
@@ -116,7 +124,11 @@ function ReplayToolbar({
         disabled={maxStep === 0}
         title={isPlaying ? "Pause (Space)" : "Play (Space)"}
       >
-        {isPlaying ? <IconPause /> : <IconPlay />}
+        {isPlaying ? (
+          <FaPause size={20} aria-hidden="true" />
+        ) : (
+          <FaPlay size={20} aria-hidden="true" />
+        )}
       </button>
       <button
         type="button"
@@ -125,7 +137,7 @@ function ReplayToolbar({
         disabled={step >= maxStep}
         title="Next move (→)"
       >
-        <IconNext />
+        <FaChevronRight size={20} aria-hidden="true" />
       </button>
       <button
         type="button"
@@ -134,114 +146,9 @@ function ReplayToolbar({
         disabled={step >= maxStep}
         title="Last move"
       >
-        <IconLast />
+        <FaForwardStep size={20} aria-hidden="true" />
       </button>
     </div>
-  );
-}
-
-function IconFirst() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="11 18 6 12 11 6" />
-      <polyline points="18 18 13 12 18 6" />
-      <line x1="4" y1="4" x2="4" y2="20" />
-    </svg>
-  );
-}
-
-function IconPrev() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
-  );
-}
-
-function IconNext() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  );
-}
-
-function IconLast() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="13 18 18 12 13 6" />
-      <polyline points="6 18 11 12 6 6" />
-      <line x1="20" y1="4" x2="20" y2="20" />
-    </svg>
-  );
-}
-
-function IconPlay() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <polygon points="8 5 19 12 8 19 8 5" />
-    </svg>
-  );
-}
-
-function IconPause() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <rect x="6" y="5" width="4" height="14" rx="1" />
-      <rect x="14" y="5" width="4" height="14" rx="1" />
-    </svg>
   );
 }
 

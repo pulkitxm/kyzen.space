@@ -10,8 +10,7 @@ import {
 import { useStore } from "jotai";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BiSend } from "react-icons/bi";
-import { FaRegSmile } from "react-icons/fa";
+import { FaPaperPlane, FaRegFaceSmile } from "react-icons/fa6";
 import {
   type ChatMessage,
   messagesAtomFamily,
@@ -252,7 +251,7 @@ export function MessageComposer({
           aria-label="Emoji & GIFs"
           className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-surface-overlay hover:text-foreground"
         >
-          <FaRegSmile className="size-5" />
+          <FaRegFaceSmile className="size-5" />
         </button>
         {me ? (
           <GameLauncher conversation={conversation} userId={me.id} />
@@ -283,7 +282,7 @@ export function MessageComposer({
           aria-label="Send"
           className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition hover:bg-primary-hover disabled:opacity-50"
         >
-          <BiSend className="size-4" />
+          <FaPaperPlane className="size-4" />
         </button>
       </div>
     </div>

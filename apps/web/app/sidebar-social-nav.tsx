@@ -4,7 +4,7 @@ import { useAtomValue } from "jotai";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { IconType } from "react-icons";
-import { FaComments, FaUserFriends } from "react-icons/fa";
+import { FaComments, FaUserGroup } from "react-icons/fa6";
 import { pendingRequestCountAtom, totalUnreadAtom } from "@/lib/chat/atoms";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +31,7 @@ export function SidebarSocialNav({
     {
       href: "/friends",
       label: "Friends",
-      icon: FaUserFriends,
+      icon: FaUserGroup,
       badge: pending,
     },
   ];

@@ -3,7 +3,7 @@
 import { useAtomValue } from "jotai";
 import Link from "next/link";
 import { useState } from "react";
-import { FaUserFriends, FaUsers } from "react-icons/fa";
+import { FaUserGroup, FaUsers } from "react-icons/fa6";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
 import { conversationsAtom, presenceAtom } from "@/lib/chat/atoms";
 import { messagePreview, relativeTime } from "@/lib/chat/format";
@@ -30,7 +30,7 @@ export function ChatListClient({ userId }: { userId: string }) {
             href="/friends"
             className="flex items-center gap-1.5 text-primary text-sm hover:underline"
           >
-            <FaUserFriends className="size-4" /> Friends
+            <FaUserGroup className="size-4" /> Friends
           </Link>
         </div>
       </header>

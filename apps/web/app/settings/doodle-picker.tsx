@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import { FaCheck } from "react-icons/fa";
+import { FaCheck } from "react-icons/fa6";
 
 import { usePattern } from "@/lib/appearance";
 import { DEFAULT_PATTERN, PATTERNS, type PatternId } from "@/lib/patterns";

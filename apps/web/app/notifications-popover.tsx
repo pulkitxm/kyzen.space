@@ -4,7 +4,7 @@ import { CHAT_EVENTS, type NotificationJson } from "@gamelobby/chat-core";
 import { useAtomValue, useStore } from "jotai";
 import Link from "next/link";
 import { useCallback } from "react";
-import { FaBell } from "react-icons/fa";
+import { FaBell } from "react-icons/fa6";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/ui/popover";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import { notificationsAtom, unreadNotificationsAtom } from "@/lib/chat/atoms";

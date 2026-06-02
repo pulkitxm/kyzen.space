@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FaPalette, FaShapes } from "react-icons/fa";
+import { FaPalette, FaShapes } from "react-icons/fa6";
 
 import { DoodlePicker } from "@/app/settings/doodle-picker";
 import { ThemePicker } from "@/app/settings/theme-picker";

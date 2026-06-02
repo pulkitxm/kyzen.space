@@ -16,6 +16,15 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  FaChevronDown,
+  FaChevronLeft,
+  FaChevronRight,
+  FaChevronUp,
+  FaPencil,
+  FaShuffle,
+  FaXmark,
+} from "react-icons/fa6";
 import { Button, Character } from "@/components/ui";
 import { clientFetchJson } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -50,7 +59,7 @@ export function EditableAvatar({
           alt={`${displayName?.trim() || username} avatar`}
         />
         <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition group-hover:opacity-100">
-          <PencilIcon />
+          <FaPencil size={20} aria-hidden="true" />
         </span>
       </button>
       {open ? (
@@ -165,7 +174,7 @@ function AvatarEditorModal({
               aria-label="Close"
               className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-surface-overlay hover:text-foreground"
             >
-              <CloseIcon />
+              <FaXmark size={16} aria-hidden="true" />
             </button>
           </header>
 
@@ -192,7 +201,7 @@ function AvatarEditorModal({
                   setDraft((prev) => randomAvatarConfig(undefined, prev.style))
                 }
               >
-                <ShuffleIcon /> Shuffle
+                <FaShuffle size={15} aria-hidden="true" /> Shuffle
               </Button>
             </div>
 
@@ -508,88 +517,14 @@ function humanize(value: string): string {
     .replace(/^./, (ch) => ch.toUpperCase());
 }
 
-function PencilIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M4 20h4l10-10a2.828 2.828 0 10-4-4L4 16v4z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M6 6l12 12M18 6L6 18"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function ShuffleIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M16 3h5v5M21 3l-7 7M4 20l7-7M16 21h5v-5M4 4l4 4"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-const CHEVRON_PATHS = {
-  left: "M15 6l-6 6 6 6",
-  right: "M9 6l6 6-6 6",
-  up: "M6 15l6-6 6 6",
-  down: "M6 9l6 6 6-6",
+const CHEVRON_ICONS = {
+  left: FaChevronLeft,
+  right: FaChevronRight,
+  up: FaChevronUp,
+  down: FaChevronDown,
 } as const;
 
-function ChevronIcon({ dir }: { dir: keyof typeof CHEVRON_PATHS }) {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d={CHEVRON_PATHS[dir]}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+function ChevronIcon({ dir }: { dir: keyof typeof CHEVRON_ICONS }) {
+  const Icon = CHEVRON_ICONS[dir];
+  return <Icon size={14} aria-hidden="true" />;
 }

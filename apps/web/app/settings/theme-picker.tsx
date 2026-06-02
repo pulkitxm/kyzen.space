@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import { FaCheck, FaDesktop, FaMoon, FaSun } from "react-icons/fa";
+import { FaCheck, FaDesktop, FaMoon, FaSun } from "react-icons/fa6";
 
 import { useColorModeSetting, usePalette } from "@/lib/appearance";
 import {

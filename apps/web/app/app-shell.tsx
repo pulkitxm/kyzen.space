@@ -8,7 +8,7 @@ import type {
 } from "@gamelobby/chat-core";
 import { Provider } from "jotai";
 import { useCallback, useState } from "react";
-import { FaChevronRight } from "react-icons/fa";
+import { FaChevronRight } from "react-icons/fa6";
 
 import { ChatSocketBridge } from "@/app/chat-socket-bridge";
 import { Sidebar } from "@/app/sidebar";

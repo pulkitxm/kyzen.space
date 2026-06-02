@@ -3,7 +3,7 @@
 import type { GameCardMeta } from "@gamelobby/chat-core";
 import { listGameMeta } from "@gamelobby/games-core";
 import Link from "next/link";
-import { FaGamepad } from "react-icons/fa";
+import { FaGamepad } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 
 function gameName(gameType: string): string {

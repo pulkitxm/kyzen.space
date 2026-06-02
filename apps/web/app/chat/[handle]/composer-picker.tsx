@@ -3,7 +3,7 @@
 import type { GifJson } from "@gamelobby/chat-core";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaRegSmile } from "react-icons/fa";
+import { FaRegFaceSmile } from "react-icons/fa6";
 import { clientFetchJson } from "@/lib/api-client";
 import { gifCacheAtom, recentEmojisAtom } from "@/lib/chat/atoms";
 import { type EmojiGroup, loadEmojiGroups } from "@/lib/chat/emoji";
@@ -370,7 +370,7 @@ export function ComposerPicker({
                 : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
-            <FaRegSmile className="size-4" />
+            <FaRegFaceSmile className="size-4" />
             Emoji
           </button>
           <button

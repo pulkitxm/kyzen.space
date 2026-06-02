@@ -12,6 +12,15 @@ The **only** comments permitted are functional tooling directives, which must be
 
 Enforcement: `bun run strip-comments` removes every non-directive comment in place; `bun run strip-comments -- --check` lists any offenders and exits non-zero. CI runs the check on every PR (`.github/workflows/no-comments.yml`), so a PR that introduces a comment fails. The gate covers every tracked code file, including `scripts/strip-comments.mjs` itself — there are no exemptions.
 
+## Icons — use `react-icons`, not raw SVG
+
+**Render icons from `react-icons`, not hand-written inline `<svg>`.** Import a component and size it with the `size` prop or a `className` (e.g. `import { FaBell } from "react-icons/fa6";` → `<FaBell size={18} aria-hidden="true" />`). This keeps icons consistent, themeable via `currentColor`, and free of bespoke SVG markup.
+
+- **Pack preference (in order):** Font Awesome 6 (`react-icons/fa6`) is the project default — reach for it first. If FA6 has no good match, use another `react-icons` pack: Lucide (`react-icons/lu`) for thin outline glyphs, or brand/flat-color logos (`react-icons/fc`, e.g. `FcGoogle` for the authentic multicolor Google mark). **Only when no library icon fits is a raw inline `<svg>` acceptable** — that fallback is allowed, not forbidden.
+- **Stay on `fa6`, not the legacy `fa` (FA5).** Mind the FA6 renames: `FaCog`→`FaGear`, `FaUserFriends`→`FaUserGroup`, `FaRegSmile`→`FaRegFaceSmile`.
+- **`games-client`** declares `react-icons` as a peer + dev dependency, so game UIs draw from the same icon set as the web app.
+- **Not icons — leave as SVG:** generated/decorative art (`scripts/gen-doodle-tile.ts`, `public/` pattern tiles), DiceBear avatar rendering, and SVG used in tests.
+
 ## Commands
 
 Bun is the package manager and test runner (`packageManager: bun@1.3.11`); Turborepo orchestrates tasks across the monorepo.

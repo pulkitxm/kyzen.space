@@ -17,10 +17,10 @@ import {
 import {
   FaChevronLeft,
   FaChevronRight,
-  FaCog,
   FaGamepad,
+  FaGear,
   FaUser,
-} from "react-icons/fa";
+} from "react-icons/fa6";
 import { NotificationsPopover } from "@/app/notifications-popover";
 import { SidebarSocialNav } from "@/app/sidebar-social-nav";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
@@ -396,7 +396,7 @@ export function Sidebar({
                 aria-label="Settings"
               >
                 <span className="flex size-7 shrink-0 items-center justify-center">
-                  <FaCog className="size-4 shrink-0" aria-hidden />
+                  <FaGear className="size-4 shrink-0" aria-hidden />
                 </span>
                 <span
                   className={cn(

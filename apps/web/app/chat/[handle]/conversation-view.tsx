@@ -9,7 +9,7 @@ import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft } from "react-icons/fa6";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
 import {
   activeConversationIdAtom,

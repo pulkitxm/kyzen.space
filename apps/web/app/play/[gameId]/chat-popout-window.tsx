@@ -151,19 +151,19 @@ export function ChatPopoutWindow({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={onMinimize}
-            className="text-muted-foreground outline-none transition hover:text-foreground"
-            aria-label="Minimize chat"
-          >
-            <FaXmark className="size-4" />
-          </button>
-          <button
-            type="button"
             onClick={onDock}
             className="text-muted-foreground outline-none transition hover:text-foreground"
             aria-label="Dock chat"
           >
             <FaCompress className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onMinimize}
+            className="text-muted-foreground outline-none transition hover:text-foreground"
+            aria-label="Minimize chat"
+          >
+            <FaXmark className="size-4" />
           </button>
         </div>
       </div>

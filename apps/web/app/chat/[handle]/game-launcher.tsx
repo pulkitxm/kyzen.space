@@ -4,7 +4,7 @@ import { CHAT_EVENTS, type ConversationJson } from "@gamelobby/chat-core";
 import { listGameMeta } from "@gamelobby/games-core";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { FaGamepad } from "react-icons/fa";
+import { FaGamepad } from "react-icons/fa6";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 
 export function GameLauncher({
