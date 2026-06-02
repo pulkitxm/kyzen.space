@@ -180,7 +180,7 @@ export function MessageBubble({
           <GifMessage gif={gif} pending={message.pending} stamp={stamp} />
         ) : (
           <div className={bubbleClass}>
-            <span className="whitespace-pre-wrap break-words">
+            <span className="wrap-break-word whitespace-pre-wrap">
               {linkify(message.body ?? "", own)}
             </span>
             <div

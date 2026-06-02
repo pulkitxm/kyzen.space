@@ -14,7 +14,7 @@ export default function PlayLoading() {
         </div>
       </div>
 
-      <div className="hidden w-[360px] shrink-0 flex-col border-border border-l md:flex">
+      <div className="hidden w-90 shrink-0 flex-col border-border border-l md:flex">
         <div className="flex items-center gap-3 border-border border-b px-4 py-3">
           <Skeleton className="size-9 shrink-0 rounded-full" />
           <div className="space-y-1.5">

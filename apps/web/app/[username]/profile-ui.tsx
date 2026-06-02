@@ -61,7 +61,7 @@ export function ProfilePageView({
                   displayName={displayName}
                 />
               ) : (
-                <div className="relative size-[5.75rem] shrink-0 overflow-hidden rounded-2xl ring-4 ring-card sm:size-24">
+                <div className="relative size-23 shrink-0 overflow-hidden rounded-2xl ring-4 ring-card sm:size-24">
                   <Character
                     config={avatar}
                     fallbackSeed={username}
@@ -116,9 +116,9 @@ export function ProfilePageView({
 
 function Banner() {
   return (
-    <div className="relative h-[9.5rem] overflow-hidden rounded-2xl sm:h-[12rem]">
+    <div className="relative h-38 overflow-hidden rounded-2xl sm:h-48">
       <div
-        className="absolute inset-0 bg-gradient-to-br"
+        className="absolute inset-0 bg-linear-to-br"
         style={{
           backgroundImage: `linear-gradient(to bottom right, var(--banner-from), var(--banner-via), var(--banner-to))`,
         }}
@@ -164,7 +164,7 @@ function ProfileOverflowMenu() {
           <circle cx="19" cy="12" r="2" />
         </svg>
       </summary>
-      <div className="absolute right-0 z-30 mt-2 min-w-[11rem] overflow-hidden rounded-xl border border-border bg-card py-1 text-sm shadow-2xl ring-1 ring-black/10">
+      <div className="absolute right-0 z-30 mt-2 min-w-44 overflow-hidden rounded-xl border border-border bg-card py-1 text-sm shadow-2xl ring-1 ring-black/10">
         <Link
           href="/profile"
           className="block px-4 py-2.5 text-card-foreground transition hover:bg-surface-overlay"

@@ -12,9 +12,9 @@ export default function GamesLoading() {
         {[0, 1, 2].map((i) => (
           <li
             key={i}
-            className="flex min-h-[8.5rem] overflow-hidden rounded-2xl border border-border bg-surface-raised"
+            className="flex min-h-34 overflow-hidden rounded-2xl border border-border bg-surface-raised"
           >
-            <Skeleton className="aspect-[5/6] min-h-[8.5rem] w-[44%] max-w-[11rem] shrink-0 rounded-none" />
+            <Skeleton className="aspect-5/6 min-h-34 w-[44%] max-w-44 shrink-0 rounded-none" />
             <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 px-5 py-4">
               <Skeleton className="h-3 w-24" />
               <Skeleton className="h-5 w-40" />

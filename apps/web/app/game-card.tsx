@@ -15,7 +15,7 @@ export function GameCard({
       <li>
         <Link
           href={href}
-          className="group relative flex aspect-[4/3] flex-col justify-end overflow-hidden rounded-2xl bg-card p-5 shadow-sm transition hover:bg-surface-overlay"
+          className="group relative flex aspect-4/3 flex-col justify-end overflow-hidden rounded-2xl bg-card p-5 shadow-sm transition hover:bg-surface-overlay"
         >
           <h3 className="font-semibold text-card-foreground text-lg tracking-tight">
             {game.name}
@@ -32,7 +32,7 @@ export function GameCard({
     <li>
       <Link
         href={href}
-        className="group relative flex aspect-[4/3] flex-col justify-end overflow-hidden rounded-2xl bg-surface-raised shadow-[0_8px_30px_-8px_rgb(0_0_0/0.12)] outline-none ring-offset-background transition hover:shadow-[0_12px_40px_-12px_rgb(0_0_0/0.18)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="group relative flex aspect-4/3 flex-col justify-end overflow-hidden rounded-2xl bg-surface-raised shadow-[0_8px_30px_-8px_rgb(0_0_0/0.12)] outline-none ring-offset-background transition hover:shadow-[0_12px_40px_-12px_rgb(0_0_0/0.18)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         <Image
           src={game.coverImage}
