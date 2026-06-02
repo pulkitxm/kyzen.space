@@ -11,7 +11,7 @@ GameLobby is a real-time multiplayer game **and** chat lobby. Two apps sit on to
 The single most important architectural decision is that **the game and chat domain logic lives in `packages/` and is imported by both the frontend and the backend**. A game is one self-describing `GameDefinition` — engine + strict Zod schemas — in `packages/games-core` (`@gamelobby/games-core`). Because that package is **framework-agnostic (no React)**, the server can import it directly:
 
 - The **server** uses the engine as the authority. On every move it re-validates the move and the stored state against the game's Zod schemas and runs `engine.reduce(...)` to compute the next state. The client is never trusted. See `apps/server/src/realtime/turn-based.ts:122` (`handleMakeMove`).
-- The **client** imports the same package for its TypeScript types and shared rules, and renders the board via a separate React-only package, `@gamelobby/games-client`, resolved by game `type` (`packages/games-client/src/registry.ts:12`).
+- The **client** imports the same package for its TypeScript types and shared rules, and renders the board via a separate React-only package, `@gamelobby/games-client`, resolved by game `type` (`packages/games-client/src/registry.ts:18`).
 
 The same is true for chat: `@gamelobby/chat-core` is the single source of truth for the realtime message shapes and the socket event names (`CHAT_EVENTS`), imported by both web and server so the wire contract can never drift.
 
@@ -76,13 +76,13 @@ Who imports whom:
 
 ### 2. A player makes a move
 
-1. The board lives at the dynamic route `apps/web/app/play/[gameId]/page.tsx`. It is an RSC: it validates the gameId, requires a session (else redirects to `/auth`), and SSR-fetches the game + moves from the only game REST endpoint, `GET /api/games/:gameId` (`apps/web/app/play/[gameId]/page.tsx:31`). It passes the data to the client (`PlayClient`, `apps/web/app/play/[gameId]/play-client.tsx`), which resolves the board component by game type via `getGameClient(gameType)` (`play-client.tsx:33`).
+1. The board lives at the dynamic route `apps/web/app/play/[gameId]/page.tsx`. It is an RSC: it validates the gameId, requires a session (else redirects to `/auth`), and SSR-fetches the game + moves from the only game REST endpoint, `GET /api/games/:gameId` (`apps/web/app/play/[gameId]/page.tsx:31`). It passes the data to the client (`PlayClient`, `apps/web/app/play/[gameId]/play-client.tsx`), which resolves the board component by game type via `getGameClient(gameType)` (`play-client.tsx:38`).
 2. `GET /api/games/:gameId` is served by `apps/server/src/api/routes/games.ts:9` — the **only** game REST route. Games are created and played over the socket, not REST.
-3. The board component opens a Socket.IO connection and emits `join_room`, then on a tap emits `make_move` with `{ gameId, moveData: { row, col } }` (`packages/games-client/src/games/tic-tac-toe/client.tsx:407`).
+3. The board component reuses the app's shared Socket.IO connection (passed in as `GameClientProps.socket`) and emits `join_room`, then on a tap emits `make_move` with `{ gameId, moveData: { row, col } }`, and `leave_room` when it unmounts (`packages/games-client/src/games/tic-tac-toe/client.tsx`).
 4. The server authenticated the socket at connect time by reading the Better Auth session from the handshake cookie (`apps/server/src/realtime/index.ts:32`). The `make_move` handler validates the payload against the games-core Zod schema `clientMakeMoveSchema` and routes through the driver (`apps/server/src/realtime/index.ts:95`).
 5. Game events route through a **driver** (`apps/server/src/realtime/drivers.ts:25`), currently the turn-based one (`apps/server/src/realtime/turn-based.ts`). `handleMakeMove` (`turn-based.ts:122`) loads the game, looks up the `GameDefinition` via `getDefinition` (`packages/games-core/src/registry.ts:14`), validates the move with `def.moveSchema` and the stored state with `def.stateSchema`, then runs the **authoritative** `def.engine.reduce(...)` (`turn-based.ts:145`). An illegal move is rejected with `game_error`; the client never decides legality.
 6. On success it persists the move (`games.addMove`) and the new state (`games.updateGame`), finalizes the outcome / bumps player stats if the game ended, then broadcasts `move_made` + a fresh `game_state` to everyone in the game room (`turn-based.ts:163`). State and moves live as JSONB on the generic `game` / `move` / `game_player` tables (`apps/server/src/db/schema.ts:98`) — there are no per-game tables.
-7. The board's socket listeners (`game_state`, `move_made`) update local React state and re-render (`client.tsx:360`). For an in-chat game, a game card is also re-broadcast to the originating conversation.
+7. The board's socket listeners (`game_state`, `move_made`) update local React state and re-render (`client.tsx:252`). For an in-chat game, a game card is also re-broadcast to the originating conversation.
 
 ## Subsystem docs
 
@@ -94,7 +94,7 @@ This is the index for `docs/architecture/`. Each per-subsystem doc is a sibling 
 | [database.md](./database.md) | The Drizzle/Postgres schema, the **generic** `game`/`move`/`game_player` tables (JSONB state, no per-game tables), the postgres-js client, and the repository pattern exposed as namespaces from `db/index.ts`. |
 | [games-core-schemas.md](./games-core-schemas.md) | The contract layer of `@gamelobby/games-core`: `GameDefinition<S,I,C>`, the `GameEngine` types, the shared wire/socket Zod schemas, and the `.strict()` + `z.infer` discipline. |
 | [games-core-engine.md](./games-core-engine.md) | The logic/registry layer: the `GameEngine` contract, tic-tac-toe's pure `reduce()`, the single `GAMES` array, the derived registry, and the conformance invariants every game must satisfy. |
-| [games-client.md](./games-client.md) | `@gamelobby/games-client`: the web-only React board package, lazy resolution by game type via `getGameClient`, the `GameClientProps` SSR contract, and how a board talks to the socket directly. |
+| [games-client.md](./games-client.md) | `@gamelobby/games-client`: the web-only React board package, lazy resolution by game type via `getGameClient`, the `GameClientProps` SSR contract, and how a board rides the app's shared socket. |
 | [chat-core.md](./chat-core.md) | `@gamelobby/chat-core`: the chat/social DTOs, the `CHAT_EVENTS` socket registry, the `Ack` discriminated union, and how game cards get embedded in conversations. |
 | [realtime.md](./realtime.md) | The Socket.IO layer: one authenticated connection multiplexed into a **chat lane** and a **game lane**, the driver indirection, and the full authoritative `make_move` round trip with dual broadcast. |
 | [server-api.md](./server-api.md) | How the backend process is assembled (Express + Hono + Socket.IO on one port), the routes → services → repositories layering with the `ServiceResult` pattern, and why `GET /api/games/:gameId` is the only game REST endpoint. |
@@ -107,7 +107,7 @@ The authoritative quick-start narrative also lives in the repo root `CLAUDE.md` 
 1. **This file** — the system shape and the shared-logic insight.
 2. **`docs/adding-a-game.md`** — the fastest way to internalize the `GameDefinition` model and the packages↔apps split, by walking the smallest possible feature.
 3. **`packages/games-core`** — start at `definition.ts` and `engine.ts` (`GameEngine` shape), then `registry.ts` and `games/index.ts` (the single `GAMES` array). This is the domain core.
-4. **`apps/server/src/realtime/`** — `index.ts` (connection + the `join_room` / `make_move` lanes), then `turn-based.ts` (the authoritative driver). This is where game-core meets the database.
+4. **`apps/server/src/realtime/`** — `index.ts` (connection + the `join_room` / `make_move` / `leave_room` game lane), then `turn-based.ts` (the authoritative driver). This is where game-core meets the database.
 5. **`apps/server/src/api/`** and **`apps/server/src/db/`** — Hono router-per-feature and the layered repositories (`db/index.ts` namespaces).
 6. **`apps/web/app/play/[gameId]/`** and **`packages/games-client`** — how a board is fetched, hydrated, and wired to the socket.
 7. **`packages/chat-core`** and the server's `realtime/chat.ts` + `chat/` services — the chat lane that shares the same connection.

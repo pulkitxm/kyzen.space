@@ -8,7 +8,7 @@
 2. **Zod schemas** (`src/schemas.ts`) — runtime validators for the two payloads that come **from the client and therefore cannot be trusted** (`clientCreateGameInConversationSchema`) and for the JSONB blobs persisted in the DB (`gameCardMetaSchema`, `notificationPayloadSchema`).
 3. **The socket contract** (`src/socket-events.ts`) — a frozen map of event **names** (`CHAT_EVENTS`) plus a `Client*`/`Server*` type for every payload that flows in each direction over the chat lane of the Socket.IO connection.
 
-Why does this live in a shared package instead of being defined twice? Because **both the Next.js frontend and the Bun backend import it via `workspace:*`** (`packages/chat-core/package.json:14`). The server builds a `MessageJson`, the client consumes a `MessageJson`, and both refer to the *same* TypeScript type and the *same* event-name constant. If a field is renamed, both sides fail to type-check in the same `bun run type-check` pass — the contract physically cannot drift. This is the chat-side mirror of the core repo insight: shared domain code lives in `packages/` and is imported by both ends, so the wire format has exactly one definition.
+Why does this live in a shared package instead of being defined twice? Because **both the Next.js frontend and the Bun backend import it via `workspace:*`** (`apps/web/package.json:16`, `apps/server/package.json:16`). The server builds a `MessageJson`, the client consumes a `MessageJson`, and both refer to the *same* TypeScript type and the *same* event-name constant. If a field is renamed, both sides fail to type-check in the same `bun run type-check` pass — the contract physically cannot drift. This is the chat-side mirror of the core repo insight: shared domain code lives in `packages/` and is imported by both ends, so the wire format has exactly one definition.
 
 It is the social counterpart to `@gamelobby/games-core`. games-core owns the *game* engine + schemas (and the server validates moves against them so the client is never trusted); chat-core owns the *social* DTOs + the one client-supplied chat schema. The package has **no React** (so the server can import it) and only one runtime dependency, Zod, plus `@gamelobby/avatar` for the `AvatarConfig` type embedded in `PublicUser`.
 
@@ -253,7 +253,7 @@ export async function broadcastGameCard(
 }
 ```
 
-(`apps/server/src/chat/game-card-broadcast.ts:7`). It no-ops when the game wasn't started from a conversation (`getGameCardByGameId` returns nothing — see `apps/server/tests/game-card.test.ts:117`). On the client, `CHAT_EVENTS.messageUpdated` is handled in `apps/web/app/chat-socket-bridge.tsx:106`, which upserts the refreshed message into the atom and re-renders the card with its new status badge. So a move made on the game board live-updates the "In progress" / "Bob won" pill on the card sitting in the chat — without the card and the board sharing any state beyond the `gameId`.
+(`apps/server/src/chat/game-card-broadcast.ts:7`). It no-ops when the game wasn't started from a conversation (`getGameCardByGameId` returns nothing — see `apps/server/tests/game-card.test.ts:121`). On the client, `CHAT_EVENTS.messageUpdated` is handled in `apps/web/app/chat-socket-bridge.tsx:106`, which upserts the refreshed message into the atom and re-renders the card with its new status badge. So a move made on the game board live-updates the "In progress" / "Bob won" pill on the card sitting in the chat — without the card and the board sharing any state beyond the `gameId`.
 
 ## A typical inbound message, end to end
 

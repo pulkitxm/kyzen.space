@@ -9,6 +9,7 @@ import {
 import { Suspense } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import type { ChatLayout } from "@/lib/chat-layout";
+import { useSocket } from "@/lib/socket/socket-context";
 import { GameChatSplit } from "./game-chat-split";
 
 export function PlayClient({
@@ -36,6 +37,7 @@ export function PlayClient({
 }) {
   const GameClient = getGameClient(gameType);
   const GameSkeleton = getGameSkeleton(gameType);
+  const { socket, status } = useSocket();
 
   const gameNode = GameClient ? (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
@@ -43,6 +45,8 @@ export function PlayClient({
         <GameClient
           gameId={gameId}
           userId={userId}
+          socket={socket}
+          connected={status === "connected"}
           initialGame={initialGame}
           initialMoves={initialMoves}
         />

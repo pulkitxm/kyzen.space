@@ -8,6 +8,10 @@ export function joinGameRoom(socket: Socket, gameId: string): void {
   void socket.join(gameRoom(gameId));
 }
 
+export function leaveGameRoom(socket: Socket, gameId: string): void {
+  void socket.leave(gameRoom(gameId));
+}
+
 export function emitToGame(
   io: IOServer,
   gameId: string,

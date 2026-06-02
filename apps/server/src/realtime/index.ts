@@ -15,6 +15,7 @@ import { attachGameChatHandlers } from "./games-in-chat";
 import { setIO } from "./io";
 import { handlePresenceConnect, handlePresenceDisconnect } from "./presence";
 import { attachRedisAdapter } from "./redis";
+import { leaveGameRoom } from "./rooms";
 import { attachTypingHandlers } from "./typing";
 
 const log = childLogger({ mod: "realtime" });
@@ -123,6 +124,21 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
           socket.emit("game_error", { message: msg });
         }
       })();
+    });
+
+    socket.on("leave_room", (payload: unknown, cb?: (err?: string) => void) => {
+      const parsed = clientJoinRoomSchema.safeParse(payload);
+      if (!parsed.success) {
+        slog.warn({ payload }, "invalid leave_room payload");
+        cb?.("Invalid payload");
+        return;
+      }
+      leaveGameRoom(socket, parsed.data.gameId);
+      slog.info(
+        { event: "leave_room", gameId: parsed.data.gameId },
+        "leave_room handled",
+      );
+      cb?.();
     });
 
     socket.on("disconnect", (reason) => {

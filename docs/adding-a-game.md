@@ -79,8 +79,10 @@ packages/games-client/src/registry.ts                     # "tic-tac-toe": lazy(
    symbols from `src/index.ts`. Add a category to `src/categories.ts` only if you
    need a new one.
 2. **games-client** — add `src/games/<type>/client.tsx` (`"use client"`, typed
-   `GameClientProps`; emit `make_move`, render from `game_state`/`move_made`) and
-   register it in `src/registry.ts` by `type`. Optionally add
+   `GameClientProps`; emit `join_room`/`make_move`/`leave_room` over the **shared
+   `props.socket`** — never call `io()` — and render from
+   `game_state`/`move_made`) and register it in `src/registry.ts` by `type`.
+   Optionally add
    `src/games/<type>/skeleton.tsx` — a prop-less component that mirrors your
    board's layout (built from the shared `SkeletonBox`, no `"use client"` needed)
    — and register it in `SKELETON_REGISTRY` by `type`. It renders as the board's

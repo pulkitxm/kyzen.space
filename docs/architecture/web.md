@@ -335,13 +335,17 @@ See `apps/web/app/play/[gameId]/page.tsx:31`. All of that becomes props on `Play
 
 ```tsx
 const GameClient = getGameClient(gameType);
+const GameSkeleton = getGameSkeleton(gameType);
+const { socket, status } = useSocket();
 
 const gameNode = GameClient ? (
   <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
-    <Suspense fallback={null}>
+    <Suspense fallback={<GameSkeleton />}>
       <GameClient
         gameId={gameId}
         userId={userId}
+        socket={socket}
+        connected={status === "connected"}
         initialGame={initialGame}
         initialMoves={initialMoves}
       />
@@ -352,9 +356,9 @@ const gameNode = GameClient ? (
 );
 ```
 
-See `apps/web/app/play/[gameId]/play-client.tsx:33`. If the game belongs to a conversation it wraps the board and a `ConversationView` in a `GameChatSplit`; otherwise it renders the board alone (`apps/web/app/play/[gameId]/play-client.tsx:52`).
+See `apps/web/app/play/[gameId]/play-client.tsx:38`. If the game belongs to a conversation it wraps the board and a `ConversationView` in a `GameChatSplit`; otherwise it renders the board alone (`apps/web/app/play/[gameId]/play-client.tsx:61`).
 
-`getGameClient` (`packages/games-client/src/registry.ts`) is just a lookup table of lazy imports, and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, `initialGame`, `initialMoves`). Adding a game means adding one row to the `REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, socket event, or driver.**
+`getGameClient` (`packages/games-client/src/registry.ts`) is just a lookup table of lazy imports, and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`). `play-client.tsx` pulls `socket`/`status` from `useSocket()` and passes them down so the board rides the app's single connection. `getGameSkeleton(type)` (same `registry.ts`) returns the board's `<Suspense>` fallback, falling back to `DefaultGameSkeleton` when a game registers no skeleton. Adding a game means adding one row to the `REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, socket event, or driver.**
 
 ### Why this design
 
@@ -366,13 +370,13 @@ The reason one route can render every game is that the *boundary* between web an
 
 This traces a single move from click to confirmed render, and shows exactly where "the client is never trusted" bites.
 
-1. **User clicks a cell.** `TicTacToeGameClient` only allows it when `canMove` is true — it is the player's turn for their role and the game is `active` (`packages/games-client/src/games/tic-tac-toe/client.tsx:396`).
-2. **Client emits, optimistically.** `makeMove` emits over the board's own socket — `socket.emit("make_move", { gameId, moveData: { row, col } })` (`packages/games-client/src/games/tic-tac-toe/client.tsx:407`). The client does **not** mutate its board itself here; it waits for the server.
+1. **User clicks a cell.** `TicTacToeGameClient` only allows it when `canMove` is true — it is the player's turn for their role and the game is `active` (`packages/games-client/src/games/tic-tac-toe/client.tsx:281`).
+2. **Client emits.** `makeMove` emits over the **shared** socket (`props.socket`) — `socket.emit("make_move", { gameId, moveData: { row, col } })`. The client does **not** mutate its board itself here; it waits for the server.
 3. **Server validates against the shared schema + engine.** The game lane's `make_move` handler validates the payload with the `games-core` Zod `moveSchema`, loads the stored state, re-runs the engine's `reduce`, and rejects illegal moves. This is the trust boundary: the same engine that told the client `canMove` is the one that *decides*, and it would reject a forged move from a tampered client. (See `./realtime.md` and `./games-core-engine.md`.)
 4. **Server persists + broadcasts.** It persists the move and broadcasts the new canonical state to the game room.
-5. **Client receives `game_state` / `move_made`.** The board listens for `"game_state"` (full state + moves) and `"move_made"` (just the new `gameState`) and `setGame` / `setMoves` from the payload (`packages/games-client/src/games/tic-tac-toe/client.tsx:360` and `:368`). This overwrites whatever the client believed.
+5. **Client receives `game_state` / `move_made`.** The board listens for `"game_state"` (full state + moves) and `"move_made"` (just the new `gameState`) and `setGame` / `setMoves` from the payload (`packages/games-client/src/games/tic-tac-toe/client.tsx:240` and `:244`). This overwrites whatever the client believed.
 
-So the arrow is: **cell click → `client.tsx:407` `socket.emit("make_move")` → server game lane (Zod-validate + engine `reduce` + persist) → broadcast `game_state` → `client.tsx:360` `setGame`/`setMoves` → React re-renders the board.** The web app never decides the outcome; it requests one and renders the answer.
+So the arrow is: **cell click → `client.tsx:291` `socket.emit("make_move")` → server game lane (Zod-validate + engine `reduce` + persist) → broadcast `game_state` → `client.tsx:240` `setGame`/`setMoves` → React re-renders the board.** The web app never decides the outcome; it requests one and renders the answer.
 
 The same shape governs chat: composer optimistically inserts a `pending` message with a `clientId` → emits → server validates/persists → broadcasts `messageNew` → `ChatSocketBridge` calls `upsertMessage`, which finds the pending row by `clientId` and swaps in the confirmed one.
 
@@ -424,7 +428,7 @@ Two small but easy-to-trip-over config facts let the shared packages work in the
 - **If a new game's classes vanish in production CSS,** check the `@source` in `globals.css` covers where those classes are authored.
 - **`params` and `cookies()` are awaited.** This Next.js version treats route `params` as a `Promise` and `cookies()` as async (`apps/web/app/play/[gameId]/page.tsx:25`, `apps/web/lib/api-server.ts:13`). Per AGENTS.md, consult `node_modules/next/dist/docs/` before writing Next-specific code rather than assuming older-version behavior.
 - **`suppressHydrationWarning` on `<html>` is intentional.** The boot scripts mutate the DOM before hydration; the attribute prevents false hydration mismatch warnings. Don't remove it.
-- **The game board opens its *own* socket.** `TicTacToeGameClient` does not reuse `SocketProvider`'s connection; it creates a dedicated socket to join the game room (`packages/games-client/src/games/tic-tac-toe/client.tsx:342`), so games-client stays independent of the web app's socket context.
+- **The game board reuses the *shared* socket.** `play-client.tsx` reads `socket`/`status` from `useSocket()` and passes them into the board as `GameClientProps.socket`/`connected`; `TicTacToeGameClient` rides that one connection for the game lane (`join_room`/`make_move`/`leave_room`) instead of opening its own `io()`. A board must never call `io()` or `socket.disconnect()` — the host's `SocketProvider` owns the connection's lifecycle.
 
 ---
 

@@ -62,8 +62,13 @@ canonical guide and this prompt mirrors it.
 
 3. **games-client (UI)** under `packages/games-client/src/games/<type>/client.tsx`
    — a `"use client"` component typed `GameClientProps` that renders the board
-   and emits `make_move`/listens to `game_state`/`move_made` over its socket
-   (model it on the tic-tac-toe client). Register it in
+   and emits `make_move`/listens to `game_state`/`move_made` over the **shared
+   socket** it receives via `props.socket` (model it on the tic-tac-toe client).
+   **Never call `io()` to open your own connection** — the host app supplies the
+   one shared Socket.IO connection through `GameClientProps`; emit `join_room` on
+   mount/`connect` and `leave_room` on cleanup, and remove your listeners with
+   `socket.off(...)` — never `socket.disconnect()` (that would kill the shared
+   chat connection). Register it in
    `packages/games-client/src/registry.ts` keyed by the game `type`. Tailwind
    theme tokens (e.g. `bg-surface-raised`, `text-card-foreground`) are available.
    Also add `packages/games-client/src/games/<type>/skeleton.tsx` — a prop-less,
