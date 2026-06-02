@@ -20,7 +20,7 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/gamelobby' }}
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/gamelobby
     services:
       postgres:
         image: postgres:16
