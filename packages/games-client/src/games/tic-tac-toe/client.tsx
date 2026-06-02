@@ -111,7 +111,7 @@ function ReplayToolbar({
       </button>
       <button
         type="button"
-        className={`${glass} min-w-[3.25rem]`}
+        className={`${glass} min-w-13`}
         onClick={onTogglePlay}
         disabled={maxStep === 0}
         title={isPlaying ? "Pause (Space)" : "Play (Space)"}

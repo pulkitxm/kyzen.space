@@ -133,7 +133,7 @@ export function ChatPopoutWindow({
           : isPopout
             ? "fixed z-50 flex rounded-xl border border-border shadow-2xl"
             : cn(
-                "max-md:!w-full relative border-border md:shrink-0 md:border-l",
+                "relative border-border max-md:w-full! md:shrink-0 md:border-l",
                 mountedVisible ? "flex" : "hidden md:flex",
               ),
       )}

@@ -7,7 +7,7 @@ export default function HomeLoading() {
         <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <li key={i}>
-              <Skeleton className="aspect-[4/3] w-full rounded-2xl" />
+              <Skeleton className="aspect-4/3 w-full rounded-2xl" />
             </li>
           ))}
         </ul>

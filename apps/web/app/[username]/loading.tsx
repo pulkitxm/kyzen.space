@@ -7,10 +7,10 @@ export default function ProfileLoading() {
         <Skeleton className="h-4 w-20" />
 
         <header className="mt-8">
-          <Skeleton className="h-[9.5rem] w-full rounded-2xl sm:h-[12rem]" />
+          <Skeleton className="h-38 w-full rounded-2xl sm:h-48" />
           <div className="relative z-10 mx-3 -mt-9 flex flex-col gap-6 rounded-2xl border border-border bg-card/95 p-4 shadow-black/5 shadow-xl backdrop-blur sm:mx-6 sm:flex-row sm:items-end sm:justify-between sm:gap-8 sm:p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-5">
-              <Skeleton className="size-[5.75rem] shrink-0 rounded-2xl sm:size-24" />
+              <Skeleton className="size-23 shrink-0 rounded-2xl sm:size-24" />
               <div className="min-w-0 space-y-2 pb-1 sm:pb-2">
                 <Skeleton className="h-7 w-40" />
                 <Skeleton className="h-4 w-24" />

@@ -108,7 +108,7 @@ export function NotificationsPopover({
         align="end"
         alignOffset={-12}
         sideOffset={12}
-        className="flex max-h-[70vh] w-[420px] max-w-[calc(100vw-2rem)] flex-col p-0"
+        className="flex max-h-[70vh] w-105 max-w-[calc(100vw-2rem)] flex-col p-0"
       >
         <div className="flex items-center gap-2 border-border border-b px-4 py-3">
           <span className="font-semibold text-sm">Notifications</span>

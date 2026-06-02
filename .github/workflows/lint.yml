@@ -16,5 +16,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Biome (format + imports + lint)
         run: bun run check
+      - name: Tailwind canonical classes
+        run: bun run fix:tw:check
       - name: Type-check
         run: bun run type-check

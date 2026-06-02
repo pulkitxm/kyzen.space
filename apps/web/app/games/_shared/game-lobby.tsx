@@ -79,7 +79,7 @@ function ConfigFieldRow({
           type="checkbox"
           checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
-          className="size-4 accent-[var(--color-primary)]"
+          className="size-4 accent-primary"
         />
       </label>
     );
