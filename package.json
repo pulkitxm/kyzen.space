@@ -15,7 +15,7 @@
     "type-check": "turbo run type-check",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "fix": "biome check --write .",
+    "fix": "biome check --write . && biome check --write --unsafe --only=nursery/useSortedClasses .",
     "check": "biome check .",
     "strip-comments": "bun scripts/strip-comments.mjs",
     "db:start": "docker compose -f scripts/docker-compose.yml up -d postgres",

@@ -16,7 +16,5 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Biome (format + imports + lint)
         run: bun run check
-      - name: ESLint + tsc per workspace
-        run: bun run lint
       - name: Type-check
         run: bun run type-check

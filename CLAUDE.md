@@ -48,7 +48,7 @@ bun run db:push             # push schema directly (dev)
 bun run db:reset            # drop volumes and recreate
 ```
 
-Lint note: `apps/web` lints with ESLint (`eslint-config-next`); every other workspace's `lint` script is just `tsc --noEmit`. Biome handles formatting only — its linter is disabled, CSS files are excluded.
+Lint note: Biome is the only linter (ESLint was removed). `bun run check` runs format + import-organize + lint (strict: recommended plus curated rules as errors, with `useSortedClasses` enforcing Tailwind class order); `bun run fix` autofixes everything safe **and** sorts Tailwind classes. Every workspace's `lint` script is `tsc --noEmit` (type-only). CSS files are excluded from Biome.
 
 ## Environment
 
