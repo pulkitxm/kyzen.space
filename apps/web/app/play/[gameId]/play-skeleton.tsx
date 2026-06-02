@@ -1,5 +1,21 @@
+import type { CSSProperties } from "react";
 import { Skeleton } from "@/components/ui";
-import type { ChatLayout } from "@/lib/chat-layout";
+import {
+  type ChatLayout,
+  EDGE_TAB_LENGTH,
+  EDGE_TAB_THICKNESS,
+  ICON_MARGIN,
+  ICON_SIZE,
+  POPOUT_MARGIN,
+} from "@/lib/chat-layout";
+import { cn } from "@/lib/utils";
+
+function clampX(px: number, reserve: number) {
+  return `clamp(${ICON_MARGIN}px, ${px}px, calc(100vw - ${reserve}px))`;
+}
+function clampY(px: number, reserve: number) {
+  return `clamp(${ICON_MARGIN}px, ${px}px, calc(100vh - ${reserve}px))`;
+}
 
 function GameSkeleton() {
   return (
@@ -51,6 +67,68 @@ function ChatSkeleton() {
   );
 }
 
+function popoutStyle({ popout }: ChatLayout): CSSProperties {
+  return {
+    width: popout.w,
+    height: popout.h,
+    left: `clamp(0px, ${popout.x}px, calc(100vw - ${popout.w + POPOUT_MARGIN}px))`,
+    top: `clamp(0px, ${popout.y}px, calc(100vh - ${popout.h + POPOUT_MARGIN}px))`,
+  };
+}
+
+function MinimizedSkeleton({ layout }: { layout: ChatLayout }) {
+  const { icon, stashEdge } = layout;
+
+  if (!stashEdge) {
+    return (
+      <Skeleton
+        className="fixed z-50 hidden size-14 rounded-full md:block"
+        style={{
+          left: clampX(icon.x, ICON_SIZE + ICON_MARGIN),
+          top: clampY(icon.y, ICON_SIZE + ICON_MARGIN),
+        }}
+      />
+    );
+  }
+
+  const centerX = icon.x + ICON_SIZE / 2;
+  const centerY = icon.y + ICON_SIZE / 2;
+  const vertical = stashEdge === "left" || stashEdge === "right";
+  const style: CSSProperties = vertical
+    ? {
+        [stashEdge === "left" ? "left" : "right"]: 0,
+        top: clampY(
+          centerY - EDGE_TAB_LENGTH / 2,
+          EDGE_TAB_LENGTH + ICON_MARGIN,
+        ),
+        width: EDGE_TAB_THICKNESS,
+        height: EDGE_TAB_LENGTH,
+      }
+    : {
+        [stashEdge === "top" ? "top" : "bottom"]: 0,
+        left: clampX(
+          centerX - EDGE_TAB_LENGTH / 2,
+          EDGE_TAB_LENGTH + ICON_MARGIN,
+        ),
+        width: EDGE_TAB_LENGTH,
+        height: EDGE_TAB_THICKNESS,
+      };
+
+  return (
+    <div
+      aria-hidden
+      style={style}
+      className={cn(
+        "fixed z-50 hidden animate-pulse bg-foreground/30 md:block dark:bg-surface-overlay",
+        stashEdge === "left" && "rounded-r-lg",
+        stashEdge === "right" && "rounded-l-lg",
+        stashEdge === "top" && "rounded-b-lg",
+        stashEdge === "bottom" && "rounded-t-lg",
+      )}
+    />
+  );
+}
+
 export function PlaySkeleton({ layout }: { layout: ChatLayout }) {
   const docked = !layout.minimized && layout.mode === "mounted";
   const popout = !layout.minimized && layout.mode === "popout";
@@ -80,8 +158,8 @@ export function PlaySkeleton({ layout }: { layout: ChatLayout }) {
 
         {popout ? (
           <div
-            className="fixed right-4 bottom-4 z-50 hidden flex-col rounded-xl border border-border bg-background shadow-2xl md:flex"
-            style={{ width: layout.popout.w, height: layout.popout.h }}
+            className="fixed z-50 hidden flex-col rounded-xl border border-border bg-background shadow-2xl md:flex"
+            style={popoutStyle(layout)}
           >
             <div className="flex shrink-0 items-center justify-between rounded-t-xl border-border border-b bg-muted/40 px-3 py-2">
               <Skeleton className="h-3.5 w-10" />
@@ -91,9 +169,7 @@ export function PlaySkeleton({ layout }: { layout: ChatLayout }) {
           </div>
         ) : null}
 
-        {layout.minimized ? (
-          <Skeleton className="fixed right-4 bottom-4 z-50 hidden size-14 rounded-full md:block" />
-        ) : null}
+        {layout.minimized ? <MinimizedSkeleton layout={layout} /> : null}
       </div>
     </div>
   );

@@ -66,6 +66,13 @@ canonical guide and this prompt mirrors it.
    (model it on the tic-tac-toe client). Register it in
    `packages/games-client/src/registry.ts` keyed by the game `type`. Tailwind
    theme tokens (e.g. `bg-surface-raised`, `text-card-foreground`) are available.
+   Also add `packages/games-client/src/games/<type>/skeleton.tsx` — a prop-less,
+   `"use client"`-free placeholder built from the shared `SkeletonBox` that
+   mirrors the board's layout — and register it in `SKELETON_REGISTRY` (same
+   file) keyed by `type`. It renders as the board's `<Suspense>` fallback while
+   the lazy chunk loads; without it, `getGameSkeleton(type)` falls back to
+   `DefaultGameSkeleton`. Keep it in its own module (never import the board into
+   it) so the heavy `client.tsx` stays out of the main bundle.
 
 4. **Tests** (`bun:test`):
    - The conformance suite (`packages/games-core/tests/conformance.test.ts`)

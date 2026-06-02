@@ -15,10 +15,12 @@ A second key idea is **lazy resolution by `type` string**. The web app has a sin
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/games-client/src/index.ts` | Public package surface: re-exports `getGameClient` and the `GameClientProps` type. |
+| `packages/games-client/src/index.ts` | Public package surface: re-exports `getGameClient`, `getGameSkeleton`, `DefaultGameSkeleton`, `SkeletonBox`, and the `GameClientProps` type. |
 | `packages/games-client/src/types.ts` | `GameClientProps` — the contract every board component receives (`gameId`, `userId`, `initialGame`, `initialMoves`). |
-| `packages/games-client/src/registry.ts` | `getGameClient(type)` — maps a game-type string to a `React.lazy` board component; returns `null` for unknown types. |
+| `packages/games-client/src/registry.ts` | `getGameClient(type)` — maps a game-type string to a `React.lazy` board component (`null` for unknown types); `getGameSkeleton(type)` — maps it to the board's loading skeleton, falling back to `DefaultGameSkeleton`. |
+| `packages/games-client/src/skeletons.tsx` | `SkeletonBox` (a pulse-animated placeholder primitive) and `DefaultGameSkeleton` (the generic board placeholder). No `"use client"` — pure markup, so it renders in both server and client trees. |
 | `packages/games-client/src/games/tic-tac-toe/client.tsx` | A concrete board: opens its own socket.io connection, emits `join_room`/`make_move`, listens for `game_state`/`move_made`/`game_error`, derives `canMove`, and renders a replay scrubber for finished games. |
+| `packages/games-client/src/games/tic-tac-toe/skeleton.tsx` | `TicTacToeSkeleton` — a prop-less placeholder that mirrors the board (status dot, 3×3 grid, footer line) so the loading state matches the eventual UI. |
 | `packages/games-client/package.json` | Declares `react`, `react-dom`, `socket.io-client` as **peer** deps (provided by the host web app), not bundled. |
 
 Consumed on the web side by:
@@ -26,7 +28,8 @@ Consumed on the web side by:
 | Path | Role |
 | --- | --- |
 | `apps/web/app/play/[gameId]/page.tsx` | RSC route: fetches the game + moves over REST, passes them as `initial*` props. |
-| `apps/web/app/play/[gameId]/play-client.tsx` | Calls `getGameClient(gameType)` and renders the board inside `<Suspense>`. |
+| `apps/web/app/play/[gameId]/play-client.tsx` | Calls `getGameClient(gameType)` and renders the board inside `<Suspense>`, with `getGameSkeleton(gameType)` as the fallback. |
+| `apps/web/app/play/[gameId]/loading.tsx` + `play-skeleton.tsx` | Route-level loading UI streamed while `page.tsx` fetches the game record. Reads the `gl_chat_layout` cookie and renders the matching chat shell — docked panel (`mounted`, sized to `chatWidth`), floating window (`popout`, positioned/sized from the saved `x/y/w/h`), or floating icon (minimized/closed, positioned from the saved `x/y`). The board area is a **generic** placeholder: the game `type` isn't known yet at this stage (it *is* the data being fetched), so it can't pick a per-game skeleton. |
 
 Authoritative counterpart on the server:
 
@@ -37,16 +40,47 @@ Authoritative counterpart on the server:
 
 ## The package surface
 
-The package exposes exactly two things:
+The package's public surface is small:
 
 ```ts
-export { getGameClient } from "./registry";
+export { getGameClient, getGameSkeleton } from "./registry";
+export { DefaultGameSkeleton, SkeletonBox } from "./skeletons";
 export type { GameClientProps } from "./types";
 ```
 
 (`packages/games-client/src/index.ts:1`)
 
-That is the entire public API. Everything else — the per-game boards, the replay toolbar, the socket plumbing — is an implementation detail reached only through `getGameClient`.
+That is the entire public API. Everything else — the per-game boards, the replay toolbar, the socket plumbing — is an implementation detail reached only through these helpers.
+
+### Per-game loading skeletons
+
+The board chunk is `React.lazy`, so something must render while it loads. `getGameSkeleton(type)` resolves the matching skeleton from a small `SKELETON_REGISTRY`, falling back to `DefaultGameSkeleton` when a game ships none:
+
+```ts
+export function getGameSkeleton(gameType: string): ComponentType {
+  return SKELETON_REGISTRY[gameType] ?? DefaultGameSkeleton;
+}
+```
+
+(`packages/games-client/src/registry.ts`)
+
+Two deliberate choices:
+
+- **Skeletons are registered eagerly, not lazily.** A skeleton must be available *before* the board chunk it stands in for has loaded — so it lives in its own tiny module (`games/<type>/skeleton.tsx`) and is statically imported into the registry, never `React.lazy`'d. Keeping it separate from `client.tsx` is also what stops the heavy board (and its `socket.io-client` import) from being pulled into the main bundle.
+- **Skeletons are prop-less and `"use client"`-free.** They are pure presentational markup built from `SkeletonBox`, so they render as a `<Suspense>` fallback in the client tree without needing game data or a client boundary. A good skeleton mirrors the board's layout (tic-tac-toe draws a 3×3 grid) so the swap to the live board doesn't shift the page.
+
+`play-client.tsx` uses it as the board's fallback:
+
+```tsx
+const GameClient = getGameClient(gameType);
+const GameSkeleton = getGameSkeleton(gameType);
+// …
+<Suspense fallback={<GameSkeleton />}>
+  <GameClient … />
+</Suspense>
+```
+
+This is distinct from the **route-level** `loading.tsx`, which streams while `page.tsx` fetches the game record. It reads the `gl_chat_layout` cookie so the chat half of the shell (docked / popout / closed, at the saved geometry) matches what the user will see, but its board area is a generic placeholder — the game `type` is unknown at that point (it *is* the data being fetched), so it can't pick a per-game skeleton. The per-game skeleton takes over once the type is resolved and the board starts loading.
 
 ### Why React/socket.io are *peer* dependencies
 
@@ -118,16 +152,17 @@ Why this design:
 - **Code splitting.** Each board is a dynamic `import()`, so a game's UI (and its sometimes-heavy assets) only downloads when someone actually opens that game. The lobby and unrelated games stay light.
 - **The board export isn't a default.** `client.tsx` exports a *named* `TicTacToeGameClient`, so the `.then((m) => ({ default: m.TicTacToeGameClient }))` adapts it into the `{ default }` shape `React.lazy` requires.
 - **Unknown types return `null`, not a throw.** A game-type the web build doesn't know how to render degrades gracefully — the caller shows a "not supported here" message rather than crashing (`apps/web/app/play/[gameId]/play-client.tsx:46`).
-- **One source of truth on the web side.** The route never references a specific game component; it only knows the string. Adding a game = one line in `REGISTRY` plus the matching `GameDefinition` in games-core. No new route, no new endpoint.
+- **One source of truth on the web side.** The route never references a specific game component; it only knows the string. Adding a game = one line in `REGISTRY` (and, optionally, one in `SKELETON_REGISTRY`) plus the matching `GameDefinition` in games-core. No new route, no new endpoint.
 
 Because the registry hands back `React.lazy` components, callers must render them inside a `<Suspense>` boundary. That's exactly what the web app does:
 
 ```tsx
 const GameClient = getGameClient(gameType);
+const GameSkeleton = getGameSkeleton(gameType);
 
 const gameNode = GameClient ? (
   <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
-    <Suspense fallback={null}>
+    <Suspense fallback={<GameSkeleton />}>
       <GameClient
         gameId={gameId}
         userId={userId}
