@@ -8,10 +8,9 @@ import * as conversationsService from "../../chat/conversations-service";
 import { createGameInConversation } from "../../chat/games-in-chat-service";
 import * as messagesService from "../../chat/messages-service";
 import { conversations, messages, profiles } from "../../db";
-import { getUserId, readJson } from "../auth-context";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "../../lib/uuid";
+import { readJson } from "../auth-context";
+import { type AuthEnv, requireAuth } from "../middleware/auth";
 
 function asStringArray(v: unknown): string[] {
   return Array.isArray(v)
@@ -19,16 +18,15 @@ function asStringArray(v: unknown): string[] {
     : [];
 }
 
-export const conversationsRouter = new Hono()
+export const conversationsRouter = new Hono<AuthEnv>()
+  .use("*", requireAuth)
   .get("/", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const rows = await conversations.listForUser(userId);
     return c.json({ conversations: await assembleConversations(rows, userId) });
   })
   .post("/dm", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const body = await readJson(c);
     const targetId = typeof body?.userId === "string" ? body.userId : null;
     if (!targetId) return c.json({ error: "userId is required" }, 400);
@@ -37,8 +35,7 @@ export const conversationsRouter = new Hono()
     return c.json({ conversation: res.value });
   })
   .post("/group", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const body = await readJson(c);
     const name = typeof body?.name === "string" ? body.name : "";
     const memberIds = asStringArray(body?.memberIds);
@@ -47,8 +44,7 @@ export const conversationsRouter = new Hono()
     return c.json({ conversation: res.value }, 201);
   })
   .get("/with/:username", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const profile = await profiles.getProfileByUsername(
       c.req.param("username"),
     );
@@ -67,10 +63,9 @@ export const conversationsRouter = new Hono()
     return c.json({ conversation: res.value });
   })
   .get("/:id", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const id = c.req.param("id");
-    if (!UUID_RE.test(id)) return c.json({ error: "Not found" }, 404);
+    if (!isUuid(id)) return c.json({ error: "Not found" }, 404);
     if (!(await conversations.isMember(id, userId))) {
       return c.json({ error: "Not found" }, 404);
     }
@@ -79,10 +74,9 @@ export const conversationsRouter = new Hono()
     return c.json({ conversation: await assembleConversation(conv, userId) });
   })
   .get("/:id/messages", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const id = c.req.param("id");
-    if (!UUID_RE.test(id)) return c.json({ error: "Not found" }, 404);
+    if (!isUuid(id)) return c.json({ error: "Not found" }, 404);
     if (!(await conversations.isMember(id, userId))) {
       return c.json({ error: "Not found" }, 404);
     }
@@ -96,10 +90,9 @@ export const conversationsRouter = new Hono()
     return c.json({ messages: await assembleMessages(rows), nextCursor });
   })
   .post("/:id/messages", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const id = c.req.param("id");
-    if (!UUID_RE.test(id)) return c.json({ error: "Not found" }, 404);
+    if (!isUuid(id)) return c.json({ error: "Not found" }, 404);
     const body = await readJson(c);
     const res = await messagesService.sendMessage({
       conversationId: id,
@@ -116,10 +109,9 @@ export const conversationsRouter = new Hono()
     return c.json({ message: res.value }, 201);
   })
   .post("/:id/games", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const id = c.req.param("id");
-    if (!UUID_RE.test(id)) return c.json({ error: "Not found" }, 404);
+    if (!isUuid(id)) return c.json({ error: "Not found" }, 404);
     const body = await readJson(c);
     const res = await createGameInConversation({
       userId,
@@ -138,8 +130,7 @@ export const conversationsRouter = new Hono()
     return c.json(res.value, 201);
   })
   .post("/:id/read", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const id = c.req.param("id");
     const body = await readJson(c);
     const messageId =
@@ -150,8 +141,7 @@ export const conversationsRouter = new Hono()
     return c.json({ ok: true });
   })
   .post("/:id/members", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const id = c.req.param("id");
     const body = await readJson(c);
     const res = await conversationsService.addMembers(
@@ -163,8 +153,7 @@ export const conversationsRouter = new Hono()
     return c.json({ conversation: res.value });
   })
   .delete("/:id/members/:userId", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const res = await conversationsService.removeMember(
       userId,
       c.req.param("id"),
@@ -174,8 +163,7 @@ export const conversationsRouter = new Hono()
     return c.json({ ok: true });
   })
   .patch("/:id", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const body = await readJson(c);
     const name = typeof body?.name === "string" ? body.name : "";
     const res = await conversationsService.renameGroup(
