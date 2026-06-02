@@ -20,7 +20,8 @@ Why it matters: because this package is **pure and dependency-free, the same cod
 | --- | --- |
 | `packages/games-core/src/engine.ts` | The `GameEngine<State, Input>` interface + the `Outcome` / `ReduceResult` / `StepResult` / `Seat` / `MoveContext` types |
 | `packages/games-core/src/definition.ts` | `GameDefinition` (engine + schemas + meta) and `GameMeta` / `ConfigField` types |
-| `packages/games-core/src/games/tic-tac-toe/schemas.ts` | Strict Zod `stateSchema` / `moveSchema` / `configSchema` and the `TIC_TAC_TOE` type-id constant |
+| `packages/games-core/src/game-types.ts` | Slug constants (e.g. `TIC_TAC_TOE`), the `GAME_TYPES` tuple, the `GameType` union, and `gameTypeSchema` — **the single source of truth for every game's type id** |
+| `packages/games-core/src/games/tic-tac-toe/schemas.ts` | Strict Zod `stateSchema` / `moveSchema` / `configSchema`; TS types derived via `z.infer`. The slug is imported from `game-types.ts`, not declared here. |
 | `packages/games-core/src/games/tic-tac-toe/engine.ts` | Concrete pure engine: `createInitialState`, `reduce`, win/draw helpers |
 | `packages/games-core/src/games/tic-tac-toe/meta.ts` | Display metadata (`name`, `description`, `categoryId`, `coverImage`) |
 | `packages/games-core/src/games/tic-tac-toe/index.ts` | Assembles the four pieces into one `ticTacToeDefinition` |
@@ -246,7 +247,7 @@ const byType: Map<string, GameDefinition> = new Map(
 The accessors:
 
 ```ts
-export function hasEngine(type: string): boolean {
+export function hasEngine(type: string): type is GameType {
   return byType.has(type);
 }
 
@@ -259,13 +260,18 @@ export function getDefinition(type: string): GameDefinition {
 export function getEngine(type: string): GameEngine<unknown, unknown> {
   return getDefinition(type).engine as GameEngine<unknown, unknown>;
 }
+
+export function listGameTypes(): GameType[] {
+  return GAMES.map((def) => def.meta.type);
+}
 ```
 
 (`packages/games-core/src/registry.ts:10`). Notes:
 
-- **`getDefinition` throws on an unknown type** — a missing game is a programming error, not a recoverable condition. (Contrast with `hasEngine`, which lets a caller check first; the server uses the `UUID_RE` + `getGameById` path and only ever passes a `gameType` that came from the DB.) The focused test pins the message: `getEngine("chess")` throws `"Unknown game type: chess"` (`packages/games-core/tests/tic-tac-toe.test.ts:287`).
+- **`hasEngine` is a type guard** — `hasEngine(type: string): type is GameType` narrows a raw string to the `GameType` union when the check passes. The server uses it as a soft "is this a real game?" check before creating a game.
+- **`getDefinition` throws on an unknown type** — a missing game is a programming error, not a recoverable condition. (It still accepts `string` as a defensive DB-boundary measure, since the `gameType` column is `text` in Postgres.) The focused test pins the message: `getEngine("chess")` throws `"Unknown game type: chess"` (`packages/games-core/tests/tic-tac-toe.test.ts:287`).
 - **`getEngine` erases the generics to `GameEngine<unknown, unknown>`.** See "Type erasure" below.
-- **`listGameMeta()` / `listGameTypes()` / `listDefinitions()`** are simple maps over `GAMES` (`packages/games-core/src/registry.ts:24`–`:34`) — the lobby UI calls `listGameMeta()` to render the catalog.
+- **`listGameMeta()` / `listGameTypes()` / `listDefinitions()`** are simple maps over `GAMES` (`packages/games-core/src/registry.ts:24`–`:34`) — the lobby UI calls `listGameMeta()` to render the catalog. `listGameTypes()` returns `GameType[]`, not `string[]`.
 
 `getCategoryGroups()` joins `GAMES` against `GAME_CATEGORIES` for the grouped lobby view:
 
@@ -356,6 +362,7 @@ The focused `tests/tic-tac-toe.test.ts` complements this with game-specific beha
 - **`reduce` must be pure and deterministic.** No mutation of `state`/`input`, no `Date.now`/`Math.random`/network/DB. Copy-then-write; return a fresh state object. The server's trust model depends on it.
 - **The engine validates everything itself.** Don't rely on the caller having pre-validated. tic-tac-toe re-runs `moveSchema.safeParse` *inside* `reduce` (`packages/games-core/src/games/tic-tac-toe/engine.ts:77`) even though the server already parsed — defense in depth, and it keeps the engine correct in isolation (tests call `reduce` directly).
 - **Roles are not users.** `Outcome.winnerRole`, `MoveContext.role`, and `engine.roles` are all in role-space (`"X"`/`"O"`). The user↔role mapping lives entirely on the server (`apps/server/src/realtime/turn-based.ts:79`, `:134`).
+- **The slug constant lives only in `game-types.ts`.** `meta.ts` and `engine.ts` import it from `../../game-types`; it is never redeclared in a per-game file. `GameMeta.type` is `GameType` (not `string`); the `GAME_TYPES` tuple and the `GAMES` array must stay in sync — the conformance suite's `"GAME_TYPES matches the registry exactly"` test enforces this.
 - **`meta.type` must equal `engine.type`, and types must be globally unique.** Both are enforced by conformance; both feed the `byType` registry key.
 - **`roles.length >= maxPlayers`.** The server seats by index (`engine.roles[players.length]`), so there must be a role for each seat. Conformance guards it (`packages/games-core/tests/conformance.test.ts:32`).
 - **Failures are values, not throws** — in `reduce` (`ReduceResult.error`). The *registry* is the exception: `getDefinition` throws on an unknown type because that's a bug, not a runtime condition.

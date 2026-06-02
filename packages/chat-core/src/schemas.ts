@@ -1,3 +1,4 @@
+import { gameTypeSchema } from "@gamelobby/games-core";
 import { z } from "zod";
 
 const gameCardPlayerSchema = z
@@ -11,7 +12,7 @@ const gameCardPlayerSchema = z
 export const gameCardMetaSchema = z
   .object({
     gameId: z.string().min(1),
-    gameType: z.string().min(1),
+    gameType: gameTypeSchema,
     seatingMode: z.enum(["open", "challenge"]),
     challengedUserId: z.string().nullable().optional(),
     creatorUsername: z.string(),
@@ -25,14 +26,14 @@ export const gameCardMetaSchema = z
 export const notificationPayloadSchema = z.object({
   conversationId: z.string().optional(),
   gameId: z.string().optional(),
-  gameType: z.string().optional(),
+  gameType: gameTypeSchema.optional(),
   requestId: z.string().optional(),
 });
 
 export const clientCreateGameInConversationSchema = z
   .object({
     conversationId: z.string().min(1),
-    gameType: z.string().min(1),
+    gameType: gameTypeSchema,
     seatingMode: z.enum(["open", "challenge"]).optional(),
     challengedUserId: z.string().nullable().optional(),
     config: z.unknown().optional(),

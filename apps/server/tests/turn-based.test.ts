@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { TIC_TAC_TOE } from "@gamelobby/games-core";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
 
@@ -99,7 +100,7 @@ function fakeSocket(userId: string) {
 function freshGame(over: Partial<GameRec> = {}): GameRec {
   return {
     id: UUID,
-    gameType: "tic-tac-toe",
+    gameType: TIC_TAC_TOE,
     status: "waiting",
     winner: null,
     gameState: { board: Array(9).fill(null), currentTurn: "X" },

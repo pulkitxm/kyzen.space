@@ -1,6 +1,7 @@
 "use client";
 
 import { CHAT_EVENTS, type ConversationJson } from "@gamelobby/chat-core";
+import type { GameType } from "@gamelobby/games-core";
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -18,7 +19,7 @@ export function ConversationPicker({
   onClose,
 }: {
   userId: string;
-  gameType: string;
+  gameType: GameType;
   config?: unknown;
   onClose: () => void;
 }) {

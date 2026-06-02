@@ -1,10 +1,10 @@
-import { listGameMeta } from "@gamelobby/games-core";
+import { type GameType, listGameMeta } from "@gamelobby/games-core";
 
 export const PROFILE_ACTIVITY_PAGE_SIZE = 5;
 
 export type ProfileActivityApiRow = {
   id: string;
-  gameType: string;
+  gameType: GameType;
   status: string;
   updatedAt: string;
 };

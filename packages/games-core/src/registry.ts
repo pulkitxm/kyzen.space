@@ -1,13 +1,14 @@
 import { GAME_CATEGORIES, type GameCategoryDef } from "./categories";
 import type { GameDefinition, GameMeta } from "./definition";
 import type { GameEngine } from "./engine";
+import type { GameType } from "./game-types";
 import { GAMES } from "./games";
 
 const byType: Map<string, GameDefinition> = new Map(
   GAMES.map((def) => [def.meta.type, def]),
 );
 
-export function hasEngine(type: string): boolean {
+export function hasEngine(type: string): type is GameType {
   return byType.has(type);
 }
 
@@ -21,7 +22,7 @@ export function getEngine(type: string): GameEngine<unknown, unknown> {
   return getDefinition(type).engine as GameEngine<unknown, unknown>;
 }
 
-export function listGameTypes(): string[] {
+export function listGameTypes(): GameType[] {
   return GAMES.map((def) => def.meta.type);
 }
 

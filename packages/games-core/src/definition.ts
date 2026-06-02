@@ -1,8 +1,9 @@
 import type { ZodType } from "zod";
 import type { GameEngine } from "./engine";
+import type { GameType } from "./game-types";
 
 export interface GameMeta {
-  type: string;
+  type: GameType;
   name: string;
   description: string;
   categoryId: string;

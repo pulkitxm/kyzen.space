@@ -1,5 +1,5 @@
 import type { GameMeta } from "../../definition";
-import { TIC_TAC_TOE } from "./schemas";
+import { TIC_TAC_TOE } from "../../game-types";
 
 export const ticTacToeMeta: GameMeta = {
   type: TIC_TAC_TOE,

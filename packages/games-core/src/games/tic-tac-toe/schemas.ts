@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-export const TIC_TAC_TOE = "tic-tac-toe";
-
 export const cellSchema = z.enum(["X", "O"]).nullable();
 export type Cell = z.infer<typeof cellSchema>;
 

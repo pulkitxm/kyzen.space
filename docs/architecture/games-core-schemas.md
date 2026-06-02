@@ -17,15 +17,16 @@ This doc covers the **schema/contract half** of games-core: the `GameDefinition`
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/games-core/src/definition.ts` | `GameDefinition<S,I,C>`, `GameMeta`, `ConfigField` — the self-describing manifest one game ships. |
+| `packages/games-core/src/game-types.ts` | **Single source of truth for game slugs.** Declares each slug constant (e.g. `TIC_TAC_TOE`), the `GAME_TYPES` tuple, the `GameType` union, and `gameTypeSchema` (`z.enum(GAME_TYPES)`). All wire schemas that carry a `gameType` field validate against `gameTypeSchema`. |
+| `packages/games-core/src/definition.ts` | `GameDefinition<S,I,C>`, `GameMeta` (`type: GameType`, not `string`), `ConfigField` — the self-describing manifest one game ships. |
 | `packages/games-core/src/engine.ts` | `GameEngine<State,Input>`, `Outcome`, `ReduceResult`, `StepResult`, `Seat`, `MoveContext` — the behavioral contract a `GameDefinition` references. |
-| `packages/games-core/src/schemas.ts` | Shared **wire/socket** Zod schemas: `uuidSchema`, `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, and the server→client `Server*Payload` types. |
+| `packages/games-core/src/schemas.ts` | Shared **wire/socket** Zod schemas: `uuidSchema`, `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, and the server→client `Server*Payload` types. `gameJsonSchema.gameType` is validated by `gameTypeSchema`. |
 | `packages/games-core/src/categories.ts` | `GameCategoryDef` + the static `GAME_CATEGORIES` list used to group games in the lobby. |
-| `packages/games-core/src/registry.ts` | Derives `getDefinition`/`getEngine`/`hasEngine`/`listGameMeta`/`getCategoryGroups` from the single `GAMES` array. |
+| `packages/games-core/src/registry.ts` | Derives `getDefinition`/`getEngine`/`hasEngine`/`listGameMeta`/`getCategoryGroups`/`listGameTypes` from the single `GAMES` array. `hasEngine(type: string): type is GameType` is a type guard; `listGameTypes(): GameType[]` returns the narrowed list. |
 | `packages/games-core/src/games/index.ts` | The single `GAMES: GameDefinition[]` array — the registry's source. |
 | `packages/games-core/src/index.ts` | Public package surface (every export consumers may use). |
-| `packages/games-core/src/games/tic-tac-toe/schemas.ts` | A worked example: per-game `stateSchema` / `moveSchema` / `configSchema`, each `.strict()`, with TS types derived via `z.infer`. |
-| `packages/games-core/tests/conformance.test.ts` | Generic suite that runs against every entry in `GAMES`, asserting each definition's schemas and engine agree. |
+| `packages/games-core/src/games/tic-tac-toe/schemas.ts` | A worked example: per-game `stateSchema` / `moveSchema` / `configSchema`, each `.strict()`, with TS types derived via `z.infer`. The slug constant lives in `game-types.ts`, not here. |
+| `packages/games-core/tests/conformance.test.ts` | Generic suite that runs against every entry in `GAMES`, asserting each definition's schemas and engine agree. Includes a `"GAME_TYPES matches the registry exactly"` test so `GAME_TYPES` and the `GAMES` array can never drift. |
 
 ## The `GameDefinition`: one object that fully describes a game
 
@@ -167,7 +168,7 @@ Two things to internalize:
 ```ts
 export const gameJsonSchema = z.object({
   id: z.string(),
-  gameType: z.string(),
+  gameType: gameTypeSchema,
   status: gameStatusSchema,
   winner: z.string().nullable(),
   players: z.array(gamePlayerSchema),
@@ -178,7 +179,7 @@ export const gameJsonSchema = z.object({
 export type GameJson = z.infer<typeof gameJsonSchema>;
 ```
 
-Again `gameState: z.unknown()` — the *outer* DTO is game-agnostic; the inner per-game state is validated separately by that game's `stateSchema`. `gameStatusSchema` (`packages/games-core/src/schemas.ts:8`) is `z.enum(["waiting", "active", "completed", "abandoned"])` and `gamePlayerSchema` (`packages/games-core/src/schemas.ts:19`) is a `.strict()` object of `{ userId, username, role }`.
+`gameType` is validated by `gameTypeSchema` (a `z.enum(GAME_TYPES)` from `game-types.ts`) — an unknown game slug is rejected at the wire boundary, not silently passed through. The `GameType` union and `GAME_TYPES` tuple are the single source of truth; adding a game to `GAME_TYPES` automatically widens the schema everywhere it is used. Again `gameState: z.unknown()` — the *outer* DTO is game-agnostic; the inner per-game state is validated separately by that game's `stateSchema`. `gameStatusSchema` (`packages/games-core/src/schemas.ts:8`) is `z.enum(["waiting", "active", "completed", "abandoned"])` and `gamePlayerSchema` (`packages/games-core/src/schemas.ts:19`) is a `.strict()` object of `{ userId, username, role }`.
 
 `GameJson` is the lingua franca of the system. The server *produces* it via `serializeGame` (`apps/server/src/api/serialize.ts:25`), which maps a Drizzle `GameRecord` row into this exact shape; the web app *consumes* it as the type of what `GET /api/games/:gameId` returns (`apps/web/app/play/[gameId]/page.tsx:31`). The same `z.infer`-derived type is the contract on both ends.
 
@@ -208,7 +209,7 @@ These name the `game_state`, `move_made`, `game_over`, and `game_error` socket e
 
 ## Per-game schemas and the `.strict()` discipline
 
-Each game owns a `schemas.ts` declaring its three Zod schemas. Tic-tac-toe (`packages/games-core/src/games/tic-tac-toe/schemas.ts:11`):
+Each game owns a `schemas.ts` declaring its three Zod schemas (no slug constant here — the slug lives in `game-types.ts`). Tic-tac-toe (`packages/games-core/src/games/tic-tac-toe/schemas.ts:11`):
 
 ```ts
 export const ticTacToeStateSchema = z
@@ -266,6 +267,7 @@ A parallel flow exists for game creation: the chat service validates the **confi
 ## Gotchas, invariants & conventions
 
 - **No React, ever, in games-core.** This is what lets the server import it. UI lives in `@gamelobby/games-client`. If you reach for a React import here, you've broken the architecture — see [./games-client.md](./games-client.md).
+- **`GameType` is a registry-derived union, not a free string.** The type slug lives once, in `packages/games-core/src/game-types.ts` (`GAME_TYPES` tuple → `GameType` union → `gameTypeSchema`). `GameMeta.type` is `GameType`; `hasEngine(type: string): type is GameType` narrows a raw string; `GameRecord.gameType` on the server is narrowed to `GameType` at the repository boundary (the DB column stays `text`). Wire schemas that carry a `gameType` field (`gameJsonSchema`, chat-core's `gameCardMetaSchema` / `clientCreateGameInConversationSchema` / `notificationPayloadSchema`) validate it with `gameTypeSchema`. `getDefinition`/`getEngine` still accept `string` as a defensive DB-boundary measure.
 - **Two-stage validation is intentional.** `clientMakeMoveSchema.moveData` and `gameJsonSchema.gameState` are `z.unknown()` because the generic transport layer doesn't know the game type. The game-specific `moveSchema`/`stateSchema` are the second, authoritative pass. Don't try to "tighten" the envelope schemas to a specific game's shape.
 - **The server validates *stored state*, not just incoming moves.** `def.stateSchema.safeParse(gameRow.gameState)` guards against corrupt/migrated JSONB. Treat persisted state as untrusted, just like client input.
 - **`.strict()` on every per-game object schema.** Unknown keys must fail. A non-strict schema is a silent security hole here.

@@ -4,6 +4,7 @@ import {
   clientMakeMoveSchema,
   gameJsonSchema,
   gamePlayerSchema,
+  TIC_TAC_TOE,
   ticTacToeMoveSchema,
   ticTacToeStateSchema,
 } from "../src/index";
@@ -112,7 +113,7 @@ describe("wire payload schemas", () => {
     expect(
       gameJsonSchema.safeParse({
         id: "g1",
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
         status: "active",
         winner: null,
         players: [{ userId: "u1", username: "a", role: "X" }],
@@ -125,8 +126,20 @@ describe("wire payload schemas", () => {
     expect(
       gameJsonSchema.safeParse({
         id: "g1",
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
         status: "exploded",
+        winner: null,
+        players: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  test("gameJson rejects an unknown gameType", () => {
+    expect(
+      gameJsonSchema.safeParse({
+        id: "g1",
+        gameType: "chess",
+        status: "active",
         winner: null,
         players: [],
       }).success,

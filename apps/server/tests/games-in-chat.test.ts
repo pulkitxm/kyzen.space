@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { TIC_TAC_TOE } from "@gamelobby/games-core";
 
 type Conv = { id: string; kind: "dm" | "group"; name: string | null } | null;
 
@@ -78,7 +79,7 @@ describe("createGameInConversation", () => {
     const res = await createGameInConversation({
       userId: "alice",
       conversationId: "c1",
-      gameType: "tic-tac-toe",
+      gameType: TIC_TAC_TOE,
     });
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.status).toBe(403);
@@ -102,7 +103,7 @@ describe("createGameInConversation", () => {
     const res = await createGameInConversation({
       userId: "alice",
       conversationId: "c1",
-      gameType: "tic-tac-toe",
+      gameType: TIC_TAC_TOE,
       seatingMode: "challenge",
       challengedUserId: "bob",
     });
@@ -121,7 +122,7 @@ describe("createGameInConversation", () => {
     const res = await createGameInConversation({
       userId: "alice",
       conversationId: "g1",
-      gameType: "tic-tac-toe",
+      gameType: TIC_TAC_TOE,
     });
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.status).toBe(400);
@@ -133,7 +134,7 @@ describe("createGameInConversation", () => {
     const notMember = await createGameInConversation({
       userId: "alice",
       conversationId: "g1",
-      gameType: "tic-tac-toe",
+      gameType: TIC_TAC_TOE,
       seatingMode: "challenge",
       challengedUserId: "dave",
     });
@@ -141,7 +142,7 @@ describe("createGameInConversation", () => {
     const self = await createGameInConversation({
       userId: "alice",
       conversationId: "g1",
-      gameType: "tic-tac-toe",
+      gameType: TIC_TAC_TOE,
       seatingMode: "challenge",
       challengedUserId: "alice",
     });
@@ -154,7 +155,7 @@ describe("createGameInConversation", () => {
     const res = await createGameInConversation({
       userId: "alice",
       conversationId: "g1",
-      gameType: "tic-tac-toe",
+      gameType: TIC_TAC_TOE,
       seatingMode: "challenge",
       challengedUserId: "bob",
     });
@@ -174,7 +175,7 @@ describe("createGameInConversation", () => {
     const res = await createGameInConversation({
       userId: "alice",
       conversationId: "g1",
-      gameType: "tic-tac-toe",
+      gameType: TIC_TAC_TOE,
       seatingMode: "open",
     });
     expect(res.ok).toBe(true);

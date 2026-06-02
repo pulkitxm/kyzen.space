@@ -1,3 +1,4 @@
+import type { GameType } from "@gamelobby/games-core";
 import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { db } from "../client";
 import {
@@ -11,10 +12,17 @@ import {
   type SeatingMode,
 } from "../schema";
 
-export type GameRecord = GameRow & { players: GamePlayer[] };
+export type GameRecord = Omit<GameRow, "gameType"> & {
+  gameType: GameType;
+  players: GamePlayer[];
+};
+
+function toGameRecord(row: GameRow, players: GamePlayer[]): GameRecord {
+  return { ...row, gameType: row.gameType as GameType, players };
+}
 
 export type CreateGameInput = {
-  gameType: string;
+  gameType: GameType;
   players: GamePlayer[];
   gameState: unknown;
   config?: unknown;
@@ -54,7 +62,7 @@ export async function createGame(input: CreateGameInput): Promise<GameRecord> {
         })),
       );
     }
-    return { ...created, players: input.players };
+    return toGameRecord(created, input.players);
   });
 }
 
@@ -75,7 +83,7 @@ export async function getGameById(id: string): Promise<GameRecord | null> {
   const [row] = await db.select().from(game).where(eq(game.id, id)).limit(1);
   if (!row) return null;
   const players = await getPlayers(id);
-  return { ...row, players };
+  return toGameRecord(row, players);
 }
 
 export async function seatPlayer(
@@ -107,7 +115,7 @@ export async function updateGame(
     .returning();
   if (!row) throw new Error("Failed to update game");
   const players = await getPlayers(id);
-  return { ...row, players };
+  return toGameRecord(row, players);
 }
 
 export async function gamesForUser(

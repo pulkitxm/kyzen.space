@@ -1,5 +1,10 @@
 import type { GameCardMeta, MessageJson } from "@gamelobby/chat-core";
-import { type GameJson, getDefinition, hasEngine } from "@gamelobby/games-core";
+import {
+  type GameJson,
+  type GameType,
+  getDefinition,
+  hasEngine,
+} from "@gamelobby/games-core";
 import { serializeGame } from "../api/serialize";
 import { conversations, games, profiles, type SeatingMode } from "../db";
 import { notify } from "../realtime/notify";
@@ -9,7 +14,7 @@ import { fail, ok, type ServiceResult } from "./result";
 export async function createGameInConversation(input: {
   userId: string;
   conversationId: string;
-  gameType: string;
+  gameType: GameType;
   seatingMode?: SeatingMode;
   challengedUserId?: string | null;
   config?: unknown;

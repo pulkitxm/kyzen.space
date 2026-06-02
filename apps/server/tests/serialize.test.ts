@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { TIC_TAC_TOE } from "@gamelobby/games-core";
 import { serializeGame, serializeMove } from "../src/api/serialize";
 import type { GameRecord } from "../src/db";
 
 const baseRow: GameRecord = {
   id: "g1",
-  gameType: "tic-tac-toe",
+  gameType: TIC_TAC_TOE,
   status: "active",
   winner: null,
   gameState: { board: Array(9).fill(null), currentTurn: "X" },

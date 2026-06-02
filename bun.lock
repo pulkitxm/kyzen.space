@@ -90,6 +90,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@gamelobby/avatar": "workspace:*",
+        "@gamelobby/games-core": "workspace:*",
         "zod": "^3.24.1",
       },
       "devDependencies": {

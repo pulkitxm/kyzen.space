@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DefaultGameSkeleton, getGameSkeleton } from "@gamelobby/games-client";
+import { TIC_TAC_TOE } from "@gamelobby/games-core";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   type ChatLayout,
@@ -22,7 +23,7 @@ describe("games-client game skeletons", () => {
   });
 
   test("TicTacToeSkeleton renders 9 board cells", () => {
-    const TicTacToeSkeleton = getGameSkeleton("tic-tac-toe");
+    const TicTacToeSkeleton = getGameSkeleton(TIC_TAC_TOE);
     const html = renderToStaticMarkup(<TicTacToeSkeleton />);
     expect(html.length).toBeGreaterThan(0);
     const cells = html.match(/size-24/g) ?? [];
