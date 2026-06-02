@@ -35,15 +35,24 @@ client map to keep in sync — do not reintroduce one.
 ## A `GameDefinition` (see `src/definition.ts`)
 
 ```ts
-interface GameDefinition<S, I, C> {
-  meta: GameMeta;            // type, name, description, categoryId, coverImage?
-  engine: GameEngine<S, I>;  // mode, roles, min/maxPlayers, createInitialState, reduce|step
-  stateSchema: ZodType<S>;   // validates the game_state JSONB
-  moveSchema: ZodType<I>;    // validates move_data JSONB + the make_move payload
-  configSchema: ZodType<C>;  // validates the config JSONB + the lobby setup form
-  configFields?: ConfigField[]; // declarative setup inputs; [] for none
+export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
+  meta: GameMeta;
+  engine: GameEngine<S, I>;
+  stateSchema: ZodType<S>;
+  moveSchema: ZodType<I>;
+  configSchema: ZodType<C>;
+  configFields?: ConfigField[];
 }
 ```
+
+- `meta` — `type` (a `GameType`, not `string`), `name`, `description`,
+  `categoryId`, and an optional `coverImage`.
+- `engine` — `mode`, `roles`, `min`/`maxPlayers`, `createInitialState`, and
+  `reduce`/`step`.
+- `stateSchema` validates the `game_state` JSONB; `moveSchema` validates
+  `move_data` JSONB **and** the `make_move` payload; `configSchema` validates the
+  `config` JSONB **and** the lobby setup form.
+- `configFields` — declarative setup inputs; `[]` for none.
 
 ### Strict Zod is mandatory
 

@@ -55,7 +55,7 @@ export type MoveContext = { role: string };
 
 These types (`packages/games-core/src/engine.ts:1`) are the vocabulary of the whole system:
 
-- **`Outcome`** is a discriminated union on `status`. A game is either `"active"` or `"completed"`. When completed, `draw` distinguishes a tie from a win, and `winnerRole` names the winning *role* (e.g. `"X"`), **not** a user id — the engine knows nothing about users, sessions, or the database. Mapping a `winnerRole` back to a `userId` is the server's job, and it does exactly that in `apps/server/src/realtime/turn-based.ts:79`.
+- **`Outcome`** is a discriminated union on `status`. A game is either `"active"` or `"completed"`. When completed, `draw` distinguishes a tie from a win, and `winnerRole` names the winning *role* (e.g. `"X"`), **not** a user id — the engine knows nothing about users, sessions, or the database. Mapping a `winnerRole` back to a `userId` is the server's job, and it does exactly that in `apps/server/src/realtime/turn-based.ts:78`.
 - **`ReduceResult<State>`** is a result type, not an exception. A rejected move is a value (`{ ok: false, error }`), so the caller must explicitly handle failure — there's no throwing across the move path.
 - **`MoveContext`** is the *trusted* context the server attaches: the role of the player making the move. The engine never has to figure out "who is this" — the server resolves the authenticated user to a seat/role first, then passes `{ role }` in.
 
@@ -85,7 +85,7 @@ export interface GameEngine<State, Input> {
 
 `packages/games-core/src/engine.ts:15`. Key design points:
 
-- **Two static identities of a game live here**: its `type` string (the registry key, e.g. `"tic-tac-toe"`) and its seating shape (`minPlayers`, `maxPlayers`, `roles`). The server reads `roles[players.length]` to assign the next seat (`apps/server/src/realtime/turn-based.ts:55`) and compares `players.length` against `minPlayers` / `maxPlayers` to decide when a game can start or is full (`apps/server/src/realtime/turn-based.ts:41`, `:58`).
+- **Two static identities of a game live here**: its `type` string (the registry key, e.g. `"tic-tac-toe"`) and its seating shape (`minPlayers`, `maxPlayers`, `roles`). The server reads `roles[players.length]` to assign the next seat (`apps/server/src/realtime/turn-based.ts:53`) and compares `players.length` against `minPlayers` / `maxPlayers` to decide when a game can start or is full (`apps/server/src/realtime/turn-based.ts:40`, `:56`).
 - **`reduce` and `step` are both optional, and the `mode` field says which one to expect.** A `"turn-based"` game implements `reduce` (one player acts, state advances by one move); a `"realtime"` game would implement `step` (all queued inputs applied per tick, with `tickRate`). Today every game is turn-based, and the only server driver is the turn-based one — see [./realtime.md](./realtime.md). The conformance suite enforces the pairing (below).
 - **`State` and `Input` are generic** so each engine is precisely typed, but the registry erases them to `unknown` (more on that under "Type erasure" below).
 
@@ -173,7 +173,7 @@ Only after all guards pass does it produce the next state — and it does so **i
 
 `reduce` must be a **pure function**: `(state, ctx, input) -> ReduceResult`. Concretely the contract is:
 
-- **No mutation of inputs.** The input `state` must be byte-for-byte unchanged after the call. Tic-tac-toe achieves this by copying before writing (`:87`). The conformance suite snapshots state with `JSON.parse(JSON.stringify(...))` and asserts equality afterward (`packages/games-core/tests/conformance.test.ts:72`), and the focused suite repeats it (`packages/games-core/tests/tic-tac-toe.test.ts:108`).
+- **No mutation of inputs.** The input `state` must be byte-for-byte unchanged after the call. Tic-tac-toe achieves this by copying before writing (`:87`). The conformance suite snapshots state with `JSON.parse(JSON.stringify(...))` and asserts equality afterward (`packages/games-core/tests/conformance.test.ts:81`), and the focused suite repeats it (`packages/games-core/tests/tic-tac-toe.test.ts:108`).
 - **Determinism.** Same `(state, ctx, input)` ⇒ same result, every time. No `Date.now()`, no `Math.random()`, no network, no DB. (If a game needs randomness it must be seeded *into* the state by `createInitialState` and carried forward deterministically — never sampled inside `reduce`.)
 - **Total over its result type.** Every branch returns a `ReduceResult`; failures are `{ ok: false, error }`, never thrown exceptions.
 
@@ -185,7 +185,7 @@ Why this matters so much: the server treats `reduce()` as the **authority**. It 
 
 ## Assembling a `GameDefinition`
 
-A game is **not** just an engine. It's a `GameDefinition` (`packages/games-core/src/definition.ts:24`):
+A game is **not** just an engine. It's a `GameDefinition` (`packages/games-core/src/definition.ts:25`):
 
 ```ts
 export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
@@ -217,7 +217,7 @@ export const ticTacToeDefinition: GameDefinition<
 };
 ```
 
-(`packages/games-core/src/games/tic-tac-toe/index.ts:13`). The explicit `GameDefinition<TicTacToeState, TicTacToeMove, TicTacToeConfig>` annotation is what makes TypeScript verify the engine's `State`/`Input` match the schemas' inferred types. The Zod types are themselves *derived from* the schemas via `z.infer` (`packages/games-core/src/games/tic-tac-toe/schemas.ts:17`, `:25`, `:28`) — the schema is the source, the TS type is a projection of it. See [./games-core-schemas.md](./games-core-schemas.md) for the schema layer in depth.
+(`packages/games-core/src/games/tic-tac-toe/index.ts:13`). The explicit `GameDefinition<TicTacToeState, TicTacToeMove, TicTacToeConfig>` annotation is what makes TypeScript verify the engine's `State`/`Input` match the schemas' inferred types. The Zod types are themselves *derived from* the schemas via `z.infer` (`packages/games-core/src/games/tic-tac-toe/schemas.ts:15`, `:23`, `:26`) — the schema is the source, the TS type is a projection of it. See [./games-core-schemas.md](./games-core-schemas.md) for the schema layer in depth.
 
 ## The single `GAMES` array
 
@@ -242,7 +242,7 @@ const byType: Map<string, GameDefinition> = new Map(
 );
 ```
 
-(`packages/games-core/src/registry.ts:6`). Keying by `def.meta.type` is why `meta.type` must equal `engine.type` — the conformance suite enforces that (below), so a mismatch would mean the registry key and the engine's self-reported type disagree.
+(`packages/games-core/src/registry.ts:7`). Keying by `def.meta.type` is why `meta.type` must equal `engine.type` — the conformance suite enforces that (below), so a mismatch would mean the registry key and the engine's self-reported type disagree.
 
 The accessors:
 
@@ -266,12 +266,12 @@ export function listGameTypes(): GameType[] {
 }
 ```
 
-(`packages/games-core/src/registry.ts:10`). Notes:
+(`packages/games-core/src/registry.ts:11`). Notes:
 
 - **`hasEngine` is a type guard** — `hasEngine(type: string): type is GameType` narrows a raw string to the `GameType` union when the check passes. The server uses it as a soft "is this a real game?" check before creating a game.
 - **`getDefinition` throws on an unknown type** — a missing game is a programming error, not a recoverable condition. (It still accepts `string` as a defensive DB-boundary measure, since the `gameType` column is `text` in Postgres.) The focused test pins the message: `getEngine("chess")` throws `"Unknown game type: chess"` (`packages/games-core/tests/tic-tac-toe.test.ts:287`).
 - **`getEngine` erases the generics to `GameEngine<unknown, unknown>`.** See "Type erasure" below.
-- **`listGameMeta()` / `listGameTypes()` / `listDefinitions()`** are simple maps over `GAMES` (`packages/games-core/src/registry.ts:24`–`:34`) — the lobby UI calls `listGameMeta()` to render the catalog. `listGameTypes()` returns `GameType[]`, not `string[]`.
+- **`listGameMeta()` / `listGameTypes()` / `listDefinitions()`** are simple maps over `GAMES` (`packages/games-core/src/registry.ts:25`–`:35`) — the lobby UI calls `listGameMeta()` to render the catalog. `listGameTypes()` returns `GameType[]`, not `string[]`, and is keyed off `def.meta.type` (which is itself `GameType`).
 
 `getCategoryGroups()` joins `GAMES` against `GAME_CATEGORIES` for the grouped lobby view:
 
@@ -289,7 +289,7 @@ export function getCategoryGroups(): {
 }
 ```
 
-(`packages/games-core/src/registry.ts:36`). It preserves the order of `GAME_CATEGORIES`, attaches each category's matching game metas, and **drops empty categories** (the trailing `.filter`) so the UI never renders a category with no games.
+(`packages/games-core/src/registry.ts:37`). It preserves the order of `GAME_CATEGORIES`, attaches each category's matching game metas, and **drops empty categories** (the trailing `.filter`) so the UI never renders a category with no games.
 
 ### Type erasure at the registry boundary
 
@@ -299,35 +299,36 @@ Each `GameDefinition` is precisely generic (`<TicTacToeState, TicTacToeMove, Tic
 
 This is the payoff of the whole design — the same engine that informs the client is the thing that validates the move on the server. Walkthrough of a `make_move`, all in `apps/server/src/realtime/turn-based.ts`:
 
-1. **Client emits `make_move`** with `{ gameId, moveData }`. `handleMakeMove` runs → `apps/server/src/realtime/turn-based.ts:122`.
-2. **Load + gate** → it reads the authenticated `userId` from `socket.data`, validates the `gameId` shape, loads the `GameRecord` from Postgres, and rejects if the game isn't `active` (`:127`–`:132`).
-3. **Resolve the seat** → `gameRow.players.find((p) => p.userId === userId)` maps the trusted user to a `role`; not seated ⇒ rejected (`:134`). The user→role mapping is the server's, never the client's.
-4. **Look up the definition by type** → `const def = getDefinition(gameRow.gameType)` (`:137`) — the same registry call the web app uses, importing the identical games-core code.
-5. **Validate the untrusted input** → `def.moveSchema.safeParse(payload.moveData)` (`:140`). Malformed ⇒ `"Invalid move"`, never reaches the engine.
-6. **Validate the stored state** → `def.stateSchema.safeParse(gameRow.gameState)` (`:142`). This both re-narrows the JSONB blob to the engine's `State` type and guards against a `"Corrupt game state"`.
-7. **Run the authoritative `reduce`** → `def.engine.reduce(parsedState.data, { role: player.role }, parsedMove.data)` (`:145`). The engine re-applies every rule (turn, occupancy, terminal) independently. `!result.ok` ⇒ the engine's own `error` string is sent straight back (`:150`).
-8. **Persist + broadcast** → on success, append the move (`:153`), `updateGame(..., { gameState: result.state })` (`:160`), then `finalize(updated, result.outcome)` maps `outcome.winnerRole` → `winnerUserId`, marks `completed`/`draw`, and bumps player stats (`:71`–`:98`). Finally it emits `move_made` + `game_state` to the room (`:163`, `:167`) and, if completed, `game_over` (`:170`).
+1. **Client emits `make_move`** with `{ gameId, moveData }`. `handleMakeMove` runs → `apps/server/src/realtime/turn-based.ts:120`.
+2. **Load + gate** → it reads the authenticated `userId` from `socket.data`, validates the `gameId` shape, loads the `GameRecord` from Postgres, and rejects if the game isn't `active` (`:125`–`:130`).
+3. **Resolve the seat** → `gameRow.players.find((p) => p.userId === userId)` maps the trusted user to a `role`; not seated ⇒ rejected (`:132`). The user→role mapping is the server's, never the client's.
+4. **Look up the definition by type** → `const def = getDefinition(gameRow.gameType)` (`:135`) — the same registry call the web app uses, importing the identical games-core code. A turn-based game must expose `reduce`; a missing one ⇒ `"Game does not accept moves"` (`:136`).
+5. **Validate the untrusted input** → `def.moveSchema.safeParse(payload.moveData)` (`:138`). Malformed ⇒ `"Invalid move"`, never reaches the engine.
+6. **Validate the stored state** → `def.stateSchema.safeParse(gameRow.gameState)` (`:140`). This both re-narrows the JSONB blob to the engine's `State` type and guards against a `"Corrupt game state"`.
+7. **Run the authoritative `reduce`** → `def.engine.reduce(parsedState.data, { role: player.role }, parsedMove.data)` (`:143`). The engine re-applies every rule (turn, occupancy, terminal) independently. `!result.ok` ⇒ the engine's own `error` string is sent straight back (`:148`).
+8. **Persist + broadcast** → on success, append the move (`:151`), `updateGame(..., { gameState: result.state })` (`:158`), then `finalize(updated, result.outcome)` maps `outcome.winnerRole` → `winnerUserId`, marks `completed`/`draw`, and bumps player stats (`:69`–`:96`). Finally it emits `move_made` (`:161`) + `game_state` to the room (`:165`) and, if completed, `game_over` (`:168`).
 
-So the path is: **client `make_move` -> `turn-based.ts:122` -> `getDefinition` `turn-based.ts:137` -> `moveSchema`/`stateSchema` parse `turn-based.ts:140`/`:142` -> `engine.reduce` `turn-based.ts:145` (which itself re-runs `tic-tac-toe/engine.ts:67`) -> persist + broadcast.** The client supplied data; the engine decided truth.
+So the path is: **client `make_move` -> `turn-based.ts:120` -> `getDefinition` `turn-based.ts:135` -> `moveSchema`/`stateSchema` parse `turn-based.ts:138`/`:140` -> `engine.reduce` `turn-based.ts:143` (which itself re-runs `tic-tac-toe/engine.ts:67`) -> persist + broadcast.** The client supplied data; the engine decided truth.
 
-The seating side mirrors this: `ensureSeated` reads `engine.maxPlayers` to know if a seat is free, `engine.roles[players.length]` to assign the next role, `engine.minPlayers` to flip the game to `active`, and `engine.createInitialState(...)` to mint the starting state on first seat (`apps/server/src/realtime/turn-based.ts:40`–`:67`).
+The seating side mirrors this: `ensureSeated` reads `engine.maxPlayers` to know if a seat is free, `engine.roles[players.length]` to assign the next role, `engine.minPlayers` to flip the game to `active`, and `engine.createInitialState(...)` to mint the starting state on first seat (`apps/server/src/realtime/turn-based.ts:38`–`:67`).
 
 ## The conformance suite: invariants every game must satisfy
 
 `packages/games-core/tests/conformance.test.ts` is generic — it loops over `GAMES` and asserts the contract for each one, so a new game is tested the moment it's added to the array (no per-game wiring). The invariants:
 
-- **Registry sanity** — `GAMES` is non-empty and all `meta.type` values are unique (`:14`). Uniqueness must hold or the `byType` Map would silently collide.
-- **`meta.type === engine.type`** (`:23`) — the registry key and the engine's self-id must agree.
-- **Coherent player bounds** (`:27`) — `minPlayers >= 1`, `maxPlayers >= minPlayers`, and `roles.length >= maxPlayers` (there must be a distinct role for every possible seat — this is what makes `roles[players.length]` safe on the server).
-- **Mode/handler pairing** (`:37`) — `turn-based` ⇒ `reduce` is a function; otherwise `step` is.
-- **Initial state validates** (`:45`) — `createInitialState(minSeats(def))` must pass `stateSchema.safeParse`. So the engine cannot emit a state its own schema would reject.
-- **Fresh state each call** (`:51`) — two `createInitialState` calls return non-identical objects (`a !== b`); no shared mutable singletons.
-- **`moveSchema` rejects junk** (`:57`) — `undefined`, a string, and a bogus object all fail to parse.
-- **`configSchema` accepts the declared defaults** (`:65`) — building a config object from each `configFields[].default` must parse, so the lobby's default form is always valid.
-- **`reduce` does not mutate input state** (`:72`) — the purity check described above, asserted for every turn-based game.
-- **`meta.categoryId` is a known category** (`:83`) — every game's `categoryId` joins to an id in `GAME_CATEGORIES`.
-- **`roles` has no duplicates** (`:87`) — each declared role is distinct.
-- **`coverImage`, when set, is a `/games/` path** (`:91`) — cover art lives under `public/games/`.
+- **Registry sanity** — `GAMES` is non-empty and all `meta.type` values are unique (`:19`). Uniqueness must hold or the `byType` Map would silently collide.
+- **`GAME_TYPES` matches the registry exactly** (`:25`) — `[...GAME_TYPES].sort()` must equal `listGameTypes().sort()`, so the `game-types.ts` tuple and the `GAMES` array can never drift (added with the registry-typed `gameType` work).
+- **`meta.type === engine.type`** (`:32`) — the registry key and the engine's self-id must agree.
+- **Coherent player bounds** (`:36`) — `minPlayers >= 1`, `maxPlayers >= minPlayers`, and `roles.length >= maxPlayers` (there must be a distinct role for every possible seat — this is what makes `roles[players.length]` safe on the server).
+- **Mode/handler pairing** (`:46`) — `turn-based` ⇒ `reduce` is a function; otherwise `step` is.
+- **Initial state validates** (`:54`) — `createInitialState(minSeats(def))` must pass `stateSchema.safeParse`. So the engine cannot emit a state its own schema would reject.
+- **Fresh state each call** (`:60`) — two `createInitialState` calls return non-identical objects (`a !== b`); no shared mutable singletons.
+- **`moveSchema` rejects junk** (`:66`) — `undefined`, a string, and a bogus object all fail to parse.
+- **`configSchema` accepts the declared defaults** (`:74`) — building a config object from each `configFields[].default` must parse, so the lobby's default form is always valid.
+- **`reduce` does not mutate input state** (`:81`) — the purity check described above, asserted for every turn-based game.
+- **`meta.categoryId` is a known category** (`:92`) — every game's `categoryId` joins to an id in `GAME_CATEGORIES`.
+- **`roles` has no duplicates** (`:96`) — each declared role is distinct.
+- **`coverImage`, when set, is a `/games/` path** (`:100`) — cover art lives under `public/games/`.
 
 Here is the helper that makes the suite game-agnostic, plus the mutation invariant:
 
@@ -352,7 +353,7 @@ function minSeats(def: GameDefinition): Seat[] {
     });
 ```
 
-(`packages/games-core/tests/conformance.test.ts:7` and `:72`). Note the empty `{}` move: a game must remain immutable even when handed a clearly-invalid input — proof that the guards reject *before* mutating.
+(`packages/games-core/tests/conformance.test.ts:12` and `:81`). Note the empty `{}` move: a game must remain immutable even when handed a clearly-invalid input — proof that the guards reject *before* mutating.
 
 The focused `tests/tic-tac-toe.test.ts` complements this with game-specific behavior: turn/role enforcement (`:62`), out-of-bounds and occupied-cell rejection (`:88`), all 8 win lines (`:116`), draw detection (`:186`), no-move-after-win (`:210`), and registry resolution (`:277`). New games should add a similar focused suite — conformance proves the contract, the focused suite proves the *rules*.
 
@@ -361,10 +362,10 @@ The focused `tests/tic-tac-toe.test.ts` complements this with game-specific beha
 - **No React, no I/O in this package — ever.** games-core is imported by the server, which has no DOM and must stay React-free. Keep game UI in `@gamelobby/games-client` (see [./games-client.md](./games-client.md)) and logic here.
 - **`reduce` must be pure and deterministic.** No mutation of `state`/`input`, no `Date.now`/`Math.random`/network/DB. Copy-then-write; return a fresh state object. The server's trust model depends on it.
 - **The engine validates everything itself.** Don't rely on the caller having pre-validated. tic-tac-toe re-runs `moveSchema.safeParse` *inside* `reduce` (`packages/games-core/src/games/tic-tac-toe/engine.ts:77`) even though the server already parsed — defense in depth, and it keeps the engine correct in isolation (tests call `reduce` directly).
-- **Roles are not users.** `Outcome.winnerRole`, `MoveContext.role`, and `engine.roles` are all in role-space (`"X"`/`"O"`). The user↔role mapping lives entirely on the server (`apps/server/src/realtime/turn-based.ts:79`, `:134`).
+- **Roles are not users.** `Outcome.winnerRole`, `MoveContext.role`, and `engine.roles` are all in role-space (`"X"`/`"O"`). The user↔role mapping lives entirely on the server (`apps/server/src/realtime/turn-based.ts:78`, `:132`).
 - **The slug constant lives only in `game-types.ts`.** `meta.ts` and `engine.ts` import it from `../../game-types`; it is never redeclared in a per-game file. `GameMeta.type` is `GameType` (not `string`); the `GAME_TYPES` tuple and the `GAMES` array must stay in sync — the conformance suite's `"GAME_TYPES matches the registry exactly"` test enforces this.
 - **`meta.type` must equal `engine.type`, and types must be globally unique.** Both are enforced by conformance; both feed the `byType` registry key.
-- **`roles.length >= maxPlayers`.** The server seats by index (`engine.roles[players.length]`), so there must be a role for each seat. Conformance guards it (`packages/games-core/tests/conformance.test.ts:32`).
+- **`roles.length >= maxPlayers`.** The server seats by index (`engine.roles[players.length]`), so there must be a role for each seat. Conformance guards it (`packages/games-core/tests/conformance.test.ts:41`).
 - **Failures are values, not throws** — in `reduce` (`ReduceResult.error`). The *registry* is the exception: `getDefinition` throws on an unknown type because that's a bug, not a runtime condition.
 - **Registry generics are erased to `unknown`.** `getEngine` / `GAMES` give you `unknown` State/Input; narrow at the boundary by parsing through the definition's Zod schemas before touching the engine.
 - **`createInitialState` must allocate fresh state.** Returning a shared/mutable singleton breaks the "fresh object each call" invariant and would let one game's state leak into another.

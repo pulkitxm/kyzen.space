@@ -76,7 +76,7 @@ Monorepo: two apps (`apps/web`, `apps/server`) over three shared packages (`pack
 
 ### `apps/server` — Express + Hono + Socket.IO on Bun
 
-`src/index.ts` mounts Express (CORS, `/health`), forwards `/api/*` to a **Hono** app (`src/api/index.ts`, router-per-feature under `api/routes/`), and attaches **Socket.IO** (`src/realtime/`). Better Auth (`auth.ts`) handles sessions/Google OAuth and provisions a profile on first sign-in; the socket middleware authenticates by reading the Better Auth session from the handshake cookie.
+`src/index.ts` mounts Express (CORS, `/health`), forwards `/api/*` to a **Hono** app (`src/api/index.ts`, router-per-feature under `api/routes/`), and attaches **Socket.IO** (`src/realtime/`). Better Auth (`auth.ts`) handles sessions/Google OAuth and provisions a profile on first sign-in. REST routes gate on a shared `requireAuth` Hono middleware (`api/middleware/auth.ts`) that re-derives the session from the cookie, 401s when absent, and sets `userId`/`user`/`session` on the context; the socket middleware authenticates the same way, reading the Better Auth session from the handshake cookie.
 
 Data access is layered: `db/schema.ts` (Drizzle/Postgres tables) → `db/repositories/*` → exposed as namespaces from `db/index.ts` (`games`, `messages`, `conversations`, …). Routes/realtime call repositories, never raw SQL. Games use a **generic schema**: `game` (with `game_state` + `config` JSONB), `move` (`move_data` JSONB), and `game_player` (one indexed row per seat — normalizes the former players array; `getGameById` returns a `GameRecord` with `players` attached). Per-game shapes stay JSONB, validated by the game's Zod schemas — never per-game tables. The only game REST endpoint is `GET /api/games/:gameId` (games are created over the socket lane).
 
@@ -110,7 +110,7 @@ A game is one `GameDefinition` (games-core) + one client component (games-client
 - **New or changed game** → its `docs/games/<type>.md`.
 - **Convention change** (style, tooling, structure) → this file (`CLAUDE.md`) **and** `AGENTS.md`.
 
-Start from `docs/architecture/README.md` (the architecture index) and `docs/architecture/testing.md` (the test guide) to find the right page.
+Start from `docs/architecture/README.md` (the architecture index) and `docs/architecture/testing.md` (the test guide) to find the right page. Use the **`docs-maintainer`** agent (`.claude/agents/docs-maintainer.md`) to audit/re-sync docs against the code or to author a new doc in the house style.
 
 ## Tests
 

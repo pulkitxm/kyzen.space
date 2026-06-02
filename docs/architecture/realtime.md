@@ -78,7 +78,7 @@ declare module "socket.io" {
 }
 ```
 
-The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:105`, `chat.ts:17`, `friends.ts:7`, `typing.ts:40`, `presence.ts:52`, `games-in-chat.ts:20`). A forged `userId` in a payload is simply ignored — the only `userId` that exists came from a verified session.
+The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:103`, `chat.ts:17`, `friends.ts:7`, `typing.ts:40`, `presence.ts:52`, `games-in-chat.ts:20`). A forged `userId` in a payload is simply ignored — the only `userId` that exists came from a verified session.
 
 ### Per-connection wiring
 
@@ -200,7 +200,7 @@ socket.on("make_move", (payload: unknown, cb?: (err?: string) => void) => {
       await driver.makeMove(io, socket, data);
 ```
 
-`apps/server/src/realtime/index.ts:96` (the `join_room` listener immediately above it at `index.ts:63` follows the identical shape). The envelope schemas are strict and tiny — `clientMakeMoveSchema` is `{ gameId: uuid, moveData: unknown }.strict()` (`packages/games-core/src/schemas.ts:36`); the *contents* of `moveData` are validated later by the game-specific `moveSchema` inside the driver, because the envelope layer cannot know what shape a Reversi vs. a Tic-Tac-Toe move takes. `clientJoinRoomSchema` adds an optional `intent: "play" | "spectate"` (`schemas.ts:28`).
+`apps/server/src/realtime/index.ts:96` (the `join_room` listener immediately above it at `index.ts:63` follows the identical shape). The envelope schemas are strict and tiny — `clientMakeMoveSchema` is `{ gameId: uuid, moveData: unknown }.strict()` (`packages/games-core/src/schemas.ts:37`); the *contents* of `moveData` are validated later by the game-specific `moveSchema` inside the driver, because the envelope layer cannot know what shape a Reversi vs. a Tic-Tac-Toe move takes. `clientJoinRoomSchema` adds an optional `intent: "play" | "spectate"` (`schemas.ts:29`). Both envelopes key off `gameId` (a uuid), not a `gameType`; the registry-typed `gameTypeSchema` (`packages/games-core/src/game-types.ts:9`) that now validates `gameType` in the parse layer guards the game-card DTOs and game creation, while the driver resolves the type from the stored `gameRow.gameType` (`index.ts:109`).
 
 `join_room` and `make_move` report failures *twice*: through the ack callback (`cb?.(msg)`) for the specific caller, and as a `"game_error"` emit. They also wrap the body in `try/catch` and log a `durationMs` on success — the game lane's own version of the safety/observability that `register` gives the chat lane. (`leave_room` only acks; it has nothing to fail at beyond payload validation.)
 
@@ -235,7 +235,7 @@ export async function handleJoinRoom(
   payload: ClientJoinRoom,
 ): Promise<void> {
   const userId = socket.data.userId;
-  if (!UUID_RE.test(payload.gameId)) return err(socket, "Invalid game id");
+  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
 
   const gameRow = await games.getGameById(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
@@ -252,7 +252,7 @@ export async function handleJoinRoom(
 }
 ```
 
-`apps/server/src/realtime/turn-based.ts:100`. Joining a room is also the only way a player takes a seat. `ensureSeated` (`turn-based.ts:30`) decides whether this user becomes a player. The seating gate is worth reading in full:
+`apps/server/src/realtime/turn-based.ts:98`. The UUID guard is `isUuid` from `../lib/uuid` (`apps/server/src/lib/uuid.ts:4`), a shared helper wrapping the same `UUID_RE` regex. Joining a room is also the only way a player takes a seat. `ensureSeated` (`turn-based.ts:28`) decides whether this user becomes a player. The seating gate is worth reading in full:
 
 ```ts
 const { engine } = getDefinition(gameRow.gameType);
@@ -268,7 +268,7 @@ if (intent === "spectate" || !seatFree || challengeReserved) {
 }
 ```
 
-`apps/server/src/realtime/turn-based.ts:40`. A user is seated only if: they are not already a player, the game is still `waiting` with room under `engine.maxPlayers`, they did not ask to merely `spectate`, and — for a `challenge` game — they are the challenged user. The seat's role comes straight from the engine: `engine.roles[players.length]` (`turn-based.ts:55`, with a `biome-ignore` justifying the non-null assertion). When the new seat count reaches `engine.minPlayers` the game flips to `active` and gets a `startedAt`, and the initial state is lazily created from the engine if absent (`turn-based.ts:58`). The seat is persisted via `games.seatPlayer` into its own indexed `game_player` row.
+`apps/server/src/realtime/turn-based.ts:38`. A user is seated only if: they are not already a player, the game is still `waiting` with room under `engine.maxPlayers`, they did not ask to merely `spectate`, and — for a `challenge` game — they are the challenged user. The seat's role comes straight from the engine: `engine.roles[players.length]` (`turn-based.ts:53`, with a `biome-ignore` at `turn-based.ts:52` justifying the non-null assertion). When the new seat count reaches `engine.minPlayers` the game flips to `active` and gets a `startedAt`, and the initial state is lazily created from the engine if absent (`turn-based.ts:56`). The seat is persisted via `games.seatPlayer` into its own indexed `game_player` row (`turn-based.ts:58`).
 
 Whether or not seating changed, the socket joins `game:<gameId>` and receives the full state. `emitFullState` always sends *everything* — the serialized game plus the full move list — so a late joiner or reconnecting client gets a complete, authoritative snapshot rather than a diff:
 
@@ -283,7 +283,7 @@ async function emitFullState(io: IOServer, gameRow: GameRecord) {
 }
 ```
 
-`apps/server/src/realtime/turn-based.ts:21`. The payload type is `ServerGameStatePayload` from games-core (`packages/games-core/src/schemas.ts:72`) — again a shared contract. If a seat was taken (`changed`), `broadcastGameCard` also updates the game-card message in the originating conversation so everyone in the chat sees the new player count.
+`apps/server/src/realtime/turn-based.ts:19`. The payload type is `ServerGameStatePayload` from games-core (`packages/games-core/src/schemas.ts:73`) — again a shared contract. If a seat was taken (`changed`), `broadcastGameCard` also updates the game-card message in the originating conversation so everyone in the chat sees the new player count.
 
 ### `handleMakeMove` — the round trip
 
@@ -296,7 +296,7 @@ export async function handleMakeMove(
   payload: ClientMakeMove,
 ): Promise<void> {
   const userId = socket.data.userId;
-  if (!UUID_RE.test(payload.gameId)) return err(socket, "Invalid game id");
+  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
 
   const gameRow = await games.getGameById(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
@@ -321,7 +321,7 @@ export async function handleMakeMove(
   if (!result.ok) return err(socket, result.error);
 ```
 
-`apps/server/src/realtime/turn-based.ts:122`. Every line is a guard, and the ordering is the design:
+`apps/server/src/realtime/turn-based.ts:120`. Every line is a guard, and the ordering is the design:
 
 1. **Identity is taken from the socket, not the payload** — `userId = socket.data.userId`, then `gameRow.players.find(p => p.userId === userId)`. There is no way for the client to claim to be another player; the player's `role` is looked up from the persisted seat, and that role is what gets passed to `reduce` as `{ role: player.role }`. A client cannot move on another seat's behalf.
 2. **The game must be `active`** and the engine must actually accept moves (`def.engine.reduce` exists) — a realtime-only engine would have no `reduce`.
@@ -356,14 +356,14 @@ Only after all five guards pass do we touch the database:
 }
 ```
 
-`apps/server/src/realtime/turn-based.ts:152`. The move is appended (one row in the `move` table, `moveData` stored as the **Zod-parsed** value, not the raw wire value), the new `gameState` is persisted, and `finalize` handles end-of-game. `finalize` (`turn-based.ts:71`) only acts on a `completed` outcome: it resolves `winnerRole` back to a `winnerUserId` via the seat list, writes `status: "completed"` + `completedAt` + `winner` (or `"draw"`), and calls `profiles.bumpStats` once per player (`"won"` / `"lost"` / `"drawn"`).
+`apps/server/src/realtime/turn-based.ts:150`. The move is appended (one row in the `move` table, `moveData` stored as the **Zod-parsed** value, not the raw wire value), the new `gameState` is persisted, and `finalize` handles end-of-game. `finalize` (`turn-based.ts:69`) only acts on a `completed` outcome: it resolves `winnerRole` back to a `winnerUserId` via the seat list, writes `status: "completed"` + `completedAt` + `winner` (or `"draw"`), and calls `profiles.bumpStats` once per player (`"won"` / `"lost"` / `"drawn"`).
 
 Then come the broadcasts — and note there are **two audiences**:
 
 - `move_made` and a full `game_state` go to the **game room** `game:<gameId>` (everyone watching/playing the board).
 - On completion, `game_over` also goes to the game room, and `broadcastGameCard` pushes a `message_updated` event to the **originating conversation room** `conv:<conversationId>` (`apps/server/src/chat/game-card-broadcast.ts:7`), so the game card embedded in the chat updates to "completed" for people who never opened the board.
 
-This dual broadcast is the bridge between the two lanes: a *game-lane* action (`make_move`) produces a *chat-lane* effect (a `message_updated` over `CHAT_EVENTS.messageUpdated`). The serialized payloads correspond to `ServerMoveMadePayload` and `ServerGameOverPayload` in games-core (`packages/games-core/src/schemas.ts:77`).
+This dual broadcast is the bridge between the two lanes: a *game-lane* action (`make_move`) produces a *chat-lane* effect (a `message_updated` over `CHAT_EVENTS.messageUpdated`). The serialized payloads correspond to `ServerMoveMadePayload` and `ServerGameOverPayload` in games-core (`packages/games-core/src/schemas.ts:78`).
 
 ### Full data-flow walkthrough: a player makes a winning move
 
@@ -373,16 +373,16 @@ Player clicks a cell in the React board (apps/web, @gamelobby/games-client)
   -> apps/server/src/realtime/index.ts:96  socket.on("make_move")
        clientMakeMoveSchema.safeParse(payload)            (envelope Zod, games-core)
   -> index.ts:108  games.getGameById(gameId) -> getDriver(gameType)  (drivers.ts:25)
-  -> driver.makeMove == turn-based.ts:122  handleMakeMove
+  -> driver.makeMove == turn-based.ts:120  handleMakeMove
        userId = socket.data.userId                         (trusted identity, NOT payload)
        guards: game active? caller is a seated player? engine has reduce?
        def.moveSchema.safeParse(payload.moveData)          (game-specific Zod)
        def.stateSchema.safeParse(gameRow.gameState)        (stored state re-validated)
-       def.engine.reduce(state, { role }, move)            (turn-based.ts:145, AUTHORITATIVE)
+       def.engine.reduce(state, { role }, move)            (turn-based.ts:143, AUTHORITATIVE)
          -> result.ok === false  => err(socket, result.error) and STOP
          -> result.ok === true   => continue
-  -> persist: games.addMove(...) + games.updateGame({ gameState })   (turn-based.ts:153)
-  -> finalize(updated, result.outcome)                     (turn-based.ts:161)
+  -> persist: games.addMove(...) + games.updateGame({ gameState })   (turn-based.ts:151)
+  -> finalize(updated, result.outcome)                     (turn-based.ts:159)
        outcome.status === "completed" => updateGame(status/winner) + profiles.bumpStats x N
   -> BROADCAST A (game room):
        emitToGame "move_made" + emitFullState "game_state"  -> room game:<gameId>  (rooms.ts:15)
@@ -393,7 +393,7 @@ Player clicks a cell in the React board (apps/web, @gamelobby/games-client)
      every chat window in conv:<convId> updates the game card to "completed".
 ```
 
-Contrast with how a game even comes to exist: that is a **chat-lane** action. `CHAT_EVENTS.createGameInConversation` (`apps/server/src/realtime/games-in-chat.ts:9`) validates with `clientCreateGameInConversationSchema`, then `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:9`) validates the game's `configSchema`, seats the creator into role `engine.roles[0]`, creates the game with `engine.createInitialState`, posts a `game_card` message, and `notify`s the other members. So creation flows over chat; play flows over the game lane; and they meet again at the game card.
+Contrast with how a game even comes to exist: that is a **chat-lane** action. `CHAT_EVENTS.createGameInConversation` (`apps/server/src/realtime/games-in-chat.ts:9`) validates with `clientCreateGameInConversationSchema`, then `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:14`) validates the game's `configSchema`, seats the creator into role `engine.roles[0]`, creates the game with `engine.createInitialState`, posts a `game_card` message, and `notify`s the other members. So creation flows over chat; play flows over the game lane; and they meet again at the game card.
 
 ## Rooms
 
@@ -421,18 +421,18 @@ export function attachRedisAdapter(io: IOServer): void {
 
 ## Gotchas, invariants & conventions
 
-- **The client is never the authority.** The browser runs the same engine for prediction, but `make_move` is re-validated by `moveSchema`, by `stateSchema`, and finally by `engine.reduce` on the server (`turn-based.ts:145`). If the three disagree with the client, the server wins. Do not "optimize" by trusting client-supplied state.
+- **The client is never the authority.** The browser runs the same engine for prediction, but `make_move` is re-validated by `moveSchema`, by `stateSchema`, and finally by `engine.reduce` on the server (`turn-based.ts:143`). If the three disagree with the client, the server wins. Do not "optimize" by trusting client-supplied state.
 - **One socket per tab carries both lanes.** The browser opens a single authenticated Socket.IO connection in the web app's `SocketProvider`; game boards receive it as a prop (`socket` / `connected`) and emit `join_room` / `make_move` / `leave_room` over it — they do **not** call `io()` themselves. So the chat lane and the game lane always share one connection, one auth check, and one `socket.data.userId`. See [games-client](./games-client.md).
 - **Identity comes from `socket.data.userId`, never from a payload.** Set once in the `io.use` middleware (`index.ts:44`). Any handler that reads a `userId` off the wire would be a security bug.
 - **Two error/result conventions, one per lane.** Chat lane: ack callbacks shaped `{ ok, ... }` via `ack`/`ackErr`, wrapped by `register` (`socket-util.ts:36`). Game lane: a `"game_error"` emit *and* a string ack `cb?.(msg)` (`index.ts:90`). Follow the lane you are in.
 - **Validate at both layers in the game lane.** The envelope schema (`clientMakeMoveSchema`) only guarantees `{ gameId, moveData: unknown }`. The real move shape is the game's `moveSchema`, checked inside the driver. Skipping either is a hole.
 - **`emitFullState` sends the entire game + move list every time.** It is intentionally not a diff, so reconnects and late joiners are correct for free. Don't replace it with incremental patches without a resync story.
-- **Seating happens on `join_room`, not on a separate "sit" event.** `intent: "spectate"`, a full table, or a reserved `challenge` seat all silently result in `changed: false` (`turn-based.ts:48`) — you watch instead of erroring.
+- **Seating happens on `join_room`, not on a separate "sit" event.** `intent: "spectate"`, a full table, or a reserved `challenge` seat all silently result in `changed: false` (`turn-based.ts:46`) — you watch instead of erroring.
 - **Typing and presence are in-process maps, not DB-backed.** They are also not Redis-aware: the maps in `typing.ts:8` and `presence.ts:8` are per-node, so a multi-node deployment would compute presence/typing per node. Treat them as best-effort, single-node-accurate signals.
 - **`notify` self-suppresses** (`notify.ts:16`) and depends on `getIO()` being set — which `attachRealtime` guarantees at boot via `setIO(io)` (`apps/server/src/realtime/index.ts:31`). Calling `notify` before `attachRealtime` would persist the row but skip the live push (`if (!io) return`).
 - **`getDriver` ignores its argument today.** All games use the turn-based driver. Add realtime games by implementing `RealtimeDriver` and branching in `getDriver` on the engine's `mode`; the listeners in `index.ts` need no change.
-- **Stored state is treated as untrusted too.** `stateSchema.safeParse(gameRow.gameState)` returning failure yields `"Corrupt game state"` rather than a crash (`turn-based.ts:142`) — a deliberate guard against bad data in JSONB.
-- **No comments in code.** This repo enforces a strict no-comments rule; the lone comment in this subsystem is a justified `biome-ignore` at `turn-based.ts:54`.
+- **Stored state is treated as untrusted too.** `stateSchema.safeParse(gameRow.gameState)` returning failure yields `"Corrupt game state"` rather than a crash (`turn-based.ts:141`) — a deliberate guard against bad data in JSONB.
+- **No comments in code.** This repo enforces a strict no-comments rule; the lone comment in this subsystem is a justified `biome-ignore` at `turn-based.ts:52`.
 
 ## Where to go next
 

@@ -109,7 +109,7 @@ Key points (`apps/server/src/api/index.ts:14`):
 
 - **`basePath("/api")`** means every mounted route is implicitly prefixed, e.g. `conversationsRouter`'s `.get("/")` becomes `GET /api/conversations`. The Express regex forwards `/api/*` here, so the prefixes line up exactly.
 - **Better Auth is a catch-all sub-app.** `authApp` (`apps/server/src/api/index.ts:14`) forwards *every* method+path under `/api/auth/*` straight into Better Auth's own handler via `getAuth().handler(c.req.raw)`. Better Auth implements its own routing internally (sign-in, OAuth callback, session, etc.), so the server just gives it the raw web `Request`. The session cookie it sets is what every other route later reads.
-- **Router-per-feature.** Each domain is an isolated `Hono` instance imported and `.route()`-mounted. This keeps each file small and lets routers carry their own typed env (`gamesRouter` is `new Hono<LoggerEnv>()`, `apps/server/src/api/routes/games.ts:9`).
+- **Router-per-feature.** Each domain is an isolated `Hono` instance imported and `.route()`-mounted. This keeps each file small and lets routers carry their own typed env (`gamesRouter` is `new Hono<LoggerEnv>()`, `apps/server/src/api/routes/games.ts:7`).
 - **One global error boundary.** `app.onError` (`apps/server/src/api/index.ts:29`) catches any thrown error, logs it with the request-scoped logger if present (`c.get("log") ?? logger`), and returns a generic `500` — never leaking internals to the client.
 
 ### Request logging middleware (`middleware/logger.ts`)
@@ -130,7 +130,12 @@ export const requestLogger: MiddlewareHandler<LoggerEnv> = async (c, next) => {
   } finally {
     const durationMs = Math.round((performance.now() - start) * 100) / 100;
     const status = c.res.status;
-    const fields = { method: c.req.method, path: c.req.path, status, durationMs };
+    const fields = {
+      method: c.req.method,
+      path: c.req.path,
+      status,
+      durationMs,
+    };
     if (status >= 500) log.error(fields, "request failed");
     else if (status >= 400) log.warn(fields, "request error");
     else log.info(fields, "request");
@@ -219,13 +224,13 @@ The division of labor:
   return c.json({ conversation: res.value });
   ```
 
-  (`apps/server/src/api/routes/conversations.ts:35`). Because `fail()` carries the HTTP status code, the route never has to *decide* whether a failure is a 403 or a 404 — the service already encoded the right status as a domain fact.
+  (`apps/server/src/api/routes/conversations.ts:36`). Because `fail()` carries the HTTP status code, the route never has to *decide* whether a failure is a 403 or a 404 — the service already encoded the right status as a domain fact.
 
 - **Services (`chat/*`) own the business rules** and any side effects (DB writes, socket emits, notifications). For example `createDm` (`apps/server/src/chat/conversations-service.ts:27`) enforces "you can only DM friends" (`fail("You can only message friends", 403)`), creates-or-gets the DM, and *fans the new conversation out over the socket* to both members before returning a DTO. The route knows none of this.
 
 - **Repositories (`db/*`, imported as namespaces like `conversations`, `friends`, `games`)** are the only code that touches Drizzle/SQL. Services call `conversations.getOrCreateDm(...)`, `friends.areFriends(...)`, etc. The repository layer is re-exported from `apps/server/src/db/index.ts` (`export * as games from "./repositories/games"` and friends, `apps/server/src/db/index.ts:5`).
 
-Why a hand-rolled `Result` type instead of throwing? Three reasons. (1) **The HTTP status is part of the domain answer** — "not your request" is a 403, "already friends" is a 409 — and encoding it in the return value keeps that decision next to the rule that produced it. (2) **The same service is called from two transports**: `createGameInConversation` is invoked from the REST route (`apps/server/src/api/routes/conversations.ts:124`) *and* from a socket handler (`apps/server/src/realtime/games-in-chat.ts:9`); a thrown exception would have to be caught and re-mapped in two places, whereas a `ServiceResult` is just inspected with `if (!res.ok)`. (3) **Expected failures stay off the exception path**, so the global `onError` boundary is reserved for genuinely unexpected bugs.
+Why a hand-rolled `Result` type instead of throwing? Three reasons. (1) **The HTTP status is part of the domain answer** — "not your request" is a 403, "already friends" is a 409 — and encoding it in the return value keeps that decision next to the rule that produced it. (2) **The same service is called from two transports**: `createGameInConversation` is invoked from the REST route (`apps/server/src/api/routes/conversations.ts:129`) *and* from a socket handler (`apps/server/src/realtime/games-in-chat.ts:9`); a thrown exception would have to be caught and re-mapped in two places, whereas a `ServiceResult` is just inspected with `if (!res.ok)`. (3) **Expected failures stay off the exception path**, so the global `onError` boundary is reserved for genuinely unexpected bugs.
 
 ### Assemblers: the read-side hydration layer (`assemble.ts`)
 
@@ -237,12 +242,12 @@ The most subtle assembler is `withGameCardStatus` (`apps/server/src/chat/assembl
 
 ## Why `GET /api/games/:gameId` is the only game REST endpoint
 
-`gamesRouter` is tiny on purpose (`apps/server/src/api/routes/games.ts:9`):
+`gamesRouter` is tiny on purpose (`apps/server/src/api/routes/games.ts:7`):
 
 ```ts
 export const gamesRouter = new Hono<LoggerEnv>().get("/:gameId", async (c) => {
   const id = c.req.param("gameId");
-  if (!UUID_RE.test(id)) return c.json({ error: "Not found" }, 404);
+  if (!isUuid(id)) return c.json({ error: "Not found" }, 404);
   const found = await games.getGameById(id);
   if (!found) return c.json({ error: "Not found" }, 404);
   const moves = await games.listMoves(id);
@@ -255,7 +260,7 @@ export const gamesRouter = new Hono<LoggerEnv>().get("/:gameId", async (c) => {
 
 There is **no** `POST /api/games`, no `PATCH`, no move endpoint. The reason is the core architectural insight stated at the top: **games are created and played over the socket lane, not over HTTP.**
 
-- **Creation** goes through `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:9`). That service is reachable two ways — `POST /api/conversations/:id/games` (`apps/server/src/api/routes/conversations.ts:118`) for the "create a game in this chat" REST action, and the `CHAT_EVENTS.createGameInConversation` socket event (`apps/server/src/realtime/games-in-chat.ts:9`). Either way it validates the config with the game's own Zod schema, seeds the initial state from the engine, persists, and posts a game-card message. It is *not* a generic game-resource POST; it's a chat action that happens to spawn a game.
+- **Creation** goes through `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:14`). That service is reachable two ways — `POST /api/conversations/:id/games` (`apps/server/src/api/routes/conversations.ts:120`) for the "create a game in this chat" REST action, and the `CHAT_EVENTS.createGameInConversation` socket event (`apps/server/src/realtime/games-in-chat.ts:9`). Both transports first narrow the client-supplied `gameType` to a registered game: the REST route does `gameTypeSchema.safeParse(body?.gameType)` (`apps/server/src/api/routes/conversations.ts:125`, the registry-backed `z.enum` exported from games-core) and returns `400 Unsupported game type` on a miss, so the service's `gameType` parameter is a typed `GameType`, not a free-form string. Either way it then validates the config with the game's own Zod schema, seeds the initial state from the engine, persists, and posts a game-card message. It is *not* a generic game-resource POST; it's a chat action that happens to spawn a game.
 - **Playing** (making moves) happens exclusively over the socket `make_move` event (`apps/server/src/realtime/index.ts:96`), routed through a driver that re-validates the move and stored state against the game's Zod schemas before applying `reduce`. A move is inherently a low-latency, broadcast-to-the-room operation; modeling it as an idempotent HTTP resource would be the wrong shape and would also bypass the realtime fan-out every other player needs.
 - **Reading** is the one thing that genuinely benefits from a plain request/response: the web app's `/play/[gameId]` page does an SSR/RSC fetch of the current game + move history to render the board before the socket connects. That's exactly what this endpoint serves. It guards against non-UUID ids (cheap rejection of garbage) and returns `404` for unknown ids so it never leaks whether an id format is valid-but-missing vs. malformed.
 
@@ -273,7 +278,7 @@ const parsedConfig = definition.configSchema.safeParse(input.config ?? {});
 if (!parsedConfig.success) return fail("Invalid game config", 400);
 ```
 
-(`apps/server/src/chat/games-in-chat-service.ts:22`). It looks the game up in the shared games-core registry, validates the client-supplied config against that game's **`configSchema`** (the same schema the web lobby form is built from), enforces membership and seating rules (`apps/server/src/chat/games-in-chat-service.ts:33`), seeds initial state via `engine.createInitialState` (`apps/server/src/chat/games-in-chat-service.ts:65`), persists through the `games` repository, posts a `game_card` message via `messagesService.sendMessage`, and fans out `game_started`/`game_challenge` notifications to the other members. On success it returns `ok({ game: serializeGame(created), message: sent.value })` — already serialized for either transport.
+(`apps/server/src/chat/games-in-chat-service.ts:27`). Its `input.gameType` is already a typed `GameType` (the caller narrowed it via `gameTypeSchema`), so `hasEngine(input.gameType)` looks the game up in the shared games-core registry and validates the client-supplied config against that game's **`configSchema`** (the same schema the web lobby form is built from), after first enforcing conversation membership (`apps/server/src/chat/games-in-chat-service.ts:24`) and, for group chats, seating rules (`apps/server/src/chat/games-in-chat-service.ts:36`). It then seeds initial state via `engine.createInitialState` (`apps/server/src/chat/games-in-chat-service.ts:70`), persists through the `games` repository, posts a `game_card` message via `sendMessage`, and fans out `game_started`/`game_challenge` notifications to the other members via `notify`. On success it returns `ok({ game: serializeGame(created), message: sent.value })` — already serialized for either transport.
 
 ## Other notable services
 
@@ -297,7 +302,7 @@ The GIF routes are a thin, auth-gated proxy to Klipy. `gifsRouter` (`apps/server
 - `lib/pattern.ts` — `PATTERN_IDS` + `isValidPattern` (`apps/server/src/lib/pattern.ts:15`).
 - `lib/chat-layout.ts` — chat layout types/constants; `validateChatModePref` (`apps/server/src/lib/chat-layout.ts:46`) coerces arbitrary input to `{ mode: "popout" | "mounted" }`.
 
-`PUT /api/profiles/me/appearance` (`apps/server/src/api/routes/profiles.ts:68`) applies these guards field-by-field, building a partial `patch` and rejecting unknown values with `400 Invalid theme` / `Invalid colorMode` / `Invalid pattern`, and a `400 Nothing to update` if the body changes nothing. The avatar route validates with `validateAvatarConfig` from `@gamelobby/avatar` (`apps/server/src/api/routes/profiles.ts:149`). These are exported pure functions specifically so they're unit-testable without HTTP, matching the repo's test conventions.
+`PUT /api/profiles/me/appearance` (`apps/server/src/api/routes/profiles.ts:67`) applies these guards field-by-field, building a partial `patch` and rejecting unknown values with `400 Invalid theme` / `Invalid colorMode` / `Invalid pattern`, and a `400 Nothing to update` if the body changes nothing. The avatar route validates with `validateAvatarConfig` from `@gamelobby/avatar` (`apps/server/src/api/routes/profiles.ts:120`). These are exported pure functions specifically so they're unit-testable without HTTP, matching the repo's test conventions.
 
 ## End-to-end data-flow walkthrough: sending a chat message via REST
 
@@ -314,7 +319,7 @@ A concrete trace from HTTP request to broadcast, showing every layer:
 9. Service hydrates the row into a DTO via `assembleMessage` (resolves sender, applies game-card status) — `apps/server/src/chat/assemble.ts:45`.
 10. Service broadcasts over the socket: `emitToConv(io, conversationId, CHAT_EVENTS.messageNew, { message, clientId })` reaches every other connected member in the `conv:<id>` room — `apps/server/src/chat/messages-service.ts:49`.
 11. Service returns `ok(message)` — `apps/server/src/chat/messages-service.ts:54`.
-12. Handler maps the `ServiceResult`: `return c.json({ message: res.value }, 201)` — `apps/server/src/api/routes/conversations.ts:116`.
+12. Handler maps the `ServiceResult`: `return c.json({ message: res.value }, 201)` — `apps/server/src/api/routes/conversations.ts:117`.
 13. `requestLogger`'s `finally` logs `{ method, path, status: 201, durationMs }` at `info` — `apps/server/src/api/middleware/logger.ts:23`.
 
 The sender gets the message back in the HTTP `201` response; every *other* member gets it pushed over their socket in step 10. The `clientId` echo lets the sender's own client de-duplicate its optimistic copy against the broadcast.
@@ -330,7 +335,7 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 - **`getIO()` can return `null`.** Services guard `if (io)` before emitting (`apps/server/src/chat/messages-service.ts:48`). This is deliberate so service functions are unit-testable without a running socket server; don't assume `io` is non-null.
 - **Games have no write REST endpoint.** Do not add `POST /api/games` or a move endpoint. Creation routes through `createGameInConversation` (REST `POST /api/conversations/:id/games` *or* the socket event); moves go through the socket `make_move` lane only.
 - **The same service is multi-transport.** `createGameInConversation` is called from both REST and socket; keep its contract a `ServiceResult` (not thrown errors) so both callers can handle failures uniformly.
-- **Manual UUID gating.** Routes use a literal `UUID_RE` regex (e.g. `apps/server/src/api/routes/conversations.ts:13`, `apps/server/src/api/routes/games.ts:6`) to reject malformed ids with `404` *before* hitting the DB. New id-taking routes should follow suit.
+- **Manual UUID gating.** Routes call the shared `isUuid` guard (`apps/server/src/lib/uuid.ts`) to reject malformed ids with `404` *before* hitting the DB — e.g. `apps/server/src/api/routes/games.ts:9` and the many `if (!isUuid(id))` checks in `conversations.ts`. New id-taking routes should follow suit.
 - **Logs redact secrets.** The pino config (`apps/server/src/logger.ts:8`) redacts cookies/auth headers/`*.token`/`*.secret`. Don't log raw request headers expecting to see the session — it's `[redacted]`.
 - **`game_card` status is computed at read time.** It's merged in by `withGameCardStatus`/`enrichGameCardMeta` during assembly, not stored on the message row. When a game ends, push the updated card with `broadcastGameCard` (`apps/server/src/chat/game-card-broadcast.ts:7`).
 - **GIF and profile-config validation are intentionally allow-list based.** Reject unknown themes/patterns/layouts with `400`; clamp GIF limits; never pass user strings straight to the provider or DB.
