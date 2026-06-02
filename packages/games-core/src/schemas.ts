@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { gameTypeSchema } from "./game-types";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -43,7 +44,7 @@ export type ClientMakeMove = z.infer<typeof clientMakeMoveSchema>;
 
 export const gameJsonSchema = z.object({
   id: z.string(),
-  gameType: z.string(),
+  gameType: gameTypeSchema,
   status: gameStatusSchema,
   winner: z.string().nullable(),
   players: z.array(gamePlayerSchema),

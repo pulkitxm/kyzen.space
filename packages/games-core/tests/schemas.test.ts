@@ -132,4 +132,16 @@ describe("wire payload schemas", () => {
       }).success,
     ).toBe(false);
   });
+
+  test("gameJson rejects an unknown gameType", () => {
+    expect(
+      gameJsonSchema.safeParse({
+        id: "g1",
+        gameType: "chess",
+        status: "active",
+        winner: null,
+        players: [],
+      }).success,
+    ).toBe(false);
+  });
 });
