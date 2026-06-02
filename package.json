@@ -13,6 +13,7 @@
     "cloc:file": "bun run cloc -- --by-file",
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "serve": "bun run build --force && bun start",
     "start": "turbo run start",
     "test": "turbo run test",
     "type-check": "turbo run type-check",
