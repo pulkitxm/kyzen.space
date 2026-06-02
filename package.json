@@ -17,6 +17,7 @@
     "format:check": "biome format .",
     "fix": "biome check --write .",
     "check": "biome check .",
+    "strip-comments": "bun scripts/strip-comments.mjs",
     "db:start": "docker compose -f scripts/docker-compose.yml up -d postgres",
     "db:stop": "docker compose -f scripts/docker-compose.yml down",
     "db:reset": "docker compose -f scripts/docker-compose.yml down -v && docker compose -f scripts/docker-compose.yml up -d",
