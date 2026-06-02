@@ -37,10 +37,4 @@ const PopoverContent = forwardRef<
 );
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;
 
-export {
-  Popover,
-  PopoverAnchor,
-  PopoverClose,
-  PopoverContent,
-  PopoverTrigger,
-};
+export { Popover, PopoverAnchor, PopoverClose, PopoverContent, PopoverTrigger };
