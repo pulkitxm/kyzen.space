@@ -116,6 +116,8 @@ export default async function RootLayout({
   const sidebarPrefsTrusted =
     typeof prefCookieRaw === "string" && prefCookieRaw.length > 0;
   const sidebarPrefs = parseSidebarPrefsCookieValue(prefCookieRaw);
+  
+  // testing if this triggers an error
 
   return (
     <html
