@@ -9,11 +9,13 @@ import { serializePublicUser } from "../serialize";
 
 export const friendsRouter = new Hono<AuthEnv>()
   .use("*", requireAuth)
+
   .get("/", async (c) => {
     const userId = c.get("userId");
     const rows = await friends.listAccepted(userId);
     return c.json({ friends: await assembleFriendships(rows, userId) });
   })
+
   .get("/requests", async (c) => {
     const userId = c.get("userId");
     const [incoming, outgoing] = await Promise.all([
@@ -25,6 +27,7 @@ export const friendsRouter = new Hono<AuthEnv>()
       outgoing: await assembleFriendships(outgoing, userId),
     });
   })
+
   .get("/search", async (c) => {
     const userId = c.get("userId");
     const q = (c.req.query("q") ?? "").trim();
@@ -48,6 +51,7 @@ export const friendsRouter = new Hono<AuthEnv>()
     }));
     return c.json({ users });
   })
+
   .post("/requests", async (c) => {
     const userId = c.get("userId");
     const body = await readJson(c);
@@ -57,6 +61,7 @@ export const friendsRouter = new Hono<AuthEnv>()
     if (!res.ok) return c.json({ error: res.error }, res.status);
     return c.json({ request: res.value }, 201);
   })
+
   .post("/requests/:id/accept", async (c) => {
     const userId = c.get("userId");
     const res = await friendsService.respondToRequest(
@@ -67,6 +72,7 @@ export const friendsRouter = new Hono<AuthEnv>()
     if (!res.ok) return c.json({ error: res.error }, res.status);
     return c.json({ friendship: res.value });
   })
+
   .post("/requests/:id/decline", async (c) => {
     const userId = c.get("userId");
     const res = await friendsService.respondToRequest(
@@ -77,6 +83,7 @@ export const friendsRouter = new Hono<AuthEnv>()
     if (!res.ok) return c.json({ error: res.error }, res.status);
     return c.json({ ok: true });
   })
+
   .delete("/:userId", async (c) => {
     const userId = c.get("userId");
     const res = await friendsService.removeFriend(

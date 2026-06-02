@@ -14,6 +14,7 @@ function readOffset(raw: string | undefined): number {
 
 export const gifsRouter = new Hono<AuthEnv>()
   .use("*", requireAuth)
+
   .get("/trending", async (c) => {
     const userId = c.get("userId");
     const limit = clampLimit(c.req.query("limit"));
@@ -29,6 +30,7 @@ export const gifsRouter = new Hono<AuthEnv>()
       return c.json({ error: "GIF service unavailable" }, 502);
     }
   })
+
   .get("/search", async (c) => {
     const userId = c.get("userId");
     const q = (c.req.query("q") ?? "").trim();

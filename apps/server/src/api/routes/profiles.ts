@@ -63,6 +63,7 @@ export const profilesRouter = new Hono<AuthEnv>()
       },
     });
   })
+
   .put("/me/appearance", requireAuth, async (c) => {
     const userId = c.get("userId");
     const body = await readJson(c);
@@ -102,6 +103,7 @@ export const profilesRouter = new Hono<AuthEnv>()
     await profiles.updateAppearance(userId, patch);
     return c.json(patch);
   })
+
   .put("/me/chat-layout", requireAuth, async (c) => {
     const userId = c.get("userId");
     const body = await readJson(c);
@@ -111,6 +113,7 @@ export const profilesRouter = new Hono<AuthEnv>()
     await profiles.updateChatLayout(userId, pref);
     return c.json(pref);
   })
+
   .put("/me/avatar", requireAuth, async (c) => {
     const userId = c.get("userId");
     const body = await readJson(c);
@@ -120,6 +123,7 @@ export const profilesRouter = new Hono<AuthEnv>()
     await profiles.updateAvatar(userId, avatar);
     return c.json({ avatar });
   })
+
   .get("/:username/recent-games", async (c) => {
     const username = c.req.param("username");
     if (RESERVED.has(username.toLowerCase()))
@@ -149,6 +153,7 @@ export const profilesRouter = new Hono<AuthEnv>()
       hasMore,
     });
   })
+
   .get("/:username", async (c) => {
     const username = c.req.param("username");
     if (RESERVED.has(username.toLowerCase()))
