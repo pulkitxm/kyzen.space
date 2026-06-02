@@ -5,7 +5,7 @@
 Everything live in this app — chat messages, typing dots, presence, friend requests, notifications, and the moment-to-moment play of a game — rides over **one Socket.IO connection per browser tab**. The realtime layer lives entirely in `apps/server/src/realtime/`. It does three jobs:
 
 1. **Authenticates the socket once, from the Better Auth session cookie** carried in the WebSocket handshake, and stamps `socket.data.userId` so every downstream handler knows who is talking without re-checking auth.
-2. **Multiplexes two logically separate "lanes" onto that single connection** — a **chat lane** (chat, friends, typing, presence, in-chat game creation, notifications) and a **game lane** (`join_room` / `make_move`). They share a connection but are wired and validated independently.
+2. **Multiplexes two logically separate "lanes" onto that single connection** — a **chat lane** (chat, friends, typing, presence, in-chat game creation, notifications) and a **game lane** (`join_room` / `make_move` / `leave_room`). They share a connection but are wired and validated independently. The browser opens **one** Socket.IO connection (the web app's `SocketProvider`); game boards reuse it rather than dialing their own — see [games-client](./games-client.md).
 3. **Routes every game action through an authoritative driver** that loads the game, validates the payload *and the stored state* against the game's strict Zod schemas (the same schemas the client uses), applies the pure engine `reduce`, persists the result, and broadcasts the new state.
 
 The reason this matters — and the single most important idea in the whole subsystem — is that **the client is never trusted**. The browser imports `@gamelobby/games-core` to render a board and *predict* legality, but the server imports the *exact same* `GameDefinition` (engine + `moveSchema` + `stateSchema`) and re-validates everything. The frontend's copy of the engine is a UX convenience; the server's copy is the source of truth. A hand-crafted `make_move` packet hits `clientMakeMoveSchema.safeParse`, then `def.moveSchema.safeParse`, then `def.engine.reduce` returning `{ ok: false }` — three independent rejections before any database write happens.
@@ -14,7 +14,7 @@ The reason this matters — and the single most important idea in the whole subs
 
 | Path | Responsibility |
 | --- | --- |
-| `apps/server/src/realtime/index.ts` | `attachRealtime`: build the `IOServer`, attach the Redis adapter, install the handshake-cookie auth middleware, and on each connection wire every chat-lane handler plus the two game-lane listeners (`join_room`, `make_move`). |
+| `apps/server/src/realtime/index.ts` | `attachRealtime`: build the `IOServer`, attach the Redis adapter, install the handshake-cookie auth middleware, and on each connection wire every chat-lane handler plus the three game-lane listeners (`join_room`, `make_move`, `leave_room`). |
 | `apps/server/src/realtime/io.ts` | `setIO` / `getIO` singleton so non-socket code (e.g. `notify`) can emit without holding a `socket` reference. |
 | `apps/server/src/realtime/rooms.ts` | Room name helpers + emit helpers: `gameRoom`/`convRoom`/`userRoom` naming and `emitToGame`/`emitToConv`/`emitToUser`. |
 | `apps/server/src/realtime/drivers.ts` | `RealtimeDriver` interface + `getDriver` indirection; currently always returns the turn-based driver. |
@@ -78,7 +78,7 @@ declare module "socket.io" {
 }
 ```
 
-The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:105`, `chat.ts:17`, `friends.ts:7`, `typing.ts:40`, `presence.ts:52`, `games-in-chat.ts:23`). A forged `userId` in a payload is simply ignored — the only `userId` that exists came from a verified session.
+The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:105`, `chat.ts:17`, `friends.ts:7`, `typing.ts:40`, `presence.ts:52`, `games-in-chat.ts:20`). A forged `userId` in a payload is simply ignored — the only `userId` that exists came from a verified session.
 
 ### Per-connection wiring
 
@@ -95,7 +95,7 @@ io.on("connection", (socket) => {
   void handlePresenceConnect(io, socket);
 ```
 
-`apps/server/src/realtime/index.ts:51`. On every connection we (1) join the user's rooms, (2) attach the four chat-lane handler groups, (3) kick off presence, and then (further down) register the two game-lane listeners. Note `joinUserRooms` and `handlePresenceConnect` are `async` and fire-and-forgotten with `void`; the listener registrations below them are synchronous, so handlers exist immediately even while those promises resolve.
+`apps/server/src/realtime/index.ts:51`. On every connection we (1) join the user's rooms, (2) attach the four chat-lane handler groups, (3) kick off presence, and then (further down) register the three game-lane listeners (`join_room`, `make_move`, `leave_room`). Note `joinUserRooms` and `handlePresenceConnect` are `async` and fire-and-forgotten with `void`; the listener registrations below them are synchronous, so handlers exist immediately even while those promises resolve.
 
 ## The two lanes
 
@@ -176,9 +176,9 @@ export async function notify(
 
 ### Lane 2 — the game lane
 
-The game lane is exactly two events, `join_room` and `make_move`, and it is wired differently from the chat lane in three deliberate ways:
+The game lane is three events — `join_room`, `make_move`, and `leave_room` — and it is wired differently from the chat lane in three deliberate ways:
 
-1. **Distinct event names** outside `CHAT_EVENTS` (plain `"join_room"` / `"make_move"`), and a distinct error channel `"game_error"`.
+1. **Distinct event names** outside `CHAT_EVENTS` (plain `"join_room"` / `"make_move"` / `"leave_room"`), and a distinct error channel `"game_error"`. `leave_room` reuses `clientJoinRoomSchema` (just `{ gameId }`) and simply `socket.leave`s the `game:<id>` room — boards emit it on unmount so the *shared, persistent* connection doesn't accumulate stale game rooms as the user navigates between games.
 2. **Zod validation from `@gamelobby/games-core`**, not the loose `isObj`/`str` coercion of the chat lane. The wire envelope is parsed with `clientJoinRoomSchema` / `clientMakeMoveSchema` before anything else.
 3. **A driver indirection** — the handler does not contain game logic; it looks up the game's type, fetches a `RealtimeDriver`, and delegates.
 
@@ -385,7 +385,7 @@ Player clicks a cell in the React board (apps/web, @gamelobby/games-client)
   -> finalize(updated, result.outcome)                     (turn-based.ts:161)
        outcome.status === "completed" => updateGame(status/winner) + profiles.bumpStats x N
   -> BROADCAST A (game room):
-       emitToGame "move_made" + emitFullState "game_state"  -> room game:<gameId>  (rooms.ts:11)
+       emitToGame "move_made" + emitFullState "game_state"  -> room game:<gameId>  (rooms.ts:15)
        emitToGame "game_over" { winner }                    -> room game:<gameId>
   -> BROADCAST B (chat room):
        broadcastGameCard -> emitToConv "message_updated"    -> room conv:<convId>  (game-card-broadcast.ts:14)
@@ -399,9 +399,9 @@ Contrast with how a game even comes to exist: that is a **chat-lane** action. `C
 
 All multicast goes through named rooms, and the naming is centralized in `apps/server/src/realtime/rooms.ts`:
 
-- `game:<gameId>` — `gameRoom` (`rooms.ts:3`), joined in `joinGameRoom` (`rooms.ts:7`), targeted by `emitToGame` (`rooms.ts:11`). Board state lives here.
-- `conv:<conversationId>` — `convRoom` (`rooms.ts:20`), `joinConvRoom`/`leaveConvRoom` (`rooms.ts:28`), `emitToConv` (`rooms.ts:36`). Chat messages, typing, and game-card updates live here.
-- `user:<userId>` — `userRoom` (`rooms.ts:24`), `emitToUser` (`rooms.ts:45`). Per-user fan-out: notifications, presence, friend events. A user can have several sockets all in this one room (multiple tabs), which is exactly why presence reference-counts.
+- `game:<gameId>` — `gameRoom` (`rooms.ts:3`), joined in `joinGameRoom` (`rooms.ts:7`), left in `leaveGameRoom` (`rooms.ts:11`), targeted by `emitToGame` (`rooms.ts:15`). Board state lives here.
+- `conv:<conversationId>` — `convRoom` (`rooms.ts:24`), `joinConvRoom`/`leaveConvRoom` (`rooms.ts:32`), `emitToConv` (`rooms.ts:40`). Chat messages, typing, and game-card updates live here.
+- `user:<userId>` — `userRoom` (`rooms.ts:28`), `emitToUser` (`rooms.ts:49`). Per-user fan-out: notifications, presence, friend events. A user can have several sockets all in this one room (multiple tabs), which is exactly why presence reference-counts.
 
 Because room membership lives in the Socket.IO adapter, `emitTo*` works the same whether the recipient is on this node or — with the Redis adapter — another.
 

@@ -10,7 +10,6 @@ import {
   FaPause,
   FaPlay,
 } from "react-icons/fa6";
-import { io, type Socket } from "socket.io-client";
 import type { GameClientProps } from "../../types";
 
 type GameJson = {
@@ -172,14 +171,14 @@ function StatusDot({ online }: { online: boolean }) {
 export function TicTacToeGameClient({
   gameId,
   userId,
+  socket,
+  connected,
   initialGame,
   initialMoves,
 }: GameClientProps) {
-  const socketRef = useRef<Socket | null>(null);
   const [game, setGame] = useState<GameJson>(initialGame as GameJson);
   const [moves, setMoves] = useState<MoveJson[]>(initialMoves);
   const [error, setError] = useState<string | null>(null);
-  const [connected, setConnected] = useState(false);
 
   const pastInitially =
     initialGame.status === "completed" || initialGame.status === "abandoned";
@@ -187,14 +186,6 @@ export function TicTacToeGameClient({
     pastInitially ? initialMoves.length : 0,
   );
   const [replayPlaying, setReplayPlaying] = useState(false);
-
-  const socketUrl = useMemo(
-    () =>
-      process.env.NEXT_PUBLIC_SOCKET_URL ??
-      process.env.NEXT_PUBLIC_API_URL ??
-      (typeof window !== "undefined" ? window.location.origin : ""),
-    [],
-  );
 
   const isLive = game.status === "waiting" || game.status === "active";
 
@@ -238,53 +229,40 @@ export function TicTacToeGameClient({
   }, [isLive, isPast, moves]);
 
   useEffect(() => {
-    if (!liveSocketKey) {
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-      return;
-    }
+    if (!socket || !liveSocketKey) return;
 
     const { gameId: gid } = liveSocketKey;
 
-    const socket: Socket = io(socketUrl, {
-      path: "/socket.io",
-      withCredentials: true,
-      transports: ["websocket"],
-    });
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      setConnected(true);
+    const onConnect = () => {
       setError(null);
       socket.emit("join_room", { gameId: gid });
-    });
-
-    socket.on("connect_error", (err) => {
-      setConnected(false);
-      setError(err.message);
-    });
-
-    socket.on(
-      "game_state",
-      (payload: { game: GameJson; moves: MoveJson[] }) => {
-        setGame(payload.game);
-        setMoves(payload.moves);
-      },
-    );
-
-    socket.on("move_made", (payload: { gameState: TicState }) => {
+    };
+    const onGameState = (payload: { game: GameJson; moves: MoveJson[] }) => {
+      setGame(payload.game);
+      setMoves(payload.moves);
+    };
+    const onMoveMade = (payload: { gameState: TicState }) => {
       setGame((g) => ({ ...g, gameState: payload.gameState }));
-    });
-
-    socket.on("game_error", (payload: { message?: string }) => {
+    };
+    const onGameError = (payload: { message?: string }) => {
       setError(payload.message ?? "Error");
-    });
+    };
+
+    socket.on("connect", onConnect);
+    socket.on("game_state", onGameState);
+    socket.on("move_made", onMoveMade);
+    socket.on("game_error", onGameError);
+
+    if (socket.connected) socket.emit("join_room", { gameId: gid });
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      socket.off("connect", onConnect);
+      socket.off("game_state", onGameState);
+      socket.off("move_made", onMoveMade);
+      socket.off("game_error", onGameError);
+      if (socket.connected) socket.emit("leave_room", { gameId: gid });
     };
-  }, [liveSocketKey, socketUrl]);
+  }, [socket, liveSocketKey]);
 
   const liveState = game.gameState ?? {
     board: emptyBoard(),
@@ -309,14 +287,13 @@ export function TicTacToeGameClient({
   const makeMove = useCallback(
     (row: number, col: number) => {
       if (!userId || !canMove) return;
-      const socket = socketRef.current;
       if (!socket?.connected) return;
       socket.emit("make_move", {
         gameId,
         moveData: { row, col },
       });
     },
-    [userId, canMove, gameId],
+    [userId, canMove, gameId, socket],
   );
 
   const winnerLabel = game.winner

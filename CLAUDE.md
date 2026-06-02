@@ -19,7 +19,7 @@ Enforcement: `bun run strip-comments` removes every non-directive comment in pla
 - **Pack preference (in order):** Font Awesome 6 (`react-icons/fa6`) is the project default — reach for it first. If FA6 has no good match, use another `react-icons` pack: Lucide (`react-icons/lu`) for thin outline glyphs, or brand/flat-color logos (`react-icons/fc`, e.g. `FcGoogle` for the authentic multicolor Google mark). **Only when no library icon fits is a raw inline `<svg>` acceptable** — that fallback is allowed, not forbidden.
 - **Stay on `fa6`, not the legacy `fa` (FA5).** Mind the FA6 renames: `FaCog`→`FaGear`, `FaUserFriends`→`FaUserGroup`, `FaRegSmile`→`FaRegFaceSmile`.
 - **`games-client`** declares `react-icons` as a peer + dev dependency, so game UIs draw from the same icon set as the web app.
-- **Not icons — leave as SVG:** generated/decorative art (`scripts/gen-doodle-tile.ts`, `public/` pattern tiles), DiceBear avatar rendering, and SVG used in tests.
+- **Not icons — leave as SVG:** generated/decorative art (`apps/web/scripts/gen-doodle-tile.ts`, `public/` pattern tiles), DiceBear avatar rendering, and SVG used in tests.
 
 ## Commands
 
@@ -57,7 +57,7 @@ bun run db:push             # push schema directly (dev)
 bun run db:reset            # drop volumes and recreate
 ```
 
-Lint note: Biome is the only linter (ESLint was removed). `bun run check` runs format + import-organize + lint (strict: recommended plus curated rules as errors, with `useSortedClasses` enforcing Tailwind class order); `bun run fix` autofixes everything safe **and** sorts Tailwind classes. Every workspace's `lint` script is `tsc --noEmit` (type-only). Biome covers all code files including CSS — Tailwind v4 at-rules (`@theme`, `@apply`, `@source`, …) parse via the `tailwindDirectives` CSS parser option in `biome.json`.
+Lint note: Biome is the only linter (ESLint was removed). `bun run check` runs format + import-organize + lint (strict: recommended plus curated rules as errors, with `useSortedClasses` enforcing Tailwind class order); `bun run fix` autofixes everything safe **and** sorts Tailwind classes. Every workspace's `type-check` script is `tsc --noEmit` (type-only). Biome covers all code files including CSS — Tailwind v4 at-rules (`@theme`, `@apply`, `@source`, …) parse via the `tailwindDirectives` CSS parser option in `biome.json`.
 
 ## Environment
 
