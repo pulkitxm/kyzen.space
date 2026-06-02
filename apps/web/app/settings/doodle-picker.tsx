@@ -15,7 +15,6 @@ function useHydrated(): boolean {
   );
 }
 
-/** Set <html data-pattern> directly for a non-persisted live preview. */
 function previewPattern(id: PatternId) {
   document.documentElement.setAttribute("data-pattern", id);
 }
@@ -24,7 +23,6 @@ export function DoodlePicker({ signedIn }: { signedIn: boolean }) {
   const mounted = useHydrated();
   const { pattern, setPattern } = usePattern();
 
-  // Keep the committed pattern in a ref so hover-out / unmount can restore it.
   const committedRef = useRef<PatternId>(DEFAULT_PATTERN);
   useEffect(() => {
     committedRef.current = pattern;
@@ -43,7 +41,6 @@ export function DoodlePicker({ signedIn }: { signedIn: boolean }) {
     >
       {PATTERNS.map((def) => {
         const active = mounted && pattern === def.id;
-        // Scale the tile down so the preview card shows a few repeats.
         const previewTile = Math.max(48, Math.round(def.tile / 4));
         return (
           <button

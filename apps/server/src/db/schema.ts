@@ -93,7 +93,6 @@ export type GamePlayer = { userId: string; username: string; role: string };
 
 export type GameStatus = "waiting" | "active" | "completed" | "abandoned";
 
-/** How a seat is claimed in a chat-created game. */
 export type SeatingMode = "open" | "challenge";
 
 export const game = pgTable(
@@ -104,9 +103,7 @@ export const game = pgTable(
     status: text("status").$type<GameStatus>().notNull().default("waiting"),
     winner: text("winner"),
     gameState: jsonb("game_state").$type<unknown>(),
-    // Opaque per-game setup, validated against the game's `configSchema`.
     config: jsonb("config").$type<unknown>(),
-    // Phase 3 — game-in-chat link columns (all nullable; legacy games have none).
     conversationId: uuid("conversation_id").references(() => conversation.id, {
       onDelete: "set null",
     }),
@@ -138,11 +135,6 @@ export const move = pgTable(
   (t) => [unique("move_game_number_uq").on(t.gameId, t.moveNumber)],
 );
 
-// One row per seated player. Normalizes the former `game.players` JSONB array so
-// "my games" and "who's in this game" are indexed joins instead of a containment
-// scan, and leaves room for per-seat data (result, rating) later. `username` is
-// denormalized (matching the old card behavior) so a card resolves without a
-// profile join. `seatOrder` is the engine role index (0 → roles[0], …).
 export const gamePlayer = pgTable(
   "game_player",
   {
@@ -192,12 +184,6 @@ export type MoveRow = typeof move.$inferSelect;
 export type GamePlayerRow = typeof gamePlayer.$inferSelect;
 export type UserProfileRow = typeof userProfile.$inferSelect;
 
-// ---------------------------------------------------------------------------
-// Friends + chat (plaintext messages; no encryption)
-// ---------------------------------------------------------------------------
-
-// One row per unordered user pair. `pairKey` = sorted(a,b).join(":"), computed
-// in the repo, so a single UNIQUE prevents A->B and B->A duplicate requests.
 export const friendship = pgTable(
   "friendship",
   {
@@ -221,9 +207,6 @@ export const friendship = pgTable(
   ],
 );
 
-// DM or group container. For DMs, `dmKey` = sorted(a,b).join(":") dedupes the
-// pair (Postgres treats multiple NULLs as distinct, so groups — dmKey NULL —
-// are unaffected by the UNIQUE). `lastMessageId` is a denormalized cache, not a FK.
 export const conversation = pgTable(
   "conversation",
   {
@@ -243,8 +226,6 @@ export const conversation = pgTable(
   (t) => [index("conversation_last_message_at_idx").on(t.lastMessageAt)],
 );
 
-// Membership + per-member read state. `leftAt` soft-leave keeps group history's
-// sender resolvable after someone leaves. `lastReadMessageId` is a cache pointer (no FK).
 export const conversationMember = pgTable(
   "conversation_member",
   {
@@ -268,9 +249,6 @@ export const conversationMember = pgTable(
   ],
 );
 
-// All message kinds, stored PLAINTEXT. `body` for text/system; `metadata` for
-// gif/game_card/system; `gameId` set for game_card. Soft delete via `deletedAt`.
-// Paginate by (conversationId, createdAt) — never by the non-monotonic uuid id.
 export const message = pgTable(
   "message",
   {
@@ -295,7 +273,6 @@ export const message = pgTable(
   ],
 );
 
-// Per-recipient, persisted (so offline users get them on next load) + pushed realtime.
 export const notification = pgTable(
   "notification",
   {

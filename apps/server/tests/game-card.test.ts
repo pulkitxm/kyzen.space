@@ -75,8 +75,6 @@ describe("enrichGameCardMeta", () => {
   });
 });
 
-// broadcastGameCard imports the messages repository leaf + assemble; mocking
-// those leaves avoids the shared "../src/db" barrel that other test files stub.
 // biome-ignore lint/suspicious/noExplicitAny: test capture of the card row
 let gameCard: any = null;
 const emitted: Array<{ event: string; payload: unknown }> = [];

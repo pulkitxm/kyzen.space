@@ -48,7 +48,6 @@ export const env = {
     optional("PUBLIC_REALTIME_URL") ||
     optional("BETTER_AUTH_URL", "http://localhost:4000"),
 
-  // Klipy GIF API — server-only, proxied so the browser never sees the key.
   klipyApiKey: optional("KLIPY_API_KEY"),
 } as const;
 

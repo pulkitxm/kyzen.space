@@ -3,10 +3,6 @@ import type { Server as IOServer, Socket } from "socket.io";
 import { conversations, friends } from "../db";
 import { emitToUser } from "./rooms";
 
-// In-memory online presence (multi-tab safe via a socket-id set per user) plus
-// best-effort lastSeen. Ephemeral — never persisted. With the Redis adapter,
-// room emits still cross nodes; only the online set is node-local (documented
-// trade-off — a Redis-backed PresenceStore is the later upgrade).
 type Presence = { sockets: Set<string>; lastSeen: number | null };
 
 const presence = new Map<string, Presence>();
@@ -34,8 +30,6 @@ function payloadFor(userId: string) {
   };
 }
 
-/** Everyone who should hear about a user's presence: their accepted friends +
- * the other members of every conversation they belong to. */
 async function audienceFor(userId: string): Promise<string[]> {
   const audience = new Set<string>();
   const [friendIds, convIds] = await Promise.all([
@@ -62,12 +56,10 @@ export async function handlePresenceConnect(
 
   const audience = await audienceFor(userId);
 
-  // Seed the connecting client with the current presence of its audience.
   socket.emit(CHAT_EVENTS.presenceSnapshot, {
     entries: audience.map(payloadFor),
   });
 
-  // Announce my offline -> online transition to my audience.
   if (!wasOnline) {
     const mine = payloadFor(userId);
     for (const uid of audience) {
@@ -84,7 +76,7 @@ export async function handlePresenceDisconnect(
   const p = presence.get(userId);
   if (!p) return;
   p.sockets.delete(socket.id);
-  if (p.sockets.size > 0) return; // still online on another tab/device
+  if (p.sockets.size > 0) return;
 
   p.lastSeen = Date.now();
   const audience = await audienceFor(userId);

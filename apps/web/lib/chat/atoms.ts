@@ -10,18 +10,14 @@ import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import { atomFamily } from "jotai-family";
 
-/** Recently-used emojis (native), most-recent first, persisted to localStorage. */
 export const recentEmojisAtom = atomWithStorage<string[]>(
   "gl-recent-emojis",
   [],
 );
 
-/** Cached GIF results keyed by query ("" = trending), so the combined picker
- * keeps its fetched pages across open/close instead of refetching each time. */
 export type GifCacheEntry = { gifs: GifJson[]; nextOffset: number | null };
 export const gifCacheAtom = atom<Map<string, GifCacheEntry>>(new Map());
 
-/** A message in the client store; optimistic sends carry `pending` + `clientId`. */
 export type ChatMessage = MessageJson & {
   pending?: boolean;
   clientId?: string;
@@ -40,17 +36,14 @@ export const outgoingRequestsAtom = atom<FriendshipJson[]>([]);
 export const notificationsAtom = atom<NotificationJson[]>([]);
 export const unreadNotificationsAtom = atom<number>(0);
 
-/** The conversation currently open on screen (so we don't badge it as unread). */
 export const activeConversationIdAtom = atom<string | null>(null);
 
-// Phase 2 (typing / presence).
 export type PresenceInfo = { online: boolean; lastSeen: string | null };
 export const presenceAtom = atom<Map<string, PresenceInfo>>(new Map());
 export const typingAtomFamily = atomFamily((_conversationId: string) =>
   atom<TypingUser[]>([]),
 );
 
-// Derived badges for the sidebar.
 export const totalUnreadAtom = atom((get) =>
   get(conversationsAtom).reduce((sum, c) => sum + (c.unreadCount ?? 0), 0),
 );
@@ -58,7 +51,6 @@ export const pendingRequestCountAtom = atom(
   (get) => get(incomingRequestsAtom).length,
 );
 
-/** Upsert a message: replace an optimistic entry by clientId, else by id, else append. */
 export function upsertMessage(
   list: ChatMessage[],
   incoming: ChatMessage,
@@ -82,7 +74,6 @@ export function upsertMessage(
   return [...list, incoming];
 }
 
-/** Move a conversation to the top with an updated preview/unread. */
 export function bumpConversation(
   list: ConversationJson[],
   conversationId: string,
@@ -94,7 +85,6 @@ export function bumpConversation(
   return [updated, ...list.filter((_, i) => i !== idx)];
 }
 
-/** Add (or replace, deduped by the friend's user id) an accepted friend, newest first. */
 export function upsertFriend(
   list: FriendshipJson[],
   friendship: FriendshipJson,

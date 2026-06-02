@@ -1,6 +1,5 @@
 import { Skeleton } from "@/components/ui";
 
-// Mirrors app/page.tsx: centered max-w-5xl grid of full-bleed GameCard tiles.
 export default function HomeLoading() {
   return (
     <div className="flex min-h-full flex-col items-center px-4 py-14">

@@ -1,8 +1,3 @@
-// Background pattern catalog (server-side source of truth for validation).
-// "pattern" is the third appearance axis (alongside theme + colorMode). Keep
-// this id list in sync with apps/web/lib/patterns.ts (the web catalog adds the
-// visual metadata used to render the picker).
-
 export const PATTERN_IDS = [
   "doodles",
   "games",

@@ -130,7 +130,6 @@ export async function bumpStats(
     .where(eq(userProfile.userId, userId));
 }
 
-/** A user as exposed to other users (id, username, display name, avatar). */
 export type PublicUserRow = {
   id: string;
   username: string;

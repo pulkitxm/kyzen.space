@@ -49,7 +49,6 @@ export function PlayClient({
     </div>
   );
 
-  // Legacy game with no conversation (or viewer can't see it) → game only.
   if (!conversation) {
     return <div className="h-full min-h-0">{gameNode}</div>;
   }

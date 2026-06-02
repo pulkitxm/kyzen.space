@@ -1,18 +1,7 @@
 @import "tailwindcss";
 
-/* Game UI ships from the games-client package; include its source so Tailwind
-   v4 keeps the board's utility classes (they live outside the app's scan root). */
 @source "../../../packages/games-client/src/**/*.{ts,tsx}";
 
-/* ===========================================================================
-   Appearance = two axes:
-     1. Palette  -> <html data-theme="..."> sets the two brand hues (--d, --v)
-     2. Mode     -> next-themes toggles the `.dark` class (light is the default)
-   Every semantic token below derives from --d (deep) and --v (vivid), so each
-   palette automatically gets a coherent light AND dark variant.
-   =========================================================================== */
-
-/* --- Palette hues (default = Midnight Blue, used pre-hydration) --- */
 :root {
   --d: #02060e;
   --v: #0356c5;
@@ -62,8 +51,6 @@ html[data-theme="csk"] {
   --v: #fdb913;
 }
 
-/* --- Background pattern: which doodle tile is masked behind the app ---
-   Default (and pre-hydration) is Doodles; the boot script sets data-pattern. */
 :root,
 html[data-pattern="doodles"] {
   --pattern-url: url("/patterns/doodles.svg");
@@ -82,11 +69,6 @@ html[data-pattern="nature"] {
   --pattern-tile: 360px 360px;
 }
 
-/* --- LIGHT mode (default; also the pre-hydration state) ---
-   Clean neutral surfaces with the palette as a true accent (not a wash). The
-   accent is darkened toward the deep hue so white-on-primary stays legible for
-   every palette, including the light vivids (amber/cyan/lime/sky). Foreground
-   is a dark neutral rather than the brand deep, for reliable contrast. */
 html:not(.dark) {
   --primary: color-mix(in srgb, var(--v) 78%, var(--d));
   --primary-dark: var(--d);
@@ -138,15 +120,12 @@ html:not(.dark) {
   --success-label-bg: color-mix(in srgb, var(--v) 16%, transparent);
   --success-label-text: var(--d);
 
-  /* Doodle background: subtle dark line over the pale page. A pale page needs
-     more ink than the dark mode to register, so darken and lift opacity. */
   --pattern-ink: color-mix(in srgb, #11151c 88%, var(--v));
   --pattern-opacity: 0.09;
 
   color-scheme: light;
 }
 
-/* --- DARK mode (deep solid background + tinted doodles) --- */
 html.dark {
   --primary: var(--v);
   --primary-dark: var(--d);
@@ -198,7 +177,6 @@ html.dark {
   --success-label-bg: color-mix(in srgb, var(--v) 22%, transparent);
   --success-label-text: #eef1f8;
 
-  /* Doodle background: light, faintly theme-tinted line over the deep page. */
   --pattern-ink: color-mix(in srgb, #ffffff 62%, var(--v));
   --pattern-opacity: 0.1;
 
@@ -250,9 +228,6 @@ html.dark {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* App-wide display face. The Game Paused font only contains A–Z/a–z, so the
-     stack falls through (per-glyph) to Geist for digits, hyphens and
-     punctuation. */
   --font-sans: var(--font-game-paused-face), var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-game-paused: var(--font-game-paused-face);
@@ -264,10 +239,6 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-/* The app shell's full-height canvas: a solid theme background plus a fixed,
-   theme-tinted doodle layer painted behind the content. The doodle SVG is used
-   as a mask, so its line colour comes from --pattern-ink (a per-theme,
-   per-mode token) and the page colour shows through underneath. */
 .app-canvas {
   position: relative;
   isolation: isolate;
@@ -288,7 +259,6 @@ body {
   mask-size: var(--pattern-tile);
 }
 
-/* "None" turns the doodle layer off entirely (no faint full-screen tint). */
 html[data-pattern="none"] .app-canvas::before {
   display: none;
 }
@@ -307,8 +277,6 @@ html[data-pattern="none"] .app-canvas::before {
     cursor: not-allowed;
   }
 
-  /* Don't show a focus ring for pointer (mouse/touch) interactions; keep it
-     for keyboard navigation via :focus-visible. */
   :focus:not(:focus-visible) {
     outline: none;
   }
@@ -323,7 +291,6 @@ html[data-pattern="none"] .app-canvas::before {
       opacity: 1;
     }
   }
-  /* Smoothly reveal media over its blurred placeholder (CSS-only, no JS). */
   .animate-gif-fade-in {
     animation: gif-fade-in 0.45s ease-out both;
   }

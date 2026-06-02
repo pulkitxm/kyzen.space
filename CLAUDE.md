@@ -4,6 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+## Code style — NO comments
+
+**Do not write comments in code.** This codebase is intentionally comment-free. Do not add line comments (`//`), block comments (`/* */`), or JSDoc (`/** */`) to any `.ts` / `.tsx` / `.js` / `.jsx` / `.mjs` / `.cjs` / `.css` / `.json` / `.jsonc` file — config files like `tsconfig.json` included. Write self-documenting code — clear names and small functions — instead of explaining it with comments. If something genuinely needs prose, put it in the commit message, the PR description, or `docs/`.
+
+The **only** comments permitted are functional tooling directives, which must be preserved: `biome-ignore`, `eslint-disable` / `eslint-enable`, `@ts-expect-error` / `@ts-ignore` / `@ts-nocheck`, `prettier-ignore`, `///` triple-slash references, `//# sourceMappingURL`, bundler/JSX pragmas, and `/*! */` / `@license` blocks.
+
+Enforcement: `bun run strip-comments` removes every non-directive comment in place; `bun run strip-comments -- --check` lists any offenders and exits non-zero. CI runs the check on every PR (`.github/workflows/no-comments.yml`), so a PR that introduces a comment fails. The gate covers every tracked code file, including `scripts/strip-comments.mjs` itself — there are no exemptions.
+
 ## Commands
 
 Bun is the package manager and test runner (`packageManager: bun@1.3.11`); Turborepo orchestrates tasks across the monorepo.

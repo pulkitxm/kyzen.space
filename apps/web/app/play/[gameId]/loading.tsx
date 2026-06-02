@@ -1,8 +1,5 @@
 import { Skeleton } from "@/components/ui";
 
-// Mirrors app/play/[gameId]/play-client.tsx: the game board (centered max-w-2xl
-// column) alongside the chat column. The real split is resizable; this is a
-// static approximation that fills the same space without layout shift.
 export default function PlayLoading() {
   return (
     <div className="flex h-full min-h-0">

@@ -1,10 +1,3 @@
-// Appearance catalog (server-side source of truth for validation).
-// Two independent axes:
-//   - theme: which color palette (each palette defines its own light + dark colors)
-//   - colorMode: light / dark / system
-// Keep these id lists in sync with apps/web/lib/themes.ts (the web catalog adds
-// the visual metadata used to render the picker).
-
 export const THEME_IDS = [
   "sangria",
   "crimson-nights",

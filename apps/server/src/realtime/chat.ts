@@ -6,8 +6,6 @@ import { conversations, notifications } from "../db";
 import { convRoom, joinConvRoom, leaveConvRoom, userRoom } from "./rooms";
 import { ack, ackErr, isObj, register, str, strArray } from "./socket-util";
 
-/** Join the user's personal room + all conversation rooms on connect, so they
- * receive messages/notifications without an explicit client-side join. */
 export async function joinUserRooms(socket: Socket): Promise<void> {
   const userId = socket.data.userId;
   void socket.join(userRoom(userId));

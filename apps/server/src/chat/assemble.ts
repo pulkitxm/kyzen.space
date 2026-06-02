@@ -25,10 +25,6 @@ import {
 } from "../db";
 import { enrichGameCardMeta } from "./game-card";
 
-// Hydrate DB rows into client DTOs (resolving the related public users).
-
-/** Resolve the live game state onto a `game_card` message's metadata so the
- *  chat card renders the right status/winner on first paint. No-op otherwise. */
 async function withGameCardStatus(
   msg: MessageJson,
   row: MessageRow,

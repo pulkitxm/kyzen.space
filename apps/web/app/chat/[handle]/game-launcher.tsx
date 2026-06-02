@@ -7,13 +7,6 @@ import { useState } from "react";
 import { FaGamepad } from "react-icons/fa";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 
-/**
- * Composer button that starts a game in the current conversation. DMs create
- * immediately ("open" seating); groups open a small menu to pick open seating
- * or challenge a specific member. On success, navigates to the side-by-side
- * /play view — everyone else gets the game card + a notification. The game is
- * resolved from the catalog (`gameType`, defaulting to the first game).
- */
 export function GameLauncher({
   conversation,
   userId,

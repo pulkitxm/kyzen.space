@@ -33,7 +33,6 @@ export function listGameMeta(): GameMeta[] {
   return GAMES.map((def) => def.meta);
 }
 
-/** Categories paired with their games, in display order, skipping empties. */
 export function getCategoryGroups(): {
   category: GameCategoryDef;
   games: GameMeta[];

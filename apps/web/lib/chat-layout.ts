@@ -1,6 +1,3 @@
-// Pure layout math + persistence helpers for the play-page game/chat split.
-// Mirror of apps/server/src/lib/chat-layout.ts — keep bounds in sync.
-
 export type ChatMode = "mounted" | "popout";
 
 export type PopoutGeometry = { x: number; y: number; w: number; h: number };
@@ -12,42 +9,37 @@ export type ChatLayout = {
   mode: ChatMode;
   minimized: boolean;
   stashEdge: StashEdge | null;
-  chatWidth: number; // chat-pane width in px; the game pane flex-fills the rest
+  chatWidth: number;
   popout: PopoutGeometry;
-  icon: IconPos; // last on-viewport floating-icon position (device-local)
+  icon: IconPos;
 };
 
-// The chat pane is the bounded one (kept deliberately small); the game pane
-// flex-fills the remainder, with the board centered by its own max width.
-// MIN_GAME guarantees the game pane always keeps room.
 export const MIN_GAME = 360;
 export const MIN_CHAT = 280;
 export const MAX_CHAT = 420;
 export const DEFAULT_CHAT_W = 360;
 
-// Floating-window size bounds.
 export const MIN_CHAT_POPOUT_W = 300;
 export const MAX_CHAT_POPOUT_W = 560;
 export const MIN_CHAT_POPOUT_H = 320;
 export const MAX_CHAT_POPOUT_H = 900;
 export const POPOUT_MARGIN = 16;
 
-// Floating-icon (minimized) bounds.
 export const ICON_SIZE = 56;
 export const ICON_MARGIN = 16;
-export const EDGE_TAB_THICKNESS = 22; // how far the stash tab pokes in from the edge
-export const EDGE_TAB_LENGTH = 44; // tab size along the edge
+export const EDGE_TAB_THICKNESS = 22;
+export const EDGE_TAB_LENGTH = 44;
 
 export const CHAT_LAYOUT_KEY = "gl_chat_layout";
 
 export const DEFAULT_POPOUT: PopoutGeometry = {
-  x: 100000, // sentinel; clampGeometry pulls it to bottom-right
+  x: 100000,
   y: 100000,
   w: 380,
   h: 520,
 };
 
-export const DEFAULT_ICON: IconPos = { x: 100000, y: 100000 }; // sentinel → clampIcon pulls to bottom-right
+export const DEFAULT_ICON: IconPos = { x: 100000, y: 100000 };
 
 export const DEFAULT_CHAT_LAYOUT: ChatLayout = {
   mode: "mounted",
@@ -74,18 +66,12 @@ function finiteOr(n: unknown, fallback: number): number {
   return Number.isFinite(v) ? v : fallback;
 }
 
-/**
- * Clamp the chat-pane width into [MIN_CHAT, MAX_CHAT], while keeping the game
- * pane at least MIN_GAME wide for the given container. Responsive: callers
- * re-run this on container resize.
- */
 export function clampChatWidth(width: number, containerW: number): number {
   const hi = Math.min(MAX_CHAT, containerW - MIN_GAME);
-  if (hi < MIN_CHAT) return MIN_CHAT; // container too small for both mins
+  if (hi < MIN_CHAT) return MIN_CHAT;
   return clampNum(width, MIN_CHAT, hi, DEFAULT_CHAT_W);
 }
 
-/** Clamp a floating-window geometry to the viewport (size + on-screen position). */
 export function clampGeometry(
   geo: PopoutGeometry,
   vw: number,
@@ -119,7 +105,6 @@ function validStashEdge(v: unknown): StashEdge | null {
     : null;
 }
 
-/** Keep the floating icon fully on-screen; resolves the bottom-right sentinel. */
 export function clampIcon(icon: IconPos, vw: number, vh: number): IconPos {
   const maxX = Math.max(ICON_MARGIN, vw - ICON_SIZE - ICON_MARGIN);
   const maxY = Math.max(ICON_MARGIN, vh - ICON_SIZE - ICON_MARGIN);
@@ -129,7 +114,6 @@ export function clampIcon(icon: IconPos, vw: number, vh: number): IconPos {
   };
 }
 
-/** Which viewport edge the icon center has crossed (largest overshoot), or null. */
 export function edgeForIcon(
   icon: IconPos,
   vw: number,
@@ -202,13 +186,9 @@ export function readChatLayout(): ChatLayout | null {
   }
 }
 
-// --- Cookie sync (server-readable, so SSR renders the right layout, no flash).
-// localStorage stays the source of truth; the cookie mirrors it for the server.
-
 export const CHAT_LAYOUT_COOKIE = CHAT_LAYOUT_KEY;
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 400;
 
-/** Parse the URI-encoded JSON cookie value (server + client). */
 export function parseChatLayoutCookie(value: string | undefined): ChatLayout {
   if (!value) return DEFAULT_CHAT_LAYOUT;
   try {
@@ -218,7 +198,6 @@ export function parseChatLayoutCookie(value: string | undefined): ChatLayout {
   }
 }
 
-/** Persist to localStorage (client) AND the cookie (next SSR, flash-free). */
 export function persistChatLayout(layout: ChatLayout): void {
   const json = JSON.stringify(layout);
   try {
@@ -229,8 +208,6 @@ export function persistChatLayout(layout: ChatLayout): void {
   } catch {}
 }
 
-// Runs before React hydrates: re-mirror localStorage into the cookie so the
-// next navigation's SSR matches (covers a cleared/expired cookie).
 export const CHAT_LAYOUT_BOOT_SCRIPT = `(function(){try{
 var K=${JSON.stringify(CHAT_LAYOUT_KEY)};
 var v=null;try{v=localStorage.getItem(K)}catch(e){}

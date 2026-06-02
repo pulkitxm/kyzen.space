@@ -1,18 +1,8 @@
 import { z } from "zod";
 
-/**
- * Shared, strict Zod schemas for the game wire DTOs and socket payloads.
- * These are the single source of truth for both runtime validation and the
- * exported TypeScript types (derived via `z.infer`), so the two can never
- * drift. Game-specific shapes (`gameState`, `moveData`) stay `unknown` here and
- * are validated by each game's own `stateSchema` / `moveSchema`
- * (see `GameDefinition`).
- */
-
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** A UUID string (case-insensitive). */
 export const uuidSchema = z.string().regex(UUID_RE, "Invalid id");
 
 export const gameStatusSchema = z.enum([
@@ -35,12 +25,9 @@ export const gamePlayerSchema = z
   .strict();
 export type GamePlayerDto = z.infer<typeof gamePlayerSchema>;
 
-// ---- client -> server payloads (validated on receipt) ----
-
 export const clientJoinRoomSchema = z
   .object({
     gameId: uuidSchema,
-    /** "spectate" joins read-only (no seat). Defaults to "play". */
     intent: z.enum(["play", "spectate"]).optional(),
   })
   .strict();
@@ -49,13 +36,10 @@ export type ClientJoinRoom = z.infer<typeof clientJoinRoomSchema>;
 export const clientMakeMoveSchema = z
   .object({
     gameId: uuidSchema,
-    // Per-game shape; validated by the game's `moveSchema` before `reduce`.
     moveData: z.unknown(),
   })
   .strict();
 export type ClientMakeMove = z.infer<typeof clientMakeMoveSchema>;
-
-// ---- server -> client DTOs ----
 
 export const gameJsonSchema = z.object({
   id: z.string(),

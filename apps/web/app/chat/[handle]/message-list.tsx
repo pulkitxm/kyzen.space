@@ -9,8 +9,8 @@ import { type ChatMessage, messagesAtomFamily } from "@/lib/chat/atoms";
 import { MessageBubble } from "./message-bubble";
 
 const PAGE_SIZE = 20;
-const LOAD_OLDER_AT = 200; // px from the top (older) edge
-const SHOW_JUMP_AT = 280; // px scrolled up from the bottom
+const LOAD_OLDER_AT = 200;
+const SHOW_JUMP_AT = 280;
 
 export function MessageList({
   conversationId,
@@ -35,8 +35,6 @@ export function MessageList({
   const nameOf = (id: string | null | undefined) =>
     members.find((m) => m.id === id)?.username ?? "Someone";
 
-  // Group consecutive messages (chronological order) before reversing for the
-  // column-reverse layout below.
   const rows = messages.map((m, i) => {
     const prev = messages[i - 1];
     return {
@@ -59,7 +57,7 @@ export function MessageList({
         )}`,
       );
       cursorRef.current = res.nextCursor;
-      const older = [...res.messages].reverse(); // newest-first -> chronological
+      const older = [...res.messages].reverse();
       if (older.length) {
         store.set(messagesAtomFamily(conversationId), (prev) => {
           const seen = new Set(prev.map((m) => m.id));
@@ -68,16 +66,12 @@ export function MessageList({
         });
       }
     } catch {
-      // Leave the cursor in place so a later scroll retries.
     } finally {
       loadingRef.current = false;
       setLoadingOlder(false);
     }
   }, [conversationId, store]);
 
-  // In a column-reverse scroller the bottom (latest) is scrollTop 0, and the
-  // magnitude grows as you scroll up — so prepending older messages at the top
-  // never moves the viewport, and we never need to scroll on load.
   const onScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;

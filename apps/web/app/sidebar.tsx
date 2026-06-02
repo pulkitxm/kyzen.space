@@ -89,8 +89,6 @@ export function Sidebar({
   const hasResizedThisGestureRef = useRef(false);
   const resizeStartedFromCollapsedRef = useRef(false);
 
-  // Derive the lobby href from the game type (URLs are a web concern; game
-  // metadata lives in games-core). Keeps the render below using `game.href`.
   const groups = getCategoryGroups().map(({ category, games }) => ({
     category,
     games: games.map((game) => ({ ...game, href: `/games/${game.type}` })),

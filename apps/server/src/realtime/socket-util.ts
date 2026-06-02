@@ -24,7 +24,6 @@ export function ackErr(cb: AckFn | undefined, error: string): void {
   cb?.({ ok: false, error });
 }
 
-/** Map a service result onto the ack callback ({ ok, [key]: value } | { ok:false, error }). */
 export function ack<T>(
   cb: AckFn | undefined,
   res: ServiceResult<T>,
@@ -34,7 +33,6 @@ export function ack<T>(
   else cb?.({ ok: false, error: res.error });
 }
 
-/** Register an async socket handler with uniform error -> ack handling + logging. */
 export function register(
   socket: Socket,
   event: string,

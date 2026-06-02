@@ -6,14 +6,6 @@ import { notify } from "../realtime/notify";
 import { sendMessage } from "./messages-service";
 import { fail, ok, type ServiceResult } from "./result";
 
-/**
- * Create a game from inside a conversation (the one path behind the composer
- * game button, the `/play` slash command, and the Play → conversation picker).
- * Seats the creator, posts a `game_card` message to the conversation, and
- * notifies every other member ("game_started", or "game_challenge" for the
- * specifically challenged member). DMs always use "open" seating; groups must
- * pick "open" or "challenge".
- */
 export async function createGameInConversation(input: {
   userId: string;
   conversationId: string;
@@ -39,7 +31,7 @@ export async function createGameInConversation(input: {
   let seatingMode: SeatingMode;
   let challengedUserId: string | null = null;
   if (conv.kind === "dm") {
-    seatingMode = "open"; // DMs only ever have two participants
+    seatingMode = "open";
   } else {
     if (input.seatingMode !== "open" && input.seatingMode !== "challenge") {
       return fail("Pick a seating mode for the group game", 400);
@@ -92,7 +84,6 @@ export async function createGameInConversation(input: {
   });
   if (!sent.ok) return fail(sent.error, sent.status);
 
-  // One notification per other member; challenged member gets the challenge variant.
   const memberIds = await conversations.getMemberIds(input.conversationId);
   for (const uid of memberIds) {
     if (uid === input.userId) continue;

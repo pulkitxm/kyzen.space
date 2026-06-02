@@ -103,7 +103,6 @@ describe("createGameInConversation", () => {
       userId: "alice",
       conversationId: "c1",
       gameType: "tic-tac-toe",
-      // even if a challenge is requested, a DM coerces to "open"
       seatingMode: "challenge",
       challengedUserId: "bob",
     });
@@ -166,7 +165,6 @@ describe("createGameInConversation", () => {
       notifyCalls.map((n) => [n.userId, n.type]),
     );
     expect(byUser).toEqual({ bob: "game_challenge", carol: "game_started" });
-    // the creator is never notified of their own action
     expect(notifyCalls.find((n) => n.userId === "alice")).toBeUndefined();
   });
 

@@ -109,8 +109,6 @@ export async function markAllRead(userId: string): Promise<void> {
     .where(and(eq(notification.userId, userId), isNull(notification.readAt)));
 }
 
-/** Resolve (and mark read) actionable notifications referencing a thing, e.g. a
- * friend request that has now been answered, so it stops being actionable. */
 export async function resolveByRequestId(
   userId: string,
   type: NotificationType,

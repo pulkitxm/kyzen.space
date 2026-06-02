@@ -11,7 +11,6 @@ import {
   type SeatingMode,
 } from "../schema";
 
-/** A game row with its seated players attached (in seat order). */
 export type GameRecord = GameRow & { players: GamePlayer[] };
 
 export type CreateGameInput = {
@@ -20,7 +19,6 @@ export type CreateGameInput = {
   gameState: unknown;
   config?: unknown;
   status?: GameStatus;
-  // Phase 3 — link a game to the conversation it was created from.
   conversationId?: string | null;
   creatorUserId?: string | null;
   seatingMode?: SeatingMode | null;
@@ -79,7 +77,6 @@ export async function getGameById(id: string): Promise<GameRecord | null> {
   return { ...row, players };
 }
 
-/** Seat a new player. `seatOrder` is the engine role index (roles[seatOrder]). */
 export async function seatPlayer(
   gameId: string,
   player: GamePlayer,

@@ -22,9 +22,6 @@ import { cn } from "@/lib/utils";
 
 const DRAG_THRESHOLD = 4;
 
-// Position via CSS clamp() + vw/vh units so the server-rendered HTML matches the
-// first client paint exactly (no flash on reload, no window access during SSR).
-// clamp() also resolves the bottom-right sentinel (a huge stored coord) on its own.
 function clampX(px: number, reserve: number) {
   return `clamp(${ICON_MARGIN}px, ${px}px, calc(100vw - ${reserve}px))`;
 }
@@ -40,11 +37,6 @@ function Chevron({ edge }: { edge: StashEdge }) {
   return <FaChevronUp className={cls} />;
 }
 
-/**
- * The minimized chat: a draggable round bubble. Dragging its center past a
- * viewport edge morphs it (live) into a thin chevron tab pinned to that edge.
- * Click the bubble → restore the chat (onRestore). Click the tab → un-stash.
- */
 export function ChatFloatingIcon({
   icon,
   stashEdge,
@@ -64,16 +56,11 @@ export function ChatFloatingIcon({
 }) {
   const edgeRef = useRef(stashEdge);
   edgeRef.current = stashEdge;
-  // Set when a drag just ended so the trailing synthetic click (e.g. released
-  // on the edge tab) doesn't immediately un-stash.
   const justDraggedRef = useRef(false);
 
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      // Origin = the bubble's ACTUAL on-screen rect, not the stored coord. The
-      // stored value may be the bottom-right sentinel that CSS clamp() resolves
-      // only at paint time; measuring keeps the drag math anchored to reality.
       const rect = e.currentTarget.getBoundingClientRect();
       const orig = { x: rect.left, y: rect.top };
       const startX = e.clientX;
@@ -120,8 +107,6 @@ export function ChatFloatingIcon({
   );
 
   if (stashEdge) {
-    // Pin the cross-axis to the edge via CSS; clamp the along-edge coordinate
-    // (derived from the icon center) with vw/vh so SSR and client agree.
     const centerX = icon.x + ICON_SIZE / 2;
     const centerY = icon.y + ICON_SIZE / 2;
     const vertical = stashEdge === "left" || stashEdge === "right";

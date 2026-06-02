@@ -1,7 +1,5 @@
 import { PageContainer, Skeleton } from "@/components/ui";
 
-// Mirrors app/games/page.tsx: PageContainer + back link + header + a list of
-// GameCard rows.
 export default function GamesLoading() {
   return (
     <PageContainer>

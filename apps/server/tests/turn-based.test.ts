@@ -55,9 +55,6 @@ const profiles = {
   },
 };
 
-// Full-superset barrel mock: provide every named export the real `../db`
-// re-exports so no other test file hits a link error if this leaks, and so the
-// real game-card-broadcast (which assemble imports) never loads the DB client.
 mock.module("../src/db", () => ({
   games,
   profiles,
@@ -68,9 +65,6 @@ mock.module("../src/db", () => ({
   db: {},
   schema: {},
 }));
-// broadcastGameCard imports this leaf directly; returning null makes it no-op
-// (it runs on seat/complete) without pulling in the DB client. We mock the leaf
-// rather than the broadcast module so game-card.test.ts can test it for real.
 mock.module("../src/db/repositories/messages", () => ({
   getGameCardByGameId: async () => null,
 }));

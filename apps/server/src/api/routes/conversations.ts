@@ -46,8 +46,6 @@ export const conversationsRouter = new Hono()
     if (!res.ok) return c.json({ error: res.error }, res.status);
     return c.json({ conversation: res.value }, 201);
   })
-  // Resolve a DM by the other user's username (get-or-create). Powers the
-  // username-based URL /chat/<username>.
   .get("/with/:username", async (c) => {
     const userId = await getUserId(c);
     if (!userId) return c.json({ error: "Unauthorized" }, 401);
@@ -58,8 +56,6 @@ export const conversationsRouter = new Hono()
     if (profile.userId === userId) {
       return c.json({ error: "Cannot DM yourself" }, 400);
     }
-    // Open an existing DM regardless of current friendship; only creating a new
-    // DM requires being friends.
     const existing = await conversations.findDm(userId, profile.userId);
     if (existing) {
       return c.json({

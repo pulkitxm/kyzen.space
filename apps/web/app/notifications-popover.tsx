@@ -44,8 +44,6 @@ export function NotificationsPopover({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
-  // The list is seeded on the server and kept live by the socket bridge, so the
-  // popover just reads the atoms — the ticker reflects how many are unread.
   const notifs = useAtomValue(notificationsAtom);
   const count = useAtomValue(unreadNotificationsAtom);
   const store = useStore();
@@ -54,8 +52,6 @@ export function NotificationsPopover({
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!open) return;
-      // Seeing the list counts as reading it: clear the unread state locally and
-      // on the server the moment the popover opens.
       if (store.get(unreadNotificationsAtom) === 0) return;
       store.set(unreadNotificationsAtom, 0);
       store.set(notificationsAtom, (prev) =>

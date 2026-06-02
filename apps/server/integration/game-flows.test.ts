@@ -1,8 +1,3 @@
-// Integration tests for the game domain against real Postgres: the normalized
-// `game_player` table, the transactional createGame, the indexed "my games"
-// join, and move/state persistence to completion. Run with:
-// `bun run test:integration` (needs the DB up). Self-skips if unreachable.
-
 import { afterAll, describe, expect, it } from "bun:test";
 import { type TicTacToeState, ticTacToeEngine } from "@gamelobby/games-core";
 import { eq, sql } from "drizzle-orm";
@@ -140,7 +135,6 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
     );
     await games.updateGame(game.id, { status: "active" });
 
-    // X (player a) wins the top row.
     const seq: [string, "X" | "O", number, number][] = [
       [a.id, "X", 0, 0],
       [b.id, "O", 1, 0],

@@ -1,7 +1,5 @@
 import { Skeleton } from "@/components/ui";
 
-// Mirrors app/friends/friends-client.tsx: full-height max-w-4xl column with a
-// bordered header (title + tabs) and a list of friend rows.
 export default function FriendsLoading() {
   return (
     <div className="mx-auto flex h-full w-full max-w-4xl flex-col">
