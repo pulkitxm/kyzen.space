@@ -129,6 +129,49 @@ function cssComments(text) {
   return { remove, kept };
 }
 
+function jsoncComments(text) {
+  const remove = [];
+  let i = 0;
+  const n = text.length;
+  let str = false;
+  while (i < n) {
+    const c = text[i];
+    if (str) {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (c === '"') str = false;
+      i++;
+      continue;
+    }
+    if (c === '"') {
+      str = true;
+      i++;
+      continue;
+    }
+    if (c === "/" && text[i + 1] === "*") {
+      const start = i;
+      let j = i + 2;
+      while (j < n && !(text[j] === "*" && text[j + 1] === "/")) j++;
+      const end = Math.min(n, j + 2);
+      remove.push({ pos: start, end });
+      i = end;
+      continue;
+    }
+    if (c === "/" && text[i + 1] === "/") {
+      const start = i;
+      let j = i + 2;
+      while (j < n && text[j] !== "\n") j++;
+      remove.push({ pos: start, end: j });
+      i = j;
+      continue;
+    }
+    i++;
+  }
+  return { remove, kept: 0 };
+}
+
 function expand(text, pos, end) {
   let ls = pos;
   while (ls > 0 && text[ls - 1] !== "\n") ls--;
@@ -181,7 +224,7 @@ function snippet(text, r) {
 }
 
 const files = execSync(
-  "git ls-files '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.css'",
+  "git ls-files '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.css' '*.json' '*.jsonc'",
   {
     encoding: "utf8",
   },
@@ -189,7 +232,7 @@ const files = execSync(
   .split("\n")
   .map((s) => s.trim())
   .filter(Boolean)
-  .filter((f) => !/(^|\/)next-env\.d\.ts$/.test(f));
+  .filter((f) => !/(^|\/)next-env\.d\.ts$/.test(f) && !/\/drizzle\//.test(f));
 
 let changedFiles = 0;
 let totalRemoved = 0;
@@ -198,8 +241,13 @@ const findings = [];
 
 for (const f of files) {
   const text = readFileSync(f, "utf8");
-  const isCss = f.endsWith(".css");
-  const { remove, kept } = isCss ? cssComments(text) : tsComments(f, text);
+  const ext = f.slice(f.lastIndexOf("."));
+  const { remove, kept } =
+    ext === ".css"
+      ? cssComments(text)
+      : ext === ".json" || ext === ".jsonc"
+        ? jsoncComments(text)
+        : tsComments(f, text);
   totalKept += kept;
   if (remove.length === 0) continue;
   changedFiles++;
@@ -210,7 +258,7 @@ for (const f of files) {
     continue;
   }
   let out = build(text, remove);
-  if (isCss) out = tidyCss(out);
+  if (ext === ".css") out = tidyCss(out);
   if (out !== text) writeFileSync(f, out);
 }
 
