@@ -343,3 +343,4 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 - [games-core schemas](./games-core-schemas.md) — the `GameJson`/`MoveJson` + `configSchema` that `serialize.ts` and `createGameInConversation` rely on.
 - [games-core engine](./games-core-engine.md) — `GameEngine`, `createInitialState`, and `reduce`, the authoritative logic shared with the client.
 - [Web app](./web.md) — how the Next.js frontend consumes this REST surface (`serverFetch*`/`clientFetch*`) and the socket lane.
+- [Testing](./testing.md) — the DB-backed `integration/` suite exercises these routes/services and the shared `createGameInConversation` flow end to end.

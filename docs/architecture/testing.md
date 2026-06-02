@@ -1,6 +1,6 @@
 # Testing
 
-The runner is **`bun:test`** (no Jest/Vitest). Every workspace keeps its tests in a `tests/` directory; `apps/server` additionally has an `integration/` suite that needs a live database. Tests are mostly fast, dependency-free unit tests over pure helpers, plus a set of **structural** suites that enforce the platform contract — every registered game must ship an engine, schemas, a board, a skeleton, and a doc, or a test fails.
+The runner is **`bun:test`** (no Jest/Vitest). Every workspace keeps its tests in a `tests/` directory; `apps/server` additionally has an `integration/` suite (8 files, ~122 DB-backed tests) that needs a live database. Tests are mostly fast, dependency-free unit tests over pure helpers, plus a set of **structural** suites that enforce the platform contract — every registered game must ship an engine, schemas, a board, a skeleton, and a doc, or a test fails.
 
 ## How to run
 
@@ -22,7 +22,9 @@ The server's default `test` script runs only `tests/` (`apps/server/package.json
 cd apps/server && bun run test:integration     # runs integration/ with --env-file=../../.env
 ```
 
-Integration tests **self-skip without a DB**: each file probes `select 1` and gates with `describe.skipIf(!DB_UP)` (`apps/server/integration/game-flows.test.ts:10`, `apps/server/integration/chat-flows.test.ts:16`), so they pass cleanly when Postgres is down — but to actually exercise them, start the DB (`bun run db:start`) and provide `.env`.
+Integration tests **self-skip without a DB**: each file probes `select 1` and gates with `describe.skipIf(!DB_UP)`, so they pass cleanly when Postgres is down — but to actually exercise them, start the DB (`bun run db:start`) and provide `.env`. The two original files keep the probe inline (`apps/server/integration/game-flows.test.ts:10`, `apps/server/integration/chat-flows.test.ts:16`); the six newer files import a shared `DB_UP` from `apps/server/integration/harness.ts:8`.
+
+`harness.ts` factors out the boilerplate: `createHarness(prefix)` returns `makeUser`/`befriend`/`makeDm`/`makeGroup`/`trackGame`/`cleanup` over UUID-namespaced fixtures (so parallel files never collide), plus `unwrap`/`expectErr`/`TestUser`. Each newer file does `const h = createHarness("…")` and `afterAll(h.cleanup)`, which deletes its tracked games/conversations/users. The two original files still carry their own copy of this harness inline.
 
 ## Files at a glance
 
@@ -39,10 +41,17 @@ Integration tests **self-skip without a DB**: each file probes `select 1` and ga
 | `apps/web/tests/avatar-render.test.ts` | Every avatar option value + palette color renders a real DiceBear `<svg>`; rendering is deterministic for a fixed config. |
 | `apps/web/tests/*` (others) | Pure web helpers: chat formatting, chat-layout cookie parsing, friends atoms, pattern/shortcode/theme utilities. |
 | `apps/server/tests/rooms.test.ts` | Socket room helpers: `gameRoom`/`convRoom`/`userRoom` key builders and `join*`/`leave*`/`emitTo*` against a fake io/socket. |
-| `apps/server/tests/turn-based.test.ts` | The authoritative game-lane driver: `handleJoinRoom` seating/spectate/challenge rules and `handleMakeMove` validation (non-player, inactive game, bad move via Zod, corrupt stored state) + applying moves, broadcasting, and stat bumps. DB layer mocked with `mock.module("../src/db", …)`. |
+| `apps/server/tests/turn-based.test.ts` | The game-lane driver as a **unit**: `handleJoinRoom` seating/spectate/challenge rules and `handleMakeMove` validation (non-player, inactive game, bad move via Zod, corrupt stored state) + applying moves, broadcasting, and stat bumps. **DB layer mocked** with `mock.module("../src/db", …)` — no Postgres. (Its DB-backed twin is `integration/game-driver.test.ts`, which runs the same driver against a live DB with only io/socket faked.) |
 | `apps/server/tests/games-in-chat.test.ts` | Creating a game inside a conversation, again with the repos mocked. |
 | `apps/server/tests/*` (others) | Pure helpers and serializers: `serialize` (`serializeGame`/`serializeMove`), `chat-cursor`, `db-latency`, `game-card`, `profiles-route`, `theme`, `pattern`, `chat-layout`. |
-| `apps/server/integration/*` | DB-backed end-to-end flows (game + chat) against the normalized `game_player` join — self-skips without Postgres. |
+| `apps/server/integration/chat-flows.test.ts` | DB-backed chat basics: friend requests (send/accept/decline/duplicate/auto-accept/canonical pairKey), DM open + friends-only gate, messaging member gates + unread/read + delete, group ownership/membership/rename, and notification fan-out basics. |
+| `apps/server/integration/game-flows.test.ts` | DB-backed game lifecycle over the normalized `game_player` join: create-in-DM seats the creator + posts a card, a second seat lists the game for both via the indexed join, and a full move sequence persists moves and completes with a winner. |
+| `apps/server/integration/friends-edge.test.ts` | Friends service edge matrix: already-friends 409, respond 404/403/409 (ownership-before-status), idempotent `removeFriend`, pending lists both directions, canonical pairKey across pairs, reverse-request auto-accept. |
+| `apps/server/integration/conversations-edge.test.ts` | Conversation service edges: order-independent DM dedupe; `addMembers`/`removeMember`/`renameGroup` 404-on-DM, 400/403 gates, re-add clears `leftAt`, no-dup membership; `getMemberRole`/`createGroup` role assignment, member dedupe, creator-in-members drop. |
+| `apps/server/integration/messages-edge.test.ts` | Message service edges: delete 404, markRead/send 403 for non-members, multi-message unread accrual, system + gif (non-text) messages bypass the empty-body check and skip unread, whitespace/null text → 400, cursor pagination (newest-first, no overlap), soft-delete hides body/metadata + drops unread. |
+| `apps/server/integration/games-in-chat-edge.test.ts` | `createGameInConversation` branch matrix: 404 no-conversation, 403 non-member, 400 unsupported type / invalid config / group missing seating mode / challenge missing-or-self-or-outsider target; valid open + challenge games seat the creator as X; DM forces `open` and ignores challenge fields. |
+| `apps/server/integration/game-driver.test.ts` | The **real** turn-based driver (`handleJoinRoom`/`handleMakeMove`) against a live DB with only io/socket faked: creator-join vs. second-member seating/active-flip, spectate doesn't seat, and every `game_error` branch (invalid id, not-active, non-player, out-of-turn, occupied cell, out-of-range move) plus a full X win (winner = userId, `game_over`, stat bumps), a draw (drawn bumps), and challenge-reserved seating. |
+| `apps/server/integration/notifications-edge.test.ts` | Notifications repo edges: `markRead` (single, already-read null, wrong-owner null) and `markAllRead`, `unreadCount`, `listForUser` pagination/`unreadOnly`, `resolveByRequestId` (resolves + reads only the matching request), decline creates no requester notification, and `notify` suppresses self-targeted entries. |
 | `packages/avatar/tests/*` | The avatar domain: `generate`, `validate`, `compare`, `options`, `dicebear-mapping`. |
 
 ## Patterns to know

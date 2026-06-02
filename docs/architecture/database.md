@@ -277,3 +277,4 @@ Notice that no SQL appears anywhere in `turn-based.ts` — only `games.*` and `p
 - [`./auth.md`](./auth.md) — Better Auth and the `user` / `session` / `account` tables plus first-sign-in profile provisioning.
 - [`./chat-core.md`](./chat-core.md) — the chat/social DTOs and socket contract backing the `conversation` / `message` / `friendship` / `notification` tables.
 - [`./web.md`](./web.md) — how the frontend reads this data over HTTP/WebSocket (it never touches Postgres directly).
+- [`./testing.md`](./testing.md) — the DB-backed `integration/` suite that runs these repositories against a live Postgres.

@@ -445,3 +445,4 @@ export function attachRedisAdapter(io: IOServer): void {
 - [chat-core](./chat-core.md) — `CHAT_EVENTS`, the chat DTOs, and the socket event contract shared by both ends.
 - [Server API](./server-api.md) — the Express/Hono REST side that mounts `attachRealtime`.
 - [Web](./web.md) — how the Next.js client connects the socket and wires Jotai state to these events.
+- [Testing](./testing.md) — the `integration/game-driver.test.ts` suite drives the real `handleJoinRoom`/`handleMakeMove` against a live DB via a mock io/socket.
