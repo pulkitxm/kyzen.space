@@ -1,27 +1,12 @@
-// Strips human-readable comments from tracked source files while preserving
-// functional tooling directives (so the build/lint stays green).
-//
-//   bun run strip-comments                  # rewrite files in place
-//   bun run strip-comments -- --check       # report only; exit 1 if any found
-//
-// Scope: tracked .ts .tsx .js .jsx .mjs .cjs .css (excludes next-env.d.ts).
-// Uses the TypeScript parser to find real comment trivia (JSX-text aware), so
-// `//` in URLs/strings/regex and `/* */` inside JSX text are never touched.
-// CSS uses a string-aware scanner. After running, format with `bun run fix`.
-
 import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
-import { relative } from "node:path";
-import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-// In check mode we report findings and never write — used as a CI gate.
 const args = process.argv.slice(2);
 const CHECK = args.some(
   (a) => a === "--check" || a === "--dry-run" || a === "--dry",
 );
 
-// Comments we KEEP — functional / tooling directives and preserved blocks.
 function keep(raw) {
   const isLine = raw.startsWith("//");
   if (
@@ -29,28 +14,26 @@ function keep(raw) {
     raw.startsWith("///") &&
     /^<(reference|amd-)/.test(raw.slice(3).trim())
   ) {
-    return true; // triple-slash reference directive
+    return true;
   }
-  if (!isLine && raw.startsWith("/*!")) return true; // preserved / license block
+  if (!isLine && raw.startsWith("/*!")) return true;
   const inner = isLine ? raw.replace(/^\/\/+/, "") : raw.slice(2, -2);
-  const t = inner.trim().replace(/^\*+\s*/, ""); // tolerate JSDoc `/** ... */`
+  const t = inner.trim().replace(/^\*+\s*/, "");
 
-  // universal (line or block) directives
   if (/^@(ts-ignore|ts-expect-error|ts-nocheck|ts-check)\b/.test(t))
     return true;
   if (/^eslint-(disable|enable)(-next-line|-line)?\b/.test(t)) return true;
   if (/^biome-ignore\b/.test(t)) return true;
   if (/^prettier-ignore\b/.test(t)) return true;
   if (/^@(jsx|jsxImportSource|jsxRuntime|jsxFrag)\b/.test(t)) return true;
-  if (/^#\s*source(MappingURL|URL)\b/.test(t)) return true; // //# sourceMappingURL=
+  if (/^#\s*source(MappingURL|URL)\b/.test(t)) return true;
   if (/^@vite-ignore\b/.test(t)) return true;
-  if (/^[#@]__(PURE|NO_SIDE_EFFECTS)__/.test(t)) return true; // bundler annotations
-  if (/^(istanbul|c8|v8)\s+ignore\b/.test(t)) return true; // coverage
+  if (/^[#@]__(PURE|NO_SIDE_EFFECTS)__/.test(t)) return true;
+  if (/^(istanbul|c8|v8)\s+ignore\b/.test(t)) return true;
   if (/^@(license|preserve)\b/.test(t)) return true;
   if (/webpack(ChunkName|Mode|Prefetch|Preload|Include|Exclude|Ignore)/.test(t))
     return true;
 
-  // block-only directives
   if (!isLine && /^(eslint-env|eslint\s|globals?\s|exported\b)/.test(t))
     return true;
 
@@ -64,11 +47,6 @@ function scriptKind(file) {
   return ts.ScriptKind.JS;
 }
 
-// Collect real comment ranges via the parser. Each leaf token contributes its
-// leading comments (standalone / after a newline) and trailing comments
-// (same line, e.g. `code; // note` or `{/* c */}` — these are NOT returned by
-// getLeadingCommentRanges). JSX literal text is recorded separately and any
-// range overlapping it is discarded, so `//` / `/* */` inside JSX text is safe.
 function tsComments(file, text) {
   const sf = ts.createSourceFile(
     file,
@@ -114,7 +92,6 @@ function tsComments(file, text) {
   return { remove, kept };
 }
 
-// CSS: only /* */ comments, respecting string literals; keep /*! ... */.
 function cssComments(text) {
   const remove = [];
   let kept = 0;
@@ -152,7 +129,6 @@ function cssComments(text) {
   return { remove, kept };
 }
 
-// Whole-line comments drop the entire line; inline ones drop just their span.
 function expand(text, pos, end) {
   let ls = pos;
   while (ls > 0 && text[ls - 1] !== "\n") ls--;
@@ -185,7 +161,6 @@ function build(text, ranges) {
   return out + text.slice(cursor);
 }
 
-// CSS is excluded from biome formatting, so tidy whitespace ourselves.
 function tidyCss(s) {
   return s
     .replace(/[ \t]+$/gm, "")
@@ -205,7 +180,6 @@ function snippet(text, r) {
   return first.length > 80 ? `${first.slice(0, 77)}...` : first;
 }
 
-const self = relative(process.cwd(), fileURLToPath(import.meta.url));
 const files = execSync(
   "git ls-files '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.css'",
   {
@@ -215,7 +189,7 @@ const files = execSync(
   .split("\n")
   .map((s) => s.trim())
   .filter(Boolean)
-  .filter((f) => f !== self && !/(^|\/)next-env\.d\.ts$/.test(f));
+  .filter((f) => !/(^|\/)next-env\.d\.ts$/.test(f));
 
 let changedFiles = 0;
 let totalRemoved = 0;

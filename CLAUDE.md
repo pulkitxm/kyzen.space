@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The **only** comments permitted are functional tooling directives, which must be preserved: `biome-ignore`, `eslint-disable` / `eslint-enable`, `@ts-expect-error` / `@ts-ignore` / `@ts-nocheck`, `prettier-ignore`, `///` triple-slash references, `//# sourceMappingURL`, bundler/JSX pragmas, and `/*! */` / `@license` blocks.
 
-Enforcement: `bun run strip-comments` removes every non-directive comment in place; `bun run strip-comments -- --check` lists any offenders and exits non-zero. CI runs the check on every PR (`.github/workflows/no-comments.yml`), so a PR that introduces a comment fails. (The `scripts/strip-comments.mjs` tool itself is exempt — it documents this policy.)
+Enforcement: `bun run strip-comments` removes every non-directive comment in place; `bun run strip-comments -- --check` lists any offenders and exits non-zero. CI runs the check on every PR (`.github/workflows/no-comments.yml`), so a PR that introduces a comment fails. The gate covers every tracked code file, including `scripts/strip-comments.mjs` itself — there are no exemptions.
 
 ## Commands
 
