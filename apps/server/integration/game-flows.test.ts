@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { type TicTacToeState, ticTacToeEngine } from "@gamelobby/games-core";
+import { TIC_TAC_TOE, type TicTacToeState, ticTacToeEngine } from "@gamelobby/games-core";
 import { eq, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";
@@ -75,7 +75,7 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
       await createGameInConversation({
         userId: a.id,
         conversationId: convId,
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
       }),
     );
 
@@ -97,7 +97,7 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
       await createGameInConversation({
         userId: a.id,
         conversationId: convId,
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
       }),
     );
 
@@ -125,7 +125,7 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
       await createGameInConversation({
         userId: a.id,
         conversationId: convId,
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
       }),
     );
     await games.seatPlayer(

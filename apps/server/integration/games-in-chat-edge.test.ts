@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
+import { TIC_TAC_TOE } from "@gamelobby/games-core";
 import { createGameInConversation } from "../src/chat/games-in-chat-service";
 import { games } from "../src/db";
 import { createHarness, DB_UP, expectErr, unwrap } from "./harness";
@@ -15,7 +16,7 @@ describe.skipIf(!DB_UP)(
       const res = await createGameInConversation({
         userId: a.id,
         conversationId: crypto.randomUUID(),
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
       });
       expectErr(res, 404);
       if (!res.ok) expect(res.error).toBe("Conversation not found");
@@ -30,7 +31,7 @@ describe.skipIf(!DB_UP)(
       const res = await createGameInConversation({
         userId: outsider.id,
         conversationId: convId,
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
       });
       expectErr(res, 403);
       if (!res.ok) expect(res.error).toBe("Not a member of this conversation");
@@ -58,7 +59,7 @@ describe.skipIf(!DB_UP)(
       const res = await createGameInConversation({
         userId: a.id,
         conversationId: convId,
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
         config: { x: 1 },
       });
       expectErr(res, 400);
@@ -73,7 +74,7 @@ describe.skipIf(!DB_UP)(
       const res = await createGameInConversation({
         userId: owner.id,
         conversationId: convId,
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
       });
       expectErr(res, 400);
       if (!res.ok)
@@ -90,7 +91,7 @@ describe.skipIf(!DB_UP)(
       const res = await createGameInConversation({
         userId: owner.id,
         conversationId: convId,
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
         seatingMode: "challenge",
       });
       expectErr(res, 400);
@@ -107,7 +108,7 @@ describe.skipIf(!DB_UP)(
       const res = await createGameInConversation({
         userId: owner.id,
         conversationId: convId,
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
         seatingMode: "challenge",
         challengedUserId: owner.id,
       });
@@ -124,7 +125,7 @@ describe.skipIf(!DB_UP)(
       const res = await createGameInConversation({
         userId: owner.id,
         conversationId: convId,
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
         seatingMode: "challenge",
         challengedUserId: stranger.id,
       });
@@ -145,7 +146,7 @@ describe.skipIf(!DB_UP)(
         await createGameInConversation({
           userId: owner.id,
           conversationId: convId,
-          gameType: "tic-tac-toe",
+          gameType: TIC_TAC_TOE,
           seatingMode: "challenge",
           challengedUserId: member.id,
         }),
@@ -180,7 +181,7 @@ describe.skipIf(!DB_UP)(
         await createGameInConversation({
           userId: owner.id,
           conversationId: convId,
-          gameType: "tic-tac-toe",
+          gameType: TIC_TAC_TOE,
           seatingMode: "open",
         }),
       );
@@ -209,7 +210,7 @@ describe.skipIf(!DB_UP)(
         await createGameInConversation({
           userId: a.id,
           conversationId: convId,
-          gameType: "tic-tac-toe",
+          gameType: TIC_TAC_TOE,
           seatingMode: "challenge",
           challengedUserId: b.id,
         }),
@@ -233,7 +234,7 @@ describe.skipIf(!DB_UP)(
         await createGameInConversation({
           userId: challenger.id,
           conversationId: convId,
-          gameType: "tic-tac-toe",
+          gameType: TIC_TAC_TOE,
           seatingMode: "challenge",
           challengedUserId: target.id,
         }),

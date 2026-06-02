@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
+import { TIC_TAC_TOE } from "@gamelobby/games-core";
 import { createGameInConversation } from "../src/chat/games-in-chat-service";
 import { games, profiles } from "../src/db";
 import { handleJoinRoom, handleMakeMove } from "../src/realtime/turn-based";
@@ -73,7 +74,7 @@ async function createDmGame(creator: TestUser, conversationId: string) {
   const res = await createGameInConversation({
     userId: creator.id,
     conversationId,
-    gameType: "tic-tac-toe",
+    gameType: TIC_TAC_TOE,
   });
   if (!res.ok) throw new Error(`game create failed: ${res.error}`);
   h.trackGame(res.value.game.id);
@@ -461,7 +462,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
     const res = await createGameInConversation({
       userId: owner.id,
       conversationId: convId,
-      gameType: "tic-tac-toe",
+      gameType: TIC_TAC_TOE,
       seatingMode: "challenge",
       challengedUserId: challenged.id,
     });

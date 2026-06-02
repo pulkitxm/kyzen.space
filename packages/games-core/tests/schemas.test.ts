@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  TIC_TAC_TOE,
   clientJoinRoomSchema,
   clientMakeMoveSchema,
   gameJsonSchema,
@@ -112,7 +113,7 @@ describe("wire payload schemas", () => {
     expect(
       gameJsonSchema.safeParse({
         id: "g1",
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
         status: "active",
         winner: null,
         players: [{ userId: "u1", username: "a", role: "X" }],
@@ -125,7 +126,7 @@ describe("wire payload schemas", () => {
     expect(
       gameJsonSchema.safeParse({
         id: "g1",
-        gameType: "tic-tac-toe",
+        gameType: TIC_TAC_TOE,
         status: "exploded",
         winner: null,
         players: [],

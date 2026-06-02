@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { GameCardMeta } from "@gamelobby/chat-core";
+import { TIC_TAC_TOE } from "@gamelobby/games-core";
 import { enrichGameCardMeta } from "../src/chat/game-card";
 import * as rooms from "../src/realtime/rooms";
 
@@ -7,7 +8,7 @@ const realRooms = { ...rooms };
 
 const BASE: GameCardMeta = {
   gameId: "g1",
-  gameType: "tic-tac-toe",
+  gameType: TIC_TAC_TOE,
   seatingMode: "open",
   creatorUsername: "alice",
 };
