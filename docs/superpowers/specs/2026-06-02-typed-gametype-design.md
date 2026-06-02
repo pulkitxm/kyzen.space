@@ -70,7 +70,7 @@ This catches the one remaining manual step — appending to `GAME_TYPES` when ad
 
 ### Validation gate stays `string`
 
-`getDefinition`, `hasEngine`, `getEngine` (registry.ts) and `getDriver` (drivers.ts) keep `(type: string)`. They are the trust boundary against DB values and unknown input; narrowing their parameters would force casts at every call from a DB read. `listGameTypes()` return type tightens to `GameType[]`.
+`getDefinition`, `getEngine` (registry.ts) and `getDriver` (drivers.ts) keep `(type: string)`. They are the trust boundary against DB values and unknown input; narrowing their parameters would force casts at every call from a DB read. `hasEngine` keeps its `string` parameter too, but becomes a type predicate — `hasEngine(type: string): type is GameType` — so an existing `if (!hasEngine(x)) …` guard narrows `x` to `GameType` for free. `listGameTypes()` return type tightens to `GameType[]`.
 
 ### Schemas → `gameTypeSchema`
 
@@ -89,8 +89,10 @@ Cast once in the games repository mapper (`apps/server/src/db/repositories/games
 
 Replace `gameType: string` with `GameType` at:
 
-- Server: `chat/games-in-chat-service.ts`, `db/repositories/games.ts`, `db/repositories/profiles.ts`, `api/routes/profiles.ts`.
+- Server: `chat/games-in-chat-service.ts` (create input), `db/repositories/games.ts` (`CreateGameInput` + the `GameRecord` override), `db/repositories/profiles.ts` (`bumpStats`).
 - Web props/args: `app/play/[gameId]/play-client.tsx`, `app/games/components/conversation-picker.tsx`, `app/chat/[handle]/game-launcher.tsx`, `lib/profile-activity-games.ts`, `app/chat/[handle]/game-card-message.tsx`.
+
+Raw DB-read consumers that map `GameRow`/`GameRow[]` directly (e.g. `api/routes/profiles.ts` `activityRow`) stay `string` — they sit on the DB boundary, not the app-level argument boundary, so narrowing them would only add casts for no caller benefit.
 
 ### games-client registries (collapse the 2nd source of truth)
 
@@ -105,7 +107,7 @@ The `Record<GameType, …>` annotation makes a missing entry a compile error (co
 
 ### Route params stay `string`, narrowed at the boundary
 
-`app/games/[gameType]/page.tsx` and `app/games/[gameType]/[gameId]/page.tsx` receive raw URL strings from Next.js. Narrow at the page boundary with `gameTypeSchema.safeParse(...)` and call `notFound()` on failure, after which the value is `GameType`.
+`app/games/[gameType]/page.tsx` receives a raw URL string from Next.js and already guards with `if (!hasEngine(gameType)) notFound();`. Because `hasEngine` becomes a `type is GameType` predicate, that existing guard narrows `gameType` to `GameType` afterwards with no extra code. `app/games/[gameType]/[gameId]/page.tsx` only reads `gameId` (it redirects), so its `gameType` param needs no change.
 
 ## Cost / trade-off
 
@@ -130,7 +132,7 @@ Edited:
 - `games-core`: `index.ts`, `definition.ts`, `schemas.ts`, `registry.ts`, `games/tic-tac-toe/schemas.ts` (remove the moved constant), `games/tic-tac-toe/meta.ts`, `games/tic-tac-toe/engine.ts`, `tests/conformance.test.ts`.
 - `chat-core`: `package.json` (add dep), `schemas.ts`.
 - `games-client`: `registry.ts` (computed keys + `Record<GameType, …>`).
-- `apps/server`: `db/repositories/games.ts`, `db/repositories/profiles.ts`, `chat/games-in-chat-service.ts`, `api/routes/profiles.ts`, `api/routes/conversations.ts`.
+- `apps/server`: `db/repositories/games.ts`, `db/repositories/profiles.ts`, `chat/games-in-chat-service.ts`, `api/routes/conversations.ts`.
 - `apps/web`: `play-client.tsx`, `conversation-picker.tsx`, `game-launcher.tsx`, `lib/profile-activity-games.ts`, `game-card-message.tsx`.
 - Test fixtures (slug constant, not assertions): `games-core/tests/schemas.test.ts`; `apps/web/tests/game-skeletons.test.tsx`; `apps/server` unit (`serialize.test.ts`, `games-in-chat.test.ts`, `turn-based.test.ts`, `game-card.test.ts`) and integration (`game-flows.test.ts`, `games-in-chat-edge.test.ts`, `game-driver.test.ts`).
 - Docs/agents: `docs/adding-a-game.md`, relevant `docs/architecture/*`, `.claude/agents/game-builder.md`.
