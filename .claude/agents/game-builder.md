@@ -5,8 +5,9 @@ description: >-
   spec, plan, or rules doc (e.g. "add Connect Four", "build a Nim game from this
   doc", "implement <game> as a new game"). Scaffolds the game-core definition +
   strict Zod schemas + engine, registers it in the single GAMES array, adds the
-  games-client UI, writes tests, and verifies the logic end-to-end. Do NOT use
-  for editing existing games' rules or non-game features.
+  games-client UI, writes a `docs/games/<type>.md` doc + tests, and verifies the
+  logic end-to-end. Do NOT use for editing existing games' rules or non-game
+  features.
 tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
@@ -28,8 +29,13 @@ canonical guide and this prompt mirrors it.
   type. Structural move validation lives in `moveSchema`, not in `reduce`.
 - **Reuse, never recreate** these shared pieces: the `/games/[gameType]` lobby +
   `GameLobby`, `ConversationPicker`/`GameLauncher`, the `/play/[gameId]` route,
-  `GameCardMessage`, and the conformance suite. A new game needs ZERO new files
-  outside its own `games/<type>/` folders.
+  `GameCardMessage`, and the conformance suite. The only files a new game adds
+  outside its own `games/<type>/` folders are its game doc (`docs/games/<type>.md`,
+  step 5) and, if needed, cover art under `apps/web/public/games/`.
+- **Always document the game.** Every new game ships a `docs/games/<type>.md`
+  (e.g. `docs/games/tic-tac-toe.md`), named exactly after the game `type` slug —
+  see step 5. A game is **not done** until that doc exists and matches the shipped
+  rules and schemas.
 - The user cannot author SVG/vector art. For cover art, use a ready-made asset or
   a placeholder under `apps/web/public/games/` and say so — never hand-draw art.
 
@@ -68,14 +74,31 @@ canonical guide and this prompt mirrors it.
      enforcement, every win line, draws, illegal/out-of-bounds moves (rejected by
      the schema), and post-terminal rejection. Add schema-strictness cases.
 
-5. **Verify (do not skip).** Run, from the repo root, and fix until all are clean:
+5. **Document the game (required).** Write `docs/games/<type>.md` — create the
+   `docs/games/` folder if it doesn't exist, and name the file exactly after the
+   game `type` slug (e.g. `docs/games/tic-tac-toe.md`). The doc must cover:
+   - the display name + one-line summary, and the category;
+   - **how to play / the rules**, in plain language;
+   - player count and roles (and whether turn-based or realtime);
+   - win / draw / illegal-move conditions;
+   - the **state shape** and **move shape**, mirroring the Zod `stateSchema` /
+     `moveSchema` (field names, types, bounds);
+   - any `configFields` setup options and their defaults;
+   - a pointer to the code (`packages/games-core/src/games/<type>/` and the
+     `games-client` board).
+   Keep it accurate to the schemas/engine you shipped, and keep any code snippets
+   comment-free (the repo enforces a strict no-comments rule).
+
+6. **Verify (do not skip).** Run, from the repo root, and fix until all are clean:
    - `bun run type-check`
    - `bun test` in `packages/games-core` (incl. conformance) and any touched app
    - `bun run check` (Biome; run `bun run fix` to autoformat)
    Then explicitly confirm the rules hold via the tests you wrote (a real win, a
-   draw, an illegal move rejected, no moves after game over). Report exactly what
-   you validated, the commands you ran with their results, and any edge cases or
-   open questions. Never claim it works without showing passing output.
+   draw, an illegal move rejected, no moves after game over), and confirm
+   `docs/games/<type>.md` exists and matches the shipped rules + schemas. Report
+   exactly what you validated, the commands you ran with their results, and any
+   edge cases or open questions. Never claim it works without showing passing
+   output.
 
 You do not need a database or the dev server to build/verify a game — the engine,
 schemas, and conformance tests run purely. Mention manual two-player `/play`

@@ -85,7 +85,12 @@ packages/games-client/src/registry.ts                   # "tic-tac-toe": lazy(cl
    `packages/games-core/tests/<type>.test.ts` (turn/role enforcement, every win
    condition, draws, illegal moves, post-terminal rejection) and schema-strictness
    cases.
-4. **Verify** — `bun run type-check`, `bun test` (games-core incl. conformance),
+4. **Document** — add `docs/games/<type>.md`, named after the `type` slug (e.g.
+   `docs/games/tic-tac-toe.md`): how to play, player count and roles,
+   win/draw/illegal-move rules, the state and move shapes (mirroring the Zod
+   schemas), any `configFields`, and a link to `packages/games-core/src/games/<type>/`.
+   Every new game ships this doc.
+5. **Verify** — `bun run type-check`, `bun test` (games-core incl. conformance),
    `bun run check`. Then `bun run dev` and play a full game two-up on `/play/:id`.
 
 ## What you reuse (never recreate)
