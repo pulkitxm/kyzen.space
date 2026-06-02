@@ -44,6 +44,6 @@ jobs:
       - name: Provide env for integration run
         run: cp .env.example .env
       - name: Apply database schema
-        run: bun run db:push
+        run: bun run db:push -- --force
       - name: Run integration tests
         run: cd apps/server && bun run test:integration
