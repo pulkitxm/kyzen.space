@@ -14,6 +14,7 @@ import { attachFriendHandlers } from "./friends";
 import { attachGameChatHandlers } from "./games-in-chat";
 import { setIO } from "./io";
 import { handlePresenceConnect, handlePresenceDisconnect } from "./presence";
+import { startPresenceHeartbeats } from "./presence-heartbeat";
 import { attachRedisAdapter } from "./redis";
 import { leaveGameRoom } from "./rooms";
 import { attachTypingHandlers } from "./typing";
@@ -29,6 +30,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
 
   attachRedisAdapter(io);
   setIO(io);
+  startPresenceHeartbeats(io);
 
   io.use(async (socket, next) => {
     try {
