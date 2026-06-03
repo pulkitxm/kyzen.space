@@ -1,4 +1,6 @@
 import type { Redis } from "ioredis";
+import { env } from "../env";
+import { getRedis } from "./redis-client";
 
 export interface PresenceStore {
   markOnline(userId: string, socketId: string): Promise<{ wasOnline: boolean }>;
@@ -116,3 +118,10 @@ export class RedisPresenceStore implements PresenceStore {
     return online;
   }
 }
+
+export function createPresenceStore(): PresenceStore {
+  if (!env.redisUrl) return new InMemoryPresenceStore();
+  return new RedisPresenceStore(getRedis(), { staleMs: env.presenceStaleMs });
+}
+
+export const presenceStore = createPresenceStore();
