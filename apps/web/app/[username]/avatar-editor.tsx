@@ -403,7 +403,7 @@ function StyleControl({
           className={cn(
             "flex-1 rounded-md px-1 py-1.5 font-medium text-[11px] transition",
             value === style
-              ? "bg-card text-card-foreground shadow-sm"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
