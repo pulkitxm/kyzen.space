@@ -2,8 +2,11 @@ import { randomAvatarConfig } from "@gamelobby/avatar";
 import {
   createProfile,
   getProfileByUserId,
-  isUsernameTaken,
+  getTakenUsernames,
 } from "./db/repositories/profiles";
+
+const CANDIDATE_COUNT = 20;
+const BATCH_SIZE = 5;
 
 function slugifyBase(name: string): string {
   return (
@@ -29,9 +32,19 @@ export async function ensureUsernameForUser(
 
   const avatar = randomAvatarConfig(userId);
   const base = slugifyBase(displayName ?? "player");
-  let candidate = base;
-  for (let i = 0; i < 20; i++) {
-    if (!(await isUsernameTaken(candidate))) {
+  const candidates = [
+    base,
+    ...Array.from(
+      { length: CANDIDATE_COUNT - 1 },
+      () => `${base}_${randomSuffix()}`,
+    ),
+  ];
+
+  for (let start = 0; start < candidates.length; start += BATCH_SIZE) {
+    const batch = candidates.slice(start, start + BATCH_SIZE);
+    const taken = await getTakenUsernames(batch);
+    for (const candidate of batch) {
+      if (taken.has(candidate.toLowerCase())) continue;
       try {
         const profile = await createProfile({
           userId,
@@ -41,12 +54,12 @@ export async function ensureUsernameForUser(
         return profile.username;
       } catch {}
     }
-    candidate = `${base}_${randomSuffix()}`;
   }
-  candidate = `player_${randomSuffix()}`;
+
+  const fallback = `player_${randomSuffix()}`;
   const profile = await createProfile({
     userId,
-    username: candidate,
+    username: fallback,
     avatar,
   });
   return profile.username;

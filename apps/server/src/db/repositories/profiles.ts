@@ -53,6 +53,18 @@ export async function isUsernameTaken(username: string): Promise<boolean> {
   return Boolean(row);
 }
 
+export async function getTakenUsernames(
+  usernames: string[],
+): Promise<Set<string>> {
+  if (usernames.length === 0) return new Set();
+  const lowered = usernames.map((name) => name.toLowerCase());
+  const rows = await db
+    .select({ username: userProfile.username })
+    .from(userProfile)
+    .where(inArray(sql`lower(${userProfile.username})`, lowered));
+  return new Set(rows.map((row) => row.username.toLowerCase()));
+}
+
 export async function createProfile(input: {
   userId: string;
   username: string;
