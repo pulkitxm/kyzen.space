@@ -91,6 +91,7 @@ describe("createGameInConversation", () => {
     const res = await createGameInConversation({
       userId: "alice",
       conversationId: "c1",
+      // @ts-expect-error unknown game type is rejected at runtime
       gameType: "chess",
     });
     expect(res.ok).toBe(false);

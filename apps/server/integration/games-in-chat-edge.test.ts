@@ -45,6 +45,7 @@ describe.skipIf(!DB_UP)(
       const res = await createGameInConversation({
         userId: a.id,
         conversationId: convId,
+        // @ts-expect-error unknown game type is rejected at runtime
         gameType: "definitely-not-a-game",
       });
       expectErr(res, 400);

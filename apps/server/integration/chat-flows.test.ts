@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";
 import * as messagesService from "../src/chat/messages-service";
-import type { ServiceResult } from "../src/chat/result";
+import type { ErrorStatus, ServiceResult } from "../src/chat/result";
 import {
   conversations,
   db,
@@ -48,7 +48,7 @@ function unwrap<T>(res: ServiceResult<T>): T {
   return res.value;
 }
 
-function expectErr<T>(res: ServiceResult<T>, status?: number): void {
+function expectErr<T>(res: ServiceResult<T>, status?: ErrorStatus): void {
   expect(res.ok).toBe(false);
   if (!res.ok && status !== undefined) expect(res.status).toBe(status);
 }
