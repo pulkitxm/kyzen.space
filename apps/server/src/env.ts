@@ -54,6 +54,10 @@ export const env = {
 
   notAllowedUsernames: parseUsernameCsv(optional("NOT_ALLOWED_USERNAMES")),
   usernameChangeCooldownDays: number("USERNAME_CHANGE_COOLDOWN_DAYS", 30),
+
+  presenceHeartbeatMs: number("PRESENCE_HEARTBEAT_MS", 10000),
+  presenceStaleMs: number("PRESENCE_STALE_MS", 25000),
+  presenceLastSeenPersistMs: number("PRESENCE_LASTSEEN_PERSIST_MS", 60000),
 } as const;
 
 export function googleConfigured(): boolean {
