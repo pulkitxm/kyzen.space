@@ -215,3 +215,25 @@ export async function searchByUsername(
     )
     .limit(limit);
 }
+
+export async function touchLastSeen(
+  userIds: string[],
+  when: Date,
+): Promise<void> {
+  if (userIds.length === 0) return;
+  await db
+    .update(userProfile)
+    .set({ lastSeenAt: when })
+    .where(inArray(userProfile.userId, userIds));
+}
+
+export async function getLastSeen(
+  userIds: string[],
+): Promise<Map<string, Date | null>> {
+  if (userIds.length === 0) return new Map();
+  const rows = await db
+    .select({ userId: userProfile.userId, lastSeenAt: userProfile.lastSeenAt })
+    .from(userProfile)
+    .where(inArray(userProfile.userId, userIds));
+  return new Map(rows.map((r) => [r.userId, r.lastSeenAt]));
+}

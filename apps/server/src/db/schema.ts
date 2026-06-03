@@ -176,6 +176,7 @@ export const userProfile = pgTable("user_profile", {
   pattern: patternEnum("pattern").notNull().default(DEFAULT_PATTERN),
   chatLayout: jsonb("chat_layout").$type<{ mode: ChatMode } | null>(),
   usernameChangedAt: timestamp("username_changed_at"),
+  lastSeenAt: timestamp("last_seen_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
