@@ -30,7 +30,7 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 | `apps/server/src/api/routes/gifs.ts` | Proxy to the Klipy GIF provider: trending + search, with limit/offset clamping. |
 | `apps/server/src/api/routes/messages.ts` | `DELETE /:id` (soft-delete a message). |
 | `apps/server/src/api/routes/notifications.ts` | List / unread-count / mark-read / read-all. |
-| `apps/server/src/api/routes/profiles.ts` | `me` profile, appearance/avatar/chat-layout updates, public profile + recent games by username. |
+| `apps/server/src/api/routes/profiles.ts` | `me` profile, appearance/avatar/chat-layout updates, display-name + username changes (with live availability + suggestions + cooldown), public profile + recent games by username. |
 | `apps/server/src/chat/result.ts` | The `ServiceResult<T>` discriminated union + `ok()` / `fail(error, status)` helpers. |
 | `apps/server/src/chat/assemble.ts` | "Assemblers": hydrate repository rows into full DTOs (resolve senders, members, unread counts, live game-card status). |
 | `apps/server/src/chat/conversations-service.ts` | DM/group lifecycle, membership rules, socket fan-out of conversation changes. |
@@ -81,6 +81,8 @@ Things to notice (`apps/server/src/index.ts:10`):
 ### Environment (`env.ts`)
 
 `env.ts` is the single typed gateway to `process.env`. It exposes three tiny parsers — `required` (throws if missing, `apps/server/src/env.ts:3`), `optional` (trims, defaults, `apps/server/src/env.ts:11`), and `number` (`apps/server/src/env.ts:15`) — and assembles one frozen `as const` object (`apps/server/src/env.ts:22`). Two of these required vars (`DATABASE_URL`, `BETTER_AUTH_SECRET`) make the process refuse to start if absent, which is the desired fail-fast behavior.
+
+Two username vars feed profile editing: `NOT_ALLOWED_USERNAMES` (a comma-separated blocklist parsed by `parseUsernameCsv` from `username-rules.ts` into `env.notAllowedUsernames`) and `USERNAME_CHANGE_COOLDOWN_DAYS` (default `30`, `0` disables the cooldown). Both are optional.
 
 `googleConfigured()` (`apps/server/src/env.ts:54`) returns whether both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. This is the gate `auth.ts` uses to decide whether to register the Google social provider at all (`apps/server/src/auth.ts:15`) — Google OAuth is optional, so a dev `.env` without Google keys still boots with email/session auth.
 
@@ -303,6 +305,14 @@ The GIF routes are a thin, auth-gated proxy to Klipy. `gifsRouter` (`apps/server
 - `lib/chat-layout.ts` — chat layout types/constants; `validateChatModePref` (`apps/server/src/lib/chat-layout.ts:46`) coerces arbitrary input to `{ mode: "popout" | "mounted" }`.
 
 `PUT /api/profiles/me/appearance` (`apps/server/src/api/routes/profiles.ts:67`) applies these guards field-by-field, building a partial `patch` and rejecting unknown values with `400 Invalid theme` / `Invalid colorMode` / `Invalid pattern`, and a `400 Nothing to update` if the body changes nothing. The avatar route validates with `validateAvatarConfig` from `@gamelobby/avatar` (`apps/server/src/api/routes/profiles.ts:120`). These are exported pure functions specifically so they're unit-testable without HTTP, matching the repo's test conventions.
+
+### Name & username changes
+
+Identity edits share the same pure-helper discipline. The rules live in `apps/server/src/username-rules.ts` (no env/DB imports, so they unit-test without mocking): `normalizeUsername` (trim + lowercase), `isValidUsernameFormat` (`/^[a-z0-9_]{3,30}$/`), `RESERVED_USERNAMES` / `isReservedUsername`, `parseUsernameCsv`, suggestion builders, and `usernameEditableAt` (cooldown math). `username.ts` wires those to env + DB as `isUsernameBlocked` (reserved ∪ `NOT_ALLOWED_USERNAMES`) and `suggestUsernames` (batch-checks `getTakenUsernames`, returns valid free variants); the same helpers power first-sign-in provisioning so an auto-assigned name is never reserved or blocked.
+
+- `PUT /api/profiles/me/name` — trims and bounds the display name to 1–50 chars, then `setDisplayName`.
+- `GET /api/profiles/me/username-available?u=` — returns `{ available }`, or `{ available: false, reason: "format" | "reserved" | "taken", suggestions }` (up to 5). The caller's current username always reads as available.
+- `PUT /api/profiles/me/username` — validates format (`400`) → reserved/blocked (`400`) → cooldown (`429` with `nextChangeAt`) → uniqueness (`409`), then `updateUsername` (which stamps `username_changed_at`). Changing to your current name is a no-op `200`. `GET /api/profiles/me` exposes the precomputed `usernameEditableAt` (so the client can lock the field before a save attempt) and `usernameChangeCooldownDays` (so the client's confirm dialog can state the window).
 
 ## End-to-end data-flow walkthrough: sending a chat message via REST
 

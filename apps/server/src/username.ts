@@ -4,24 +4,42 @@ import {
   getProfileByUserId,
   getTakenUsernames,
 } from "./db/repositories/profiles";
+import { env } from "./env";
 import { predictAvatarStyle } from "./services/gender-detection";
+import {
+  buildUsernameCandidates,
+  isReservedUsername,
+  isValidUsernameFormat,
+  normalizeUsername,
+  randomUsernameSuffix,
+  selectSuggestions,
+  slugifyBase,
+} from "./username-rules";
 
 const CANDIDATE_COUNT = 20;
 const BATCH_SIZE = 5;
+const SUGGESTION_POOL = 30;
 
-function slugifyBase(name: string): string {
+export function isUsernameBlocked(normalized: string): boolean {
   return (
-    name
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_]/g, "")
-      .slice(0, 30) || "player"
+    isReservedUsername(normalized) ||
+    env.notAllowedUsernames.includes(normalized)
   );
 }
 
-function randomSuffix(): string {
-  return Math.random().toString(36).slice(2, 8);
+export async function suggestUsernames(
+  base: string,
+  count = 5,
+): Promise<string[]> {
+  const candidates = buildUsernameCandidates(
+    slugifyBase(base),
+    SUGGESTION_POOL,
+  ).filter((candidate) => {
+    const normalized = normalizeUsername(candidate);
+    return isValidUsernameFormat(normalized) && !isUsernameBlocked(normalized);
+  });
+  const taken = await getTakenUsernames(candidates);
+  return selectSuggestions(candidates, taken, count);
 }
 
 export async function ensureUsernameForUser(
@@ -34,13 +52,9 @@ export async function ensureUsernameForUser(
   const style = await predictAvatarStyle(displayName);
   const avatar = randomAvatarConfig(userId, style);
   const base = slugifyBase(displayName ?? "player");
-  const candidates = [
-    base,
-    ...Array.from(
-      { length: CANDIDATE_COUNT - 1 },
-      () => `${base}_${randomSuffix()}`,
-    ),
-  ];
+  const candidates = buildUsernameCandidates(base, CANDIDATE_COUNT).filter(
+    (candidate) => !isUsernameBlocked(normalizeUsername(candidate)),
+  );
 
   for (let start = 0; start < candidates.length; start += BATCH_SIZE) {
     const batch = candidates.slice(start, start + BATCH_SIZE);
@@ -58,7 +72,7 @@ export async function ensureUsernameForUser(
     }
   }
 
-  const fallback = `player_${randomSuffix()}`;
+  const fallback = `player_${randomUsernameSuffix()}`;
   const profile = await createProfile({
     userId,
     username: fallback,

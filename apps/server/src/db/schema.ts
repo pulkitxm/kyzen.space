@@ -175,6 +175,7 @@ export const userProfile = pgTable("user_profile", {
   colorMode: colorModeEnum("color_mode").notNull().default(DEFAULT_COLOR_MODE),
   pattern: patternEnum("pattern").notNull().default(DEFAULT_PATTERN),
   chatLayout: jsonb("chat_layout").$type<{ mode: ChatMode } | null>(),
+  usernameChangedAt: timestamp("username_changed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

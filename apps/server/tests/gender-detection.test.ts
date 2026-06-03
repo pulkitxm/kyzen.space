@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import type { AvatarConfig } from "@gamelobby/avatar";
 
-const mockEnv = { genderizeApiKey: "test-key", nodeEnv: "development" };
+const mockEnv = {
+  genderizeApiKey: "test-key",
+  nodeEnv: "development",
+  notAllowedUsernames: [] as string[],
+  usernameChangeCooldownDays: 30,
+};
 mock.module("../src/env", () => ({ env: mockEnv }));
 
 let detectedGender = "unknown";

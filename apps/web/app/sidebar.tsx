@@ -380,7 +380,7 @@ export function Sidebar({
             const isActive = pathname.startsWith("/settings");
             const settingsLink = (
               <Link
-                href="/settings"
+                href="/settings/account"
                 onClick={onCloseMobile}
                 className={cn(
                   "flex h-9 w-full cursor-pointer items-center rounded-lg outline-none transition-[gap,padding,background-color] duration-250 ease-in-out focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",

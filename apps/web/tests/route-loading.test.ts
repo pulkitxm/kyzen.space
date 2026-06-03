@@ -8,7 +8,6 @@ const ROUTES_WITH_LOADING = [
   "play/[gameId]",
   "chat",
   "chat/[handle]",
-  "games",
   "games/[gameType]",
   "friends",
   "settings",

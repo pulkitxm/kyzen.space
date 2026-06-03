@@ -93,6 +93,27 @@ export async function updateAvatar(
     .where(eq(userProfile.userId, userId));
 }
 
+export async function setDisplayName(
+  userId: string,
+  name: string,
+): Promise<void> {
+  await db
+    .update(user)
+    .set({ name, updatedAt: new Date() })
+    .where(eq(user.id, userId));
+}
+
+export async function updateUsername(
+  userId: string,
+  username: string,
+): Promise<void> {
+  const now = new Date();
+  await db
+    .update(userProfile)
+    .set({ username, usernameChangedAt: now, updatedAt: now })
+    .where(eq(userProfile.userId, userId));
+}
+
 export async function updateAppearance(
   userId: string,
   patch: { theme?: ThemeId; colorMode?: ColorMode; pattern?: PatternId },

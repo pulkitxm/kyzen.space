@@ -1,4 +1,5 @@
 import { resolveDbLatencyMs } from "./db/latency";
+import { parseUsernameCsv } from "./username-rules";
 
 function required(name: string): string {
   const v = process.env[name];
@@ -50,6 +51,9 @@ export const env = {
 
   klipyApiKey: optional("KLIPY_API_KEY"),
   genderizeApiKey: optional("GENDERIZE_API_KEY"),
+
+  notAllowedUsernames: parseUsernameCsv(optional("NOT_ALLOWED_USERNAMES")),
+  usernameChangeCooldownDays: number("USERNAME_CHANGE_COOLDOWN_DAYS", 30),
 } as const;
 
 export function googleConfigured(): boolean {

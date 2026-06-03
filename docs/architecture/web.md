@@ -40,7 +40,12 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/lib/chat-layout.ts` | `ChatLayout` type + `parseChatLayoutCookie` / `normalizeChatLayout` + layout geometry constants; the layout cookie/localStorage contract shared by page, loading, and `GameChatSplit`. |
 | `apps/web/app/chat/[handle]/page.tsx` | SSR conversation page; resolves handle (UUID or username) → conversation + messages. |
 | `apps/web/app/chat/[handle]/conversation-view.tsx` | Client conversation UI: hydrates messages atom, marks read, renders list/composer/typing. |
-| `apps/web/app/settings/page.tsx` | Settings Server Component: appearance section + account/session management. |
+| `apps/web/app/settings/layout.tsx` | Settings shell: header + `SettingsTabs` nav (Account \| Appearance) wrapping the sub-route pages. |
+| `apps/web/app/settings/page.tsx` | Redirects `/settings` → `/settings/account` (the default tab). |
+| `apps/web/app/settings/settings-tabs.tsx` | Client sub-route nav; active tab from `usePathname()`. |
+| `apps/web/app/settings/account/page.tsx` | Account tab: identity form + email + sessions + sign-out/revoke; fetches `/api/profiles/me` to seed the identity form. |
+| `apps/web/app/settings/appearance/page.tsx` | Appearance tab: the Theme/Doodles `AppearanceTabs`. |
+| `apps/web/app/settings/account-identity-form.tsx` | Client form to edit display name + username (debounced live availability check, suggestion chips, cooldown lock). |
 | `apps/web/app/settings/theme-picker.tsx` | Hover-preview palette/color-mode picker driven by the appearance context. |
 | `apps/web/next.config.ts` | `transpilePackages` for both shared packages. |
 | `apps/web/app/globals.css` | Tailwind v4 entry; `@source` so Tailwind scans games-client classes. |

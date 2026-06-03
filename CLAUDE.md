@@ -93,6 +93,10 @@ Routes live in `apps/web/app/` (route folders + colocated `*-client.tsx` compone
 
 Realtime client lives in `lib/socket/`. **State management is Jotai-first**: state shared by ≥2 components is a Jotai atom (`lib/chat/atoms.ts`, `lib/sidebar-atoms.ts`); `useState` only for state private to a single component. Games render through one **dynamic route** `app/games/[gameType]/page.tsx` (no per-game folders), driven by `listGameMeta()`/`getDefinition()` from games-core; the shared `app/games/_shared/game-lobby.tsx` renders the `configFields` form + "Play with…" entry. Game board UIs come from **`@gamelobby/games-client`** via `getGameClient(type)` (rendered inside `<Suspense>` in `app/play/[gameId]/play-client.tsx`); cover art goes in `public/games/`. Both shared packages are listed in `next.config.ts` `transpilePackages`, and `globals.css` has an `@source` for the games-client src so Tailwind keeps its classes.
 
+### Reserved usernames vs. top-level routes
+
+The profile page is a **catch-all `/[username]` route**, so every top-level segment under `apps/web/app/` is a potential username collision. When you add a new top-level route, add its segment to `RESERVED_USERNAMES` in `apps/server/src/username-rules.ts` if a user claiming that name would shadow the route — otherwise that route becomes unreachable for whoever owns the username. (Per-user/personal blocklisting is separate: the `NOT_ALLOWED_USERNAMES` env var, a comma-separated list parsed into the same block set.)
+
 ### Adding a game
 
 A game is one `GameDefinition` (games-core) + one client component (games-client) — **no new routes, endpoints, DB tables, socket events, or drivers**. See **`docs/adding-a-game.md`** for the full guide, or use the **`game-builder`** agent (`.claude/agents/game-builder.md`) to implement one from a spec. In short:

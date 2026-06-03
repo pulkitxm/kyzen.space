@@ -17,7 +17,8 @@ A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `
 | Path | Responsibility |
 | --- | --- |
 | `apps/server/src/auth.ts` | The Better Auth instance: secret, base URL, trusted origins, Drizzle adapter, Google provider, first-sign-in profile hook, prod cookie attributes. |
-| `apps/server/src/username.ts` | `ensureUsernameForUser` — slugify display name, find a free username, create the `user_profile` row with a seeded avatar. |
+| `apps/server/src/username.ts` | `ensureUsernameForUser` (provisioning) + `isUsernameBlocked` / `suggestUsernames`, wiring the pure `username-rules.ts` helpers to env + DB. |
+| `apps/server/src/username-rules.ts` | Pure, dependency-free username rules: normalize, format check, `RESERVED_USERNAMES`, CSV blocklist parse, candidate/suggestion builders, cooldown math. |
 | `apps/server/src/api/index.ts` | Mounts Better Auth's request handler at `/api/auth/*` inside the Hono app. |
 | `apps/server/src/api/middleware/auth.ts` | `requireAuth` middleware — how REST routers read the session from request headers and gate on it. |
 | `apps/server/src/api/routes/account.ts` | Session-management REST: list sessions, sign out, revoke a session, revoke all others. |
@@ -117,7 +118,7 @@ Note the **catch-and-log**: provisioning failure does not abort account creation
 
 1. **Idempotency guard** — `getProfileByUserId` first; if a profile exists, return its username (`apps/server/src/username.ts:27`). This is why the hook is safe to retry.
 2. **Name-styled seeded avatar** — `predictAvatarStyle(displayName)` (`apps/server/src/services/gender-detection.ts`) guesses a `feminine`/`masculine`/`any` style from the user's first name, then `randomAvatarConfig(userId, style)` produces a deterministic DiceBear avataaars config seeded by the user id with that style bias (`apps/server/src/username.ts`). Same user → same starting avatar; the style only nudges hairstyle and facial-hair probability and stays fully editable afterwards. The guess calls the genderize.io API (keyed by `GENDERIZE_API_KEY`, ~2s timeout) and falls back to an offline name dictionary (`gender-detection-from-name`), then to a neutral `any`, whenever the API is unavailable, the result is low-confidence, the key is unset, or `NODE_ENV=test` (so tests never spend API quota). (See `./README.md` for the avatar package; the repo uses ready-made DiceBear assets rather than hand-drawn art.)
-3. **Slugify** — `slugifyBase` lowercases, collapses whitespace to `_`, strips anything outside `[a-z0-9_]`, caps at 30 chars, and falls back to `"player"` if nothing survives (`apps/server/src/username.ts:8`).
+3. **Slugify** — `slugifyBase` lowercases, collapses whitespace to `_`, strips anything outside `[a-z0-9_]`, caps at 30 chars, and falls back to `"player"` if nothing survives (`apps/server/src/username-rules.ts`). Candidates are then filtered through `isUsernameBlocked`, so a reserved route name or a `NOT_ALLOWED_USERNAMES` entry is never auto-assigned.
 4. **Collision retry loop** — try the base, then `base_<random6>` up to 20 times, checking `isUsernameTaken` (a case-insensitive `lower(username)` lookup, `apps/server/src/db/repositories/profiles.ts:47`) before each insert:
 
 ```ts
