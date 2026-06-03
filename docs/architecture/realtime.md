@@ -419,6 +419,10 @@ export function attachRedisAdapter(io: IOServer): void {
 
 `apps/server/src/realtime/redis.ts:9`. With no `REDIS_URL` the app runs single-node and the adapter is a no-op. With one set, `@socket.io/redis-adapter` is installed so that an `emitToGame`/`emitToConv`/`emitToUser` on **any** node reaches sockets connected to **every** node. Nothing in the handlers changes — they always call the same room helpers — which is the entire reason the room abstraction exists.
 
+**Multiple nodes need sticky sessions.** The adapter fans out broadcasts but does **not** share the Socket.IO handshake session. The default transport opens with HTTP long-polling — several separate HTTP requests — before upgrading to WebSocket, and the session created on the first request lives in that one node's memory. A load balancer that round-robins those requests across nodes yields `"Session ID unknown"` errors and an endless reconnect loop. Pin each client to one node with session affinity (sticky sessions keyed on the `io` cookie or client IP), or force `transports: ["websocket"]` on the client so there is no polling phase to pin — at the cost of the long-polling fallback that some proxies require.
+
+**Redis is a shared dependency, not a store.** If it becomes unreachable, each node silently degrades to local-only broadcasting — the split-brain the adapter exists to prevent — so run it with the availability you expect of the cluster. Pub/sub is fire-and-forget with no replay: a node briefly disconnected from Redis drops those messages. Durable game state is unaffected (Postgres is authoritative and `emitFullState` re-syncs on reconnect), but purely ephemeral broadcasts like typing and presence can be lost.
+
 ## Gotchas, invariants & conventions
 
 - **The client is never the authority.** The browser runs the same engine for prediction, but `make_move` is re-validated by `moveSchema`, by `stateSchema`, and finally by `engine.reduce` on the server (`turn-based.ts:143`). If the three disagree with the client, the server wins. Do not "optimize" by trusting client-supplied state.
