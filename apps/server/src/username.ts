@@ -4,6 +4,7 @@ import {
   getProfileByUserId,
   getTakenUsernames,
 } from "./db/repositories/profiles";
+import { predictAvatarStyle } from "./services/gender-detection";
 
 const CANDIDATE_COUNT = 20;
 const BATCH_SIZE = 5;
@@ -30,7 +31,8 @@ export async function ensureUsernameForUser(
   const existing = await getProfileByUserId(userId);
   if (existing) return existing.username;
 
-  const avatar = randomAvatarConfig(userId);
+  const style = await predictAvatarStyle(displayName);
+  const avatar = randomAvatarConfig(userId, style);
   const base = slugifyBase(displayName ?? "player");
   const candidates = [
     base,

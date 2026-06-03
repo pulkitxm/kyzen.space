@@ -17,7 +17,8 @@
     "API_URL",
     "NEXT_PUBLIC_API_URL",
     "NEXT_PUBLIC_SOCKET_URL",
-    "KLIPY_API_KEY"
+    "KLIPY_API_KEY",
+    "GENDERIZE_API_KEY"
   ],
   "tasks": {
     "dev": {

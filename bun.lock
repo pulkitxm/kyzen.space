@@ -25,6 +25,7 @@
         "cors": "^2.8.5",
         "drizzle-orm": "^0.38.3",
         "express": "^4.21.2",
+        "gender-detection-from-name": "^1.11.4",
         "hono": "^4.12.16",
         "ioredis": "^5.4.2",
         "pino": "^10.3.1",
@@ -736,6 +737,8 @@
     "function-bind": ["function-bind@1.1.2", "", {}, "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="],
 
     "gel": ["gel@2.2.0", "", { "dependencies": { "@petamoriken/float16": "^3.8.7", "debug": "^4.3.4", "env-paths": "^3.0.0", "semver": "^7.6.2", "shell-quote": "^1.8.1", "which": "^4.0.0" }, "bin": { "gel": "dist/cli.mjs" } }, "sha512-q0ma7z2swmoamHQusey8ayo8+ilVdzDt4WTxSPzq/yRqvucWRfymRVMvNgmSC0XK7eNjjEZEcplxpgaNojKdmQ=="],
+
+    "gender-detection-from-name": ["gender-detection-from-name@1.11.4", "", {}, "sha512-OI6GTyMqfcCKRFZ28IoEyobVa63K1b+V+gmoY5E0x10mu3G3u3iwoReYTn61OPjqnGfDZlCW4gRBGxgBr68w2g=="],
 
     "gensync": ["gensync@1.0.0-beta.2", "", {}, "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="],
 

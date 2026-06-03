@@ -10,7 +10,7 @@ This matters because of the repo's core architectural principle: **the client is
 2. **Browser fetches** — `"use client"` components call the server with `credentials: "include"` (`apps/web/lib/api-client.ts:6`).
 3. **Socket.IO handshake** — the realtime middleware reads the cookie off the WebSocket handshake and resolves the session before any game/chat event is allowed (`apps/server/src/realtime/index.ts:33`).
 
-A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `databaseHooks.user.create.after` hook that provisions a `user_profile` row (username + random DiceBear avatar). So "auth" and "profile bootstrap" are a single atomic flow — by the time a session cookie exists, the user already has a username.
+A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `databaseHooks.user.create.after` hook that provisions a `user_profile` row (username + a name-styled DiceBear avatar). So "auth" and "profile bootstrap" are a single atomic flow — by the time a session cookie exists, the user already has a username.
 
 ## Files at a glance
 
@@ -116,7 +116,7 @@ Note the **catch-and-log**: provisioning failure does not abort account creation
 `ensureUsernameForUser` (`apps/server/src/username.ts:23`) turns a Google display name into a unique, URL-safe username and creates the profile. The flow:
 
 1. **Idempotency guard** — `getProfileByUserId` first; if a profile exists, return its username (`apps/server/src/username.ts:27`). This is why the hook is safe to retry.
-2. **Seeded avatar** — `randomAvatarConfig(userId)` produces a deterministic DiceBear avataaars config seeded by the user id (`apps/server/src/username.ts:30`). Same user → same starting avatar. (See `./README.md` for the avatar package; the repo uses ready-made DiceBear assets rather than hand-drawn art.)
+2. **Name-styled seeded avatar** — `predictAvatarStyle(displayName)` (`apps/server/src/services/gender-detection.ts`) guesses a `feminine`/`masculine`/`any` style from the user's first name, then `randomAvatarConfig(userId, style)` produces a deterministic DiceBear avataaars config seeded by the user id with that style bias (`apps/server/src/username.ts`). Same user → same starting avatar; the style only nudges hairstyle and facial-hair probability and stays fully editable afterwards. The guess calls the genderize.io API (keyed by `GENDERIZE_API_KEY`, ~2s timeout) and falls back to an offline name dictionary (`gender-detection-from-name`), then to a neutral `any`, whenever the API is unavailable, the result is low-confidence, the key is unset, or `NODE_ENV=test` (so tests never spend API quota). (See `./README.md` for the avatar package; the repo uses ready-made DiceBear assets rather than hand-drawn art.)
 3. **Slugify** — `slugifyBase` lowercases, collapses whitespace to `_`, strips anything outside `[a-z0-9_]`, caps at 30 chars, and falls back to `"player"` if nothing survives (`apps/server/src/username.ts:8`).
 4. **Collision retry loop** — try the base, then `base_<random6>` up to 20 times, checking `isUsernameTaken` (a case-insensitive `lower(username)` lookup, `apps/server/src/db/repositories/profiles.ts:47`) before each insert:
 

@@ -49,6 +49,7 @@ export const env = {
     optional("BETTER_AUTH_URL", "http://localhost:4000"),
 
   klipyApiKey: optional("KLIPY_API_KEY"),
+  genderizeApiKey: optional("GENDERIZE_API_KEY"),
 } as const;
 
 export function googleConfigured(): boolean {

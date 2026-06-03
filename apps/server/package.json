@@ -21,6 +21,7 @@
     "cors": "^2.8.5",
     "drizzle-orm": "^0.38.3",
     "express": "^4.21.2",
+    "gender-detection-from-name": "^1.11.4",
     "hono": "^4.12.16",
     "ioredis": "^5.4.2",
     "pino": "^10.3.1",
