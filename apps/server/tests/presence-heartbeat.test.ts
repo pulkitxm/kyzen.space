@@ -1,37 +1,30 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
+import {
+  type HeartbeatDeps,
+  persistLastSeen,
+  refreshPresence,
+  startPresenceHeartbeats,
+} from "../src/realtime/presence-heartbeat";
 
+const REFRESH_REJECT_SOCKET_ID = "reject-socket";
 const refreshCalls: Array<[string, string]> = [];
 const touchLastSeenCalls: Array<{ userIds: string[]; when: Date }> = [];
-const REFRESH_REJECT_SOCKET_ID = "reject-socket";
 
-mock.module("../src/realtime/presence-store-instance", () => ({
-  presenceStore: {
-    refresh: async (userId: string, socketId: string) => {
-      refreshCalls.push([userId, socketId]);
-      if (socketId === REFRESH_REJECT_SOCKET_ID) {
-        throw new Error("refresh failed");
-      }
+function makeDeps(): HeartbeatDeps {
+  return {
+    store: {
+      refresh: async (userId: string, socketId: string) => {
+        refreshCalls.push([userId, socketId]);
+        if (socketId === REFRESH_REJECT_SOCKET_ID) {
+          throw new Error("refresh failed");
+        }
+      },
     },
-  },
-}));
-
-mock.module("../src/db", () => ({
-  db: {},
-  schema: {},
-  games: {},
-  messages: {},
-  notifications: {},
-  friends: {},
-  conversations: {},
-  profiles: {
     touchLastSeen: async (userIds: string[], when: Date) => {
       touchLastSeenCalls.push({ userIds, when });
     },
-  },
-}));
-
-const { refreshPresence, persistLastSeen, startPresenceHeartbeats } =
-  await import("../src/realtime/presence-heartbeat");
+  };
+}
 
 function fakeIo(sockets: Array<{ id: string; userId?: string }>) {
   const map = new Map(
@@ -53,6 +46,7 @@ describe("refreshPresence", () => {
         { id: "s2", userId: "u2" },
         { id: "s3" },
       ]),
+      makeDeps(),
     );
     expect(refreshCalls.sort()).toEqual([
       ["u1", "s1"],
@@ -67,20 +61,13 @@ describe("refreshPresence", () => {
         { id: REFRESH_REJECT_SOCKET_ID, userId: "u2" },
         { id: "s3", userId: "u3" },
       ]),
+      makeDeps(),
     );
     expect(refreshCalls.sort()).toEqual([
       ["u1", "s1"],
       ["u2", REFRESH_REJECT_SOCKET_ID],
       ["u3", "s3"],
     ]);
-  });
-});
-
-describe("startPresenceHeartbeats", () => {
-  it("returns a disposer that can be called without throwing", () => {
-    const dispose = startPresenceHeartbeats(fakeIo([]));
-    expect(typeof dispose).toBe("function");
-    expect(() => dispose()).not.toThrow();
   });
 });
 
@@ -92,13 +79,22 @@ describe("persistLastSeen", () => {
         { id: "s2", userId: "u1" },
         { id: "s3", userId: "u2" },
       ]),
+      makeDeps(),
     );
     expect(touchLastSeenCalls).toHaveLength(1);
     expect(touchLastSeenCalls[0]?.userIds.sort()).toEqual(["u1", "u2"]);
   });
 
   it("does not write when no sockets are connected", async () => {
-    await persistLastSeen(fakeIo([]));
+    await persistLastSeen(fakeIo([]), makeDeps());
     expect(touchLastSeenCalls).toHaveLength(0);
+  });
+});
+
+describe("startPresenceHeartbeats", () => {
+  it("returns a disposer that can be called without throwing", () => {
+    const dispose = startPresenceHeartbeats(fakeIo([]));
+    expect(typeof dispose).toBe("function");
+    expect(() => dispose()).not.toThrow();
   });
 });

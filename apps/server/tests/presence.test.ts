@@ -1,4 +1,9 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
+import {
+  handlePresenceConnect,
+  handlePresenceDisconnect,
+  type PresenceDeps,
+} from "../src/realtime/presence";
 
 let onlineSet = new Set<string>();
 let markOnlineResult = { wasOnline: false };
@@ -11,29 +16,19 @@ let lastSeen = new Map<string, Date | null>();
 let touchLastSeenShouldThrow = false;
 const touchLastSeenCalls: Array<{ userIds: string[]; when: Date }> = [];
 
-mock.module("../src/realtime/presence-store-instance", () => ({
-  presenceStore: {
-    markOnline: async () => markOnlineResult,
-    markOffline: async () => markOfflineResult,
-    refresh: async () => {},
-    isOnline: async (userId: string) => onlineSet.has(userId),
-    onlineAmong: async (ids: string[]) =>
-      new Set(ids.filter((id) => onlineSet.has(id))),
-  },
-}));
-
-mock.module("../src/db", () => ({
-  db: {},
-  schema: {},
-  games: {},
-  messages: {},
-  notifications: {},
-  friends: { acceptedFriendIds: async () => friendIds },
-  conversations: {
-    getConversationIdsForUser: async () => convIds,
-    getMemberIds: async (cid: string) => memberIds[cid] ?? [],
-  },
-  profiles: {
+function makeDeps(): PresenceDeps {
+  return {
+    store: {
+      markOnline: async () => markOnlineResult,
+      markOffline: async () => markOfflineResult,
+      refresh: async () => {},
+      isOnline: async (userId: string) => onlineSet.has(userId),
+      onlineAmong: async (ids: string[]) =>
+        new Set(ids.filter((id) => onlineSet.has(id))),
+    },
+    acceptedFriendIds: async () => friendIds,
+    conversationIdsForUser: async () => convIds,
+    memberIds: async (cid: string) => memberIds[cid] ?? [],
     getLastSeen: async () => lastSeen,
     touchLastSeen: async (userIds: string[], when: Date) => {
       if (touchLastSeenShouldThrow) {
@@ -41,12 +36,8 @@ mock.module("../src/db", () => ({
       }
       touchLastSeenCalls.push({ userIds, when });
     },
-  },
-}));
-
-const { handlePresenceConnect, handlePresenceDisconnect } = await import(
-  "../src/realtime/presence"
-);
+  };
+}
 
 type Emit = { room: string; event: string; payload: unknown };
 
@@ -90,6 +81,7 @@ describe("handlePresenceConnect", () => {
     await handlePresenceConnect(
       fakeIo(ioEmits),
       fakeSocket("me", "s1", selfEmits),
+      makeDeps(),
     );
 
     const snapshot = selfEmits.find((e) => e.event === "presence_snapshot");
@@ -111,6 +103,33 @@ describe("handlePresenceConnect", () => {
     });
   });
 
+  it("includes online audience members in the snapshot with a null lastSeen", async () => {
+    friendIds = ["friendA", "friendB"];
+    onlineSet = new Set(["friendB"]);
+    lastSeen = new Map([["friendA", new Date("2026-06-01T00:00:00.000Z")]]);
+
+    const selfEmits: Emit[] = [];
+    await handlePresenceConnect(
+      fakeIo([]),
+      fakeSocket("me", "s1", selfEmits),
+      makeDeps(),
+    );
+
+    const snapshot = selfEmits.find((e) => e.event === "presence_snapshot");
+    const entries = (snapshot?.payload as { entries: PresenceEntryShape[] })
+      .entries;
+    expect(entries).toContainEqual({
+      userId: "friendB",
+      status: "online",
+      lastSeen: null,
+    });
+    expect(entries).toContainEqual({
+      userId: "friendA",
+      status: "offline",
+      lastSeen: "2026-06-01T00:00:00.000Z",
+    });
+  });
+
   it("does not broadcast online when the user was already online", async () => {
     friendIds = ["friendA"];
     markOnlineResult = { wasOnline: true };
@@ -120,6 +139,7 @@ describe("handlePresenceConnect", () => {
     await handlePresenceConnect(
       fakeIo(ioEmits),
       fakeSocket("me", "s2", selfEmits),
+      makeDeps(),
     );
 
     expect(ioEmits.find((e) => e.event === "presence_update")).toBeUndefined();
@@ -132,7 +152,11 @@ describe("handlePresenceDisconnect", () => {
     markOfflineResult = { stillOnline: false };
 
     const ioEmits: Emit[] = [];
-    await handlePresenceDisconnect(fakeIo(ioEmits), fakeSocket("me", "s1", []));
+    await handlePresenceDisconnect(
+      fakeIo(ioEmits),
+      fakeSocket("me", "s1", []),
+      makeDeps(),
+    );
 
     expect(touchLastSeenCalls).toHaveLength(1);
     expect(touchLastSeenCalls[0]?.userIds).toEqual(["me"]);
@@ -152,7 +176,11 @@ describe("handlePresenceDisconnect", () => {
     markOfflineResult = { stillOnline: true };
 
     const ioEmits: Emit[] = [];
-    await handlePresenceDisconnect(fakeIo(ioEmits), fakeSocket("me", "s1", []));
+    await handlePresenceDisconnect(
+      fakeIo(ioEmits),
+      fakeSocket("me", "s1", []),
+      makeDeps(),
+    );
 
     expect(touchLastSeenCalls).toHaveLength(0);
     expect(ioEmits).toHaveLength(0);
@@ -165,7 +193,11 @@ describe("handlePresenceDisconnect", () => {
 
     const ioEmits: Emit[] = [];
     await expect(
-      handlePresenceDisconnect(fakeIo(ioEmits), fakeSocket("me", "s1", [])),
+      handlePresenceDisconnect(
+        fakeIo(ioEmits),
+        fakeSocket("me", "s1", []),
+        makeDeps(),
+      ),
     ).resolves.toBeUndefined();
 
     expect(touchLastSeenCalls).toHaveLength(0);
@@ -175,3 +207,9 @@ describe("handlePresenceDisconnect", () => {
     expect((update?.payload as { status: string }).status).toBe("offline");
   });
 });
+
+type PresenceEntryShape = {
+  userId: string;
+  status: string;
+  lastSeen: string | null;
+};

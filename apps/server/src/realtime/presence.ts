@@ -1,7 +1,8 @@
 import { CHAT_EVENTS, type PresenceStatus } from "@gamelobby/chat-core";
 import type { Server as IOServer, Socket } from "socket.io";
-import { conversations, friends, profiles } from "../db";
+import * as db from "../db";
 import { childLogger } from "../logger";
+import type { PresenceStore } from "./presence-store";
 import { presenceStore } from "./presence-store-instance";
 import { emitToUser } from "./rooms";
 
@@ -13,19 +14,44 @@ type PresenceEntry = {
   lastSeen: string | null;
 };
 
+export type PresenceDeps = {
+  store: PresenceStore;
+  acceptedFriendIds: (userId: string) => Promise<string[]>;
+  conversationIdsForUser: (userId: string) => Promise<string[]>;
+  memberIds: (conversationId: string) => Promise<string[]>;
+  getLastSeen: (userIds: string[]) => Promise<Map<string, Date | null>>;
+  touchLastSeen: (userIds: string[], when: Date) => Promise<void>;
+};
+
+function defaultDeps(): PresenceDeps {
+  return {
+    store: presenceStore,
+    acceptedFriendIds: (userId) => db.friends.acceptedFriendIds(userId),
+    conversationIdsForUser: (userId) =>
+      db.conversations.getConversationIdsForUser(userId),
+    memberIds: (conversationId) =>
+      db.conversations.getMemberIds(conversationId),
+    getLastSeen: (userIds) => db.profiles.getLastSeen(userIds),
+    touchLastSeen: (userIds, when) => db.profiles.touchLastSeen(userIds, when),
+  };
+}
+
 export function isOnline(userId: string): Promise<boolean> {
   return presenceStore.isOnline(userId);
 }
 
-async function audienceFor(userId: string): Promise<string[]> {
+async function audienceFor(
+  userId: string,
+  deps: PresenceDeps,
+): Promise<string[]> {
   const audience = new Set<string>();
   const [friendIds, convIds] = await Promise.all([
-    friends.acceptedFriendIds(userId),
-    conversations.getConversationIdsForUser(userId),
+    deps.acceptedFriendIds(userId),
+    deps.conversationIdsForUser(userId),
   ]);
   for (const id of friendIds) audience.add(id);
   for (const cid of convIds) {
-    const ids = await conversations.getMemberIds(cid);
+    const ids = await deps.memberIds(cid);
     for (const id of ids) audience.add(id);
   }
   audience.delete(userId);
@@ -35,14 +61,15 @@ async function audienceFor(userId: string): Promise<string[]> {
 export async function handlePresenceConnect(
   io: IOServer,
   socket: Socket,
+  deps: PresenceDeps = defaultDeps(),
 ): Promise<void> {
   const userId = socket.data.userId;
-  const { wasOnline } = await presenceStore.markOnline(userId, socket.id);
-  const audience = await audienceFor(userId);
+  const { wasOnline } = await deps.store.markOnline(userId, socket.id);
+  const audience = await audienceFor(userId, deps);
 
-  const onlineSet = await presenceStore.onlineAmong(audience);
+  const onlineSet = await deps.store.onlineAmong(audience);
   const offlineIds = audience.filter((id) => !onlineSet.has(id));
-  const lastSeen = await profiles.getLastSeen(offlineIds);
+  const lastSeen = await deps.getLastSeen(offlineIds);
   const entries: PresenceEntry[] = audience.map(
     (id): PresenceEntry =>
       onlineSet.has(id)
@@ -66,19 +93,20 @@ export async function handlePresenceConnect(
 export async function handlePresenceDisconnect(
   io: IOServer,
   socket: Socket,
+  deps: PresenceDeps = defaultDeps(),
 ): Promise<void> {
   const userId = socket.data.userId;
-  const { stillOnline } = await presenceStore.markOffline(userId, socket.id);
+  const { stillOnline } = await deps.store.markOffline(userId, socket.id);
   if (stillOnline) return;
 
   const now = new Date();
   try {
-    await profiles.touchLastSeen([userId], now);
+    await deps.touchLastSeen([userId], now);
   } catch (err) {
     log.error({ err, userId }, "touchLastSeen failed");
   }
 
-  const audience = await audienceFor(userId);
+  const audience = await audienceFor(userId, deps);
   const mine: PresenceEntry = {
     userId,
     status: "offline",
