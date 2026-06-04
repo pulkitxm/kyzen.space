@@ -47,9 +47,10 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
 
   attachRedisAdapter(io);
   setIO(io);
+  startPresenceHeartbeats(io);
 ```
 
-`apps/server/src/realtime/index.ts:24` — three things to note. `transports: ["websocket"]` skips the HTTP long-poll fallback entirely (one transport, simpler reasoning). `cors.credentials: true` plus a concrete `origin` is what lets the browser send the auth cookie cross-origin. And `setIO(io)` (`apps/server/src/realtime/io.ts:5`) stashes the server in a module singleton so code with no socket in scope — most importantly `notify` — can still emit.
+`apps/server/src/realtime/index.ts:24` — four things to note. `transports: ["websocket"]` skips the HTTP long-poll fallback entirely (one transport, simpler reasoning). `cors.credentials: true` plus a concrete `origin` is what lets the browser send the auth cookie cross-origin. `setIO(io)` (`apps/server/src/realtime/io.ts:5`) stashes the server in a module singleton so code with no socket in scope — most importantly `notify` — can still emit. And `startPresenceHeartbeats(io)` (`apps/server/src/realtime/presence-heartbeat.ts:32`) starts the per-node timers that refresh live presence entries and periodically persist last-seen.
 
 ### The auth middleware: one cookie check per connection
 
@@ -72,7 +73,7 @@ io.use(async (socket, next) => {
   } catch (e) {
 ```
 
-`apps/server/src/realtime/index.ts:33`. The WebSocket handshake is an HTTP upgrade, so it carries the same cookies the browser would send to any same-site request. We hand the raw `Cookie` header to Better Auth's `getSession`, and on success stamp `socket.data.userId`. That field is typed by the module augmentation in `apps/server/src/realtime/socket-data.d.ts:4`:
+`apps/server/src/realtime/index.ts:35`. The WebSocket handshake is an HTTP upgrade, so it carries the same cookies the browser would send to any same-site request. We hand the raw `Cookie` header to Better Auth's `getSession`, and on success stamp `socket.data.userId`. That field is typed by the module augmentation in `apps/server/src/realtime/socket-data.d.ts:4`:
 
 ```ts
 declare module "socket.io" {
@@ -82,7 +83,7 @@ declare module "socket.io" {
 }
 ```
 
-The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:103`, `chat.ts:17`, `friends.ts:7`, `typing.ts:40`, `presence.ts:52`, `games-in-chat.ts:20`). A forged `userId` in a payload is simply ignored — the only `userId` that exists came from a verified session.
+The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:103`, `chat.ts:17`, `friends.ts:7`, `typing.ts:40`, `presence.ts:39`, `games-in-chat.ts:20`). A forged `userId` in a payload is simply ignored — the only `userId` that exists came from a verified session.
 
 ### Per-connection wiring
 
@@ -99,7 +100,7 @@ io.on("connection", (socket) => {
   void handlePresenceConnect(io, socket);
 ```
 
-`apps/server/src/realtime/index.ts:52`. On every connection we (1) join the user's rooms, (2) attach the four chat-lane handler groups, (3) kick off presence, and then (further down) register the three game-lane listeners (`join_room`, `make_move`, `leave_room`). Note `joinUserRooms` and `handlePresenceConnect` are `async` and fire-and-forgotten with `void`; the listener registrations below them are synchronous, so handlers exist immediately even while those promises resolve.
+`apps/server/src/realtime/index.ts:54`. On every connection we (1) join the user's rooms, (2) attach the four chat-lane handler groups, (3) kick off presence, and then (further down) register the three game-lane listeners (`join_room`, `make_move`, `leave_room`). Note `joinUserRooms` and `handlePresenceConnect` are `async` and fire-and-forgotten with `void`; the listener registrations below them are synchronous, so handlers exist immediately even while those promises resolve.
 
 ## The two lanes
 
@@ -161,7 +162,7 @@ export async function joinUserRooms(socket: Socket): Promise<void> {
 
 So a freshly connected socket is already in its personal `user:<id>` room (for notifications, presence, friend events) and in a `conv:<id>` room for every conversation it belongs to — without any client round-trip.
 
-**Typing** and **presence** are the two lane members that keep ephemeral in-memory state rather than touching the DB. Typing stores a `Map<conversationId, Map<userId, Entry>>` with a 5 s `setTimeout` TTL per typer and re-broadcasts the full typer list on every change (`typing.ts:8`, `typing.ts:20`, `typing.ts:56`); a disconnect clears all of that socket's active typers (`typing.ts:77`). Presence reference-counts a user's live socket ids — a user is online while `sockets.size > 0`, so opening a second tab does not double-count and closing one tab does not flip them offline (`presence.ts:19`, `presence.ts:54`, `presence.ts:79`). Presence only broadcasts a transition (`if (!wasOnline)` on connect, `if (p.sockets.size > 0) return` on disconnect) to a computed *audience* of friends plus co-conversation members (`presence.ts:33`).
+**Typing** keeps ephemeral in-memory state rather than touching the DB: it stores a `Map<conversationId, Map<userId, Entry>>` with a 5 s `setTimeout` TTL per typer and re-broadcasts the full typer list on every change (`typing.ts:8`, `typing.ts:20`, `typing.ts:56`); a disconnect clears all of that socket's active typers (`typing.ts:77`). **Presence** instead delegates its socket bookkeeping to a `PresenceStore` (`presence-store.ts`) — reference-counting a user's live socket ids so a user is online while their set is non-empty, so opening a second tab does not double-count and closing one tab does not flip them offline (`presence-store.ts:17`, `presence-store.ts:33`). The store returns `{ wasOnline }` on `markOnline` and `{ stillOnline }` on `markOffline`, so presence only broadcasts a transition (`if (!wasOnline)` on connect at `presence.ts:58`, `if (stillOnline) return` on disconnect at `presence.ts:72`) to a computed *audience* of friends plus co-conversation members (`audienceFor`, `presence.ts:20`).
 
 **`notify`** is the chat lane's escape hatch for code that has no socket. It persists a notification row, then emits to the recipient's user room via the `getIO()` singleton — note the self-suppression guard so you are never notified about your own action:
 
@@ -182,7 +183,7 @@ export async function notify(
 
 The game lane is three events — `join_room`, `make_move`, and `leave_room` — and it is wired differently from the chat lane in three deliberate ways:
 
-1. **Distinct event names** outside `CHAT_EVENTS` (plain `"join_room"` / `"make_move"` / `"leave_room"`), and a distinct error channel `"game_error"`. `leave_room` (`index.ts:129`) reuses `clientJoinRoomSchema` (just `{ gameId }`), then calls `leaveGameRoom(socket, gameId)` (`rooms.ts:11`) to `socket.leave` the `game:<id>` room — boards emit it on unmount so the *shared, persistent* connection doesn't accumulate stale game rooms as the user navigates between games. It is the one game-lane listener that is synchronous (no DB work) and so is not wrapped in `void (async () => …)`.
+1. **Distinct event names** outside `CHAT_EVENTS` (plain `"join_room"` / `"make_move"` / `"leave_room"`), and a distinct error channel `"game_error"`. `leave_room` (`index.ts:131`) reuses `clientJoinRoomSchema` (just `{ gameId }`), then calls `leaveGameRoom(socket, gameId)` (`rooms.ts:11`) to `socket.leave` the `game:<id>` room — boards emit it on unmount so the *shared, persistent* connection doesn't accumulate stale game rooms as the user navigates between games. It is the one game-lane listener that is synchronous (no DB work) and so is not wrapped in `void (async () => …)`.
 2. **Zod validation from `@gamelobby/games-core`**, not the loose `isObj`/`str` coercion of the chat lane. The wire envelope is parsed with `clientJoinRoomSchema` / `clientMakeMoveSchema` before anything else.
 3. **A driver indirection** — the handler does not contain game logic; it looks up the game's type, fetches a `RealtimeDriver`, and delegates.
 
@@ -204,7 +205,7 @@ socket.on("make_move", (payload: unknown, cb?: (err?: string) => void) => {
       await driver.makeMove(io, socket, data);
 ```
 
-`apps/server/src/realtime/index.ts:96` (the `join_room` listener immediately above it at `index.ts:63` follows the identical shape). The envelope schemas are strict and tiny — `clientMakeMoveSchema` is `{ gameId: uuid, moveData: unknown }.strict()` (`packages/games-core/src/schemas.ts:37`); the *contents* of `moveData` are validated later by the game-specific `moveSchema` inside the driver, because the envelope layer cannot know what shape a Reversi vs. a Tic-Tac-Toe move takes. `clientJoinRoomSchema` adds an optional `intent: "play" | "spectate"` (`schemas.ts:29`). Both envelopes key off `gameId` (a uuid), not a `gameType`; the registry-typed `gameTypeSchema` (`packages/games-core/src/game-types.ts:9`) that now validates `gameType` in the parse layer guards the game-card DTOs and game creation, while the driver resolves the type from the stored `gameRow.gameType` (`index.ts:109`).
+`apps/server/src/realtime/index.ts:98` (the `join_room` listener immediately above it at `index.ts:65` follows the identical shape). The envelope schemas are strict and tiny — `clientMakeMoveSchema` is `{ gameId: uuid, moveData: unknown }.strict()` (`packages/games-core/src/schemas.ts:37`); the *contents* of `moveData` are validated later by the game-specific `moveSchema` inside the driver, because the envelope layer cannot know what shape a Reversi vs. a Tic-Tac-Toe move takes. `clientJoinRoomSchema` adds an optional `intent: "play" | "spectate"` (`schemas.ts:29`). Both envelopes key off `gameId` (a uuid), not a `gameType`; the registry-typed `gameTypeSchema` (`packages/games-core/src/game-types.ts:9`) that now validates `gameType` in the parse layer guards the game-card DTOs and game creation, while the driver resolves the type from the stored `gameRow.gameType` (`index.ts:111`).
 
 `join_room` and `make_move` report failures *twice*: through the ack callback (`cb?.(msg)`) for the specific caller, and as a `"game_error"` emit. They also wrap the body in `try/catch` and log a `durationMs` on success — the game lane's own version of the safety/observability that `register` gives the chat lane. (`leave_room` only acks; it has nothing to fail at beyond payload validation.)
 
@@ -374,9 +375,9 @@ This dual broadcast is the bridge between the two lanes: a *game-lane* action (`
 ```
 Player clicks a cell in the React board (apps/web, @gamelobby/games-client)
   -> client emits "make_move" { gameId, moveData } over the socket
-  -> apps/server/src/realtime/index.ts:96  socket.on("make_move")
+  -> apps/server/src/realtime/index.ts:98  socket.on("make_move")
        clientMakeMoveSchema.safeParse(payload)            (envelope Zod, games-core)
-  -> index.ts:108  games.getGameById(gameId) -> getDriver(gameType)  (drivers.ts:25)
+  -> index.ts:110  games.getGameById(gameId) -> getDriver(gameType)  (drivers.ts:25)
   -> driver.makeMove == turn-based.ts:120  handleMakeMove
        userId = socket.data.userId                         (trusted identity, NOT payload)
        guards: game active? caller is a seated player? engine has reduce?
@@ -433,13 +434,13 @@ export function attachRedisAdapter(io: IOServer): void {
 
 - **The client is never the authority.** The browser runs the same engine for prediction, but `make_move` is re-validated by `moveSchema`, by `stateSchema`, and finally by `engine.reduce` on the server (`turn-based.ts:143`). If the three disagree with the client, the server wins. Do not "optimize" by trusting client-supplied state.
 - **One socket per tab carries both lanes.** The browser opens a single authenticated Socket.IO connection in the web app's `SocketProvider`; game boards receive it as a prop (`socket` / `connected`) and emit `join_room` / `make_move` / `leave_room` over it — they do **not** call `io()` themselves. So the chat lane and the game lane always share one connection, one auth check, and one `socket.data.userId`. See [games-client](./games-client.md).
-- **Identity comes from `socket.data.userId`, never from a payload.** Set once in the `io.use` middleware (`index.ts:44`). Any handler that reads a `userId` off the wire would be a security bug.
-- **Two error/result conventions, one per lane.** Chat lane: ack callbacks shaped `{ ok, ... }` via `ack`/`ackErr`, wrapped by `register` (`socket-util.ts:36`). Game lane: a `"game_error"` emit *and* a string ack `cb?.(msg)` (`index.ts:90`). Follow the lane you are in.
+- **Identity comes from `socket.data.userId`, never from a payload.** Set once in the `io.use` middleware (`index.ts:46`). Any handler that reads a `userId` off the wire would be a security bug.
+- **Two error/result conventions, one per lane.** Chat lane: ack callbacks shaped `{ ok, ... }` via `ack`/`ackErr`, wrapped by `register` (`socket-util.ts:36`). Game lane: a `"game_error"` emit *and* a string ack `cb?.(msg)` (`index.ts:92`). Follow the lane you are in.
 - **Validate at both layers in the game lane.** The envelope schema (`clientMakeMoveSchema`) only guarantees `{ gameId, moveData: unknown }`. The real move shape is the game's `moveSchema`, checked inside the driver. Skipping either is a hole.
 - **`emitFullState` sends the entire game + move list every time.** It is intentionally not a diff, so reconnects and late joiners are correct for free. Don't replace it with incremental patches without a resync story.
 - **Seating happens on `join_room`, not on a separate "sit" event.** `intent: "spectate"`, a full table, or a reserved `challenge` seat all silently result in `changed: false` (`turn-based.ts:46`) — you watch instead of erroring.
 - **Presence is Redis-backed; typing is still an in-process map.** Presence reads/writes go through a `PresenceStore` (`presence-store.ts`): a Redis sorted set per user (`presence:<userId>`, scored by heartbeat time) when `REDIS_URL` is set, or an in-process map for single-node dev. A per-node timer refreshes the live entries every `PRESENCE_HEARTBEAT_MS`, so a crashed node's users age out of reads within `PRESENCE_STALE_MS`. Durable last-seen lives in `user_profile.last_seen_at`, written on graceful disconnect and on a slower `PRESENCE_LASTSEEN_PERSIST_MS` timer while online. The live "went offline" push on a hard crash is not yet implemented (online reads still self-correct within the stale window). Typing (`typing.ts:8`) is still a per-node in-process map — treat it as best-effort, single-node-accurate.
-- **`notify` self-suppresses** (`notify.ts:16`) and depends on `getIO()` being set — which `attachRealtime` guarantees at boot via `setIO(io)` (`apps/server/src/realtime/index.ts:31`). Calling `notify` before `attachRealtime` would persist the row but skip the live push (`if (!io) return`).
+- **`notify` self-suppresses** (`notify.ts:16`) and depends on `getIO()` being set — which `attachRealtime` guarantees at boot via `setIO(io)` (`apps/server/src/realtime/index.ts:32`). Calling `notify` before `attachRealtime` would persist the row but skip the live push (`if (!io) return`).
 - **`getDriver` ignores its argument today.** All games use the turn-based driver. Add realtime games by implementing `RealtimeDriver` and branching in `getDriver` on the engine's `mode`; the listeners in `index.ts` need no change.
 - **Stored state is treated as untrusted too.** `stateSchema.safeParse(gameRow.gameState)` returning failure yields `"Corrupt game state"` rather than a crash (`turn-based.ts:141`) — a deliberate guard against bad data in JSONB.
 - **No comments in code.** This repo enforces a strict no-comments rule; the lone comment in this subsystem is a justified `biome-ignore` at `turn-based.ts:52`.

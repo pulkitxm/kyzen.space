@@ -52,7 +52,7 @@ Two things to note. Passing `{ schema }` (`apps/server/src/db/client.ts:12`) giv
 
 The auth tables — `user`, `session`, `account`, `verification` (`apps/server/src/db/schema.ts:36`–`90`) — are the shape Better Auth expects (see `docs/architecture/auth.md`); the rest of the app references `user.id` with `onDelete` rules.
 
-At the bottom of the file, Drizzle's `$inferSelect` derives a TypeScript row type for each table (`apps/server/src/db/schema.ts:182`–`185` and `301`–`305`), e.g. `export type GameRow = typeof game.$inferSelect;`. These `*Row` types flow out through `db/index.ts` and become the currency that repositories return — so callers get fully typed rows without hand-writing interfaces.
+At the bottom of the file, Drizzle's `$inferSelect` derives a TypeScript row type for each table (`apps/server/src/db/schema.ts:184`–`187` and `303`–`307`), e.g. `export type GameRow = typeof game.$inferSelect;`. These `*Row` types flow out through `db/index.ts` and become the currency that repositories return — so callers get fully typed rows without hand-writing interfaces.
 
 ### The generic game schema (the important part)
 
@@ -142,10 +142,10 @@ This table is a **normalization** of what used to be a `players` JSONB array on 
 The remaining tables back the chat-and-social half of the product (DTOs/contract in `docs/architecture/chat-core.md`):
 
 - **`userProfile`** (`apps/server/src/db/schema.ts:165`) — one per `user` (`unique` FK), holding `username` (unique), a `stats` JSONB of type `ProfileStats` (`Record<gameType, GameStat>`, declared at `apps/server/src/db/schema.ts:163`), an `avatar` JSONB (`AvatarConfig`, from `packages/avatar`), appearance columns backed by the three pgEnums, a `chatLayout` JSONB, and a nullable `usernameChangedAt` timestamp (null = never changed) that gates the username-change cooldown. `last_seen_at` (nullable timestamp) records when the user was last online — written on graceful disconnect and periodically while connected by the realtime presence heartbeat; see [realtime.md](./realtime.md). This is the "profile provisioned on first sign-in" row.
-- **`conversation`** + **`conversationMember`** (`apps/server/src/db/schema.ts:210`, `229`) — a conversation is a `dm` or `group` (`kind`), and DMs carry a unique `dmKey` so a pair of users can have at most one DM. Membership is a join table with per-member read state (`lastReadMessageId`, `lastReadAt`), `muted`, and a `leftAt` soft-leave. `unique("conversation_member_uq").on(conversationId, userId)` plus `index(...).on(userId)` mirror the `game_player` design.
-- **`message`** (`apps/server/src/db/schema.ts:252`) — `kind` (`text`, `game_card`, …), nullable `body`, a `metadata` JSONB (`MessageMetadata` from chat-core), an optional `gameId` link (so a `game_card` message points at a game), and a `deletedAt` for soft delete. The composite `index("message_conv_created_idx").on(conversationId, createdAt)` is precisely the index that makes the keyset pagination below efficient.
-- **`friendship`** (`apps/server/src/db/schema.ts:187`) — a `requesterId` / `addresseeId` pair plus a `pairKey` (sorted, unique) so direction doesn't create duplicates; indexed both ways by `(addressee, status)` and `(requester, status)`.
-- **`notification`** (`apps/server/src/db/schema.ts:276`) — `userId`, `type`, optional `actorId`, a `payload` JSONB (`NotificationPayload`), and `readAt` / `resolvedAt`. Indexed by `(userId, createdAt)` for the feed and `(userId, readAt)` for the unread badge.
+- **`conversation`** + **`conversationMember`** (`apps/server/src/db/schema.ts:212`, `231`) — a conversation is a `dm` or `group` (`kind`), and DMs carry a unique `dmKey` so a pair of users can have at most one DM. Membership is a join table with per-member read state (`lastReadMessageId`, `lastReadAt`), `muted`, and a `leftAt` soft-leave. `unique("conversation_member_uq").on(conversationId, userId)` plus `index(...).on(userId)` mirror the `game_player` design.
+- **`message`** (`apps/server/src/db/schema.ts:254`) — `kind` (`text`, `game_card`, …), nullable `body`, a `metadata` JSONB (`MessageMetadata` from chat-core), an optional `gameId` link (so a `game_card` message points at a game), and a `deletedAt` for soft delete. The composite `index("message_conv_created_idx").on(conversationId, createdAt)` is precisely the index that makes the keyset pagination below efficient.
+- **`friendship`** (`apps/server/src/db/schema.ts:189`) — a `requesterId` / `addresseeId` pair plus a `pairKey` (sorted, unique) so direction doesn't create duplicates; indexed both ways by `(addressee, status)` and `(requester, status)`.
+- **`notification`** (`apps/server/src/db/schema.ts:278`) — `userId`, `type`, optional `actorId`, a `payload` JSONB (`NotificationPayload`), and `readAt` / `resolvedAt`. Indexed by `(userId, createdAt)` for the feed and `(userId, readAt)` for the unread badge.
 
 ## The repository pattern
 
@@ -227,7 +227,7 @@ Repositories occasionally need a SQL expression Drizzle's builder doesn't model 
 
 ### `profiles.bumpStats` — read-modify-write of JSONB
 
-`bumpStats` (`apps/server/src/db/repositories/profiles.ts:114`) is worth flagging because it's a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime driver when a game completes (`apps/server/src/realtime/turn-based.ts:90`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice — but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
+`bumpStats` (`apps/server/src/db/repositories/profiles.ts:147`) is worth flagging because it's a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime driver when a game completes (`apps/server/src/realtime/turn-based.ts:90`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice — but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
 
 ## Data-flow walkthrough: persisting a move
 
@@ -239,11 +239,11 @@ This is the database layer's busiest path, and it's where the "client is never t
 4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`apps/server/src/db/repositories/games.ts:143`) returns `max(moveNumber) + 1`. The `move_game_number_uq` unique constraint is the backstop if two moves race to the same number.
 5. **Append the move.** `games.addMove({ gameId, moveNumber, playerId, moveData: parsedMove.data })` (`apps/server/src/db/repositories/games.ts:151`) inserts the validated move into the append-only `move` table.
 6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`apps/server/src/db/repositories/games.ts:107`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
-7. **Finalize on game over.** If the engine's `outcome.status === "completed"`, `finalize` (`turn-based.ts:69`) calls `games.updateGame` again (status/`completedAt`/`winner`) and `profiles.bumpStats` (`apps/server/src/db/repositories/profiles.ts:114`) once per seat.
+7. **Finalize on game over.** If the engine's `outcome.status === "completed"`, `finalize` (`turn-based.ts:69`) calls `games.updateGame` again (status/`completedAt`/`winner`) and `profiles.bumpStats` (`apps/server/src/db/repositories/profiles.ts:147`) once per seat.
 
 In arrows:
 
-`make_move` → `handleMakeMove` (`turn-based.ts:120`) → `games.getGameById` (`games.ts:82`) → `moveSchema/stateSchema.safeParse` (`turn-based.ts:138`) → `engine.reduce` (`turn-based.ts:143`) → `games.nextMoveNumber` (`games.ts:143`) → `games.addMove` (`games.ts:151`) → `games.updateGame` (`games.ts:107`) → `finalize` → `profiles.bumpStats` (`profiles.ts:114`) → broadcast `move_made` + `game_state`.
+`make_move` → `handleMakeMove` (`turn-based.ts:120`) → `games.getGameById` (`games.ts:82`) → `moveSchema/stateSchema.safeParse` (`turn-based.ts:138`) → `engine.reduce` (`turn-based.ts:143`) → `games.nextMoveNumber` (`games.ts:143`) → `games.addMove` (`games.ts:151`) → `games.updateGame` (`games.ts:107`) → `finalize` → `profiles.bumpStats` (`profiles.ts:147`) → broadcast `move_made` + `game_state`.
 
 Notice that no SQL appears anywhere in `turn-based.ts` — only `games.*` and `profiles.*` calls. That's the layering working as intended. The full realtime side of this story is in `docs/architecture/realtime.md`.
 
@@ -265,7 +265,7 @@ Notice that no SQL appears anywhere in `turn-based.ts` — only `games.*` and `p
 - **Move numbers are dense, unique, and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` plus `nextMoveNumber = max + 1` (`apps/server/src/db/repositories/games.ts:143`). A duplicate is a hard insert failure, which is the intended double-submit guard.
 - **Cursors are opaque and tolerant.** `decodeCursor` returns `null` (rather than throwing) on a malformed or non-base64 cursor (`apps/server/src/db/repositories/cursor.ts:7`); callers then simply page from the start. Keyset pagination relies on the composite `createdAt`-leading indexes — keep them if you add new paginated lists.
 - **DMs and friendships are keyed by a *sorted* pair.** `conversations.dmKey(a, b)` and `friends.pairKey(a, b)` both `[a, b].sort().join(":")` (`apps/server/src/db/repositories/conversations.ts:12`, `apps/server/src/db/repositories/friends.ts:6`), so the relationship is direction-independent and the unique constraint actually prevents duplicates.
-- **`bumpStats` is read-modify-write on JSONB.** Not an atomic increment (`apps/server/src/db/repositories/profiles.ts:114`). Fine for the current serialized call site in the move handler; be careful if you ever bump stats from concurrent paths.
+- **`bumpStats` is read-modify-write on JSONB.** Not an atomic increment (`apps/server/src/db/repositories/profiles.ts:147`). Fine for the current serialized call site in the move handler; be careful if you ever bump stats from concurrent paths.
 - **Dev DB is push-managed.** Use `db:push` (or direct SQL) for local schema/enum changes; `db:migrate` expects a migration baseline the local push-managed DB doesn't have.
 - **`DB_LATENCY_MS` is dev-only.** Forced to 0 in production by `resolveDbLatencyMs` (`apps/server/src/db/latency.ts:63`). New vars like this must be added to `turbo.json` `globalEnv` (see `CLAUDE.md`) or builds won't see them.
 - **No comments in code.** Per the repo-wide rule, the only comment you'll find in this layer is the single `biome-ignore` on the `or(...)!` non-null assertions in the paginated repositories.
