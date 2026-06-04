@@ -2,7 +2,7 @@ import type { Server as IOServer } from "socket.io";
 import { profiles } from "../db";
 import { env } from "../env";
 import { childLogger } from "../logger";
-import { presenceStore } from "./presence-store";
+import { presenceStore } from "./presence-store-instance";
 
 const log = childLogger({ mod: "realtime:presence-heartbeat" });
 

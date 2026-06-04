@@ -3,15 +3,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
 const refreshCalls: Array<[string, string]> = [];
 const touchLastSeenCalls: Array<{ userIds: string[]; when: Date }> = [];
 
-mock.module("../src/env", () => ({
-  env: {
-    logLevel: "silent",
-    presenceHeartbeatMs: 10000,
-    presenceLastSeenPersistMs: 60000,
-  },
-}));
-
-mock.module("../src/realtime/presence-store", () => ({
+mock.module("../src/realtime/presence-store-instance", () => ({
   presenceStore: {
     refresh: async (userId: string, socketId: string) => {
       refreshCalls.push([userId, socketId]);
@@ -20,6 +12,13 @@ mock.module("../src/realtime/presence-store", () => ({
 }));
 
 mock.module("../src/db", () => ({
+  db: {},
+  schema: {},
+  games: {},
+  messages: {},
+  notifications: {},
+  friends: {},
+  conversations: {},
   profiles: {
     touchLastSeen: async (userIds: string[], when: Date) => {
       touchLastSeenCalls.push({ userIds, when });

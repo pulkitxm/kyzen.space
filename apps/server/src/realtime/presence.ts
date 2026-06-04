@@ -2,7 +2,7 @@ import { CHAT_EVENTS, type PresenceStatus } from "@gamelobby/chat-core";
 import type { Server as IOServer, Socket } from "socket.io";
 import { conversations, friends, profiles } from "../db";
 import { childLogger } from "../logger";
-import { presenceStore } from "./presence-store";
+import { presenceStore } from "./presence-store-instance";
 import { emitToUser } from "./rooms";
 
 const log = childLogger({ mod: "realtime:presence" });

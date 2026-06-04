@@ -10,16 +10,7 @@ let memberIds: Record<string, string[]> = {};
 let lastSeen = new Map<string, Date | null>();
 const touchLastSeenCalls: Array<{ userIds: string[]; when: Date }> = [];
 
-mock.module("../src/logger", () => ({
-  childLogger: () => ({
-    debug() {},
-    info() {},
-    warn() {},
-    error() {},
-  }),
-}));
-
-mock.module("../src/realtime/presence-store", () => ({
+mock.module("../src/realtime/presence-store-instance", () => ({
   presenceStore: {
     markOnline: async () => markOnlineResult,
     markOffline: async () => markOfflineResult,
@@ -31,6 +22,11 @@ mock.module("../src/realtime/presence-store", () => ({
 }));
 
 mock.module("../src/db", () => ({
+  db: {},
+  schema: {},
+  games: {},
+  messages: {},
+  notifications: {},
   friends: { acceptedFriendIds: async () => friendIds },
   conversations: {
     getConversationIdsForUser: async () => convIds,

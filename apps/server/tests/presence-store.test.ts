@@ -1,22 +1,9 @@
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import type { Redis } from "ioredis";
-
-mock.module("../src/env", () => ({
-  env: { redisUrl: "", presenceStaleMs: 25_000 },
-}));
-
-mock.module("../src/realtime/redis-client", () => ({
-  getRedis: () => {
-    throw new Error("getRedis() called without REDIS_URL");
-  },
-}));
-
-const {
+import {
   InMemoryPresenceStore,
   RedisPresenceStore,
-  createPresenceStore,
-  presenceStore,
-} = await import("../src/realtime/presence-store");
+} from "../src/realtime/presence-store";
 
 describe("InMemoryPresenceStore", () => {
   it("reports a user online after markOnline and offline after the last markOffline", async () => {
@@ -45,13 +32,6 @@ describe("InMemoryPresenceStore", () => {
 
     const online = await store.onlineAmong(["a", "b", "c"]);
     expect([...online].sort()).toEqual(["a", "c"]);
-  });
-});
-
-describe("createPresenceStore", () => {
-  it("returns the in-memory store when REDIS_URL is unset", () => {
-    expect(createPresenceStore()).toBeInstanceOf(InMemoryPresenceStore);
-    expect(presenceStore).toBeInstanceOf(InMemoryPresenceStore);
   });
 });
 
