@@ -26,6 +26,8 @@ Integration tests **self-skip without a DB**: each file probes `select 1` and ga
 
 `harness.ts` factors out the boilerplate: `createHarness(prefix)` returns `makeUser`/`befriend`/`makeDm`/`makeGroup`/`trackGame`/`cleanup` over UUID-namespaced fixtures (so parallel files never collide), plus `unwrap`/`expectErr`/`TestUser`. Each edge/driver file does `const h = createHarness("…")` and `afterAll(h.cleanup)`, which deletes its tracked games/conversations/users. The two original files still carry their own copy of this harness inline.
 
+The presence Redis integration tests (`apps/server/integration/presence-redis.test.ts`) exercise `RedisPresenceStore` against a real Redis rather than a DB, so they need a reachable `REDIS_URL`. The `redis` service in `scripts/docker-compose.yml` sits behind a `redis` Compose profile, so `bun run db:start` (postgres only) does **not** bring it up — start it explicitly with `bun run redis:start` (`redis:7` on `localhost:6379`). In CI it's the `redis` service on the `integration` job.
+
 ## Files at a glance
 
 | Suite | Guarantees |
@@ -64,6 +66,8 @@ Integration tests **self-skip without a DB**: each file probes `select 1` and ga
 
 **`mock.module` for server plumbing.** Server route/driver tests stub the data layer instead of touching Postgres: `mock.module("../src/db", () => ({ games, profiles, … }))` (`apps/server/tests/turn-based.test.ts:59`) then `await import("../src/realtime/turn-based")` (`:73`). The `requireAuth` test follows the same shape, mocking `../src/auth` before importing the middleware. Pure helpers are exported so they're unit-testable independent of HTTP/socket plumbing. See `docs/architecture/server-api.md` for the routes → services → repositories layering this leans on.
 
+**A preload that seeds env for unit tests.** The server's unit suite runs with a preload — `apps/server/bunfig.toml` sets `[test] preload = ["./tests/setup.ts"]` — and `apps/server/tests/setup.ts` defaults the required env vars (`DATABASE_URL`, `BETTER_AUTH_SECRET`, `LOG_LEVEL`) with `||=` if they're unset. That lets the real `env`/`db`/`logger` modules import without throwing during unit tests, even with no `.env` present.
+
 **Structural contract suites.** Several suites iterate `GAMES`/`listGameTypes()` rather than hard-coding a game, so adding a `GameDefinition` automatically extends coverage — and forgetting any required artifact fails CI:
 
 - no board / no skeleton → `packages/games-client/tests/registry.test.ts`
@@ -77,7 +81,7 @@ This is the testing half of the "adding a game needs no new routes, endpoints, o
 `.github/workflows/test.yml` runs on every push to `main` and every pull request, and defines **two jobs**:
 
 - **`test`** — checks out, installs Bun `1.3.11`, `bun install --frozen-lockfile`, then `bun run test` (the unit suites; no DB, so any `integration/` files it touches self-skip).
-- **`integration`** — spins up a `postgres:16` service (health-checked, on `localhost:5432`), sets `DATABASE_URL`, copies `.env.example` to `.env`, applies the schema non-interactively with `bun run db:push -- --force`, then runs `cd apps/server && bun run test:integration`. Because the DB is reachable, `_preflight.test.ts` does **not** skip — a broken setup fails the job.
+- **`integration`** — spins up a `postgres:16` service (health-checked, on `localhost:5432`) **and** a `redis:7` service (health-checked, on `localhost:6379`), sets `DATABASE_URL` + `REDIS_URL`, copies `.env.example` to `.env`, applies the schema non-interactively with `bun run db:push -- --force`, then runs `cd apps/server && bun run test:integration`. Because the DB is reachable, `_preflight.test.ts` does **not** skip — a broken setup fails the job; and because Redis is reachable, the presence Redis tests run instead of skipping.
 
 Separate workflows cover the other gates — `lint.yml` (Biome `bun run check`), `build.yml`, and `no-comments.yml`.
 

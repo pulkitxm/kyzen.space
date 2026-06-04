@@ -23,6 +23,7 @@
     "check": "biome check .",
     "strip-comments": "bun scripts/strip-comments.mjs",
     "db:start": "docker compose -f scripts/docker-compose.yml up -d postgres",
+    "redis:start": "docker compose -f scripts/docker-compose.yml --profile redis up -d redis",
     "db:stop": "docker compose -f scripts/docker-compose.yml down",
     "db:reset": "docker compose -f scripts/docker-compose.yml down -v && docker compose -f scripts/docker-compose.yml up -d",
     "db:studio": "docker compose -f scripts/docker-compose.yml --profile studio up -d postgres adminer && echo Adminer → http://127.0.0.1:18081",

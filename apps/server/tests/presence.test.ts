@@ -8,6 +8,7 @@ let friendIds: string[] = [];
 let convIds: string[] = [];
 let memberIds: Record<string, string[]> = {};
 let lastSeen = new Map<string, Date | null>();
+let touchLastSeenShouldThrow = false;
 const touchLastSeenCalls: Array<{ userIds: string[]; when: Date }> = [];
 
 mock.module("../src/realtime/presence-store-instance", () => ({
@@ -35,6 +36,9 @@ mock.module("../src/db", () => ({
   profiles: {
     getLastSeen: async () => lastSeen,
     touchLastSeen: async (userIds: string[], when: Date) => {
+      if (touchLastSeenShouldThrow) {
+        throw new Error("touchLastSeen failed");
+      }
       touchLastSeenCalls.push({ userIds, when });
     },
   },
@@ -72,6 +76,7 @@ beforeEach(() => {
   convIds = [];
   memberIds = {};
   lastSeen = new Map();
+  touchLastSeenShouldThrow = false;
   touchLastSeenCalls.length = 0;
 });
 
@@ -151,5 +156,22 @@ describe("handlePresenceDisconnect", () => {
 
     expect(touchLastSeenCalls).toHaveLength(0);
     expect(ioEmits).toHaveLength(0);
+  });
+
+  it("still broadcasts offline to the audience even when touchLastSeen throws", async () => {
+    friendIds = ["friendA"];
+    markOfflineResult = { stillOnline: false };
+    touchLastSeenShouldThrow = true;
+
+    const ioEmits: Emit[] = [];
+    await expect(
+      handlePresenceDisconnect(fakeIo(ioEmits), fakeSocket("me", "s1", [])),
+    ).resolves.toBeUndefined();
+
+    expect(touchLastSeenCalls).toHaveLength(0);
+
+    const update = ioEmits.find((e) => e.event === "presence_update");
+    expect(update?.room).toBe("user:friendA");
+    expect((update?.payload as { status: string }).status).toBe("offline");
   });
 });

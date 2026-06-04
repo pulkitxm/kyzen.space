@@ -22,10 +22,14 @@ The reason this matters — and the single most important idea in the whole subs
 | `apps/server/src/realtime/chat.ts` | Chat-lane handlers (join/leave conversation, send message, mark read, DM/group lifecycle, notification read) and `joinUserRooms` on connect. |
 | `apps/server/src/realtime/friends.ts` | Friend request / respond / remove handlers. |
 | `apps/server/src/realtime/typing.ts` | In-memory per-conversation typing indicator with a 5 s TTL and disconnect cleanup. |
-| `apps/server/src/realtime/presence.ts` | In-memory online/last-seen tracking, reference-counted by socket id, broadcast to friends + co-conversation members. |
+| `apps/server/src/realtime/presence.ts` | Online/last-seen tracking backed by a `PresenceStore` (Redis sorted-set when `REDIS_URL` is set, else in-memory), with durable last-seen in the DB; broadcasts transitions to friends + co-conversation members. |
+| `apps/server/src/realtime/presence-store.ts` | The `PresenceStore` interface plus its `InMemoryPresenceStore` and `RedisPresenceStore` implementations (pure; no env import). |
+| `apps/server/src/realtime/presence-store-instance.ts` | `createPresenceStore` + the `presenceStore` singleton, env-selected (Redis when `REDIS_URL` is set, else in-memory). |
+| `apps/server/src/realtime/presence-heartbeat.ts` | Per-node timers that refresh live presence entries and periodically persist last-seen to `user_profile.last_seen_at`. |
 | `apps/server/src/realtime/games-in-chat.ts` | `createGameInConversation` over the socket: validate payload, create the game, post a game-card message. |
 | `apps/server/src/realtime/notify.ts` | `notify(userId, type, opts)`: persist a notification row and push it to the user's room via the `getIO()` singleton. |
 | `apps/server/src/realtime/redis.ts` | Optional `@socket.io/redis-adapter` wiring for multi-node scale-out; no-op without `REDIS_URL`. |
+| `apps/server/src/realtime/redis-client.ts` | Shared ioredis command client (`getRedis()`) used by the Redis-backed presence store, separate from the adapter's pub/sub connections. |
 | `apps/server/src/realtime/socket-util.ts` | Tiny helpers shared by chat handlers: `isObj`/`str`/`strArray` coercion, `ack`/`ackErr` ack shaping, and `register` (a try/catch wrapper around `socket.on`). |
 | `apps/server/src/realtime/socket-data.d.ts` | Module augmentation typing `socket.data.userId: string`. |
 
