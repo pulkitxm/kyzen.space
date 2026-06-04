@@ -8,7 +8,7 @@ This matters because of the repo's core architectural principle: **the client is
 
 1. **RSC / SSR** — Next.js server components call the server over HTTP, forwarding the browser's cookies (`apps/web/lib/get-server-session.ts:16`).
 2. **Browser fetches** — `"use client"` components call the server with `credentials: "include"` (`apps/web/lib/api-client.ts:6`).
-3. **Socket.IO handshake** — the realtime middleware reads the cookie off the WebSocket handshake and resolves the session before any game/chat event is allowed (`apps/server/src/realtime/index.ts:33`).
+3. **Socket.IO handshake** — the realtime middleware reads the cookie off the WebSocket handshake and resolves the session before any game/chat event is allowed (`apps/server/src/realtime/index.ts:35`).
 
 A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `databaseHooks.user.create.after` hook that provisions a `user_profile` row (username + a name-styled DiceBear avatar). So "auth" and "profile bootstrap" are a single atomic flow — by the time a session cookie exists, the user already has a username.
 
@@ -24,7 +24,7 @@ A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `
 | `apps/server/src/api/routes/account.ts` | Session-management REST: list sessions, sign out, revoke a session, revoke all others. |
 | `apps/server/src/db/schema.ts` | The `user` / `session` / `account` / `verification` Drizzle tables the adapter maps onto. |
 | `apps/server/src/db/client.ts` | The Drizzle `db` + `schema` handed to `drizzleAdapter`. |
-| `apps/server/src/db/repositories/profiles.ts` | `getProfileByUserId`, `isUsernameTaken`, `createProfile` used during provisioning. |
+| `apps/server/src/db/repositories/profiles.ts` | `getProfileByUserId`, `getTakenUsernames` (batched availability), `createProfile` used during provisioning. |
 | `apps/server/src/realtime/index.ts` | Socket.IO `io.use(...)` auth middleware: resolve session from the handshake cookie, attach `socket.data.userId`. |
 | `apps/server/src/env.ts` | `betterAuthSecret`, `betterAuthUrl`, `webUrl`, Google credentials, `googleConfigured()`. |
 | `apps/web/lib/auth-client.ts` | Better Auth React client (`signIn.social`, etc.), pointed at `NEXT_PUBLIC_API_URL`. |
@@ -37,7 +37,8 @@ A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `
 | `apps/web/app/sign-out-form.tsx` | Sign out the current session. |
 | `apps/web/app/session-end-form.tsx` | Revoke one specific session by token. |
 | `apps/web/app/revoke-others-form.tsx` | Revoke all sessions except the current one. |
-| `apps/web/app/settings/page.tsx` | Renders the active-session list + the three session forms. |
+| `apps/web/app/settings/page.tsx` | Redirects `/settings` → `/settings/account` (the default tab). |
+| `apps/web/app/settings/account/page.tsx` | The Account tab: identity form + active-session list + the three session forms. |
 | `apps/web/lib/socket/socket-context.tsx` | Socket.IO client; `withCredentials: true` so the session cookie rides the handshake. |
 
 ## The Better Auth instance
@@ -62,10 +63,10 @@ export const auth = betterAuth({
 
 Key decisions:
 
-- **`baseURL: env.betterAuthUrl`** (default `http://localhost:4000`, `apps/server/src/env.ts:40`) — Better Auth lives on the **server**, not the web app. The browser hits `${NEXT_PUBLIC_API_URL}/api/auth/...`, and the OAuth callback URI is `[server URL]/api/auth/callback/google` (the sign-in page literally tells you this at `apps/web/app/auth/page.tsx:50`).
+- **`baseURL: env.betterAuthUrl`** (default `http://localhost:4000`, `apps/server/src/env.ts:41`) — Better Auth lives on the **server**, not the web app. The browser hits `${NEXT_PUBLIC_API_URL}/api/auth/...`, and the OAuth callback URI is `[server URL]/api/auth/callback/google` (the sign-in page literally tells you this at `apps/web/app/auth/page.tsx:50`).
 - **`trustedOrigins: [env.webUrl]`** — only the Next.js origin (default `http://localhost:3000`) is allowed to drive auth flows, which is the CSRF/redirect allowlist.
 - **`drizzleAdapter(db, { provider: "pg", schema })`** — the adapter persists users/sessions/accounts into the very same Postgres + Drizzle setup the rest of the server uses (`apps/server/src/db/client.ts:12`). No separate auth store.
-- **`socialProviders`** is conditional on `googleConfigured()` (`apps/server/src/env.ts:54`), which returns `true` only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Without them the object is `{}` and there is no working sign-in — the UI degrades gracefully (see below).
+- **`socialProviders`** is conditional on `googleConfigured()` (`apps/server/src/env.ts:63`), which returns `true` only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Without them the object is `{}` and there is no working sign-in — the UI degrades gracefully (see below).
 
 The `advanced` block only turns on in production (`apps/server/src/auth.ts:46`):
 
@@ -114,17 +115,19 @@ Note the **catch-and-log**: provisioning failure does not abort account creation
 
 ## Username generation
 
-`ensureUsernameForUser` (`apps/server/src/username.ts:23`) turns a Google display name into a unique, URL-safe username and creates the profile. The flow:
+`ensureUsernameForUser` (`apps/server/src/username.ts:45`) turns a Google display name into a unique, URL-safe username and creates the profile. The flow:
 
-1. **Idempotency guard** — `getProfileByUserId` first; if a profile exists, return its username (`apps/server/src/username.ts:27`). This is why the hook is safe to retry.
-2. **Name-styled seeded avatar** — `predictAvatarStyle(displayName)` (`apps/server/src/services/gender-detection.ts`) guesses a `feminine`/`masculine`/`any` style from the user's first name, then `randomAvatarConfig(userId, style)` produces a deterministic DiceBear avataaars config seeded by the user id with that style bias (`apps/server/src/username.ts`). Same user → same starting avatar; the style only nudges hairstyle and facial-hair probability and stays fully editable afterwards. The guess calls the genderize.io API (keyed by `GENDERIZE_API_KEY`, ~2s timeout) and falls back to an offline name dictionary (`gender-detection-from-name`), then to a neutral `any`, whenever the API is unavailable, the result is low-confidence, the key is unset, or `NODE_ENV=test` (so tests never spend API quota). (See `./README.md` for the avatar package; the repo uses ready-made DiceBear assets rather than hand-drawn art.)
-3. **Slugify** — `slugifyBase` lowercases, collapses whitespace to `_`, strips anything outside `[a-z0-9_]`, caps at 30 chars, and falls back to `"player"` if nothing survives (`apps/server/src/username-rules.ts`). Candidates are then filtered through `isUsernameBlocked`, so a reserved route name or a `NOT_ALLOWED_USERNAMES` entry is never auto-assigned.
-4. **Collision retry loop** — try the base, then `base_<random6>` up to 20 times, checking `isUsernameTaken` (a case-insensitive `lower(username)` lookup, `apps/server/src/db/repositories/profiles.ts:47`) before each insert:
+1. **Idempotency guard** — `getProfileByUserId` first; if a profile exists, return its username (`apps/server/src/username.ts:49`). This is why the hook is safe to retry.
+2. **Name-styled seeded avatar** — `predictAvatarStyle(displayName)` (`apps/server/src/services/gender-detection.ts`) guesses a `feminine`/`masculine`/`any` style from the user's first name, then `randomAvatarConfig(userId, style)` produces a deterministic DiceBear avataaars config seeded by the user id with that style bias (`apps/server/src/username.ts:52`). Same user → same starting avatar; the style only nudges hairstyle and facial-hair probability and stays fully editable afterwards. The guess calls the genderize.io API (keyed by `GENDERIZE_API_KEY`, ~2s timeout) and falls back to an offline name dictionary (`gender-detection-from-name`), then to a neutral `any`, whenever the API is unavailable, the result is low-confidence, the key is unset, or `NODE_ENV=test` (so tests never spend API quota). (See `./README.md` for the avatar package; the repo uses ready-made DiceBear assets rather than hand-drawn art.)
+3. **Slugify + build a candidate pool** — `slugifyBase` lowercases, collapses whitespace to `_`, strips anything outside `[a-z0-9_]`, caps at 30 chars, and falls back to `"player"` if nothing survives (`apps/server/src/username-rules.ts:37`). `buildUsernameCandidates(base, CANDIDATE_COUNT)` then produces up to `CANDIDATE_COUNT` (20) candidates — the base, then `base_<random6>` variants (`apps/server/src/username-rules.ts:52`) — filtered through `isUsernameBlocked`, so a reserved route name or a `NOT_ALLOWED_USERNAMES` entry is never auto-assigned (`apps/server/src/username.ts:55`).
+4. **Batched availability check** — instead of one `SELECT`-per-candidate, the candidates are scanned in batches of `BATCH_SIZE` (5). Each batch does a single `getTakenUsernames(batch)` lookup (a case-insensitive `lower(username)` `IN (...)` query, `apps/server/src/db/repositories/profiles.ts:56`) and inserts the first candidate the batch reports free (`apps/server/src/username.ts:59`):
 
 ```ts
-  let candidate = base;
-  for (let i = 0; i < 20; i++) {
-    if (!(await isUsernameTaken(candidate))) {
+  for (let start = 0; start < candidates.length; start += BATCH_SIZE) {
+    const batch = candidates.slice(start, start + BATCH_SIZE);
+    const taken = await getTakenUsernames(batch);
+    for (const candidate of batch) {
+      if (taken.has(candidate.toLowerCase())) continue;
       try {
         const profile = await createProfile({
           userId,
@@ -134,12 +137,10 @@ Note the **catch-and-log**: provisioning failure does not abort account creation
         return profile.username;
       } catch {}
     }
-    candidate = `${base}_${randomSuffix()}`;
   }
-  candidate = `player_${randomSuffix()}`;
 ```
 
-The `try { ... } catch {}` around `createProfile` matters: `isUsernameTaken` plus an `INSERT` is a check-then-act race, and `user_profile.username` carries a `unique` constraint (`apps/server/src/db/schema.ts:171`). If two sign-ins race to the same username the loser's insert throws, the `catch` swallows it, and the loop generates a new suffix. After 20 attempts it falls through to a guaranteed-random `player_<random6>` and inserts unconditionally (`apps/server/src/username.ts:46`). The database unique index is the real authority; the loop is just an optimistic fast path.
+The `try { ... } catch {}` around `createProfile` matters: the batched availability read plus an `INSERT` is still a check-then-act race, and `user_profile.username` carries a `unique` constraint (`apps/server/src/db/schema.ts:171`). If two sign-ins race to the same username the loser's insert throws, the `catch` swallows it, and the loop moves to the next candidate. If every candidate in the pool is taken, it falls through to a guaranteed-random `player_<random6>` and inserts unconditionally (`apps/server/src/username.ts:75`). The database unique index is the real authority; the candidate scan is just an optimistic fast path that the batching makes cheaper (≤4 queries for 20 candidates instead of up to 20).
 
 ## The auth tables & the Drizzle adapter mapping
 
@@ -205,7 +206,7 @@ Fully-authed routers (`conversations`, `friends`, `messages`, `notifications`, `
 
 ## How the socket reads the session (realtime)
 
-The realtime layer authenticates **once, at connection time**, before any handler is attached. Socket.IO middleware (`io.use`) reads the raw `cookie` header from the handshake, hands it to the same `getSession`, and either attaches `socket.data.userId` or rejects the connection (`apps/server/src/realtime/index.ts:33`):
+The realtime layer authenticates **once, at connection time**, before any handler is attached. Socket.IO middleware (`io.use`) reads the raw `cookie` header from the handshake, hands it to the same `getSession`, and either attaches `socket.data.userId` or rejects the connection (`apps/server/src/realtime/index.ts:35`):
 
 ```ts
   io.use(async (socket, next) => {
@@ -228,9 +229,9 @@ The realtime layer authenticates **once, at connection time**, before any handle
   });
 ```
 
-The cookie reaches the handshake because the web client opens the socket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:46`) and the server enables `cors: { origin: env.webUrl, credentials: true }` on the IO server (`apps/server/src/realtime/index.ts:27`).
+The cookie reaches the handshake because the web client opens the socket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:46`) and the server enables `cors: { origin: env.webUrl, credentials: true }` on the IO server (`apps/server/src/realtime/index.ts:28`).
 
-After this point, **every** chat and game handler trusts `socket.data.userId` as the authenticated identity for the lifetime of the connection — `join_room`, `make_move`, chat sends, friend requests, presence, etc. (`apps/server/src/realtime/index.ts:57`). Note the layering: this middleware only proves *who you are*; per-move/per-room authorization (are you a player in this game? a member of this conversation?) happens later in the game driver and chat handlers. See `./realtime.md`.
+After this point, **every** chat and game handler trusts `socket.data.userId` as the authenticated identity for the lifetime of the connection — `join_room`, `make_move`, chat sends, friend requests, presence, etc. (`apps/server/src/realtime/index.ts:54`). Note the layering: this middleware only proves *who you are*; per-move/per-room authorization (are you a player in this game? a member of this conversation?) happens later in the game driver and chat handlers. See `./realtime.md`.
 
 ## End-to-end sign-in flow
 
@@ -240,10 +241,10 @@ A full trace from clicking the button to being authenticated on all three lanes:
 2. **Browser → server.** The client hits `POST /api/auth/sign-in/social` on the **server**, which Better Auth handles via the catch-all (`apps/server/src/api/index.ts:14`) and responds with a redirect to Google's consent screen.
 3. **Google OAuth.** User authenticates with Google; Google redirects back to `GET /api/auth/callback/google` on the server.
 4. **Better Auth callback.** Better Auth exchanges the code, and via the Drizzle adapter upserts the `user` (`apps/server/src/db/schema.ts:36`) and `account` (`:65`) rows and creates a `session` row (`:52`).
-5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:26`) → `ensureUsernameForUser(id, name)` (`apps/server/src/username.ts:23`) → slugify + collision loop → `createProfile` inserts the `user_profile` row with a seeded avatar (`apps/server/src/db/repositories/profiles.ts:56`).
+5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:26`) → `ensureUsernameForUser(id, name)` (`apps/server/src/username.ts:45`) → slugify + batched candidate scan → `createProfile` inserts the `user_profile` row with a seeded avatar (`apps/server/src/db/repositories/profiles.ts:68`).
 6. **Cookie set + redirect.** Better Auth sets the session cookie (in prod: `secure`, `SameSite=Lax`, cross-subdomain per `apps/server/src/auth.ts:48`) and redirects the browser to the `callbackURL` (`/profile`).
 7. **RSC reads the session.** The `/profile` (and root layout) server component calls `getServerSession()` → `serverFetchJson("/api/auth/get-session")` (`apps/web/lib/get-server-session.ts:17`). `serverFetch` forwards the browser's cookies from `next/headers` `cookies()` with `cache: "no-store"` (`apps/web/lib/api-server.ts:13`), so the server resolves the session and returns `{ user, session }`. `getServerSession` is wrapped in `react.cache` so multiple components in one render share a single fetch.
-8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:44`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:44`).
+8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:44`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:46`).
 9. **Browser fetches.** Any subsequent client-side mutation (`SignOutForm`, friend actions, settings) uses `clientFetch(..., { credentials: "include" })` (`apps/web/lib/api-client.ts:12`), and the `requireAuth` middleware re-derives identity into `c.get("userId")` (`apps/server/src/api/middleware/auth.ts:16`).
 
 Arrow summary:
@@ -252,7 +253,7 @@ Arrow summary:
 click → authClient.signIn.social (auth-client.ts) → POST /api/auth/sign-in/social
   → Better Auth handler (api/index.ts:14) → Google consent
   → GET /api/auth/callback/google → drizzleAdapter upserts user/account/session
-  → user.create.after hook (auth.ts:26) → ensureUsernameForUser (username.ts:23) → createProfile
+  → user.create.after hook (auth.ts:26) → ensureUsernameForUser (username.ts:45) → createProfile
   → Set-Cookie + redirect /profile
   → RSC getServerSession → serverFetch forwards cookie → /api/auth/get-session
   → socket handshake (withCredentials) → io.use getSession → socket.data.userId
@@ -260,7 +261,7 @@ click → authClient.signIn.social (auth-client.ts) → POST /api/auth/sign-in/s
 
 ## Sign-out & session management flow
 
-The settings page (`apps/web/app/settings/page.tsx:17`) is an RSC that calls `getAccountSessions()` → `GET /api/account/sessions` (`apps/web/lib/get-account-sessions.ts:22`), splitting the list into the current session vs. others. It renders three client forms, each a thin `clientFetch` wrapper that then nudges the Next router:
+The Account settings tab (`apps/web/app/settings/account/page.tsx:27`) is an RSC that calls `getAccountSessions()` → `GET /api/account/sessions` (`apps/web/lib/get-account-sessions.ts:22`), splitting the list into the current session vs. others (`/settings` itself just `redirect`s here). It renders three client forms, each a thin `clientFetch` wrapper that then nudges the Next router:
 
 - **`SignOutForm`** → `POST /api/account/sign-out`, then `router.push("/")` + `router.refresh()` (`apps/web/app/sign-out-form.tsx:16`).
 - **`SessionEndForm`** (per other-session row) → `POST /api/account/revoke-session` with `{ token }`; if the response says `signedOut` it pushes to `/auth`, else refreshes (`apps/web/app/session-end-form.tsx:16`). This is what lets you end *the current* session from the list.
@@ -275,12 +276,12 @@ The settings page (`apps/web/app/settings/page.tsx:17`) is an RSC that calls `ge
 - **Always go through `getAuth()`.** Nothing imports the bare `auth` object; the accessor (`apps/server/src/auth.ts:56`) keeps a single instance and is the mock point in tests (`mock.module` per the repo's test conventions).
 - **No Google creds → no sign-in, gracefully.** `googleConfigured()` gates the provider (`apps/server/src/env.ts:54`); the sign-in page independently checks `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and shows setup instructions instead of a broken button (`apps/web/app/auth/page.tsx:10`). `BETTER_AUTH_SECRET` and `DATABASE_URL` are `required()` and crash startup if missing; Google creds are `optional()`.
 - **`user.id` is `text`, not `uuid`.** Better Auth generates the id (`apps/server/src/db/schema.ts:37`). The app's own tables (`game`, `move`, `user_profile`, …) use uuid PKs but still store the auth user id as `text` in FK columns like `userId` / `creator_user_id`.
-- **Profile provisioning is best-effort and idempotent.** The `create.after` hook swallows errors (`apps/server/src/auth.ts:36`); `ensureUsernameForUser` early-returns if a profile already exists (`apps/server/src/username.ts:28`). The DB unique constraint on `user_profile.username` — not the in-memory `isUsernameTaken` check — is the real collision authority.
+- **Profile provisioning is best-effort and idempotent.** The `create.after` hook swallows errors (`apps/server/src/auth.ts:36`); `ensureUsernameForUser` early-returns if a profile already exists (`apps/server/src/username.ts:49`). The DB unique constraint on `user_profile.username` — not the in-memory `getTakenUsernames` batch read — is the real collision authority.
 - **`user_profile` ≠ `user`.** Better Auth owns `user`/`session`/`account`/`verification`; the application owns `user_profile` (username, avatar, stats, theme, layout). They join on `userId`, and the profile cascades on user delete.
 - **Two web fetch paths, two env vars.** RSC uses `serverFetch` (`API_URL`, forwards `next/headers` cookies, `cache: "no-store"`); the browser uses `clientFetch` (`NEXT_PUBLIC_API_URL`, `credentials: "include"`). Use the server path inside RSCs and the client path inside `"use client"` components — they read the cookie from different places.
-- **Auth-dependent pages set `export const dynamic = "force-dynamic"`** (e.g. `apps/web/app/auth/page.tsx:7`, `apps/web/app/settings/page.tsx:14`) because they depend on per-request cookies and must not be statically cached.
+- **Auth-dependent pages set `export const dynamic = "force-dynamic"`** (e.g. `apps/web/app/auth/page.tsx:7`, `apps/web/app/settings/account/page.tsx:24`) because they depend on per-request cookies and must not be statically cached.
 - **`getServerSession`/`getAccountSessions` are `react.cache`-wrapped** so the layout and a page in the same render share one network round-trip; don't reach for module-level memoization.
-- **Cookies cross origins only because CORS allows it.** Both the Express HTTP layer (`apps/server/src/index.ts:12`) and the Socket.IO server (`apps/server/src/realtime/index.ts:27`) set `origin: env.webUrl, credentials: true`; the client mirrors this with `credentials: "include"` / `withCredentials: true`. Change the web origin and you must update `WEB_URL`.
+- **Cookies cross origins only because CORS allows it.** Both the Express HTTP layer (`apps/server/src/index.ts:12`) and the Socket.IO server (`apps/server/src/realtime/index.ts:28`) set `origin: env.webUrl, credentials: true`; the client mirrors this with `credentials: "include"` / `withCredentials: true`. Change the web origin and you must update `WEB_URL`.
 
 ## Where to go next
 

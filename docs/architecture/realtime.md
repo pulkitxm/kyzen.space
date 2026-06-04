@@ -50,7 +50,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
   startPresenceHeartbeats(io);
 ```
 
-`apps/server/src/realtime/index.ts:24` — four things to note. `transports: ["websocket"]` skips the HTTP long-poll fallback entirely (one transport, simpler reasoning). `cors.credentials: true` plus a concrete `origin` is what lets the browser send the auth cookie cross-origin. `setIO(io)` (`apps/server/src/realtime/io.ts:5`) stashes the server in a module singleton so code with no socket in scope — most importantly `notify` — can still emit. And `startPresenceHeartbeats(io)` (`apps/server/src/realtime/presence-heartbeat.ts:32`) starts the per-node timers that refresh live presence entries and periodically persist last-seen.
+`apps/server/src/realtime/index.ts:24` — four things to note. `transports: ["websocket"]` skips the HTTP long-poll fallback entirely (one transport, simpler reasoning). `cors.credentials: true` plus a concrete `origin` is what lets the browser send the auth cookie cross-origin. `setIO(io)` (`apps/server/src/realtime/io.ts:5`) stashes the server in a module singleton so code with no socket in scope — most importantly `notify` — can still emit. And `startPresenceHeartbeats(io)` (`apps/server/src/realtime/presence-heartbeat.ts:51`) starts the per-node timers that refresh live presence entries and periodically persist last-seen.
 
 ### The auth middleware: one cookie check per connection
 
@@ -83,7 +83,7 @@ declare module "socket.io" {
 }
 ```
 
-The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:103`, `chat.ts:17`, `friends.ts:7`, `typing.ts:40`, `presence.ts:39`, `games-in-chat.ts:20`). A forged `userId` in a payload is simply ignored — the only `userId` that exists came from a verified session.
+The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:103`, `chat.ts:17`, `friends.ts:7`, `typing.ts:40`, `presence.ts:66`, `games-in-chat.ts:20`). A forged `userId` in a payload is simply ignored — the only `userId` that exists came from a verified session.
 
 ### Per-connection wiring
 
@@ -162,7 +162,7 @@ export async function joinUserRooms(socket: Socket): Promise<void> {
 
 So a freshly connected socket is already in its personal `user:<id>` room (for notifications, presence, friend events) and in a `conv:<id>` room for every conversation it belongs to — without any client round-trip.
 
-**Typing** keeps ephemeral in-memory state rather than touching the DB: it stores a `Map<conversationId, Map<userId, Entry>>` with a 5 s `setTimeout` TTL per typer and re-broadcasts the full typer list on every change (`typing.ts:8`, `typing.ts:20`, `typing.ts:56`); a disconnect clears all of that socket's active typers (`typing.ts:77`). **Presence** instead delegates its socket bookkeeping to a `PresenceStore` (`presence-store.ts`) — reference-counting a user's live socket ids so a user is online while their set is non-empty, so opening a second tab does not double-count and closing one tab does not flip them offline (`presence-store.ts:17`, `presence-store.ts:33`). The store returns `{ wasOnline }` on `markOnline` and `{ stillOnline }` on `markOffline`, so presence only broadcasts a transition (`if (!wasOnline)` on connect at `presence.ts:58`, `if (stillOnline) return` on disconnect at `presence.ts:72`) to a computed *audience* of friends plus co-conversation members (`audienceFor`, `presence.ts:20`).
+**Typing** keeps ephemeral in-memory state rather than touching the DB: it stores a `Map<conversationId, Map<userId, Entry>>` with a 5 s `setTimeout` TTL per typer and re-broadcasts the full typer list on every change (`typing.ts:8`, `typing.ts:20`, `typing.ts:56`); a disconnect clears all of that socket's active typers (`typing.ts:77`). **Presence** instead delegates its socket bookkeeping to a `PresenceStore` (`presence-store.ts`) — reference-counting a user's live socket ids so a user is online while their set is non-empty, so opening a second tab does not double-count and closing one tab does not flip them offline (`presence-store.ts:17`, `presence-store.ts:33`). The store returns `{ wasOnline }` on `markOnline` and `{ stillOnline }` on `markOffline`, so presence only broadcasts a transition (`if (!wasOnline)` on connect at `presence.ts:85`, `if (stillOnline) return` on disconnect at `presence.ts:100`) to a computed *audience* of friends plus co-conversation members (`audienceFor`, `presence.ts:43`). The handlers take their store and data-access dependencies as an injectable `PresenceDeps` (defaulting to the real store + repositories), which keeps them unit-testable without module mocking.
 
 **`notify`** is the chat lane's escape hatch for code that has no socket. It persists a notification row, then emits to the recipient's user room via the `getIO()` singleton — note the self-suppression guard so you are never notified about your own action:
 

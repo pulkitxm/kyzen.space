@@ -330,14 +330,14 @@ Crucially, `makeMove` does **not** mutate the board. There is no optimistic upda
 **Phase 2 — going live (shared socket):**
 
 6. The board's effect sees a non-null `liveSocketKey` and a live `socket`, registers its listeners, and emits `join_room { gameId }` on the **shared** connection (`packages/games-client/src/games/tic-tac-toe/client.tsx`).
-7. Server `socket.on("join_room")` validates the envelope with `clientJoinRoomSchema`, looks up the game, picks a driver, calls `driver.joinRoom` (`apps/server/src/realtime/index.ts:63`).
+7. Server `socket.on("join_room")` validates the envelope with `clientJoinRoomSchema`, looks up the game, picks a driver, calls `driver.joinRoom` (`apps/server/src/realtime/index.ts:65`).
 8. `turn-based.ts` `handleJoinRoom` (`apps/server/src/realtime/turn-based.ts:98`) seats the user if there's a free seat, joins the socket room, and emits a full `game_state` snapshot back via `emitFullState` (`:116`).
 9. The board's `game_state` listener overwrites local `game`/`moves` (`packages/games-client/src/games/tic-tac-toe/client.tsx`).
 
 **Phase 3 — making a move (the trust boundary):**
 
 10. User clicks a cell → `makeMove(row, col)` emits `make_move { gameId, moveData: { row, col } }` (`packages/games-client/src/games/tic-tac-toe/client.tsx`). No local board change.
-11. Server `socket.on("make_move")` validates the envelope with `clientMakeMoveSchema`, routes to the driver (`apps/server/src/realtime/index.ts:96`).
+11. Server `socket.on("make_move")` validates the envelope with `clientMakeMoveSchema`, routes to the driver (`apps/server/src/realtime/index.ts:98`).
 12. `handleMakeMove` re-checks identity (`gameRow.players.find(... === userId)`), then **re-validates the move and the stored state against the game's own Zod schemas** and runs the shared engine:
 
 ```ts

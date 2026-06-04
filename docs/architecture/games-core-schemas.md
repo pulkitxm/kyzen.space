@@ -154,7 +154,7 @@ export const clientMakeMoveSchema = z
 export type ClientMakeMove = z.infer<typeof clientMakeMoveSchema>;
 ```
 
-`clientJoinRoomSchema` validates two inbound events: `join_room` and `leave_room`. The latter only needs `{ gameId }` (it leaves the socket room and runs no game logic), so it reuses the same `.strict()` envelope rather than declaring its own (`apps/server/src/realtime/index.ts:130`).
+`clientJoinRoomSchema` validates two inbound events: `join_room` and `leave_room`. The latter only needs `{ gameId }` (it leaves the socket room and runs no game logic), so it reuses the same `.strict()` envelope rather than declaring its own (`apps/server/src/realtime/index.ts:131`).
 
 Two things to internalize:
 
@@ -259,7 +259,7 @@ This is the core insight made concrete. Follow a single Tic-tac-toe move from th
 
 1. User clicks a cell. The web client emits a `make_move` socket event with `{ gameId, moveData: { row, col } }`.
 2. **Generic envelope validation.** The socket handler runs `clientMakeMoveSchema.safeParse(payload)` (`apps/server/src/realtime/index.ts:98`). If the envelope is malformed (bad `gameId`, extra keys), it emits `game_error` and stops. `moveData` is still `unknown` at this point.
-3. The handler looks up the game's `gameType` from the DB, picks a driver via `getDriver(...)` (`apps/server/src/realtime/index.ts:109`; currently always the turn-based driver, `apps/server/src/realtime/drivers.ts:25`), and calls `driver.makeMove(io, socket, data)`.
+3. The handler looks up the game's `gameType` from the DB, picks a driver via `getDriver(...)` (`apps/server/src/realtime/index.ts:111`; currently always the turn-based driver, `apps/server/src/realtime/drivers.ts:25`), and calls `driver.makeMove(io, socket, data)`.
 4. **Authorization.** `handleMakeMove` (`apps/server/src/realtime/turn-based.ts:120`) confirms the game is `active` and that the authenticated `socket.data.userId` actually holds a seat (`gameRow.players.find(...)`). The user is mapped to a *role* here.
 5. **Per-game move validation.** `def.moveSchema.safeParse(payload.moveData)` (`apps/server/src/realtime/turn-based.ts:138`) — now the *real* Tic-tac-toe `moveSchema` validates the move's shape. Invalid → `game_error: "Invalid move"`.
 6. **Stored-state validation.** `def.stateSchema.safeParse(gameRow.gameState)` (`apps/server/src/realtime/turn-based.ts:140`). The state pulled from Postgres JSONB is validated *too* — if it's somehow corrupt, the server bails with `"Corrupt game state"` rather than feeding garbage into the engine.
