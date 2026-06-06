@@ -60,10 +60,7 @@ export async function createGame(input: CreateGameInput): Promise<GameRecord> {
         return toGameRecord(created, input.players);
       });
     } catch (error) {
-      if (isGameCodeCollision(error) && attempt < GAME_CODE_MAX_ATTEMPTS) {
-        continue;
-      }
-      throw error;
+      if (!isGameCodeCollision(error)) throw error;
     }
   }
   throw new Error("Failed to allocate a unique game code");

@@ -27,12 +27,16 @@ type GameRec = {
 let current: GameRec;
 // biome-ignore lint/suspicious/noExplicitAny: test move store
 let moves: any[] = [];
+let lookupCalls = 0;
 const seatCalls: { player: Player; seatOrder: number }[] = [];
 const bumpCalls: { userId: string; outcome: string }[] = [];
 
 const games = {
   getGameById: async () => current,
-  getGameByCode: async () => current,
+  getGameByCode: async () => {
+    lookupCalls++;
+    return current;
+  },
   listMoves: async () => moves,
   nextMoveNumber: async () => moves.length + 1,
   // biome-ignore lint/suspicious/noExplicitAny: test stub
@@ -127,6 +131,7 @@ const call = (fn: any, io: any, socket: any, payload: any) =>
 beforeEach(() => {
   current = freshGame();
   moves = [];
+  lookupCalls = 0;
   seatCalls.length = 0;
   bumpCalls.length = 0;
 });
@@ -331,4 +336,74 @@ describe("handleMakeMove — applying moves", () => {
     expect(bumpCalls).toContainEqual({ userId: "u1", outcome: "won" });
     expect(bumpCalls).toContainEqual({ userId: "u2", outcome: "lost" });
   });
+});
+
+const INVALID_IDS = [
+  "11111111-1111-1111-1111-111111111111",
+  "ABCDE",
+  "ABCDEFG",
+  "K7P2QU",
+  "K7P2Q-",
+  "",
+];
+
+describe("handleJoinRoom — code guard", () => {
+  for (const bad of INVALID_IDS) {
+    test(`rejects ${JSON.stringify(bad)} without a DB lookup or broadcast`, async () => {
+      const { io, emits } = fakeIo();
+      const { socket, emits: sockEmits } = fakeSocket("u2");
+      await call(handleJoinRoom, io, socket, { gameId: bad });
+      expect(sockEmits).toContainEqual({
+        event: "game_error",
+        payload: { message: "Invalid game id" },
+      });
+      expect(lookupCalls).toBe(0);
+      expect(seatCalls).toHaveLength(0);
+      expect(emits).toHaveLength(0);
+    });
+  }
+
+  test("accepts a lowercase code and keys the room by the stored canonical code", async () => {
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u2");
+    await call(handleJoinRoom, io, socket, {
+      gameId: "k7p2qx",
+      intent: "spectate",
+    });
+    expect(lookupCalls).toBe(1);
+    expect(
+      emits.some((e) => e.room === `game:${CODE}` && e.event === "game_state"),
+    ).toBe(true);
+  });
+});
+
+describe("handleMakeMove — code guard", () => {
+  function activeGame() {
+    return freshGame({
+      status: "active",
+      players: [
+        { userId: "u1", username: "u1", role: "X" },
+        { userId: "u2", username: "u2", role: "O" },
+      ],
+    });
+  }
+
+  for (const bad of INVALID_IDS) {
+    test(`rejects ${JSON.stringify(bad)} without a DB lookup, move, or broadcast`, async () => {
+      current = activeGame();
+      const { io, emits } = fakeIo();
+      const { socket, emits: sockEmits } = fakeSocket("u1");
+      await call(handleMakeMove, io, socket, {
+        gameId: bad,
+        moveData: { row: 0, col: 0 },
+      });
+      expect(sockEmits).toContainEqual({
+        event: "game_error",
+        payload: { message: "Invalid game id" },
+      });
+      expect(lookupCalls).toBe(0);
+      expect(moves).toHaveLength(0);
+      expect(emits).toHaveLength(0);
+    });
+  }
 });
