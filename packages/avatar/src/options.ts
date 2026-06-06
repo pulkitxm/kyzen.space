@@ -1,6 +1,6 @@
 import type { AvatarColorKey, AvatarOptionKey, AvatarStyle } from "./types";
 
-export const AVATAR_OPTIONS: Record<AvatarOptionKey, string[]> = {
+export const AVATAR_OPTIONS = {
   top: [
     "shortFlat",
     "shortRound",
@@ -105,9 +105,9 @@ export const AVATAR_OPTIONS: Record<AvatarOptionKey, string[]> = {
     "sad",
     "screamOpen",
   ],
-};
+} satisfies Record<AvatarOptionKey, string[]>;
 
-export const AVATAR_COLORS: Record<AvatarColorKey, string[]> = {
+export const AVATAR_COLORS = {
   skinColor: ["614335", "ae5d29", "d08b5b", "edb98a", "ffdbb4", "fd9841"],
   hairColor: [
     "2c1b18",
@@ -184,7 +184,7 @@ export const AVATAR_COLORS: Record<AvatarColorKey, string[]> = {
     "fde68a",
     "e9d5ff",
   ],
-};
+} satisfies Record<AvatarColorKey, string[]>;
 
 export const HAT_TOPS = new Set<string>([
   "hat",
@@ -200,11 +200,11 @@ export function isHatTop(top: string): boolean {
   return HAT_TOPS.has(top);
 }
 
-export const AVATAR_STYLES: readonly AvatarStyle[] = [
+export const AVATAR_STYLES = [
   "any",
   "feminine",
   "masculine",
-];
+] as const satisfies readonly AvatarStyle[];
 
 const LONG_TOPS = [
   "bob",

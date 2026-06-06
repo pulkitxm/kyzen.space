@@ -1,4 +1,5 @@
-import { type GameType, TIC_TAC_TOE } from "@gamelobby/games-core";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import type { GameType } from "@gamelobby/shared/types";
 import { type ComponentType, lazy } from "react";
 import { TicTacToeSkeleton } from "./games/tic-tac-toe/skeleton";
 import { DefaultGameSkeleton } from "./skeletons";

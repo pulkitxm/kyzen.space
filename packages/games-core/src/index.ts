@@ -1,25 +1,3 @@
-export { GAME_CATEGORIES, type GameCategoryDef } from "./categories";
-
-export type {
-  ConfigField,
-  ConfigFieldType,
-  GameDefinition,
-  GameMeta,
-} from "./definition";
-export type {
-  GameEngine,
-  MoveContext,
-  Outcome,
-  ReduceResult,
-  Seat,
-  StepResult,
-} from "./engine";
-export {
-  GAME_TYPES,
-  type GameType,
-  gameTypeSchema,
-  TIC_TAC_TOE,
-} from "./game-types";
 export { GAMES } from "./games";
 export { ticTacToeDefinition } from "./games/tic-tac-toe";
 export {
@@ -31,16 +9,6 @@ export {
   WIN_LINES,
 } from "./games/tic-tac-toe/engine";
 export {
-  type Cell,
-  type Mark,
-  type TicTacToeConfig,
-  type TicTacToeMove,
-  type TicTacToeState,
-  ticTacToeConfigSchema,
-  ticTacToeMoveSchema,
-  ticTacToeStateSchema,
-} from "./games/tic-tac-toe/schemas";
-export {
   getCategoryGroups,
   getDefinition,
   getEngine,
@@ -49,24 +17,3 @@ export {
   listGameMeta,
   listGameTypes,
 } from "./registry";
-export {
-  type ClientJoinRoom,
-  type ClientMakeMove,
-  clientJoinRoomSchema,
-  clientMakeMoveSchema,
-  type GameJson,
-  type GamePlayerDto,
-  type GameStatusDto,
-  gameJsonSchema,
-  gamePlayerSchema,
-  gameStatusSchema,
-  type MoveJson,
-  moveJsonSchema,
-  type SeatingModeDto,
-  type ServerErrorPayload,
-  type ServerGameOverPayload,
-  type ServerGameStatePayload,
-  type ServerMoveMadePayload,
-  seatingModeSchema,
-  uuidSchema,
-} from "./schemas";
