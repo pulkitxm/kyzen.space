@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { gameTypeSchema } from "./game-types";
+import { gameTypeSchema } from "./core";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

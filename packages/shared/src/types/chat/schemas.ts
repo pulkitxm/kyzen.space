@@ -1,5 +1,5 @@
-import { gameTypeSchema } from "@gamelobby/games-core";
 import { z } from "zod";
+import { gameTypeSchema } from "../games/core";
 
 const gameCardPlayerSchema = z
   .object({

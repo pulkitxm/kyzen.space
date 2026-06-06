@@ -28,7 +28,7 @@
     "db:reset": "docker compose -f scripts/docker-compose.yml down -v && docker compose -f scripts/docker-compose.yml up -d",
     "db:studio": "docker compose -f scripts/docker-compose.yml --profile studio up -d postgres adminer && echo Adminer → http://127.0.0.1:18081",
     "db:generate": "bun --env-file=.env drizzle-kit generate --config=drizzle.config.ts",
-    "db:migrate": "bun --env-file=.env apps/server/src/db/migrate.ts",
+    "db:migrate": "bun --env-file=.env packages/database/src/migrate.ts",
     "db:push": "bun --env-file=.env drizzle-kit push --config=drizzle.config.ts"
   },
   "devDependencies": {

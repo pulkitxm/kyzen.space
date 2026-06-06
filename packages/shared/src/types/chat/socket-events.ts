@@ -11,42 +11,6 @@ import type {
 } from "./dto";
 import type { clientCreateGameInConversationSchema } from "./schemas";
 
-export const CHAT_EVENTS = {
-  conversationJoin: "conversation:join",
-  conversationLeave: "conversation:leave",
-  sendMessage: "send_message",
-  markRead: "conversation:read",
-  createDm: "conversation:create_dm",
-  createGroup: "conversation:create_group",
-  addMembers: "conversation:add_members",
-  removeMember: "conversation:remove_member",
-  renameGroup: "conversation:rename",
-  friendRequest: "friend:request",
-  friendRespond: "friend:respond",
-  friendRemove: "friend:remove",
-  notificationRead: "notification:read",
-  notificationReadAll: "notification:read_all",
-  typingStart: "typing_start",
-  typingStop: "typing_stop",
-  createGameInConversation: "game:create_in_conversation",
-
-  messageNew: "message_new",
-  messageUpdated: "message_updated",
-  messageDeleted: "message_deleted",
-  conversationNew: "conversation_new",
-  conversationUpdated: "conversation_updated",
-  friendRequestNew: "friend_request",
-  friendAccepted: "friend_accepted",
-  friendDeclined: "friend_declined",
-  friendRemoved: "friend_removed",
-  notificationNew: "notification_new",
-  notificationReadEvent: "notification_read",
-  readReceipt: "read_receipt",
-  typingUpdate: "typing_update",
-  presenceUpdate: "presence_update",
-  presenceSnapshot: "presence_snapshot",
-} as const;
-
 export type AckResult<T = Record<string, never>> =
   | ({ ok: true } & T)
   | { ok: false; error: string };
