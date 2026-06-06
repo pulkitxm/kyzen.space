@@ -1,12 +1,12 @@
 "use client";
 
-import {
-  CHAT_EVENTS,
-  type ConversationJson,
-  type GifJson,
-  type GifMeta,
-  type MemberJson,
-} from "@gamelobby/chat-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type {
+  ConversationJson,
+  GifJson,
+  GifMeta,
+  MemberJson,
+} from "@gamelobby/shared/types";
 import { useStore } from "jotai";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";

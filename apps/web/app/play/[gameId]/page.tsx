@@ -1,5 +1,9 @@
-import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
-import type { GameJson, MoveJson } from "@gamelobby/games-core";
+import type {
+  ConversationJson,
+  GameJson,
+  MessageJson,
+  MoveJson,
+} from "@gamelobby/shared/types";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";

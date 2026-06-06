@@ -1,12 +1,15 @@
 "use client";
 
-import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
 import {
   type GameClientProps,
   getGameClient,
   getGameSkeleton,
 } from "@gamelobby/games-client";
-import type { GameType } from "@gamelobby/games-core";
+import type {
+  ConversationJson,
+  GameType,
+  MessageJson,
+} from "@gamelobby/shared/types";
 import { Suspense } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import type { ChatLayout } from "@/lib/chat-layout";

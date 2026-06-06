@@ -6,7 +6,7 @@ import type {
   GifMeta,
   MessageMetadata,
   SystemMeta,
-} from "@gamelobby/chat-core";
+} from "@gamelobby/shared/types";
 import type { ReactNode } from "react";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import type { ChatMessage } from "@/lib/chat/atoms";

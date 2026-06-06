@@ -16,10 +16,10 @@ export type SidebarPrefs = {
   width: number;
 };
 
-export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
+export const DEFAULT_SIDEBAR_PREFS = {
   collapsed: false,
   width: DEFAULT_SIDEBAR_WIDTH,
-};
+} satisfies SidebarPrefs;
 
 function parsePrefsFromEncoded(raw: string | undefined): SidebarPrefs | null {
   if (!raw?.trim()) return null;

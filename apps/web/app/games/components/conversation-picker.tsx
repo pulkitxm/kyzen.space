@@ -1,7 +1,7 @@
 "use client";
 
-import { CHAT_EVENTS, type ConversationJson } from "@gamelobby/chat-core";
-import type { GameType } from "@gamelobby/games-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { ConversationJson, GameType } from "@gamelobby/shared/types";
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/navigation";
 import { useState } from "react";

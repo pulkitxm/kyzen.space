@@ -1,6 +1,28 @@
-export type ChatMode = "mounted" | "popout";
+import {
+  DEFAULT_CHAT_W,
+  DEFAULT_POPOUT,
+  MAX_CHAT,
+  MAX_CHAT_POPOUT_H,
+  MAX_CHAT_POPOUT_W,
+  MIN_CHAT,
+  MIN_CHAT_POPOUT_H,
+  MIN_CHAT_POPOUT_W,
+  MIN_GAME,
+} from "@gamelobby/shared/constants";
+import type { ChatMode, PopoutGeometry } from "@gamelobby/shared/types";
 
-export type PopoutGeometry = { x: number; y: number; w: number; h: number };
+export type { ChatMode, PopoutGeometry };
+export {
+  DEFAULT_CHAT_W,
+  DEFAULT_POPOUT,
+  MAX_CHAT,
+  MAX_CHAT_POPOUT_H,
+  MAX_CHAT_POPOUT_W,
+  MIN_CHAT,
+  MIN_CHAT_POPOUT_H,
+  MIN_CHAT_POPOUT_W,
+  MIN_GAME,
+};
 
 export type StashEdge = "left" | "right" | "top" | "bottom";
 export type IconPos = { x: number; y: number };
@@ -14,15 +36,6 @@ export type ChatLayout = {
   icon: IconPos;
 };
 
-export const MIN_GAME = 360;
-export const MIN_CHAT = 280;
-export const MAX_CHAT = 420;
-export const DEFAULT_CHAT_W = 360;
-
-export const MIN_CHAT_POPOUT_W = 300;
-export const MAX_CHAT_POPOUT_W = 560;
-export const MIN_CHAT_POPOUT_H = 320;
-export const MAX_CHAT_POPOUT_H = 900;
 export const POPOUT_MARGIN = 16;
 
 export const ICON_SIZE = 56;
@@ -32,23 +45,16 @@ export const EDGE_TAB_LENGTH = 44;
 
 export const CHAT_LAYOUT_KEY = "gl_chat_layout";
 
-export const DEFAULT_POPOUT: PopoutGeometry = {
-  x: 100000,
-  y: 100000,
-  w: 380,
-  h: 520,
-};
+export const DEFAULT_ICON = { x: 100000, y: 100000 } as const satisfies IconPos;
 
-export const DEFAULT_ICON: IconPos = { x: 100000, y: 100000 };
-
-export const DEFAULT_CHAT_LAYOUT: ChatLayout = {
+export const DEFAULT_CHAT_LAYOUT = {
   mode: "mounted",
   minimized: false,
   stashEdge: null,
   chatWidth: DEFAULT_CHAT_W,
   popout: DEFAULT_POPOUT,
   icon: DEFAULT_ICON,
-};
+} satisfies ChatLayout;
 
 function clampNum(
   n: unknown,

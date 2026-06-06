@@ -1,4 +1,5 @@
-import { type GameType, listGameMeta } from "@gamelobby/games-core";
+import { listGameMeta } from "@gamelobby/games-core";
+import type { GameType } from "@gamelobby/shared/types";
 
 export const PROFILE_ACTIVITY_PAGE_SIZE = 5;
 

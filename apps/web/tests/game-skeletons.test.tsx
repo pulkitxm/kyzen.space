@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DefaultGameSkeleton, getGameSkeleton } from "@gamelobby/games-client";
-import { TIC_TAC_TOE } from "@gamelobby/games-core";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   type ChatLayout,

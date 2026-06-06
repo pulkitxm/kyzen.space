@@ -1,6 +1,6 @@
 "use client";
 
-import type { ConfigField, GameMeta } from "@gamelobby/games-core";
+import type { ConfigField, GameMeta } from "@gamelobby/shared/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConversationPicker } from "@/app/games/components/conversation-picker";
