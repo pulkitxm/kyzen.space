@@ -23,7 +23,6 @@ import {
 
 const baseRow: GameRecord = {
   id: "g1",
-  code: "K7P2QX",
   gameType: TIC_TAC_TOE,
   status: "active",
   winner: null,
@@ -43,7 +42,7 @@ const baseRow: GameRecord = {
 describe("serializeGame", () => {
   test("maps fields, players, and ISO dates", () => {
     const g = serializeGame(baseRow);
-    expect(g.id).toBe("K7P2QX");
+    expect(g.id).toBe("g1");
     expect(g.gameType).toBe("tic-tac-toe");
     expect(g.status).toBe("active");
     expect(g.players).toEqual([{ userId: "u1", username: "alice", role: "X" }]);
@@ -69,20 +68,17 @@ describe("serializeGame", () => {
 
 describe("serializeMove", () => {
   test("maps fields and the ISO date", () => {
-    const m = serializeMove(
-      {
-        id: "m1",
-        gameId: "g1",
-        moveNumber: 1,
-        playerId: "u1",
-        moveData: { row: 0, col: 0 },
-        createdAt: new Date("2026-01-01T00:00:00.000Z"),
-      },
-      "K7P2QX",
-    );
+    const m = serializeMove({
+      id: "m1",
+      gameId: "g1",
+      moveNumber: 1,
+      playerId: "u1",
+      moveData: { row: 0, col: 0 },
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
     expect(m).toEqual({
       id: "m1",
-      gameId: "K7P2QX",
+      gameId: "g1",
       moveNumber: 1,
       playerId: "u1",
       moveData: { row: 0, col: 0 },
@@ -395,17 +391,14 @@ describe("serialize → wire schema round-trips", () => {
   });
 
   test("serializeMove output parses against moveJsonSchema", () => {
-    const json = serializeMove(
-      {
-        id: "m1",
-        gameId: "g1",
-        moveNumber: 0,
-        playerId: "u1",
-        moveData: { row: 1, col: 2 },
-        createdAt: T0,
-      },
-      "K7P2QX",
-    );
+    const json = serializeMove({
+      id: "m1",
+      gameId: "g1",
+      moveNumber: 0,
+      playerId: "u1",
+      moveData: { row: 1, col: 2 },
+      createdAt: T0,
+    });
     expect(moveJsonSchema.safeParse(json).success).toBe(true);
   });
 });
