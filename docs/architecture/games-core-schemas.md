@@ -131,7 +131,7 @@ Both `reduce` and `step` are optional because `mode` selects which one applies: 
 
 `MoveContext` carries only `{ role }`. The engine deliberately knows nothing about user ids, sessions, or sockets — the server resolves the authenticated user to a seat *role* before calling `reduce`, keeping the engine pure and trivially unit-testable.
 
-## Shared wire & socket schemas (`schemas.ts`)
+## Shared wire & socket schemas (`wire.ts`)
 
 This file is where the package earns the word "contract." It defines the Zod schemas for everything that crosses the network boundary, and derives the TypeScript types from them with `z.infer` so the types can never drift from the validators.
 
@@ -261,7 +261,7 @@ export const GAMES = [ticTacToeDefinition] satisfies GameDefinition[];
 This is the core insight made concrete. Follow a single Tic-tac-toe move from the browser to a persisted, broadcast state. Note that the server validates **both** the inbound `moveData` *and* the state it loaded from the database, against the per-game Zod schemas, before trusting either.
 
 1. User clicks a cell. The web client emits a `make_move` socket event with `{ gameId, moveData: { row, col } }`.
-2. **Generic envelope validation.** The socket handler runs `clientMakeMoveSchema.safeParse(payload)` (`apps/server/src/realtime/index.ts:98`). If the envelope is malformed (bad `gameId`, extra keys), it emits `game_error` and stops. `moveData` is still `unknown` at this point.
+2. **Generic envelope validation.** The socket handler runs `clientMakeMoveSchema.safeParse(payload)` (`apps/server/src/realtime/index.ts:100`). If the envelope is malformed (bad `gameId`, extra keys), it emits `game_error` and stops. `moveData` is still `unknown` at this point.
 3. The handler looks up the game's `gameType` from the DB, picks a driver via `getDriver(...)` (`apps/server/src/realtime/index.ts:111`; currently always the turn-based driver, `apps/server/src/realtime/drivers.ts:25`), and calls `driver.makeMove(io, socket, data)`.
 4. **Authorization.** `handleMakeMove` (`apps/server/src/realtime/turn-based.ts:125`) confirms the game is `active` and that the authenticated `socket.data.userId` actually holds a seat (`gameRow.players.find(...)`). The user is mapped to a *role* here.
 5. **Per-game move validation.** `def.moveSchema.safeParse(payload.moveData)` (`apps/server/src/realtime/turn-based.ts:143`) — now the *real* Tic-tac-toe `moveSchema` validates the move's shape. Invalid → `game_error: "Invalid move"`.
@@ -269,7 +269,7 @@ This is the core insight made concrete. Follow a single Tic-tac-toe move from th
 7. **Authoritative reduce.** `def.engine.reduce(parsedState.data, { role: player.role }, parsedMove.data)` (`apps/server/src/realtime/turn-based.ts:148`) runs the same engine the client could run, but on server-validated inputs. It returns `{ ok: false, error }` (relayed verbatim) or `{ ok: true, state, outcome }`.
 8. **Persist + broadcast.** On `ok`, the server records the move (`games.addMove`), writes `result.state` back (`games.updateGame`), runs `finalize` for completion/stats, then emits `move_made` and a fresh `game_state` (`ServerGameStatePayload`) to the room (`apps/server/src/realtime/turn-based.ts:166`).
 
-Summarized: `cell click → socket make_move → index.ts:98 (envelope) → turn-based.ts:143 (moveSchema) → turn-based.ts:145 (stateSchema) → turn-based.ts:148 (engine.reduce) → DB write → broadcast game_state`. The client may have *anticipated* this result by running the same engine locally, but the server's copy is the only one that counts.
+Summarized: `cell click → socket make_move → index.ts:100 (envelope) → turn-based.ts:143 (moveSchema) → turn-based.ts:145 (stateSchema) → turn-based.ts:148 (engine.reduce) → DB write → broadcast game_state`. The client may have *anticipated* this result by running the same engine locally, but the server's copy is the only one that counts.
 
 A parallel flow exists for game creation: the chat service validates the **config** with the same discipline — `definition.configSchema.safeParse(input.config ?? {})` at `apps/server/src/chat/games-in-chat-service.ts:35`, after a `hasEngine` gate (`:32`) — then seeds the first seat's state with `engine.createInitialState` (`:75`).
 

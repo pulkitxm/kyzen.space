@@ -58,7 +58,7 @@ A `game` row has **two** identifiers and they serve opposite audiences:
 - **`id` (uuid PK)** — the *internal* key. It is the FK target for `move.game_id` and `game_player.game_id`, and every repository write (`addMove`, `updateGame`, `listMoves`, `seatPlayer`) is keyed on it. It is **never serialized to clients**.
 - **`code` (text, `unique("game_code_uq")`)** — the *public* key. A short, shareable, human-friendly room code (`GAME_CODE_LENGTH = 6` over the Crockford-base32 `GAME_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"`, which drops I/L/O/U — ~1.07B combinations). It is generated app-side by the column's `$defaultFn(() => generateGameCode())` and is the only game id that crosses the wire.
 
-The seam is `serializeGame` (`apps/server/src/api/serialize.ts:26`), which sets `GameJson.id = row.code`. From there on the **code is the game's identity to clients**: the web builds `/play/<code>`, and the socket `join_room` / `make_move` payloads carry the code as `gameId` (validated by `gameCodeSchema` / `isGameCode`, which `normalizeGameCode` first — uppercasing and mapping I/L→1, O→0 so a typed code is forgiving). The server resolves it back to a row with `games.getGameByCode(code)` (`packages/database/src/repositories/games.ts:92`), then uses `row.id` for all DB work. Because the code is random, `createGame` wraps its insert in a `game_code_uq` collision-retry loop. (Conversations, messages, friendships, users, and profiles are **unchanged** — they keep their UUIDs as the public id; only games moved to codes.)
+The seam is `serializeGame` (`apps/server/src/api/serialize.ts:26`), which sets `GameJson.id = row.code`. From there on the **code is the game's identity to clients**: the web builds `/play/<code>`, and the socket `join_room` / `make_move` payloads carry the code as `gameId` (validated by `gameCodeSchema` / `isGameCode`, which `normalizeGameCode` first — uppercasing and mapping I/L→1, O→0 so a typed code is forgiving). The server resolves it back to a row with `games.getGameByCode(code)` (`packages/database/src/repositories/games.ts:89`), then uses `row.id` for all DB work. Because the code is random, `createGame` wraps its insert in a `game_code_uq` collision-retry loop. (Conversations, messages, friendships, users, and profiles are **unchanged** — they keep their UUIDs as the public id; only games moved to codes.)
 
 ## How a `GameDefinition` maps to the columns
 
@@ -128,7 +128,7 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
 
 ### Phase 1 — Alice creates the game (status: `"waiting"`)
 
-Alice creates the game from a conversation. `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:19`) seats the **creator** as the first player — `firstRole` = `engine.roles[0]` → `"X"` (`const [firstRole] = engine.roles`, `:63`) — and initializes `game_state` in the *same* insert via `engine.createInitialState([{ role: firstRole }])` (`:75`). `createGame` writes the `game` row and the creator's `game_player` row in one transaction (`packages/database/src/repositories/games.ts:20`). So after creation **two** rows already exist:
+Alice creates the game from a conversation. `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:19`) seats the **creator** as the first player — `firstRole` = `engine.roles[0]` → `"X"` (`const [firstRole] = engine.roles`, `:63`) — and initializes `game_state` in the *same* insert via `engine.createInitialState([{ role: firstRole }])` (`:75`). `createGame` writes the `game` row and the creator's `game_player` row in one transaction (`packages/database/src/repositories/games.ts:28`). So after creation **two** rows already exist:
 
 ```
 game row
@@ -297,7 +297,7 @@ After `step` resolves the tick, a new `game_state` is written with the outcome a
 creator creates game (seated as the first player)
   → role = engine.roles[0]                            (games-in-chat-service.ts:63)
   → game_state = engine.createInitialState([{ role }]) (games-in-chat-service.ts:75)
-  → insert game row + creator's game_player row        (games.ts:20)
+  → insert game row + creator's game_player row        (games.ts:28)
       status "waiting", game_state already set
 
 each additional player joins

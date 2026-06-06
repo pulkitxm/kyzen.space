@@ -95,7 +95,7 @@ The remaining tables are conventional relational shapes — one line each:
 | `user` / `session` / `account` / `verification` | `:41`–`95` | The shape Better Auth expects; everything else FKs `user.id`. See [`auth.md`](./auth.md). |
 | `userProfile` | `:160` | One per user (`unique` FK): unique `username`, a `stats` JSONB (`ProfileStats`, column `:167`), `avatar` JSONB, the three pgEnum appearance columns, a `chatLayout` JSONB, `usernameChangedAt` (cooldown gate), `lastSeenAt` (presence). |
 | `conversation` / `conversationMember` | `:202` / `:221` | A `dm` or `group`; DMs carry a unique `dmKey`. Membership has per-member read state + a `leftAt` soft-leave; mirrors the `game_player` `unique + userId index` design. |
-| `message` | `:244` | `kind` (`text` / `game_card` / …), nullable `body`, a `metadata` JSONB, an optional `gameId` link (FK to the UUID `game.id`), a `deletedAt` soft delete. The composite `(conversationId, createdAt)` index powers keyset pagination. |
+| `message` | `:244` | `kind` (`text` / `game_card` / …), nullable `body`, a `metadata` JSONB, an optional `gameId` link (FK to the UUID `game.id` — but a `game_card`'s *serialized* `MessageJson.gameId` carries the game's public `code`, not this UUID; see [`chat-core.md`](./chat-core.md)), a `deletedAt` soft delete. The composite `(conversationId, createdAt)` index powers keyset pagination. |
 | `friendship` | `:179` | `requester` / `addressee` plus a sorted unique `pairKey` so direction doesn't duplicate; indexed `(addressee, status)` and `(requester, status)`. |
 | `notification` | `:268` | `userId`, `type`, optional `actorId`, a `payload` JSONB, `readAt` / `resolvedAt`; indexed `(userId, createdAt)` for the feed and `(userId, readAt)` for the unread badge. |
 

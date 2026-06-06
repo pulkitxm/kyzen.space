@@ -75,9 +75,9 @@ export type MessageJson = {
 };
 ```
 
-The design choice worth understanding: rather than a separate table or DTO per message type, **one `MessageJson` carries a `kind` plus a polymorphic `metadata` union** (`dto.ts:65`). A `"text"` message uses `body`; a `"gif"` carries a `GifMeta` (`dto.ts:38`); a `"game_card"` carries a `GameCardMeta` and points at a real game via `gameId`; a `"system"` message (member added, group renamed) carries a `SystemMeta` (`dto.ts:58`) with an `event` from the `SystemEvent` union (`dto.ts:51`) and no sender. `sender` is nullable precisely so system messages and messages from deleted users can serialize cleanly.
+The design choice worth understanding: rather than a separate table or DTO per message type, **one `MessageJson` carries a `kind` plus a polymorphic `metadata` union** (`dto.ts:65`). A `"text"` message uses `body`; a `"gif"` carries a `GifMeta` (`dto.ts:38`); a `"game_card"` carries a `GameCardMeta` and points at a real game via `gameId` (for a serialized card this is the game's shareable **room code**, not the DB foreign key — see ["Game cards"](#game-cards-how-a-game-gets-embedded-in-a-conversation) below); a `"system"` message (member added, group renamed) carries a `SystemMeta` (`dto.ts:58`) with an `event` from the `SystemEvent` union (`dto.ts:51`) and no sender. `sender` is nullable precisely so system messages and messages from deleted users can serialize cleanly.
 
-On the DB side this maps directly: `packages/database/src/schema.ts:239` declares the `message` table with `kind: text(...).$type<MessageKind>()` (`:249`) and `metadata: jsonb(...).$type<MessageMetadata>()` (`:251`). So **the JSONB column is statically typed by the shared chat union** — Drizzle will not let you store a metadata shape that isn't one of the three variants.
+On the DB side this maps directly: `packages/database/src/schema.ts:244` declares the `message` table with `kind: text(...).$type<MessageKind>()` (`:254`) and `metadata: jsonb(...).$type<MessageMetadata>()` (`:256`). So **the JSONB column is statically typed by the shared chat union** — Drizzle will not let you store a metadata shape that isn't one of the three variants. (Note the table's own `gameId: uuid("game_id").references(() => game.id)` column at `schema.ts:257` is the internal **UUID** FK — distinct from the room *code* a serialized game card puts on the wire; see below.)
 
 ### `ConversationJson` and `NotificationJson`
 
@@ -93,7 +93,7 @@ and `export type NotificationPayload = z.infer<typeof notificationPayloadSchema>
 
 ### The union types the DB schema borrows
 
-`FriendStatus` (`dto.ts:12`), `ConversationKind` (`dto.ts:28`), `MemberRole` (`dto.ts:30`), `MessageKind`, `NotificationType`, and the `NotificationPayload`/`MessageMetadata` shapes are all imported by `packages/database/src/schema.ts:9` and used to `$type<...>()` Drizzle columns — e.g. `status: text("status").$type<FriendStatus>()` on the `friendship` table (`schema.ts:185`) and `role: text("role").$type<MemberRole>()` on `conversation_member` (`schema.ts:226`). So the shared chat types are not just the *wire* contract; they are also the **shape contract for the database's text/JSONB columns**, keeping the persisted form and the transmitted form aligned by construction.
+`FriendStatus` (`dto.ts:12`), `ConversationKind` (`dto.ts:28`), `MemberRole` (`dto.ts:30`), `MessageKind`, `NotificationType`, and the `NotificationPayload`/`MessageMetadata` shapes are all imported by `packages/database/src/schema.ts:9` and used to `$type<...>()` Drizzle columns — e.g. `status: text("status").$type<FriendStatus>()` on the `friendship` table (`schema.ts:190`) and `role: text("role").$type<MemberRole>()` on `conversation_member` (`schema.ts:231`). So the shared chat types are not just the *wire* contract; they are also the **shape contract for the database's text/JSONB columns**, keeping the persisted form and the transmitted form aligned by construction.
 
 ## The Zod schemas (`types/chat/schemas.ts`)
 
@@ -187,14 +187,14 @@ This is the most interesting flow chat-core enables, and it's where the chat lan
 
 ### Creation walkthrough (client → server)
 
-1. **User taps the gamepad** in a conversation. The web `GameLauncher` emits the event with an ack, using the shared constant: `emitAck(socket, CHAT_EVENTS.createGameInConversation, { conversationId, gameType, seatingMode, challengedUserId })` → `apps/web/app/chat/[handle]/game-launcher.tsx:40`.
+1. **User taps the gamepad** in a conversation. The web `GameLauncher` emits the event with an ack, using the shared constant: `emitAck(socket, CHAT_EVENTS.createGameInConversation, { conversationId, gameType, seatingMode, challengedUserId })` → `apps/web/app/chat/[handle]/game-launcher.tsx:37`.
 2. **Server socket handler** receives the raw payload and validates it against the untrusted-input schema: `clientCreateGameInConversationSchema.safeParse(payload)` → `apps/server/src/realtime/games-in-chat.ts:11`. On failure it acks an error; on success it calls the service with `socket.data.userId` (the *authenticated* user, never a user id from the payload).
 3. **Service** `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:19`) takes a typed `GameType` and does the authority checks the wire schema can't: caller is a member (`games-in-chat-service.ts:29`), the game type has an engine (`hasEngine`, `games-in-chat-service.ts:32`), and crucially **the `config` is validated by the game's own schema** — `definition.configSchema.safeParse(input.config ?? {})` (`games-in-chat-service.ts:35`). It then creates the real game row via the games-core engine (`engine.createInitialState`, `games-in-chat-service.ts:75`).
 4. **The card metadata is built** as a `GameCardMeta` with only the durable fields, then persisted as a `"game_card"` message:
 
 ```ts
 const metadata: GameCardMeta = {
-  gameId: created.id,
+  gameId: created.code,
   gameType: input.gameType,
   seatingMode,
   challengedUserId,
@@ -209,9 +209,9 @@ const sent = await sendMessage({
 });
 ```
 
-(`apps/server/src/chat/games-in-chat-service.ts:83`). `sendMessage` broadcasts a `ServerMessageNew` (`CHAT_EVENTS.messageNew`) to the conversation room (`messages-service.ts:49`), and the service also fans out `game_challenge` / `game_started` notifications to the *other* members via `notify` (`games-in-chat-service.ts:102`).
+(`apps/server/src/chat/games-in-chat-service.ts:83`). Note the **two** ids here, the same split that runs through the whole platform: `metadata.gameId` is the game's shareable **room code** (`created.code` — what `/play/<code>` and the notification payload carry, `games-in-chat-service.ts:84`/`:109`), while the message row's own `gameId` is the internal **UUID** foreign key to the `game` table (`created.id`, `games-in-chat-service.ts:95`). `sendMessage` broadcasts a `ServerMessageNew` (`CHAT_EVENTS.messageNew`) to the conversation room (`messages-service.ts:49`), and the service also fans out `game_challenge` / `game_started` notifications to the *other* members via `notify` (`games-in-chat-service.ts:102`).
 
-So the durable creation path is: **`game-launcher.tsx:40` (emit) → `games-in-chat.ts:11` (validate w/ the shared chat schema) → `games-in-chat-service.ts:19` (authz + games-core config validate + create game) → `messages-service.ts:32` (persist message) → `CHAT_EVENTS.messageNew` broadcast → `chat-socket-bridge.tsx:81` (client writes into the messages atom) → `game-card-message.tsx` renders the card.**
+So the durable creation path is: **`game-launcher.tsx:37` (emit) → `games-in-chat.ts:11` (validate w/ the shared chat schema) → `games-in-chat-service.ts:19` (authz + games-core config validate + create game) → `messages-service.ts:32` (persist message) → `CHAT_EVENTS.messageNew` broadcast → `chat-socket-bridge.tsx:81` (client writes into the messages atom) → `game-card-message.tsx` renders the card.**
 
 ### Enrichment: live status on every read
 
@@ -227,6 +227,7 @@ async function withGameCardStatus(
   if (!game) return msg;
   return {
     ...msg,
+    gameId: game.code,
     metadata: enrichGameCardMeta(msg.metadata as GameCardMeta, {
       status: game.status,
       winner: game.winner,
@@ -236,7 +237,7 @@ async function withGameCardStatus(
 }
 ```
 
-(`apps/server/src/chat/assemble.ts:28`). `enrichGameCardMeta` (`apps/server/src/chat/game-card.ts:9`) spreads the live `status` / `winner` / `players` onto the base metadata and resolves the winner's user id to a `winnerUsername` (returning `null` for a draw or an unknown winner — exercised in `apps/server/tests/game-card.test.ts:34` and `:74`). The key insight: **the card never goes stale because its status fields aren't authoritative — the `game` row is.** The card is just a denormalized view, recomputed on read.
+(`apps/server/src/chat/assemble.ts:28`). Two things happen on read. First, the function looks up the game by the message's FK `row.gameId` — the internal **UUID** — but **rewrites the serialized `gameId` to `game.code`** (`assemble.ts:37`), so the wire DTO carries the public **room code** the client opens at `/play/<code>` while the `message.game_id` column itself stays the UUID. `apps/server/tests/assemble.test.ts` pins exactly this split: the wire `gameId` becomes the code when the game is found, and stays the UUID when the game is missing or the card has no metadata. Second, `enrichGameCardMeta` (`apps/server/src/chat/game-card.ts:9`) spreads the live `status` / `winner` / `players` onto the base metadata and resolves the winner's user id to a `winnerUsername` (returning `null` for a draw or an unknown winner — exercised in `apps/server/tests/game-card.test.ts:34` and `:74`). The key insight: **the card never goes stale because its status fields aren't authoritative — the `game` row is.** The card is just a denormalized view, recomputed on read.
 
 ### Cross-lane re-broadcast: the game lane updates the chat card
 
@@ -254,7 +255,7 @@ export async function broadcastGameCard(
 }
 ```
 
-(`apps/server/src/chat/game-card-broadcast.ts:7`). It no-ops when the game wasn't started from a conversation (`getGameCardByGameId` returns nothing — see `apps/server/tests/game-card.test.ts:122`). On the client, `CHAT_EVENTS.messageUpdated` is handled in `apps/web/app/chat-socket-bridge.tsx:106`, which upserts the refreshed message into the atom and re-renders the card with its new status badge. So a move made on the game board live-updates the "In progress" / "Bob won" pill on the card sitting in the chat — without the card and the board sharing any state beyond the `gameId`.
+(`apps/server/src/chat/game-card-broadcast.ts:7`). It no-ops when the game wasn't started from a conversation (`getGameCardByGameId` returns nothing — see `apps/server/tests/game-card.test.ts:130`). On the client, `CHAT_EVENTS.messageUpdated` is handled in `apps/web/app/chat-socket-bridge.tsx:106`, which upserts the refreshed message into the atom and re-renders the card with its new status badge. So a move made on the game board live-updates the "In progress" / "Bob won" pill on the card sitting in the chat — without the card and the board sharing any state beyond the `gameId`.
 
 ## A typical inbound message, end to end
 
@@ -262,13 +263,13 @@ Putting the DTO + socket pieces together for an ordinary text message:
 
 1. Client emits `CHAT_EVENTS.sendMessage` with a `ClientSendMessage` payload (`{ conversationId, clientId, body, ... }`, `socket-events.ts:20`).
 2. Server handler `apps/server/src/realtime/chat.ts:35` reads `socket.data.userId`, normalizes the payload, and calls `messagesService.sendMessage`.
-3. `sendMessage` inserts a `message` row (typed by `MessageKind` / `MessageMetadata` via `packages/database/src/schema.ts:239`), then `assembleMessage` (`apps/server/src/chat/assemble.ts:45`) turns the Drizzle `MessageRow` + sender into a `MessageJson` using `serializeMessage` (`apps/server/src/api/serialize.ts:86`).
+3. `sendMessage` inserts a `message` row (typed by `MessageKind` / `MessageMetadata` via `packages/database/src/schema.ts:244`), then `assembleMessage` (`apps/server/src/chat/assemble.ts:46`) turns the Drizzle `MessageRow` + sender into a `MessageJson` using `serializeMessage` (`apps/server/src/api/serialize.ts:86`).
 4. It emits `CHAT_EVENTS.messageNew` with a `ServerMessageNew` (`{ message, clientId }`) to the conversation room (`messages-service.ts:49`).
 5. The web `ChatSocketBridge` is subscribed via `useSocketEvent<ServerMessageNew>(CHAT_EVENTS.messageNew, ...)` (`apps/web/app/chat-socket-bridge.tsx:80`); it `upsertMessage`s into `messagesAtomFamily(conversationId)` (a Jotai atom typed `ChatMessage = MessageJson & { pending?; clientId? }`, `apps/web/lib/chat/atoms.ts:21`) and bumps the conversation's `unreadCount`.
 
 At no point does either side re-declare the message shape — `MessageJson` and `CHAT_EVENTS.messageNew` are the single definitions, imported on both ends. The `clientId` echoed back is how the client reconciles its optimistic "pending" bubble with the server's canonical row (`upsertMessage`, `apps/web/lib/chat/atoms.ts:54`).
 
-## Gotahas, invariants & conventions
+## Gotchas, invariants & conventions
 
 - **No React, minimal deps.** `@gamelobby/shared` must remain importable by the server. Its only runtime deps are `zod` and `@gamelobby/avatar` (`packages/shared/package.json:15`). The avatar import is `import type` only. Don't add React, DOM, or `socket.io` runtime imports here.
 - **Timestamps are `string | null`, never `Date`.** Every `*At` field in a DTO is an ISO string. The conversion happens once, in `serialize.ts`'s `iso()` (`apps/server/src/api/serialize.ts:22`). Producing a `Date` anywhere in a DTO is a bug.

@@ -61,7 +61,7 @@ export * as profiles from "./repositories/profiles";
 
 So callers write `import { games, profiles } from "@gamelobby/database"` and then `games.getGameById(id)` / `profiles.bumpStats(...)`. There is no class, no DI container, no base "Repository" abstraction — just modules. The discipline is conventional, not enforced by types: routes and realtime handlers import these namespaces and never import Drizzle directly.
 
-Repositories also **validate their inputs** with the Zod schemas exported from `@gamelobby/shared/types` before they write: `createGame` runs `createGameInputSchema.parse(input)` (`games.ts:29`), `addMove` runs `addMoveInputSchema.parse(input)` (`games.ts:167`), `insertMessage` / `create` / `createProfile` / `updateAppearance` parse theirs the same way.
+Repositories also **validate their inputs** with the Zod schemas exported from `@gamelobby/shared/types` before they write: `createGame` runs `createGameInputSchema.parse(input)` (`games.ts:29`), `addMove` runs `addMoveInputSchema.parse(input)` (`games.ts:164`), `insertMessage` / `create` / `createProfile` / `updateAppearance` parse theirs the same way.
 
 ### `GameRecord` and the seat join
 
@@ -74,7 +74,7 @@ export type GameRecord = Omit<GameRow, "gameType"> & {
 };
 ```
 
-A raw `GameRow` (straight from the `game` table) has no players — seats live in the separate `game_player` table — and its `gameType` is just free-text `string`. `GameRecord` is the **assembled aggregate**: the game row with its seats attached (in `seatOrder`) *and* `gameType` re-typed from `string` to the registry's `GameType` union, so callers can pass `record.gameType` straight to `getDefinition(...)` / `getEngine(...)` without a re-validation cast. Every game-returning function funnels through a private `toGameRecord(row, players)` helper (`games.ts:24`); `getGameById` (`games.ts:85`) is the canonical assembler:
+A raw `GameRow` (straight from the `game` table) has no players — seats live in the separate `game_player` table — and its `gameType` is just free-text `string`. `GameRecord` is the **assembled aggregate**: the game row with its seats attached (in `seatOrder`) *and* `gameType` re-typed from `string` to the registry's `GameType` union, so callers can pass `record.gameType` straight to `getDefinition(...)` / `getEngine(...)` without a re-validation cast. Every game-returning function funnels through a private `toGameRecord(row, players)` helper (`games.ts:24`); `getGameById` (`games.ts:82`) is the canonical assembler:
 
 ```ts
 export async function getGameById(id: string): Promise<GameRecord | null> {
@@ -85,7 +85,7 @@ export async function getGameById(id: string): Promise<GameRecord | null> {
 }
 ```
 
-`getGameById` keys on the internal UUID, but the realtime lane and the read REST endpoint hold the **public room code**, so `getGameByCode` (`games.ts:92`) is the by-code twin — it normalizes the code first (`normalizeGameCode`) and otherwise assembles a `GameRecord` identically:
+`getGameById` keys on the internal UUID, but the realtime lane and the read REST endpoint hold the **public room code**, so `getGameByCode` (`games.ts:89`) is the by-code twin — it normalizes the code first (`normalizeGameCode`) and otherwise assembles a `GameRecord` identically:
 
 ```ts
 export async function getGameByCode(code: string): Promise<GameRecord | null> {
@@ -100,7 +100,7 @@ export async function getGameByCode(code: string): Promise<GameRecord | null> {
 }
 ```
 
-`getPlayers` (`games.ts:72`) does the second query, ordered by `seatOrder`; `updateGame` (`games.ts:117`) re-fetches players the same way after writing, so an updated `GameRecord` always carries fresh seats. `createGame` (`games.ts:28`) validates its input then inserts the `game` row and its `game_player` rows inside `db.transaction(...)`, so a game can never exist with a half-written seat list — and because the public `code` is randomly allocated, the whole insert is wrapped in a collision-retry loop (`GAME_CODE_MAX_ATTEMPTS = 5`, `games.ts:17`) that catches a `game_code_uq` unique violation via `isGameCodeCollision` (`games.ts:19`) and re-rolls. `conversations.getOrCreateDm` and `createGroup` use the same transaction pattern (the former additionally re-checks for an existing DM *inside* the transaction to dodge a create-create race). The `gameState ?? createInitialState(...)` and turn/role logic do **not** live here — that's the realtime driver's job; the repository only persists what it's told.
+`getPlayers` (`games.ts:69`) does the second query, ordered by `seatOrder`; `updateGame` (`games.ts:114`) re-fetches players the same way after writing, so an updated `GameRecord` always carries fresh seats. `createGame` (`games.ts:28`) validates its input then inserts the `game` row and its `game_player` rows inside `db.transaction(...)`, so a game can never exist with a half-written seat list — and because the public `code` is randomly allocated, the whole insert is wrapped in a collision-retry loop (`GAME_CODE_MAX_ATTEMPTS = 5`, `games.ts:17`) that catches a `game_code_uq` unique violation via `isGameCodeCollision` (`games.ts:19`) and re-rolls; any non-collision error is re-thrown immediately (`games.ts:63`), and exhausting all five attempts throws `Failed to allocate a unique game code` (`games.ts:66`). `conversations.getOrCreateDm` and `createGroup` use the same transaction pattern (the former additionally re-checks for an existing DM *inside* the transaction to dodge a create-create race). The `gameState ?? createInitialState(...)` and turn/role logic do **not** live here — that's the realtime driver's job; the repository only persists what it's told.
 
 ### Keyset (cursor) pagination
 
@@ -125,7 +125,7 @@ It then fetches `limit + 1` rows ordered `desc(createdAt), desc(id)`, uses the e
 
 ### Raw SQL fragments stay inside repositories
 
-Repositories occasionally need a SQL expression Drizzle's builder doesn't model — but it's always the `sql` *template tag*, which parameterizes inputs (no string concatenation), and it never leaks past the repository. Examples: the per-game max move number, `nextMoveNumber` (`games.ts:153`) uses `` sql<number>`coalesce(max(${move.moveNumber}), 0)` ``; case-insensitive username lookups in `profiles.getProfileByUsername` (`profiles.ts:42`) use `` sql`lower(${userProfile.username}) = lower(${username})` ``; and `notifications.resolveByRequestId` (`notifications.ts:110`) matches a JSONB field with `` sql`${notification.payload} ->> 'requestId' = ${requestId}` ``. The takeaway: "no raw SQL in routes" doesn't mean "no SQL anywhere" — it means the SQL is *encapsulated* behind a typed repository function.
+Repositories occasionally need a SQL expression Drizzle's builder doesn't model — but it's always the `sql` *template tag*, which parameterizes inputs (no string concatenation), and it never leaks past the repository. Examples: the per-game max move number, `nextMoveNumber` (`games.ts:150`) uses `` sql<number>`coalesce(max(${move.moveNumber}), 0)` ``; case-insensitive username lookups in `profiles.getProfileByUsername` (`profiles.ts:42`) use `` sql`lower(${userProfile.username}) = lower(${username})` ``; and `notifications.resolveByRequestId` (`notifications.ts:110`) matches a JSONB field with `` sql`${notification.payload} ->> 'requestId' = ${requestId}` ``. The takeaway: "no raw SQL in routes" doesn't mean "no SQL anywhere" — it means the SQL is *encapsulated* behind a typed repository function.
 
 ### `profiles.bumpStats` — read-modify-write of JSONB
 
@@ -135,12 +135,12 @@ Repositories occasionally need a SQL expression Drizzle's builder doesn't model 
 
 This is the database layer's busiest path, and where the "client is never trusted" insight becomes concrete. A player taps the board, the client emits `make_move`, and the server's turn-based driver runs `handleMakeMove` (`apps/server/src/realtime/turn-based.ts:125`):
 
-1. **Load the aggregate.** `games.getGameByCode(payload.gameId)` (`games.ts:92`) returns the `GameRecord` — game row + seats — resolved from the public room **code** the client sent (the wire never carries the UUID). The handler checks `status === "active"` and that the socket's `userId` is actually a seated player. The DB join is what makes the seat check possible.
+1. **Load the aggregate.** `games.getGameByCode(payload.gameId)` (`games.ts:89`) returns the `GameRecord` — game row + seats — resolved from the public room **code** the client sent (the wire never carries the UUID). The handler checks `status === "active"` and that the socket's `userId` is actually a seated player. The DB join is what makes the seat check possible.
 2. **Validate with the shared schemas.** `def.moveSchema.safeParse(payload.moveData)` validates the *client's* input (`turn-based.ts:143`), and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB (`turn-based.ts:145`). Both schemas come from the same `GameDefinition` the client imports. A bad move or corrupt state is rejected before any write.
 3. **Reduce — authoritatively.** `def.engine.reduce(...)` (`turn-based.ts:148`) computes the next state on the server. The client's opinion about legality is irrelevant.
-4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`games.ts:153`) returns `max(moveNumber) + 1` — keyed on the internal UUID `gameRow.id`, since `move.game_id` FKs the UUID. The `move_game_number_uq` constraint is the backstop if two moves race to the same number.
-5. **Append the move.** `games.addMove(...)` (`games.ts:161`) inserts the validated move into the append-only `move` table.
-6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:117`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
+4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`games.ts:150`) returns `max(moveNumber) + 1` — keyed on the internal UUID `gameRow.id`, since `move.game_id` FKs the UUID. The `move_game_number_uq` constraint is the backstop if two moves race to the same number.
+5. **Append the move.** `games.addMove(...)` (`games.ts:158`) inserts the validated move into the append-only `move` table.
+6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:114`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
 7. **Finalize on game over.** If the engine's outcome is `completed`, `finalize` (`turn-based.ts:74`) calls `games.updateGame` again (status / `completedAt` / `winner`) and `profiles.bumpStats` (`profiles.ts:153`) once per seat.
 
 In arrows:
@@ -156,8 +156,8 @@ Notice that no SQL appears anywhere in `turn-based.ts` — only `games.*` and `p
 ## Gotchas, invariants & conventions
 
 - **Never write SQL outside `packages/database/src/repositories/*`.** Routes and realtime handlers import the namespaces from `@gamelobby/database` and call functions. If you need a new query, add a repository function — don't reach for `db` in a route.
-- **`GameRecord` always carries `players`; `GameRow` never does.** Seats live in `game_player`. `getGameById` / `getGameByCode` / `createGame` / `updateGame` return the assembled `GameRecord`; `gamesForUser` (`games.ts:131`) returns bare `GameRow[]` (a list view that doesn't need seats).
-- **Resolve games by code from the wire, by id internally.** The realtime lane and `GET /api/games/:gameId` hold the public room **code**, so they call `getGameByCode(code)` (`games.ts:92`); writes (`addMove` / `updateGame` / `listMoves` / `seatPlayer`) all take the internal UUID `gameRow.id`. `createGame` retries on a `game_code_uq` collision before giving up after `GAME_CODE_MAX_ATTEMPTS` (`games.ts:17`).
+- **`GameRecord` always carries `players`; `GameRow` never does.** Seats live in `game_player`. `getGameById` / `getGameByCode` / `createGame` / `updateGame` return the assembled `GameRecord`; `gamesForUser` (`games.ts:128`) returns bare `GameRow[]` (a list view that doesn't need seats).
+- **Resolve games by code from the wire, by id internally.** The realtime lane and `GET /api/games/:gameId` hold the public room **code**, so they call `getGameByCode(code)` (`games.ts:89`); writes (`addMove` / `updateGame` / `listMoves` / `seatPlayer`) all take the internal UUID `gameRow.id`. `createGame` retries on a `game_code_uq` collision before giving up with `Failed to allocate a unique game code` once it exhausts `GAME_CODE_MAX_ATTEMPTS` (`games.ts:17`).
 - **Cursors are opaque and tolerant.** `decodeCursor` returns `null` (rather than throwing) on a malformed or non-base64 cursor (`cursor.ts:7`); callers then simply page from the start. Keyset pagination relies on the composite `createdAt`-leading indexes — keep them if you add new paginated lists.
 - **`bumpStats` is read-modify-write on JSONB** (`profiles.ts:153`), not an atomic increment. Fine for the current serialized call site in the move handler; be careful if you ever bump stats from concurrent paths.
 - **`DB_LATENCY_MS` is dev-only.** Forced to 0 in production by `resolveDbLatencyMs` (`latency.ts:63`), and resolved inside the package (`client.ts:8`).

@@ -174,7 +174,7 @@ Why this design:
 - **Typed keys.** `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>`, so the compiler requires an entry for every game type the registry (`GAME_TYPES` in `@gamelobby/shared/constants`) knows about. The public getters still accept a plain `string` and widen through a local `Record<string, …>` alias, so an unknown type returns `null`/the default instead of failing to type-check.
 - **Code splitting.** Each board is a dynamic `import()`, so a game's UI (and its sometimes-heavy assets) only downloads when someone actually opens that game. The lobby and unrelated games stay light.
 - **The board export isn't a default.** `client.tsx` exports a *named* `TicTacToeGameClient`, so the `.then((m) => ({ default: m.TicTacToeGameClient }))` adapts it into the `{ default }` shape `React.lazy` requires.
-- **Unknown types return `null`, not a throw.** A game-type the web build doesn't know how to render degrades gracefully — the caller shows a "not supported here" message rather than crashing (`apps/web/app/play/[gameId]/play-client.tsx:57`).
+- **Unknown types return `null`, not a throw.** A game-type the web build doesn't know how to render degrades gracefully — the caller shows a "not supported here" message rather than crashing (`apps/web/app/play/[gameId]/play-client.tsx:60`).
 - **One source of truth on the web side.** The route never references a specific game component; it only knows the string. Adding a game = one line in `REGISTRY` (and, optionally, one in `SKELETON_REGISTRY`) plus the matching `GameDefinition` in games-core. No new route, no new endpoint.
 
 Because the registry hands back `React.lazy` components, callers must render them inside a `<Suspense>` boundary. That's exactly what the web app does:
@@ -182,6 +182,7 @@ Because the registry hands back `React.lazy` components, callers must render the
 ```tsx
 const GameClient = getGameClient(gameType);
 const GameSkeleton = getGameSkeleton(gameType);
+const { socket, status } = useSocket();
 
 const gameNode = GameClient ? (
   <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
@@ -203,7 +204,7 @@ const gameNode = GameClient ? (
 );
 ```
 
-(`apps/web/app/play/[gameId]/play-client.tsx:39`)
+(`apps/web/app/play/[gameId]/play-client.tsx:42`)
 
 The route (`apps/web/app/play/[gameId]/page.tsx`) is a single dynamic segment for **every** game; the `gameType` it forwards comes from the fetched game record, and the registry does the dispatch.
 
@@ -323,10 +324,10 @@ Crucially, `makeMove` does **not** mutate the board. There is no optimistic upda
 
 **Phase 1 — server-rendered first paint (REST):**
 
-1. User opens `/play/<gameId>` → `apps/web/app/play/[gameId]/page.tsx:20` runs as an RSC.
+1. User opens `/play/<gameId>` → `apps/web/app/play/[gameId]/page.tsx:23` runs as an RSC.
 2. It validates the `[gameId]` segment is a game **code** (`isGameCode`, then normalizes + redirects to the canonical code), resolves the session via `getServerSession()` (redirects to `/auth` if signed out), then `serverFetchJson` → `GET /api/games/:gameId` returns `{ game, moves }` (`apps/web/app/play/[gameId]/page.tsx:36`). The `:gameId` is the code, and `data.game.id` is that same code (`serializeGame` maps `row.code → GameJson.id`).
 3. It renders `<PlayClient ... initialGame initialMoves gameType={data.game.gameType} />` (`apps/web/app/play/[gameId]/page.tsx:72`); `gameType` is the typed `GameType` carried on the fetched `GameJson` (`page.tsx:75`).
-4. `play-client.tsx:39` calls `getGameClient(gameType)` (and `getGameSkeleton(gameType)`) → registry returns the `React.lazy` tic-tac-toe component.
+4. `play-client.tsx:42` calls `getGameClient(gameType)` (and `getGameSkeleton(gameType)`) → registry returns the `React.lazy` tic-tac-toe component.
 5. `<Suspense>` resolves the lazy chunk and mounts `TicTacToeGameClient` with the SSR `initial*` props plus the shared `socket`/`connected` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx`). The board paints immediately from `initialGame`/`initialMoves` — no join needed yet.
 
 **Phase 2 — going live (shared socket):**
@@ -431,7 +432,7 @@ The rest of replay is UI sugar: a `<ReplayToolbar>` with first/prev/play/next/la
 - **Reuse the shared socket — never call `io()`.** The board receives the one shared connection via `props.socket` and rides it for the game lane alongside chat. Opening your own `io()` would create a second redundant connection (double handshake/auth, doubled presence). On cleanup, remove your listeners with `socket.off(...)` and emit `leave_room`; **never** call `socket.disconnect()` — the connection is owned by the host's `SocketProvider`.
 - **Identity is never in the payload.** Boards send `{ gameId, moveData }` only. The server reads the user from the authenticated socket (`socket.data.userId`), set from the Better Auth session cookie that rode on the shared connection's handshake (`withCredentials: true`). Sending a `userId` from the client would be ignored.
 - **`gameState` and `moveData` cross the boundary as `unknown`.** `GameClientProps.initialGame.gameState` is `unknown` and `initialMoves` is `Record<string, unknown>[]` because games-client is generic. Each board narrows these itself (tic-tac-toe casts to a local `GameJson`/`TicState`). The real schema lives in games-core; keep that the single source of truth and import its types rather than re-declaring shapes.
-- **Boards must be `"use client"` and Suspense-safe.** They are `React.lazy`-loaded, so a caller must wrap them in `<Suspense>` (the web route does at `apps/web/app/play/[gameId]/play-client.tsx:45`). The first line of `client.tsx` is `"use client"`.
+- **Boards must be `"use client"` and Suspense-safe.** They are `React.lazy`-loaded, so a caller must wrap them in `<Suspense>` (the web route does at `apps/web/app/play/[gameId]/play-client.tsx:48`). The first line of `client.tsx` is `"use client"`.
 - **Register by the typed `GameType` key.** Both `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>` keyed by the constant exported from `@gamelobby/shared/constants` (`TIC_TAC_TOE`), so a typo or a missing entry is a *compile error* — the registries can't fall out of sync with `GAME_TYPES` silently. The runtime getters still accept a plain `string` (the value comes off a fetched record), and an unrecognized one yields `null` (board) / `DefaultGameSkeleton` (skeleton).
 - **Tailwind must see the source.** Classes used in board components only survive the build because `apps/web/app/globals.css:3` has `@source "../../../packages/games-client/src/**/*.{ts,tsx}"` and `apps/web/next.config.ts:5` lists `@gamelobby/games-client` in `transpilePackages`. A new board file outside that glob would lose its Tailwind classes.
 - **React/socket.io are peers.** Don't add `react` or `socket.io-client` as regular dependencies of this package — they must come from the host app to avoid duplicate-instance bugs.

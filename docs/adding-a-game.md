@@ -194,15 +194,15 @@ These already work for every game — do not duplicate them:
   `/games/<type>`; the legacy `/games/<type>/<id>` redirects to `/play/<code>`
   (the game's short public room code, which is `GameJson.id`).
 - **"Play with…" flow** — `app/games/components/conversation-picker.tsx` and
-  `app/chat/[handle]/game-launcher.tsx` (both take a `gameType` + optional
-  `config`) create a game in a conversation via the `game:create_in_conversation`
+  `app/chat/[handle]/game-launcher.tsx` (both take a `gameType`; the picker also
+  takes an optional `config`) create a game in a conversation via the `game:create_in_conversation`
   socket event.
 - **Play view** — `app/play/[gameId]/page.tsx` (the `[gameId]` segment is the
   game's public room code) loads the game by code and renders the registered
   client via `getGameClient(type)` inside `<Suspense>`, with
   `getGameSkeleton(type)` as the fallback. The route-level `loading.tsx` reads the
   `gl_chat_layout` cookie to render the matching chat shell (docked / popout /
-  closed) while the game data is still being fetched, but its board area stays a
+  minimized) while the game data is still being fetched, but its board area stays a
   generic placeholder — it can't pick a per-game board skeleton there because the
   game `type` isn't known until the fetch resolves.
 - **In-chat card** — `app/chat/[handle]/game-card-message.tsx` renders the live
