@@ -1,13 +1,11 @@
-import type { MemberRole } from "@gamelobby/chat-core";
+import type {
+  ConversationMemberRow,
+  ConversationRow,
+  MemberRole,
+} from "@gamelobby/shared/types";
 import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "../client";
-import {
-  type ConversationMemberRow,
-  type ConversationRow,
-  conversation,
-  conversationMember,
-  message,
-} from "../schema";
+import { conversation, conversationMember, message } from "../schema";
 
 export function dmKey(a: string, b: string): string {
   return [a, b].sort().join(":");

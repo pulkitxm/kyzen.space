@@ -1,13 +1,25 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
+import {
+  COLOR_MODES,
+  DEFAULT_COLOR_MODE,
+  DEFAULT_PATTERN,
+  DEFAULT_THEME,
+  PATTERN_IDS,
+  THEME_IDS,
+} from "@gamelobby/shared/constants";
 import type {
+  AvatarConfig,
+  ChatMode,
   ConversationKind,
   FriendStatus,
+  GameStatus,
   MemberRole,
   MessageKind,
   MessageMetadata,
   NotificationPayload,
   NotificationType,
-} from "@gamelobby/chat-core";
+  ProfileStats,
+  SeatingMode,
+} from "@gamelobby/shared/types";
 import {
   boolean,
   index,
@@ -20,14 +32,6 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
-import type { ChatMode } from "../lib/chat-layout";
-import { DEFAULT_PATTERN, PATTERN_IDS } from "../lib/pattern";
-import {
-  COLOR_MODES,
-  DEFAULT_COLOR_MODE,
-  DEFAULT_THEME,
-  THEME_IDS,
-} from "../lib/theme";
 
 export const themeEnum = pgEnum("app_theme", THEME_IDS);
 export const colorModeEnum = pgEnum("color_mode", COLOR_MODES);
@@ -89,12 +93,6 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updated_at").$defaultFn(() => new Date()),
 });
 
-export type GamePlayer = { userId: string; username: string; role: string };
-
-export type GameStatus = "waiting" | "active" | "completed" | "abandoned";
-
-export type SeatingMode = "open" | "challenge";
-
 export const game = pgTable(
   "game",
   {
@@ -154,14 +152,6 @@ export const gamePlayer = pgTable(
   ],
 );
 
-export type GameStat = {
-  played: number;
-  won: number;
-  lost: number;
-  drawn: number;
-};
-export type ProfileStats = Record<string, GameStat>;
-
 export const userProfile = pgTable("user_profile", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: text("user_id")
@@ -180,11 +170,6 @@ export const userProfile = pgTable("user_profile", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
-
-export type GameRow = typeof game.$inferSelect;
-export type MoveRow = typeof move.$inferSelect;
-export type GamePlayerRow = typeof gamePlayer.$inferSelect;
-export type UserProfileRow = typeof userProfile.$inferSelect;
 
 export const friendship = pgTable(
   "friendship",
@@ -299,9 +284,3 @@ export const notification = pgTable(
     index("notification_user_unread_idx").on(t.userId, t.readAt),
   ],
 );
-
-export type FriendshipRow = typeof friendship.$inferSelect;
-export type ConversationRow = typeof conversation.$inferSelect;
-export type ConversationMemberRow = typeof conversationMember.$inferSelect;
-export type MessageRow = typeof message.$inferSelect;
-export type NotificationRow = typeof notification.$inferSelect;

@@ -1,22 +1,18 @@
-import type {
-  NotificationPayload,
-  NotificationType,
-} from "@gamelobby/chat-core";
+import {
+  type CreateNotificationInput,
+  createNotificationInputSchema,
+  type NotificationRow,
+  type NotificationType,
+} from "@gamelobby/shared/types";
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "../client";
-import { type NotificationRow, notification } from "../schema";
+import { notification } from "../schema";
 import { decodeCursor, encodeCursor } from "./cursor";
-
-export type CreateNotificationInput = {
-  userId: string;
-  type: NotificationType;
-  actorId?: string | null;
-  payload?: NotificationPayload;
-};
 
 export async function create(
   input: CreateNotificationInput,
 ): Promise<NotificationRow> {
+  createNotificationInputSchema.parse(input);
   const [row] = await db
     .insert(notification)
     .values({

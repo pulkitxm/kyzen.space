@@ -1,17 +1,23 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
-import type { GameType } from "@gamelobby/games-core";
-import { and, eq, inArray, ne, sql } from "drizzle-orm";
-import type { ChatMode } from "../../lib/chat-layout";
-import type { PatternId } from "../../lib/pattern";
-import type { ColorMode, ThemeId } from "../../lib/theme";
-import { db } from "../client";
+import type {
+  AvatarConfig,
+  ChatMode,
+  ColorMode,
+  CreateProfileInput,
+  GameStat,
+  GameType,
+  PatternId,
+  ProfileStats,
+  PublicUserRow,
+  ThemeId,
+  UserProfileRow,
+} from "@gamelobby/shared/types";
 import {
-  type GameStat,
-  type ProfileStats,
-  type UserProfileRow,
-  user,
-  userProfile,
-} from "../schema";
+  appearancePatchSchema,
+  createProfileInputSchema,
+} from "@gamelobby/shared/types";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { db } from "../client";
+import { user, userProfile } from "../schema";
 
 export async function getDisplayName(userId: string): Promise<string | null> {
   const [row] = await db
@@ -65,11 +71,10 @@ export async function getTakenUsernames(
   return new Set(rows.map((row) => row.username.toLowerCase()));
 }
 
-export async function createProfile(input: {
-  userId: string;
-  username: string;
-  avatar?: AvatarConfig | null;
-}): Promise<UserProfileRow> {
+export async function createProfile(
+  input: CreateProfileInput,
+): Promise<UserProfileRow> {
+  createProfileInputSchema.parse(input);
   const [row] = await db
     .insert(userProfile)
     .values({
@@ -118,6 +123,7 @@ export async function updateAppearance(
   userId: string,
   patch: { theme?: ThemeId; colorMode?: ColorMode; pattern?: PatternId },
 ): Promise<void> {
+  appearancePatchSchema.parse(patch);
   const set: {
     theme?: ThemeId;
     colorMode?: ColorMode;
@@ -164,13 +170,6 @@ export async function bumpStats(
     .set({ stats, updatedAt: new Date() })
     .where(eq(userProfile.userId, userId));
 }
-
-export type PublicUserRow = {
-  id: string;
-  username: string;
-  displayName: string | null;
-  avatar: AvatarConfig | null;
-};
 
 const PUBLIC_USER_COLUMNS = {
   id: userProfile.userId,

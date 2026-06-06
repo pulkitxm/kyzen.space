@@ -1,21 +1,17 @@
-import type { MessageKind, MessageMetadata } from "@gamelobby/chat-core";
+import {
+  type CreateMessageInput,
+  createMessageInputSchema,
+  type MessageRow,
+} from "@gamelobby/shared/types";
 import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { db } from "../client";
-import { type MessageRow, message } from "../schema";
+import { message } from "../schema";
 import { decodeCursor, encodeCursor } from "./cursor";
-
-export type CreateMessageInput = {
-  conversationId: string;
-  senderId: string | null;
-  kind?: MessageKind;
-  body?: string | null;
-  metadata?: MessageMetadata | null;
-  gameId?: string | null;
-};
 
 export async function insertMessage(
   input: CreateMessageInput,
 ): Promise<MessageRow> {
+  createMessageInputSchema.parse(input);
   const [row] = await db
     .insert(message)
     .values({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { resolveDbLatencyMs, withLatency } from "../src/db/latency";
+import { resolveDbLatencyMs, withLatency } from "../src/latency";
 
 type Pending<T> = PromiseLike<T> & {
   values: () => Pending<T>;

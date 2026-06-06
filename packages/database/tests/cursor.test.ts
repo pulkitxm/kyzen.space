@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decodeCursor, encodeCursor } from "../src/db/repositories/cursor";
+import { decodeCursor, encodeCursor } from "../src/repositories/cursor";
 
 describe("keyset pagination cursor", () => {
   test("round-trips createdAt + id", () => {

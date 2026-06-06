@@ -1,0 +1,23 @@
+{
+  "name": "@gamelobby/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test --pass-with-no-tests",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gamelobby/shared": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "drizzle-kit": "^0.30.1",
+    "typescript": "^5"
+  }
+}

@@ -1,39 +1,24 @@
-import type { GameType } from "@gamelobby/games-core";
+import {
+  addMoveInputSchema,
+  type CreateGameInput,
+  createGameInputSchema,
+  type GamePlayer,
+  type GameRecord,
+  type GameRow,
+  type GameType,
+  type GameUpdate,
+  type MoveRow,
+} from "@gamelobby/shared/types";
 import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { db } from "../client";
-import {
-  type GamePlayer,
-  type GameRow,
-  type GameStatus,
-  game,
-  gamePlayer,
-  type MoveRow,
-  move,
-  type SeatingMode,
-} from "../schema";
-
-export type GameRecord = Omit<GameRow, "gameType"> & {
-  gameType: GameType;
-  players: GamePlayer[];
-};
+import { game, gamePlayer, move } from "../schema";
 
 function toGameRecord(row: GameRow, players: GamePlayer[]): GameRecord {
   return { ...row, gameType: row.gameType as GameType, players };
 }
 
-export type CreateGameInput = {
-  gameType: GameType;
-  players: GamePlayer[];
-  gameState: unknown;
-  config?: unknown;
-  status?: GameStatus;
-  conversationId?: string | null;
-  creatorUserId?: string | null;
-  seatingMode?: SeatingMode | null;
-  challengedUserId?: string | null;
-};
-
 export async function createGame(input: CreateGameInput): Promise<GameRecord> {
+  createGameInputSchema.parse(input);
   return db.transaction(async (tx) => {
     const [row] = await tx
       .insert(game)
@@ -100,10 +85,6 @@ export async function seatPlayer(
   });
 }
 
-export type GameUpdate = Partial<
-  Pick<GameRow, "status" | "winner" | "gameState" | "startedAt" | "completedAt">
->;
-
 export async function updateGame(
   id: string,
   patch: GameUpdate,
@@ -154,6 +135,7 @@ export async function addMove(input: {
   playerId: string;
   moveData: unknown;
 }): Promise<MoveRow> {
+  addMoveInputSchema.parse(input);
   const [row] = await db.insert(move).values(input).returning();
   if (!row) throw new Error("Failed to add move");
   return row;

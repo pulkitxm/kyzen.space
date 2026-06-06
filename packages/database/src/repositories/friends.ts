@@ -1,7 +1,7 @@
-import type { FriendStatus } from "@gamelobby/chat-core";
+import type { FriendStatus, FriendshipRow } from "@gamelobby/shared/types";
 import { and, desc, eq, or } from "drizzle-orm";
 import { db } from "../client";
-import { type FriendshipRow, friendship } from "../schema";
+import { friendship } from "../schema";
 
 export function pairKey(a: string, b: string): string {
   return [a, b].sort().join(":");
