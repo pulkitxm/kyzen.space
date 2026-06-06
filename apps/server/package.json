@@ -20,7 +20,7 @@
     "@socket.io/redis-adapter": "^8.3.0",
     "better-auth": "^1.6.9",
     "cors": "^2.8.5",
-    "drizzle-orm": "^0.38.3",
+    "drizzle-orm": "^0.45.2",
     "express": "^4.21.2",
     "gender-detection-from-name": "^1.11.4",
     "hono": "^4.12.16",
