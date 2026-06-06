@@ -262,6 +262,45 @@ describe.skipIf(!DB_UP)("messages edge cases", () => {
     expect(page.messages.map((m) => m.id)).toEqual([...ids].reverse());
   });
 
+  it("clamps a limit of zero or negative up to a single message", async () => {
+    const { a, dmId } = await dmPair("lim1", "lim2");
+    for (let i = 0; i < 3; i++) {
+      unwrap(
+        await messagesService.sendMessage({
+          conversationId: dmId,
+          senderId: a.id,
+          body: `c${i}`,
+        }),
+      );
+    }
+    expect(
+      (await messages.listMessages(dmId, { limit: 0 })).messages,
+    ).toHaveLength(1);
+    expect(
+      (await messages.listMessages(dmId, { limit: -5 })).messages,
+    ).toHaveLength(1);
+  });
+
+  it("treats a malformed cursor as a first-page request rather than throwing", async () => {
+    const { a, dmId } = await dmPair("cur1", "cur2");
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      ids.push(
+        unwrap(
+          await messagesService.sendMessage({
+            conversationId: dmId,
+            senderId: a.id,
+            body: `d${i}`,
+          }),
+        ).id,
+      );
+    }
+    const fallback = await messages.listMessages(dmId, {
+      cursor: "not-valid-base64-$$$",
+    });
+    expect(fallback.messages.map((m) => m.id)).toEqual([...ids].reverse());
+  });
+
   it("deleting a message by its sender soft-deletes it: deletedAt set, body and metadata hidden", async () => {
     const { a, dmId } = await dmPair("sd1", "sd2");
     const msg = unwrap(
