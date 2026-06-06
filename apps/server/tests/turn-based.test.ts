@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/games-core";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
 
@@ -56,18 +56,16 @@ const profiles = {
   },
 };
 
-mock.module("../src/db", () => ({
+mock.module("@gamelobby/database", () => ({
   games,
   profiles,
   conversations: {},
   friends: {},
-  messages: {},
+  messages: { getGameCardByGameId: async () => null },
   notifications: {},
   db: {},
   schema: {},
-}));
-mock.module("../src/db/repositories/messages", () => ({
-  getGameCardByGameId: async () => null,
+  createDb: () => ({ db: {}, client: {} }),
 }));
 
 const { handleJoinRoom, handleMakeMove } = await import(

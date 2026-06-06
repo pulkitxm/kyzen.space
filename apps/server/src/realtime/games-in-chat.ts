@@ -1,7 +1,5 @@
-import {
-  CHAT_EVENTS,
-  clientCreateGameInConversationSchema,
-} from "@gamelobby/chat-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { clientCreateGameInConversationSchema } from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { createGameInConversation } from "../chat/games-in-chat-service";
 

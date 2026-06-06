@@ -1,4 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import type {
+  Mark,
+  TicTacToeMove,
+  TicTacToeState,
+} from "@gamelobby/shared/types";
 import {
   emptyBoard,
   getEngine,
@@ -7,9 +12,6 @@ import {
   isTerminal,
   lineWinner,
   listGameTypes,
-  type Mark,
-  type TicTacToeMove,
-  type TicTacToeState,
   ticTacToeEngine,
 } from "../src/index";
 
@@ -129,7 +131,7 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
 
   test.each(lineCases)("X wins on $name", ({ xCells, oCells }) => {
     let state = initial();
-    let outcome: import("../src/engine").Outcome | undefined;
+    let outcome: import("@gamelobby/shared/types").Outcome | undefined;
     for (let i = 0; i < 3; i++) {
       const xCell = xCells[i];
       expect(xCell).toBeDefined();
@@ -235,7 +237,7 @@ describe("tic-tac-toe — full playthroughs", () => {
       ["O", 0, 1],
       ["X", 0, 2],
     ];
-    let lastOutcome: import("../src/engine").Outcome | undefined;
+    let lastOutcome: import("@gamelobby/shared/types").Outcome | undefined;
     let placed = 0;
     for (const [role, row, col] of seq) {
       const res = reduce(state, { role }, { row, col });
@@ -258,7 +260,7 @@ describe("tic-tac-toe — full playthroughs", () => {
       ["O", 1, 1],
       ["X", 0, 2],
     ];
-    let outcome: import("../src/engine").Outcome | undefined;
+    let outcome: import("@gamelobby/shared/types").Outcome | undefined;
     for (const [role, row, col] of seq) {
       const res = reduce(state, { role }, { row, col });
       expect(res.ok).toBe(true);

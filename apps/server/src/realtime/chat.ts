@@ -1,8 +1,8 @@
-import { CHAT_EVENTS } from "@gamelobby/chat-core";
+import { conversations, notifications } from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
 import type { Server as IOServer, Socket } from "socket.io";
 import * as conversationsService from "../chat/conversations-service";
 import * as messagesService from "../chat/messages-service";
-import { conversations, notifications } from "../db";
 import { convRoom, joinConvRoom, leaveConvRoom, userRoom } from "./rooms";
 import { ack, ackErr, isObj, register, str, strArray } from "./socket-util";
 

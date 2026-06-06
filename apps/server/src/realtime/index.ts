@@ -1,11 +1,11 @@
 import type { Server as HTTPServer } from "node:http";
+import { games } from "@gamelobby/database";
 import {
   clientJoinRoomSchema,
   clientMakeMoveSchema,
-} from "@gamelobby/games-core";
+} from "@gamelobby/shared/types";
 import { Server as IOServer } from "socket.io";
 import { getAuth } from "../auth";
-import { games } from "../db";
 import { env } from "../env";
 import { childLogger } from "../logger";
 import { attachChatHandlers, joinUserRooms } from "./chat";

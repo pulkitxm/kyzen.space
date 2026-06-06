@@ -1,5 +1,5 @@
-import type { GameMeta } from "../../definition";
-import { TIC_TAC_TOE } from "../../game-types";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import type { GameMeta } from "@gamelobby/shared/types";
 
 export const ticTacToeMeta: GameMeta = {
   type: TIC_TAC_TOE,

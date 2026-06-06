@@ -1,4 +1,4 @@
-import type { GameMeta } from "@gamelobby/games-core";
+import type { GameMeta } from "@gamelobby/shared/types";
 import Image from "next/image";
 import Link from "next/link";
 

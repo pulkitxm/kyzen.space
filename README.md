@@ -16,7 +16,7 @@ GameLobby is a [Bun](https://bun.sh) + [Turborepo](https://turbo.build) monorepo
 - **Web** — Next.js 16, React 19 (App Router), Tailwind CSS v4, Jotai
 - **Server** — Bun, Express + Hono (REST under `/api/*`), Socket.IO (realtime)
 - **Data** — Postgres via Drizzle ORM; optional Redis adapter for multi-node scale-out
-- **Shared packages** — strict Zod schemas as the single source of truth; [Biome](https://biomejs.dev) for format + lint
+- **Shared packages** — `@gamelobby/shared` holds the strict Zod schemas, types, and constants that are the single source of truth; [Biome](https://biomejs.dev) for format + lint
 
 ## Monorepo layout
 
@@ -25,9 +25,10 @@ apps/
   web/      Next.js frontend (lobby, chat, profiles, game boards)
   server/   Express + Hono + Socket.IO backend (REST, realtime, DB)
 packages/
-  games-core/    framework-agnostic game logic + Zod schemas (no React)
+  shared/        Zod schemas, types + constants — the single source of truth
+  database/      Drizzle schema + repositories (server-only)
+  games-core/    framework-agnostic game engines + registry (no React)
   games-client/  React game board UIs (web-only)
-  chat-core/     chat/social DTOs + the socket event contract
   avatar/        DiceBear avataaars config
 ```
 

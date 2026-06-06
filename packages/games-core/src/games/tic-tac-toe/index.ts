@@ -1,14 +1,14 @@
-import type { GameDefinition } from "../../definition";
-import { ticTacToeEngine } from "./engine";
-import { ticTacToeMeta } from "./meta";
 import {
+  type GameDefinition,
   type TicTacToeConfig,
   type TicTacToeMove,
   type TicTacToeState,
   ticTacToeConfigSchema,
   ticTacToeMoveSchema,
   ticTacToeStateSchema,
-} from "./schemas";
+} from "@gamelobby/shared/types";
+import { ticTacToeEngine } from "./engine";
+import { ticTacToeMeta } from "./meta";
 
 export const ticTacToeDefinition: GameDefinition<
   TicTacToeState,

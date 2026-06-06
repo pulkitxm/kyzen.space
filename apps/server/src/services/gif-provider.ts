@@ -1,4 +1,4 @@
-import type { GifJson } from "@gamelobby/chat-core";
+import type { GifJson } from "@gamelobby/shared/types";
 import { env } from "../env";
 
 type KlipyVariant = { url?: string; width?: number; height?: number };

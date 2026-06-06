@@ -1,10 +1,7 @@
 "use client";
 
-import {
-  CHAT_EVENTS,
-  type FriendshipJson,
-  type SearchUserJson,
-} from "@gamelobby/chat-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { FriendshipJson, SearchUserJson } from "@gamelobby/shared/types";
 import { useAtomValue, useStore } from "jotai";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";

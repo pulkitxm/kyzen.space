@@ -1,4 +1,5 @@
-import { gameTypeSchema } from "@gamelobby/games-core";
+import { conversations, messages, profiles } from "@gamelobby/database";
+import { gameTypeSchema } from "@gamelobby/shared/types";
 import { Hono } from "hono";
 import {
   assembleConversation,
@@ -8,7 +9,6 @@ import {
 import * as conversationsService from "../../chat/conversations-service";
 import { createGameInConversation } from "../../chat/games-in-chat-service";
 import * as messagesService from "../../chat/messages-service";
-import { conversations, messages, profiles } from "../../db";
 import { isUuid } from "../../lib/uuid";
 import { readJson } from "../auth-context";
 import { type AuthEnv, requireAuth } from "../middleware/auth";

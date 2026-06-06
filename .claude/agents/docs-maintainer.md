@@ -27,7 +27,7 @@ docs** for an undocumented subsystem. Both follow the rules below.
 
 | Area | Files |
 | --- | --- |
-| Architecture guide | `docs/architecture/README.md` (index + overview) and one page per subsystem: `auth.md`, `database-schema.md`, `generic-game-schema.md`, `database.md`, `games-core-schemas.md`, `games-core-engine.md`, `games-client.md`, `chat-core.md`, `realtime.md`, `server-api.md`, `web.md`, `testing.md` |
+| Architecture guide | `docs/architecture/README.md` (index + overview) and one page per subsystem: `shared.md` (the `@gamelobby/shared` types/schemas/constants package), `database.md` (the `@gamelobby/database` package), `database-schema.md`, `generic-game-schema.md`, `auth.md`, `games-core-engine.md`, `games-client.md`, `chat-core.md` (chat contracts, now living in `@gamelobby/shared/types/chat`), `realtime.md`, `server-api.md`, `web.md`, `testing.md` |
 | Game-authoring guide | `docs/adding-a-game.md` |
 | Per-game docs | `docs/games/README.md` + `docs/games/<type>.md` (one per registered game; enforced by `packages/games-core/tests/game-docs.test.ts`) |
 | Project README | `README.md` (root) |
@@ -39,13 +39,19 @@ and let the human decide.
 
 ## The codebase in one paragraph
 
-Shared game/chat logic lives in `packages/` and is imported by both the frontend
-and the backend, so the same engine + strict Zod schemas that inform the client
-authoritatively validate moves on the server — the client is never trusted.
-`games-core` is framework-agnostic (no React) so the server can import it;
-`games-client` holds the React boards; `chat-core` is the chat DTO + socket
-contract; `avatar` is DiceBear config. Read `docs/architecture/README.md` for the
-full map before doing anything — it is your table of contents.
+Shared code lives in `packages/` and is imported by both the frontend and the
+backend, so the same strict Zod schemas that inform the client authoritatively
+validate moves on the server — the client is never trusted. **`@gamelobby/shared`
+is the single home for every type, every Zod schema, and every shared constant**
+(subpaths `@gamelobby/shared/types` and `@gamelobby/shared/constants`), and the
+only package that depends on `zod`. **`@gamelobby/database`** is the server-only
+Drizzle schema + repositories (it validates with `shared` schemas; the web never
+imports it). `games-core` is framework-agnostic game *logic* (engines + registry;
+its types/schemas live in `shared`); `games-client` holds the React boards;
+`avatar` is DiceBear config and the one package that keeps its own types and stays
+`zod`-free. (The former `chat-core` package was merged into `@gamelobby/shared`.)
+Read `docs/architecture/README.md` for the full map before doing anything — it is
+your table of contents.
 
 ## Cardinal rules
 

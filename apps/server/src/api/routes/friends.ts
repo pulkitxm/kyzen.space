@@ -1,8 +1,8 @@
-import type { FriendState } from "@gamelobby/chat-core";
+import { friends, profiles } from "@gamelobby/database";
+import type { FriendState } from "@gamelobby/shared/types";
 import { Hono } from "hono";
 import { assembleFriendships } from "../../chat/assemble";
 import * as friendsService from "../../chat/friends-service";
-import { friends, profiles } from "../../db";
 import { readJson } from "../auth-context";
 import { type AuthEnv, requireAuth } from "../middleware/auth";
 import { serializePublicUser } from "../serialize";

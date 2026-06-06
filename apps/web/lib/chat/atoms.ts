@@ -5,7 +5,7 @@ import type {
   MessageJson,
   NotificationJson,
   TypingUser,
-} from "@gamelobby/chat-core";
+} from "@gamelobby/shared/types";
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import { atomFamily } from "jotai-family";

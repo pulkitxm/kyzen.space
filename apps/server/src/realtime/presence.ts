@@ -1,6 +1,7 @@
-import { CHAT_EVENTS, type PresenceStatus } from "@gamelobby/chat-core";
+import * as db from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { PresenceStatus } from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
-import * as db from "../db";
 import { childLogger } from "../logger";
 import type { PresenceStore } from "./presence-store";
 import { presenceStore } from "./presence-store-instance";

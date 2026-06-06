@@ -1,6 +1,7 @@
-import { CHAT_EVENTS, type TypingUser } from "@gamelobby/chat-core";
+import { conversations, profiles } from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { TypingUser } from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
-import { conversations, profiles } from "../db";
 import { convRoom } from "./rooms";
 import { isObj, str } from "./socket-util";
 

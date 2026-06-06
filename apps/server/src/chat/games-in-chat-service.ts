@@ -1,12 +1,17 @@
-import type { GameCardMeta, MessageJson } from "@gamelobby/chat-core";
 import {
-  type GameJson,
-  type GameType,
-  getDefinition,
-  hasEngine,
-} from "@gamelobby/games-core";
+  conversations,
+  games,
+  profiles,
+  type SeatingMode,
+} from "@gamelobby/database";
+import { getDefinition, hasEngine } from "@gamelobby/games-core";
+import type {
+  GameCardMeta,
+  GameJson,
+  GameType,
+  MessageJson,
+} from "@gamelobby/shared/types";
 import { serializeGame } from "../api/serialize";
-import { conversations, games, profiles, type SeatingMode } from "../db";
 import { notify } from "../realtime/notify";
 import { sendMessage } from "./messages-service";
 import { fail, ok, type ServiceResult } from "./result";

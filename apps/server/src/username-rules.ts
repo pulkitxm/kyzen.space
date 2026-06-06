@@ -1,31 +1,5 @@
-export const USERNAME_MIN_LENGTH = 3;
-export const USERNAME_MAX_LENGTH = 30;
-const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
-
-export const RESERVED_USERNAMES: ReadonlySet<string> = new Set([
-  "api",
-  "auth",
-  "account",
-  "chat",
-  "friends",
-  "games",
-  "play",
-  "profile",
-  "settings",
-  "ui",
-]);
-
-export function normalizeUsername(raw: string): string {
-  return raw.trim().toLowerCase();
-}
-
-export function isValidUsernameFormat(normalized: string): boolean {
-  return USERNAME_PATTERN.test(normalized);
-}
-
-export function isReservedUsername(normalized: string): boolean {
-  return RESERVED_USERNAMES.has(normalized);
-}
+import { USERNAME_MAX_LENGTH } from "@gamelobby/shared/constants";
+import { normalizeUsername } from "@gamelobby/shared/types";
 
 export function parseUsernameCsv(raw: string): string[] {
   return raw

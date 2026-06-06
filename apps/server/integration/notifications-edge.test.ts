@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "bun:test";
+import { friends, notifications } from "@gamelobby/database";
 import * as friendsService from "../src/chat/friends-service";
-import { friends, notifications } from "../src/db";
 import { createHarness, DB_UP, type TestUser, unwrap } from "./harness";
 
 const h = createHarness("ne");

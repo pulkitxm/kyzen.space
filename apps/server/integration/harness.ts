@@ -1,9 +1,9 @@
 import { expect } from "bun:test";
+import { db, friends, schema } from "@gamelobby/database";
 import { eq, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";
 import type { ErrorStatus, ServiceResult } from "../src/chat/result";
-import { db, friends, schema } from "../src/db";
 
 export let DB_UP = false;
 try {

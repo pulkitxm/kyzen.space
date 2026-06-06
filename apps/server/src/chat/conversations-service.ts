@@ -1,5 +1,6 @@
-import { CHAT_EVENTS, type ConversationJson } from "@gamelobby/chat-core";
-import { conversations, friends, profiles } from "../db";
+import { conversations, friends, profiles } from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { ConversationJson } from "@gamelobby/shared/types";
 import { getIO } from "../realtime/io";
 import { convRoom, emitToUser, userRoom } from "../realtime/rooms";
 import { assembleConversation } from "./assemble";

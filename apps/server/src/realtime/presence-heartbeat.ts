@@ -1,5 +1,5 @@
+import * as db from "@gamelobby/database";
 import type { Server as IOServer } from "socket.io";
-import * as db from "../db";
 import { env } from "../env";
 import { childLogger } from "../logger";
 import type { PresenceStore } from "./presence-store";

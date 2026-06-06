@@ -1,11 +1,11 @@
-import {
-  CHAT_EVENTS,
-  type MessageJson,
-  type MessageKind,
-  type MessageMetadata,
-  type SystemMeta,
-} from "@gamelobby/chat-core";
-import { conversations, messages } from "../db";
+import { conversations, messages } from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type {
+  MessageJson,
+  MessageKind,
+  MessageMetadata,
+  SystemMeta,
+} from "@gamelobby/shared/types";
 import { getIO } from "../realtime/io";
 import { emitToConv } from "../realtime/rooms";
 import { assembleMessage } from "./assemble";

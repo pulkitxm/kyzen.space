@@ -1,6 +1,6 @@
+import { notifications } from "@gamelobby/database";
 import { Hono } from "hono";
 import { assembleNotification } from "../../chat/assemble";
-import { notifications } from "../../db";
 import { type AuthEnv, requireAuth } from "../middleware/auth";
 
 export const notificationsRouter = new Hono<AuthEnv>()

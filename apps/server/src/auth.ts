@@ -1,6 +1,6 @@
+import { db, schema } from "@gamelobby/database";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db, schema } from "./db/client";
 import { env, googleConfigured } from "./env";
 import { childLogger } from "./logger";
 import { ensureUsernameForUser } from "./username";

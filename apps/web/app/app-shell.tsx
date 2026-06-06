@@ -5,7 +5,7 @@ import type {
   ConversationJson,
   FriendshipJson,
   NotificationJson,
-} from "@gamelobby/chat-core";
+} from "@gamelobby/shared/types";
 import { Provider } from "jotai";
 import { useCallback, useState } from "react";
 import { FaChevronRight } from "react-icons/fa6";

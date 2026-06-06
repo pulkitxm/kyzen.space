@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  DISPLAY_NAME_MAX_LENGTH,
+  USERNAME_PATTERN,
+} from "@gamelobby/shared/constants";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FaCheck, FaXmark } from "react-icons/fa6";
@@ -7,8 +11,6 @@ import { Button } from "@/components/ui/button";
 import { clientFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
-const DISPLAY_NAME_MAX_LENGTH = 50;
-const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
 const CHECK_DEBOUNCE_MS = 350;
 
 const REASON_TEXT: Record<string, string> = {

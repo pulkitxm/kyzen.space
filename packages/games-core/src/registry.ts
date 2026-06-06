@@ -1,7 +1,11 @@
-import { GAME_CATEGORIES, type GameCategoryDef } from "./categories";
-import type { GameDefinition, GameMeta } from "./definition";
-import type { GameEngine } from "./engine";
-import type { GameType } from "./game-types";
+import { GAME_CATEGORIES } from "@gamelobby/shared/constants";
+import type {
+  GameCategoryDef,
+  GameDefinition,
+  GameEngine,
+  GameMeta,
+  GameType,
+} from "@gamelobby/shared/types";
 import { GAMES } from "./games";
 
 const byType: Map<string, GameDefinition> = new Map(
