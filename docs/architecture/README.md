@@ -94,7 +94,8 @@ This is the index for `docs/architecture/`. Each per-subsystem doc is a sibling 
 | Doc | What it covers |
 | --- | --- |
 | [auth.md](./auth.md) | Better Auth (Google OAuth only) mounted at `/api/auth/*`, the `user`/`session`/`account`/`verification` tables, first-sign-in profile provisioning, and how RSC, browser fetch, and the Socket.IO handshake all re-derive the same session from one cookie. |
-| [database.md](./database.md) | The Drizzle/Postgres schema, the **generic** `game`/`move`/`game_player` tables (JSONB state, no per-game tables), the postgres-js client, and the repository pattern exposed as namespaces from `db/index.ts`. |
+| [database-schema.md](./database-schema.md) | The Drizzle/Postgres **schema**: the **generic** `game`/`move`/`game_player` tables (JSONB state, no per-game tables), the pgEnums-from-constants, the `$type` / `$inferSelect` modeling patterns, and migrations (generate vs. push). |
+| [database.md](./database.md) | The **data-access** layer over that schema: the postgres-js client singleton, the repository pattern exposed as namespaces from `db/index.ts`, the `GameRecord` seat join, keyset pagination, and the persist-a-move data flow. |
 | [games-core-schemas.md](./games-core-schemas.md) | The contract layer of `@gamelobby/games-core`: `GameDefinition<S,I,C>`, the `GameEngine` types, the shared wire/socket Zod schemas, and the `.strict()` + `z.infer` discipline. |
 | [games-core-engine.md](./games-core-engine.md) | The logic/registry layer: the `GameEngine` contract, tic-tac-toe's pure `reduce()`, the single `GAMES` array, the derived registry, and the conformance invariants every game must satisfy. |
 | [games-client.md](./games-client.md) | `@gamelobby/games-client`: the web-only React board package, lazy resolution by game type via `getGameClient`, the `GameClientProps` SSR contract, and how a board rides the app's shared socket. |

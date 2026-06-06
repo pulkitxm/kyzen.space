@@ -286,7 +286,7 @@ At no point does either side re-declare the message shape — `MessageJson` and 
 - **[Architecture overview](./README.md)** — the system shape and the shared-logic insight that this package embodies on the chat side.
 - **[Realtime / Socket.IO lanes](./realtime.md)** — how the chat lane and game lane share one connection, how `CHAT_EVENTS` handlers are attached per-connection, and rooms/broadcast helpers.
 - **[Server API & services](./server-api.md)** — the `chat/` service layer (`assemble.ts`, `messages-service.ts`, `games-in-chat-service.ts`) and `api/serialize.ts` that turn rows into the DTOs defined here.
-- **[Database](./database.md)** — the Drizzle `message` / `conversation` / `notification` / `friendship` tables whose columns are typed by chat-core unions and JSONB shapes.
+- **[Database schema](./database-schema.md)** — the Drizzle `message` / `conversation` / `notification` / `friendship` tables whose columns are typed by chat-core unions and JSONB shapes.
 - **[games-core: schemas](./games-core-schemas.md)** — the game-side mirror of this package: the strict Zod schemas (including `configSchema`) that validate the `config` a game card carries.
 - **[games-core: engine](./games-core-engine.md)** — `createInitialState` / `reduce`, called when a game card spawns a real game.
 - **[games-client](./games-client.md)** — the React board UIs that a card's "Open"/"Join" link routes to.

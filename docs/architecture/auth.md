@@ -286,7 +286,7 @@ The Account settings tab (`apps/web/app/settings/account/page.tsx:27`) is an RSC
 ## Where to go next
 
 - [Architecture overview](./README.md) — the monorepo map and the "shared logic imported by both sides" insight.
-- [Database](./database.md) — the Drizzle schema in full, including the `user_profile` and game tables the auth tables sit beside.
+- [Database schema](./database-schema.md) — the Drizzle schema in full, including the `user_profile` and game tables the auth tables sit beside.
 - [Realtime](./realtime.md) — what happens after the socket is authenticated: chat lane vs. game lane, drivers, and authorization per event.
 - [Server API](./server-api.md) — the Hono router-per-feature layout that mounts `/api/auth/*` and reads identity via the `requireAuth` middleware.
 - [Web](./web.md) — the Next.js App Router side, the `serverFetch`/`clientFetch` split, and the socket provider.

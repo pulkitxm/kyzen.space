@@ -377,6 +377,6 @@ The focused `tests/tic-tac-toe.test.ts` complements this with game-specific beha
 - [./games-core-schemas.md](./games-core-schemas.md) — the strict Zod schema layer (`stateSchema` / `moveSchema` / `configSchema`) and wire DTOs that this engine layer is paired with
 - [./games-client.md](./games-client.md) — the React UI side that consumes `getDefinition()` / `getGameClient()` and renders the board. A board receives the app's shared Socket.IO connection (the `GameClientProps` contract now carries `socket` + `connected`) and emits `join_room` / `make_move` / `leave_room` over it
 - [./realtime.md](./realtime.md) — the Socket.IO game lane and the turn-based driver (`apps/server/src/realtime/turn-based.ts`) that calls the engine authoritatively
-- [./database.md](./database.md) — the generic `game` / `move` / `game_player` tables and JSONB game state the driver persists
+- [./database-schema.md](./database-schema.md) — the generic `game` / `move` / `game_player` tables and the JSONB `game_state` column the engine's state is persisted to
 - [./server-api.md](./server-api.md) — the Hono API layer, including `GET /api/games/:gameId`
 - [./web.md](./web.md) — the Next.js lobby and play routes driven by `listGameMeta()` / `getDefinition()`

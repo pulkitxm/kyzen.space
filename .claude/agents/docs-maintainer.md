@@ -27,7 +27,7 @@ docs** for an undocumented subsystem. Both follow the rules below.
 
 | Area | Files |
 | --- | --- |
-| Architecture guide | `docs/architecture/README.md` (index + overview) and one page per subsystem: `auth.md`, `database.md`, `games-core-schemas.md`, `games-core-engine.md`, `games-client.md`, `chat-core.md`, `realtime.md`, `server-api.md`, `web.md`, `testing.md` |
+| Architecture guide | `docs/architecture/README.md` (index + overview) and one page per subsystem: `auth.md`, `database-schema.md`, `database.md`, `games-core-schemas.md`, `games-core-engine.md`, `games-client.md`, `chat-core.md`, `realtime.md`, `server-api.md`, `web.md`, `testing.md` |
 | Game-authoring guide | `docs/adding-a-game.md` |
 | Per-game docs | `docs/games/README.md` + `docs/games/<type>.md` (one per registered game; enforced by `packages/games-core/tests/game-docs.test.ts`) |
 | Project README | `README.md` (root) |

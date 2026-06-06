@@ -293,4 +293,4 @@ A parallel flow exists for game creation: the chat service validates the **confi
 - [./realtime.md](./realtime.md) — the Socket.IO lanes, drivers, and the `join_room` / `make_move` handlers that perform the two-stage validation described above.
 - [./server-api.md](./server-api.md) — the Hono REST surface, including `GET /api/games/:gameId` and `serializeGame`/`serializeMove`.
 - [./chat-core.md](./chat-core.md) — the parallel chat/social contract package and the `gameCardMetaSchema` / create-game-in-conversation flow.
-- [./database.md](./database.md) — the generic `game` / `move` / `game_player` tables whose JSONB columns these per-game schemas validate.
+- [./database-schema.md](./database-schema.md) — the generic `game` / `move` / `game_player` tables whose JSONB columns these per-game schemas validate.

@@ -355,7 +355,7 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 - [Architecture overview / index](./README.md) — start here for the whole-system map.
 - [Authentication (Better Auth, sessions, OAuth)](./auth.md) — what `getAuth()`/`getSession` actually do and how the socket handshake reuses the cookie.
 - [Realtime (Socket.IO lanes, drivers, rooms)](./realtime.md) — the other half of this process: the chat lane and the game `join_room`/`make_move` driver lane.
-- [Database (Drizzle schema + repositories)](./database.md) — the repository layer these services call, including the generic `game`/`move`/`game_player` tables.
+- [Database (repositories + data access)](./database.md) — the repository layer these services call over the generic `game`/`move`/`game_player` tables.
 - [chat-core (DTOs + socket contract)](./chat-core.md) — the shared `MessageJson`/`ConversationJson`/`CHAT_EVENTS` shapes the serializers and services target.
 - [games-core schemas](./games-core-schemas.md) — the `GameJson`/`MoveJson` + `configSchema` that `serialize.ts` and `createGameInConversation` rely on.
 - [games-core engine](./games-core-engine.md) — `GameEngine`, `createInitialState`, and `reduce`, the authoritative logic shared with the client.

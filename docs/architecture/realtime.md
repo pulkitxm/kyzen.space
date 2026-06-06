@@ -449,7 +449,7 @@ export function attachRedisAdapter(io: IOServer): void {
 
 - [Architecture overview](./README.md) — the monorepo map and how these pieces fit together.
 - [Auth](./auth.md) — Better Auth, sessions, and the cookie the socket handshake reads.
-- [Database](./database.md) — the generic `game` / `move` / `game_player` schema and the repositories the driver calls (`games.*`, `profiles.*`).
+- [Database](./database.md) — the repositories the driver calls (`games.*`, `profiles.*`) over the generic `game` / `move` / `game_player` tables.
 - [games-core schemas](./games-core-schemas.md) — `clientJoinRoomSchema`, `clientMakeMoveSchema`, `moveSchema`/`stateSchema`, and the `ServerGameStatePayload` wire types.
 - [games-core engine](./games-core-engine.md) — the `GameEngine` interface, `reduce`, `Outcome`, roles, and seat counts the driver depends on.
 - [games-client](./games-client.md) — the React boards that take the shared socket as a prop and emit `join_room`/`make_move`/`leave_room`, rendering from `game_state`.
