@@ -200,12 +200,12 @@ socket.on("make_move", (payload: unknown, cb?: (err?: string) => void) => {
     const data = parsed.data;
     const start = performance.now();
     try {
-      const gameRow = await games.getGameById(data.gameId);
+      const gameRow = await games.getGameByCode(data.gameId);
       const driver = getDriver(gameRow?.gameType ?? "");
       await driver.makeMove(io, socket, data);
 ```
 
-`apps/server/src/realtime/index.ts:98` (the `join_room` listener immediately above it at `index.ts:65` follows the identical shape). The envelope schemas are strict and tiny — `clientMakeMoveSchema` is `{ gameId: uuid, moveData: unknown }.strict()` (`packages/shared/src/types/games/wire.ts`); the *contents* of `moveData` are validated later by the game-specific `moveSchema` inside the driver, because the envelope layer cannot know what shape a Reversi vs. a Tic-Tac-Toe move takes. `clientJoinRoomSchema` adds an optional `intent: "play" | "spectate"`. Both envelopes key off `gameId` (a uuid), not a `gameType`; the registry-typed `gameTypeSchema` (from `@gamelobby/shared/types`) that now validates `gameType` in the parse layer guards the game-card DTOs and game creation, while the driver resolves the type from the stored `gameRow.gameType` (`index.ts:111`).
+`apps/server/src/realtime/index.ts:98` (the `join_room` listener immediately above it at `index.ts:65` follows the identical shape). The envelope schemas are strict and tiny — `clientMakeMoveSchema` is `{ gameId: gameCodeSchema, moveData: unknown }.strict()` (`packages/shared/src/types/games/wire.ts`); the *contents* of `moveData` are validated later by the game-specific `moveSchema` inside the driver, because the envelope layer cannot know what shape a Reversi vs. a Tic-Tac-Toe move takes. `clientJoinRoomSchema` adds an optional `intent: "play" | "spectate"`. Both envelopes key off `gameId` — now the game's **public code** (validated and normalized by `gameCodeSchema`), not the internal UUID — not a `gameType`; the registry-typed `gameTypeSchema` (from `@gamelobby/shared/types`) that now validates `gameType` in the parse layer guards the game-card DTOs and game creation, while the driver resolves both the game (via `games.getGameByCode`, `index.ts:110`) and its type from the stored `gameRow.gameType` (`index.ts:111`).
 
 `join_room` and `make_move` report failures *twice*: through the ack callback (`cb?.(msg)`) for the specific caller, and as a `"game_error"` emit. They also wrap the body in `try/catch` and log a `durationMs` on success — the game lane's own version of the safety/observability that `register` gives the chat lane. (`leave_room` only acks; it has nothing to fail at beyond payload validation.)
 
@@ -240,9 +240,9 @@ export async function handleJoinRoom(
   payload: ClientJoinRoom,
 ): Promise<void> {
   const userId = socket.data.userId;
-  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
+  if (!isGameCode(payload.gameId)) return err(socket, "Invalid game id");
 
-  const gameRow = await games.getGameById(payload.gameId);
+  const gameRow = await games.getGameByCode(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
 
   const { game, changed } = await ensureSeated(
@@ -251,13 +251,13 @@ export async function handleJoinRoom(
     payload.intent ?? "play",
   );
 
-  joinGameRoom(socket, payload.gameId);
+  joinGameRoom(socket, game.code);
   await emitFullState(io, game);
   if (changed) await broadcastGameCard(io, game.id);
 }
 ```
 
-`apps/server/src/realtime/turn-based.ts:103`. The UUID guard is `isUuid` from `../lib/uuid` (`apps/server/src/lib/uuid.ts:4`), a shared helper wrapping the same `UUID_RE` regex. Joining a room is also the only way a player takes a seat. `ensureSeated` (`turn-based.ts:33`) decides whether this user becomes a player. The seating gate is worth reading in full:
+`apps/server/src/realtime/turn-based.ts:103`. The id guard is `isGameCode` from `@gamelobby/shared/types` (`packages/shared/src/types/games/code.ts:20`), which normalizes then regex-checks the 6-char public room code; the game is then loaded by that code with `games.getGameByCode` (`turn-based.ts:111`), and the socket joins the `game:<code>` room (`joinGameRoom(socket, game.code)`, `turn-based.ts:120`). Joining a room is also the only way a player takes a seat. `ensureSeated` (`turn-based.ts:33`) decides whether this user becomes a player. The seating gate is worth reading in full:
 
 ```ts
 const { engine } = getDefinition(gameRow.gameType);
@@ -275,16 +275,16 @@ if (intent === "spectate" || !seatFree || challengeReserved) {
 
 `apps/server/src/realtime/turn-based.ts:43`. A user is seated only if: they are not already a player, the game is still `waiting` with room under `engine.maxPlayers`, they did not ask to merely `spectate`, and — for a `challenge` game — they are the challenged user. The seat's role comes straight from the engine: `engine.roles[players.length]` (`turn-based.ts:58`, with a `biome-ignore` at `turn-based.ts:57` justifying the non-null assertion). When the new seat count reaches `engine.minPlayers` the game flips to `active` and gets a `startedAt`, and the initial state is lazily created from the engine if absent (`turn-based.ts:61`). The seat is persisted via `games.seatPlayer` into its own indexed `game_player` row (`turn-based.ts:63`).
 
-Whether or not seating changed, the socket joins `game:<gameId>` and receives the full state. `emitFullState` always sends *everything* — the serialized game plus the full move list — so a late joiner or reconnecting client gets a complete, authoritative snapshot rather than a diff:
+Whether or not seating changed, the socket joins `game:<code>` (keyed by `game.code`, the public room code) and receives the full state. `emitFullState` always sends *everything* — the serialized game plus the full move list — so a late joiner or reconnecting client gets a complete, authoritative snapshot rather than a diff:
 
 ```ts
 async function emitFullState(io: IOServer, gameRow: GameRecord) {
   const moves = await games.listMoves(gameRow.id);
   const payload: ServerGameStatePayload = {
     game: serializeGame(gameRow),
-    moves: moves.map(serializeMove),
+    moves: moves.map((m) => serializeMove(m, gameRow.code)),
   };
-  emitToGame(io, gameRow.id, "game_state", payload);
+  emitToGame(io, gameRow.code, "game_state", payload);
 }
 ```
 
@@ -301,9 +301,9 @@ export async function handleMakeMove(
   payload: ClientMakeMove,
 ): Promise<void> {
   const userId = socket.data.userId;
-  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
+  if (!isGameCode(payload.gameId)) return err(socket, "Invalid game id");
 
-  const gameRow = await games.getGameById(payload.gameId);
+  const gameRow = await games.getGameByCode(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
   if (gameRow.status !== "active") return err(socket, "Game is not active");
 
@@ -348,14 +348,14 @@ Only after all five guards pass do we touch the database:
   let updated = await games.updateGame(gameRow.id, { gameState: result.state });
   updated = await finalize(updated, result.outcome);
 
-  emitToGame(io, gameRow.id, "move_made", {
-    move: serializeMove(moveRow),
+  emitToGame(io, gameRow.code, "move_made", {
+    move: serializeMove(moveRow, gameRow.code),
     gameState: updated.gameState,
   });
   await emitFullState(io, updated);
 
   if (updated.status === "completed") {
-    emitToGame(io, gameRow.id, "game_over", { winner: updated.winner });
+    emitToGame(io, gameRow.code, "game_over", { winner: updated.winner });
     await broadcastGameCard(io, updated.id);
   }
 }
@@ -365,7 +365,7 @@ Only after all five guards pass do we touch the database:
 
 Then come the broadcasts — and note there are **two audiences**:
 
-- `move_made` and a full `game_state` go to the **game room** `game:<gameId>` (everyone watching/playing the board).
+- `move_made` and a full `game_state` go to the **game room** `game:<code>` (everyone watching/playing the board) — the room is keyed by the game's public code, not the UUID.
 - On completion, `game_over` also goes to the game room, and `broadcastGameCard` pushes a `message_updated` event to the **originating conversation room** `conv:<conversationId>` (`apps/server/src/chat/game-card-broadcast.ts:7`), so the game card embedded in the chat updates to "completed" for people who never opened the board.
 
 This dual broadcast is the bridge between the two lanes: a *game-lane* action (`make_move`) produces a *chat-lane* effect (a `message_updated` over `CHAT_EVENTS.messageUpdated`). The serialized payloads correspond to `ServerMoveMadePayload` and `ServerGameOverPayload` in `@gamelobby/shared/types` (`packages/shared/src/types/games/wire.ts`).
@@ -377,7 +377,7 @@ Player clicks a cell in the React board (apps/web, @gamelobby/games-client)
   -> client emits "make_move" { gameId, moveData } over the socket
   -> apps/server/src/realtime/index.ts:98  socket.on("make_move")
        clientMakeMoveSchema.safeParse(payload)            (envelope Zod, games-core)
-  -> index.ts:110  games.getGameById(gameId) -> getDriver(gameType)  (drivers.ts:25)
+  -> index.ts:110  games.getGameByCode(gameId) -> getDriver(gameType)  (drivers.ts:25)
   -> driver.makeMove == turn-based.ts:125  handleMakeMove
        userId = socket.data.userId                         (trusted identity, NOT payload)
        guards: game active? caller is a seated player? engine has reduce?
@@ -390,11 +390,11 @@ Player clicks a cell in the React board (apps/web, @gamelobby/games-client)
   -> finalize(updated, result.outcome)                     (turn-based.ts:164)
        outcome.status === "completed" => updateGame(status/winner) + profiles.bumpStats x N
   -> BROADCAST A (game room):
-       emitToGame "move_made" + emitFullState "game_state"  -> room game:<gameId>  (rooms.ts:15)
-       emitToGame "game_over" { winner }                    -> room game:<gameId>
+       emitToGame "move_made" + emitFullState "game_state"  -> room game:<code>  (rooms.ts:15)
+       emitToGame "game_over" { winner }                    -> room game:<code>
   -> BROADCAST B (chat room):
        broadcastGameCard -> emitToConv "message_updated"    -> room conv:<convId>  (game-card-broadcast.ts:14)
-  -> every board in game:<gameId> re-renders from the authoritative game_state;
+  -> every board in game:<code> re-renders from the authoritative game_state;
      every chat window in conv:<convId> updates the game card to "completed".
 ```
 
@@ -404,7 +404,7 @@ Contrast with how a game even comes to exist: that is a **chat-lane** action. `C
 
 All multicast goes through named rooms, and the naming is centralized in `apps/server/src/realtime/rooms.ts`:
 
-- `game:<gameId>` — `gameRoom` (`rooms.ts:3`), joined in `joinGameRoom` (`rooms.ts:7`), left in `leaveGameRoom` (`rooms.ts:11`), targeted by `emitToGame` (`rooms.ts:15`). Board state lives here.
+- `game:<code>` — `gameRoom` (`rooms.ts:3`), joined in `joinGameRoom` (`rooms.ts:7`), left in `leaveGameRoom` (`rooms.ts:11`), targeted by `emitToGame` (`rooms.ts:15`). Board state lives here. **The room is keyed by the game's public code, not the internal UUID** — the driver joins `game.code` and emits with `emitToGame(io, gameRow.code, …)` (`turn-based.ts:120`, `:166`). (`conv:<conversationId>` and `user:<userId>` below stay UUID-keyed.)
 - `conv:<conversationId>` — `convRoom` (`rooms.ts:24`), `joinConvRoom`/`leaveConvRoom` (`rooms.ts:32`), `emitToConv` (`rooms.ts:40`). Chat messages, typing, and game-card updates live here.
 - `user:<userId>` — `userRoom` (`rooms.ts:28`), `emitToUser` (`rooms.ts:49`). Per-user fan-out: notifications, presence, friend events. A user can have several sockets all in this one room (multiple tabs), which is exactly why presence reference-counts.
 
@@ -437,6 +437,7 @@ export function attachRedisAdapter(io: IOServer): void {
 - **Identity comes from `socket.data.userId`, never from a payload.** Set once in the `io.use` middleware (`index.ts:46`). Any handler that reads a `userId` off the wire would be a security bug.
 - **Two error/result conventions, one per lane.** Chat lane: ack callbacks shaped `{ ok, ... }` via `ack`/`ackErr`, wrapped by `register` (`socket-util.ts:36`). Game lane: a `"game_error"` emit *and* a string ack `cb?.(msg)` (`index.ts:92`). Follow the lane you are in.
 - **Validate at both layers in the game lane.** The envelope schema (`clientMakeMoveSchema`) only guarantees `{ gameId, moveData: unknown }`. The real move shape is the game's `moveSchema`, checked inside the driver. Skipping either is a hole.
+- **The game lane keys on the public code, not the UUID.** The wire `gameId` is the game's short room **code** (validated by `gameCodeSchema`/`isGameCode`); the driver resolves it via `games.getGameByCode(...)` (`turn-based.ts:111`/`:133`, `index.ts:77`/`:110`) and joins/emits the `game:<code>` room. The internal UUID `game.id` is still used for DB writes and FK joins (`games.listMoves`, `games.addMove`, `games.updateGame` all take `gameRow.id`) but never appears on the wire. Conversation and user rooms remain UUID-keyed.
 - **`emitFullState` sends the entire game + move list every time.** It is intentionally not a diff, so reconnects and late joiners are correct for free. Don't replace it with incremental patches without a resync story.
 - **Seating happens on `join_room`, not on a separate "sit" event.** `intent: "spectate"`, a full table, or a reserved `challenge` seat all silently result in `changed: false` (`turn-based.ts:51`) — you watch instead of erroring.
 - **Presence is Redis-backed; typing is still an in-process map.** Presence reads/writes go through a `PresenceStore` (`presence-store.ts`): a Redis sorted set per user (`presence:<userId>`, scored by heartbeat time) when `REDIS_URL` is set, or an in-process map for single-node dev. A per-node timer refreshes the live entries every `PRESENCE_HEARTBEAT_MS`, so a crashed node's users age out of reads within `PRESENCE_STALE_MS`. Durable last-seen lives in `user_profile.last_seen_at`, written on graceful disconnect and on a slower `PRESENCE_LASTSEEN_PERSIST_MS` timer while online. The live "went offline" push on a hard crash is not yet implemented (online reads still self-correct within the stale window). Typing (`typing.ts:8`) is still a per-node in-process map — treat it as best-effort, single-node-accurate.

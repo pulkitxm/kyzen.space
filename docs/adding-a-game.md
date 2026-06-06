@@ -180,7 +180,8 @@ type, `listGameTypes(): GameType[]` returns the narrowed list.
    `configFields`, and a link to `packages/games-core/src/games/<type>/`.
    Every new game ships this doc.
 6. **Verify** — `bun run type-check`, `bun test` (games-core incl. conformance),
-   `bun run check`. Then `bun run dev` and play a full game two-up on `/play/:id`.
+   `bun run check`. Then `bun run dev` and play a full game two-up on `/play/:code`
+   (the play route's id segment is the game's short public room code, not the UUID).
    See `docs/architecture/testing.md` for the suites the new game must keep green
    (registry parity, game-docs, conformance).
 
@@ -190,13 +191,15 @@ These already work for every game — do not duplicate them:
 
 - **Lobby** — `apps/web/app/games/[gameType]/page.tsx` + `app/games/_shared/game-lobby.tsx`
   render the catalog-driven lobby and the `configFields` form. The URL stays
-  `/games/<type>`; the legacy `/games/<type>/<id>` redirects to `/play/<id>`.
+  `/games/<type>`; the legacy `/games/<type>/<id>` redirects to `/play/<code>`
+  (the game's short public room code, which is `GameJson.id`).
 - **"Play with…" flow** — `app/games/components/conversation-picker.tsx` and
   `app/chat/[handle]/game-launcher.tsx` (both take a `gameType` + optional
   `config`) create a game in a conversation via the `game:create_in_conversation`
   socket event.
-- **Play view** — `app/play/[gameId]/page.tsx` loads the game and renders the
-  registered client via `getGameClient(type)` inside `<Suspense>`, with
+- **Play view** — `app/play/[gameId]/page.tsx` (the `[gameId]` segment is the
+  game's public room code) loads the game by code and renders the registered
+  client via `getGameClient(type)` inside `<Suspense>`, with
   `getGameSkeleton(type)` as the fallback. The route-level `loading.tsx` reads the
   `gl_chat_layout` cookie to render the matching chat shell (docked / popout /
   closed) while the game data is still being fetched, but its board area stays a

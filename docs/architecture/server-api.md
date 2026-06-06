@@ -159,7 +159,7 @@ Routers whose every route needs a session apply it once at the top — `new Hono
 
 Two surfaces deliberately keep their own `getSession` calls instead of `requireAuth`: Better Auth owns `/api/auth/*` end-to-end, and `account` (`apps/server/src/api/routes/account.ts`) is session-management itself — it reads the `session` token, calls `listSessions`/`revokeSession`, and signs out, so the session object is its domain payload, not just a gate.
 
-`readJson(c)` (`apps/server/src/api/auth-context.ts`) is the body helper: it `try/catch`-parses the JSON body and returns `null` on failure or a non-object, so routes write `const body = await readJson(c)` and then defensively pull fields. `isUuid(value)` (`apps/server/src/lib/uuid.ts`) is the shared UUID guard used by the conversation/game routes and the realtime game lane.
+`readJson(c)` (`apps/server/src/api/auth-context.ts`) is the body helper: it `try/catch`-parses the JSON body and returns `null` on failure or a non-object, so routes write `const body = await readJson(c)` and then defensively pull fields. `isUuid(value)` (`apps/server/src/lib/uuid.ts`) is the shared UUID guard used by the conversation routes; the **game** route and the realtime game lane instead validate the public room **code** with `isGameCode` (`@gamelobby/shared/types`).
 
 ## Row -> DTO serialization (`serialize.ts`)
 
@@ -168,7 +168,7 @@ Two surfaces deliberately keep their own `getSession` calls instead of `requireA
 ```ts
 export function serializeGame(row: GameRecord): GameJson {
   return {
-    id: row.id,
+    id: row.code,
     gameType: row.gameType,
     status: row.status,
     winner: row.winner,
@@ -188,6 +188,7 @@ export function serializeGame(row: GameRecord): GameJson {
 
 Two conventions worth internalizing:
 
+- **`GameJson.id` is the public room `code`, not the UUID.** `serializeGame` sets `id: row.code` (`apps/server/src/api/serialize.ts:28`), so the internal `game.id` UUID is never serialized — clients only ever see the short shareable code (and `serializeMove(row, gameCode)` likewise sets `gameId: gameCode`, `serialize.ts:47`). The web builds `/play/<code>` from it and sends it back as the socket `gameId`.
 - **`Date -> ISO string` happens exactly here**, via the `iso()` helper (`apps/server/src/api/serialize.ts:22`), which returns `null` for nullish dates. DTOs are JSON-safe by construction, so nothing downstream needs to know about `Date` objects.
 - **The DTO types are imported from `@gamelobby/shared/types`** — `GameJson`/`MoveJson` and `ConversationJson`/`MessageJson`/etc. all live there now, while the DB **row** types (`GameRecord`, `MessageRow`, …) come from `@gamelobby/database` (`apps/server/src/api/serialize.ts:1`). This is the same insight that powers move validation: the wire shapes live in `packages/`, so the web client and the server agree on them by construction. The serializer's job is just to project a DB row onto that shared shape.
 
@@ -248,14 +249,14 @@ The most subtle assembler is `withGameCardStatus` (`apps/server/src/chat/assembl
 
 ```ts
 export const gamesRouter = new Hono<LoggerEnv>().get("/:gameId", async (c) => {
-  const id = c.req.param("gameId");
-  if (!isUuid(id)) return c.json({ error: "Not found" }, 404);
-  const found = await games.getGameById(id);
+  const code = c.req.param("gameId");
+  if (!isGameCode(code)) return c.json({ error: "Not found" }, 404);
+  const found = await games.getGameByCode(code);
   if (!found) return c.json({ error: "Not found" }, 404);
-  const moves = await games.listMoves(id);
+  const moves = await games.listMoves(found.id);
   return c.json({
     game: serializeGame(found),
-    moves: moves.map(serializeMove),
+    moves: moves.map((m) => serializeMove(m, found.code)),
   });
 });
 ```
@@ -264,7 +265,7 @@ There is **no** `POST /api/games`, no `PATCH`, no move endpoint. The reason is t
 
 - **Creation** goes through `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:19`). That service is reachable two ways — `POST /api/conversations/:id/games` (`apps/server/src/api/routes/conversations.ts:120`) for the "create a game in this chat" REST action, and the `CHAT_EVENTS.createGameInConversation` socket event (`apps/server/src/realtime/games-in-chat.ts:8`). Both transports first narrow the client-supplied `gameType` to a registered game: the REST route does `gameTypeSchema.safeParse(body?.gameType)` (`apps/server/src/api/routes/conversations.ts:125`, the registry-backed `z.enum` exported from `@gamelobby/shared/types`) and returns `400 Unsupported game type` on a miss, so the service's `gameType` parameter is a typed `GameType`, not a free-form string. Either way it then validates the config with the game's own Zod schema, seeds the initial state from the engine, persists, and posts a game-card message. It is *not* a generic game-resource POST; it's a chat action that happens to spawn a game.
 - **Playing** (making moves) happens exclusively over the socket `make_move` event (`apps/server/src/realtime/index.ts:98`), routed through a driver that re-validates the move and stored state against the game's Zod schemas before applying `reduce`. A move is inherently a low-latency, broadcast-to-the-room operation; modeling it as an idempotent HTTP resource would be the wrong shape and would also bypass the realtime fan-out every other player needs.
-- **Reading** is the one thing that genuinely benefits from a plain request/response: the web app's `/play/[gameId]` page does an SSR/RSC fetch of the current game + move history to render the board before the socket connects. That's exactly what this endpoint serves. It guards against non-UUID ids (cheap rejection of garbage) and returns `404` for unknown ids so it never leaks whether an id format is valid-but-missing vs. malformed.
+- **Reading** is the one thing that genuinely benefits from a plain request/response: the web app's `/play/[gameId]` page does an SSR/RSC fetch of the current game + move history to render the board before the socket connects. That's exactly what this endpoint serves. The `:gameId` path param is the game's public room **code**, so the route guards with `isGameCode` (cheap rejection of garbage) and resolves via `getGameByCode`, returning `404` for unknown codes so it never leaks whether an id format is valid-but-missing vs. malformed.
 
 In short: HTTP is for fetching durable, cacheable read state; the socket is for the live, authoritative, broadcast lifecycle. The same engine and schemas back both lanes, so neither lane trusts the client.
 
@@ -345,7 +346,7 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 - **`getIO()` can return `null`.** Services guard `if (io)` before emitting (`apps/server/src/chat/messages-service.ts:48`). This is deliberate so service functions are unit-testable without a running socket server; don't assume `io` is non-null.
 - **Games have no write REST endpoint.** Do not add `POST /api/games` or a move endpoint. Creation routes through `createGameInConversation` (REST `POST /api/conversations/:id/games` *or* the socket event); moves go through the socket `make_move` lane only.
 - **The same service is multi-transport.** `createGameInConversation` is called from both REST and socket; keep its contract a `ServiceResult` (not thrown errors) so both callers can handle failures uniformly.
-- **Manual UUID gating.** Routes call the shared `isUuid` guard (`apps/server/src/lib/uuid.ts`) to reject malformed ids with `404` *before* hitting the DB — e.g. `apps/server/src/api/routes/games.ts:9` and the many `if (!isUuid(id))` checks in `conversations.ts`. New id-taking routes should follow suit.
+- **Manual id gating.** Routes reject malformed ids with `404` *before* hitting the DB: conversation routes call the shared `isUuid` guard (`apps/server/src/lib/uuid.ts`) — the many `if (!isUuid(id))` checks in `conversations.ts` — while the game route guards the public room **code** with `isGameCode` (`apps/server/src/api/routes/games.ts:9`). New id-taking routes should follow suit with the matching guard.
 - **Logs redact secrets.** The pino config (`apps/server/src/logger.ts:8`) redacts cookies/auth headers/`*.token`/`*.secret`. Don't log raw request headers expecting to see the session — it's `[redacted]`.
 - **`game_card` status is computed at read time.** It's merged in by `withGameCardStatus`/`enrichGameCardMeta` during assembly, not stored on the message row. When a game ends, push the updated card with `broadcastGameCard` (`apps/server/src/chat/game-card-broadcast.ts:7`).
 - **GIF and profile-config validation are intentionally allow-list based.** Reject unknown themes/patterns/layouts with `400`; clamp GIF limits; never pass user strings straight to the provider or DB.

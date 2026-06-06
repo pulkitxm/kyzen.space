@@ -34,7 +34,7 @@ This is also why the chat contract no longer has its own package: the former `@g
 | `packages/shared/src/types/theme.ts` / `pattern.ts` / `chat-layout.ts` / `username.ts` | Per-area schemas + inferred types + small guards/helpers (`isValidTheme`, `validateChatModePref`, `normalizeUsername`, …). |
 | `packages/shared/src/types/avatar.ts` | Re-exports `AvatarConfig` (and friends) from `@gamelobby/avatar`. |
 | `packages/shared/src/types/chat/` | The former `chat-core`: `dto.ts` (DTOs), `schemas.ts` (`gameCardMetaSchema`, `clientCreateGameInConversationSchema`, …), `socket-events.ts` (client/server payload types + `Ack`). |
-| `packages/shared/src/types/games/` | `core.ts` (`gameTypeSchema` + `GameType`), `definition.ts` (`GameDefinition`/`GameMeta`/`ConfigField`), `engine.ts` (`GameEngine`/`Outcome`/`Seat`/`MoveContext`), `wire.ts` (`GameJson`/`MoveJson`/`gamePlayerSchema`/`clientJoinRoom`/`clientMakeMove`/`uuidSchema`), and per-game schemas under `games/<type>/`. |
+| `packages/shared/src/types/games/` | `core.ts` (`gameTypeSchema` + `GameType`), `code.ts` (`gameCodeSchema`/`generateGameCode`/`normalizeGameCode`/`isGameCode` — the public room code), `definition.ts` (`GameDefinition`/`GameMeta`/`ConfigField`), `engine.ts` (`GameEngine`/`Outcome`/`Seat`/`MoveContext`), `wire.ts` (`GameJson`/`MoveJson`/`gamePlayerSchema`/`clientJoinRoom`/`clientMakeMove`), and per-game schemas under `games/<type>/`. |
 | `packages/shared/src/types/db/` | The DB layer's currency: hand-written row + domain types (`index.ts`) and the repository-input Zod schemas (`io.ts`). |
 
 ## The two subpaths
@@ -80,9 +80,10 @@ One tuple, and the DB enum, the Zod validator, the TS union, and the default val
 The game contract that the engine (`@gamelobby/games-core`) and the boards (`@gamelobby/games-client`) build on is all here:
 
 - `core.ts:4` — `gameTypeSchema = z.enum(GAME_TYPES)` and `type GameType = z.infer<…>` (`:5`). The literal union derives from the `GAME_TYPES` constant (`constants/games.ts:3`), so `GameType` is the registry of valid game-type strings.
+- `code.ts` — the **public game room code**: `GAME_CODE_ALPHABET` (`:3`, Crockford base32 minus I/L/O/U) + `GAME_CODE_LENGTH` (`:4`, 6), `generateGameCode()` (`:8`, unbiased `crypto.getRandomValues`), `normalizeGameCode()` (`:16`, uppercases and maps I/L→1, O→0 so typed codes are forgiving), `isGameCode()` (`:20`), and `gameCodeSchema` (`:24`, normalizes then validates `^[0-9A-HJKMNP-TV-Z]{6}$`). The code is the game id clients see in URLs and socket payloads; the UUID `game.id` stays internal — see [`generic-game-schema.md`](./generic-game-schema.md).
 - `definition.ts:25` — `GameDefinition<S, I, C>` (`meta`, `engine`, `stateSchema`, `moveSchema`, `configSchema`, optional `configFields`), plus `GameMeta` (`:5`) and `ConfigField` (`:15`).
 - `engine.ts:15` — `GameEngine<State, Input>` (`createInitialState` + optional `reduce` / `step`), with `Outcome` (`:1`), `Seat` (`:5`), `ReduceResult` (`:7`), and `MoveContext` (`:13`).
-- `wire.ts` — the socket/wire DTOs and their schemas: `uuidSchema` (`:7`), `gamePlayerSchema` (`:20`), `clientJoinRoomSchema` (`:29`), `clientMakeMoveSchema` (`:37`), `gameJsonSchema`/`GameJson` (`:45`/`:61`), `moveJsonSchema`/`MoveJson` (`:63`/`:71`), and the server payload types.
+- `wire.ts` — the socket/wire DTOs and their schemas: `gamePlayerSchema` (`:16`), `clientJoinRoomSchema` (`:25`), `clientMakeMoveSchema` (`:33`), `gameJsonSchema`/`GameJson` (`:41`/`:57`), `moveJsonSchema`/`MoveJson` (`:59`/`:67`), and the server payload types. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`), not a UUID schema.
 - `games/<type>/schemas.ts` — one folder per registered game holds its strict Zod `stateSchema` / `moveSchema` / `configSchema` and the `z.infer` types (e.g. `games/tic-tac-toe/schemas.ts`).
 
 `@gamelobby/games-core` then imports these to assemble each `GameDefinition` and to derive its registry; it holds the engines and the `GAMES` array, but no schemas. See [`games-core-schemas.md`](./games-core-schemas.md) and [`games-core-engine.md`](./games-core-engine.md).

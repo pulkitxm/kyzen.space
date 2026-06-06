@@ -127,6 +127,7 @@ export type GameClientProps = {
 
 Notes that matter:
 
+- **`gameId: string`** — the game's public room **code** (e.g. `K7P2QX`), the value carried in the `/play/<code>` URL and serialized as `initialGame.id`. The board echoes it straight back as `gameId` in `join_room` / `make_move` / `leave_room`; the server validates it with `gameCodeSchema` and resolves the game with `getGameByCode`. The internal UUID never reaches the client.
 - **`socket: Socket | null` + `connected: boolean`** — the *single shared* Socket.IO connection, supplied by the host app from `useSocket()` (the `SocketProvider` in `apps/web`). Boards **must not open their own `io()` connection** — both the chat lane and the game lane ride this one socket (see [Realtime](./realtime.md)). `socket` is `null` until the provider connects; `connected` mirrors the live connection status for the board's status dot.
 - **`userId: string | null`** — boards must handle the signed-out viewer. Tic-tac-toe shows a "Sign in to join this table" banner instead of a connection dot.
 - **`initialGame.gameState?: unknown`** — the per-game state is deliberately untyped here. games-client is generic over all games; the *concrete* board narrows `unknown` to its own type (tic-tac-toe casts to its local `GameJson`/`TicState`). The authoritative shape lives in games-core's Zod `stateSchema`, not in this prop.
@@ -323,8 +324,8 @@ Crucially, `makeMove` does **not** mutate the board. There is no optimistic upda
 **Phase 1 — server-rendered first paint (REST):**
 
 1. User opens `/play/<gameId>` → `apps/web/app/play/[gameId]/page.tsx:20` runs as an RSC.
-2. It resolves the session via `getServerSession()` (redirects to `/auth` if signed out), then `serverFetchJson` → `GET /api/games/:gameId` returns `{ game, moves }` (`apps/web/app/play/[gameId]/page.tsx:31`).
-3. It renders `<PlayClient ... initialGame initialMoves gameType={data.game.gameType} />` (`apps/web/app/play/[gameId]/page.tsx:67`); `gameType` is the typed `GameType` carried on the fetched `GameJson` (`page.tsx:70`).
+2. It validates the `[gameId]` segment is a game **code** (`isGameCode`, then normalizes + redirects to the canonical code), resolves the session via `getServerSession()` (redirects to `/auth` if signed out), then `serverFetchJson` → `GET /api/games/:gameId` returns `{ game, moves }` (`apps/web/app/play/[gameId]/page.tsx:36`). The `:gameId` is the code, and `data.game.id` is that same code (`serializeGame` maps `row.code → GameJson.id`).
+3. It renders `<PlayClient ... initialGame initialMoves gameType={data.game.gameType} />` (`apps/web/app/play/[gameId]/page.tsx:72`); `gameType` is the typed `GameType` carried on the fetched `GameJson` (`page.tsx:75`).
 4. `play-client.tsx:39` calls `getGameClient(gameType)` (and `getGameSkeleton(gameType)`) → registry returns the `React.lazy` tic-tac-toe component.
 5. `<Suspense>` resolves the lazy chunk and mounts `TicTacToeGameClient` with the SSR `initial*` props plus the shared `socket`/`connected` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx`). The board paints immediately from `initialGame`/`initialMoves` — no join needed yet.
 

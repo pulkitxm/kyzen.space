@@ -1,10 +1,6 @@
 import { z } from "zod";
+import { gameCodeSchema } from "./code";
 import { gameTypeSchema } from "./core";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export const uuidSchema = z.string().regex(UUID_RE, "Invalid id");
 
 export const gameStatusSchema = z.enum([
   "waiting",
@@ -28,7 +24,7 @@ export type GamePlayerDto = z.infer<typeof gamePlayerSchema>;
 
 export const clientJoinRoomSchema = z
   .object({
-    gameId: uuidSchema,
+    gameId: gameCodeSchema,
     intent: z.enum(["play", "spectate"]).optional(),
   })
   .strict();
@@ -36,7 +32,7 @@ export type ClientJoinRoom = z.infer<typeof clientJoinRoomSchema>;
 
 export const clientMakeMoveSchema = z
   .object({
-    gameId: uuidSchema,
+    gameId: gameCodeSchema,
     moveData: z.unknown(),
   })
   .strict();

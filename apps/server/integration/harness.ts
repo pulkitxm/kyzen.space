@@ -1,6 +1,6 @@
 import { expect } from "bun:test";
 import { db, friends, schema } from "@gamelobby/database";
-import { eq, sql } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";
 import type { ErrorStatus, ServiceResult } from "../src/chat/result";
@@ -91,7 +91,7 @@ export function createHarness(prefix: string): Harness {
     for (const id of gameIds) {
       await db
         .delete(schema.game)
-        .where(eq(schema.game.id, id))
+        .where(or(eq(schema.game.id, id), eq(schema.game.code, id)))
         .catch(() => {});
     }
     for (const id of convIds) {

@@ -21,7 +21,8 @@ This doc covers the **schema/contract half** of games-core: the `GameDefinition`
 | `packages/shared/src/types/games/core.ts` | `GameType` union and `gameTypeSchema` (`z.enum(GAME_TYPES)`). All wire schemas that carry a `gameType` field validate against `gameTypeSchema`. Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/definition.ts` | `GameDefinition<S,I,C>`, `GameMeta` (`type: GameType`, not `string`), `ConfigField` — the self-describing manifest one game ships. Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>`, `Outcome`, `ReduceResult`, `StepResult`, `Seat`, `MoveContext` — the behavioral contract a `GameDefinition` references. Exported via `@gamelobby/shared/types`. |
-| `packages/shared/src/types/games/wire.ts` | Shared **wire/socket** Zod schemas: `uuidSchema`, `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, and the server→client `Server*Payload` types. Exported via `@gamelobby/shared/types`. |
+| `packages/shared/src/types/games/code.ts` | The **public game room code**: `GAME_CODE_ALPHABET`/`GAME_CODE_LENGTH`, `generateGameCode`, `normalizeGameCode`, `isGameCode`, and `gameCodeSchema` (normalizes then validates a 6-char Crockford-base32 code). The code is the public game id; the UUID `game.id` stays internal. Exported via `@gamelobby/shared/types`. |
+| `packages/shared/src/types/games/wire.ts` | Shared **wire/socket** Zod schemas: `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, and the server→client `Server*Payload` types. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`). Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/categories.ts` | `GameCategoryDef` type. |
 | `packages/shared/src/constants/categories.ts` | The static `GAME_CATEGORIES` list used to group games in the lobby. Exported via `@gamelobby/shared/constants`. |
 | `packages/shared/src/types/games/tic-tac-toe/schemas.ts` | Per-game `stateSchema` / `moveSchema` / `configSchema`, each `.strict()`, with TS types derived via `z.infer`. The slug constant lives in `constants/games.ts`, not here. Exported via `@gamelobby/shared/types`. |
@@ -141,7 +142,7 @@ These are validated the instant a payload arrives, *before* any game logic runs.
 ```ts
 export const clientJoinRoomSchema = z
   .object({
-    gameId: uuidSchema,
+    gameId: gameCodeSchema,
     intent: z.enum(["play", "spectate"]).optional(),
   })
   .strict();
@@ -149,7 +150,7 @@ export type ClientJoinRoom = z.infer<typeof clientJoinRoomSchema>;
 
 export const clientMakeMoveSchema = z
   .object({
-    gameId: uuidSchema,
+    gameId: gameCodeSchema,
     moveData: z.unknown(),
   })
   .strict();
@@ -161,7 +162,7 @@ export type ClientMakeMove = z.infer<typeof clientMakeMoveSchema>;
 Two things to internalize:
 
 1. **`moveData` is `z.unknown()` here, on purpose.** The *envelope* schema (`clientMakeMoveSchema`) only knows there's a `gameId` and some opaque payload. It cannot validate the move's shape, because the generic socket handler doesn't know which game it is yet. The actual move validation is a **second pass**, done by the *per-game* `moveSchema` (below), after the server has looked up the `gameType`. This two-stage validation — generic envelope first, game-specific payload second — is the central design pattern of the realtime lane.
-2. **`uuidSchema`** (`packages/shared/src/types/games/wire.ts`) is `z.string().regex(UUID_RE, "Invalid id")`. The same UUID regex is duplicated defensively on the server in `apps/server/src/lib/uuid.ts` (`isUuid`), which the driver calls as a belt-and-braces guard (`isUuid(payload.gameId)`, `apps/server/src/realtime/turn-based.ts:131`).
+2. **`gameCodeSchema`** (`packages/shared/src/types/games/code.ts:24`) is the **public game room code** schema: it `transform`s the id through `normalizeGameCode` (uppercases, maps I/L→1 and O→0) then `refine`s it against `^[0-9A-HJKMNP-TV-Z]{6}$`. The same check is duplicated defensively on the server in `code.ts`'s `isGameCode`, which the driver calls as a belt-and-braces guard (`isGameCode(payload.gameId)`, `apps/server/src/realtime/turn-based.ts:131`) before resolving the game by code with `games.getGameByCode(...)`. (The internal UUID `game.id` is never serialized or accepted over the wire.)
 
 ### Outbound (server → client) wire DTOs
 
@@ -189,7 +190,7 @@ export type GameJson = z.infer<typeof gameJsonSchema>;
 
 `gameType` is validated by `gameTypeSchema` (a `z.enum(GAME_TYPES)` from `@gamelobby/shared/types`) — an unknown game slug is rejected at the wire boundary, not silently passed through. The `GameType` union and `GAME_TYPES` tuple are the single source of truth (`@gamelobby/shared/constants` and `@gamelobby/shared/types`); adding a game to `GAME_TYPES` automatically widens the schema everywhere it is used. Again `gameState: z.unknown()` — the *outer* DTO is game-agnostic; the inner per-game state is validated separately by that game's `stateSchema`. `gameStatusSchema` is `z.enum(["waiting", "active", "completed", "abandoned"])`; `seatingModeSchema` is `z.enum(["open", "challenge"])`; and `gamePlayerSchema` is a `.strict()` object of `{ userId, username, role }`. All live in `packages/shared/src/types/games/wire.ts`.
 
-`GameJson` is the lingua franca of the system. The server *produces* it via `serializeGame` (`apps/server/src/api/serialize.ts:26`), which maps a Drizzle `GameRecord` row into this exact shape; the web app *consumes* it as the type of what `GET /api/games/:gameId` returns (`apps/web/app/play/[gameId]/page.tsx:31`). The same `z.infer`-derived type is the contract on both ends.
+`GameJson` is the lingua franca of the system. The server *produces* it via `serializeGame` (`apps/server/src/api/serialize.ts:26`), which maps a Drizzle `GameRecord` row into this exact shape — note `id` is set to `row.code`, the public room code, never the internal UUID (`apps/server/src/api/serialize.ts:28`), so `GameJson.id` *is* the code clients put in URLs and socket payloads. The web app *consumes* it as the type of what `GET /api/games/:gameId` returns (`apps/web/app/play/[gameId]/page.tsx:36`). The same `z.infer`-derived type is the contract on both ends.
 
 The server→client socket payload types are plain TS structural types (not Zod), since the server constructs them and the client only reads them (`packages/shared/src/types/games/wire.ts`):
 

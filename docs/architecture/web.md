@@ -33,7 +33,7 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/games/[gameType]/page.tsx` | The single dynamic game-lobby route; `hasEngine` gate + `getDefinition` drive `GameLobby`. |
 | `apps/web/app/games/_shared/game-lobby.tsx` | Renders `configFields` form + "Play with a friend" button → `ConversationPicker`. |
 | `apps/web/app/games/components/conversation-picker.tsx` | "Play with…" modal: picks a conversation/friend, emits `createGameInConversation`, routes to `/play/:id`. |
-| `apps/web/app/play/[gameId]/page.tsx` | SSR-fetches game + moves (+ conversation + messages), gates on auth/UUID, resolves the chat layout, renders `PlayClient`. |
+| `apps/web/app/play/[gameId]/page.tsx` | SSR-fetches game + moves (+ conversation + messages), gates on auth + game **code** (`isGameCode`, then normalizes and redirects to the canonical uppercase code), resolves the chat layout, renders `PlayClient`. |
 | `apps/web/app/play/[gameId]/play-client.tsx` | Resolves `getGameClient` / `getGameSkeleton`, renders the board in `<Suspense>` over the shared socket, optionally side-by-side with chat via `GameChatSplit`. |
 | `apps/web/app/play/[gameId]/loading.tsx` | Route `loading.tsx`: reads the chat-layout cookie and renders `<PlaySkeleton layout={…} />` during the SSR fetch. |
 | `apps/web/app/play/[gameId]/play-skeleton.tsx` | Layout-aware skeleton mirroring `GameChatSplit` (docked / popout / minimized). |
@@ -325,20 +325,20 @@ onClose();
 router.push(`/play/${res.game.id}`);
 ```
 
-See `apps/web/app/games/components/conversation-picker.tsx:41`. Games are created **over the socket**, never via a REST POST — the only game REST endpoint is the read at `GET /api/games/:gameId`.
+See `apps/web/app/games/components/conversation-picker.tsx:41`. Games are created **over the socket**, never via a REST POST — the only game REST endpoint is the read at `GET /api/games/:gameId`. Note `res.game.id` is the game's public room **code** — `serializeGame` sets `GameJson.id = row.code` — so `/play/<code>` is the canonical play URL and that same code is later sent as the socket `gameId`; the internal UUID never reaches the browser.
 
 ### The play route
 
-`app/play/[gameId]/page.tsx` is a Server Component that does the SSR fetch for a single game. It validates the `gameId` is a UUID (`notFound()` otherwise), requires a session (`redirect("/auth")`), then fetches game + moves, and — if the game is attached to a conversation — also fetches the conversation and its first page of messages so the chat can render side-by-side:
+`app/play/[gameId]/page.tsx` is a Server Component that does the SSR fetch for a single game. The `[gameId]` segment is the game's public room **code**: it validates it with `isGameCode` (`notFound()` otherwise), `normalizeGameCode`s it, and redirects to the canonical uppercase code if they differ (`apps/web/app/play/[gameId]/page.tsx:29`–`:31`). It then requires a session (`redirect("/auth")`), fetches game + moves by that code, and — if the game is attached to a conversation — also fetches the conversation and its first page of messages so the chat can render side-by-side:
 
 ```tsx
 const data = await serverFetchJson<{ game: GameJson; moves: MoveJson[] }>(
-  `/api/games/${gameId}`,
+  `/api/games/${code}`,
 );
 if (!data) notFound();
 ```
 
-See `apps/web/app/play/[gameId]/page.tsx:31`. It also resolves the **chat layout**: it reads the `CHAT_LAYOUT_COOKIE` and, when the cookie is missing/untrusted, falls back to the profile's saved `chatLayout` — passing `initialLayout` + `layoutTrusted` down so `GameChatSplit` can render docked/popout without a flash (`apps/web/app/play/[gameId]/page.tsx:54`). All of that becomes props on `PlayClient`.
+See `apps/web/app/play/[gameId]/page.tsx:36`. It also resolves the **chat layout**: it reads the `CHAT_LAYOUT_COOKIE` and, when the cookie is missing/untrusted, falls back to the profile's saved `chatLayout` — passing `initialLayout` + `layoutTrusted` down so `GameChatSplit` can render docked/popout without a flash (`apps/web/app/play/[gameId]/page.tsx:59`). All of that becomes props on `PlayClient`.
 
 `PlayClient` (`apps/web/app/play/[gameId]/play-client.tsx`) is where the data-driven rendering happens. It resolves the board component **by string** and renders it inside `<Suspense>` (because `getGameClient` returns a `React.lazy` component):
 

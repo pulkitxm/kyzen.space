@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
+const CODE = "K7P2QX";
 
 type Player = { userId: string; username: string; role: string };
 type GameRec = {
   id: string;
+  code: string;
   gameType: string;
   status: string;
   winner: string | null;
@@ -30,6 +32,7 @@ const bumpCalls: { userId: string; outcome: string }[] = [];
 
 const games = {
   getGameById: async () => current,
+  getGameByCode: async () => current,
   listMoves: async () => moves,
   nextMoveNumber: async () => moves.length + 1,
   // biome-ignore lint/suspicious/noExplicitAny: test stub
@@ -98,6 +101,7 @@ function fakeSocket(userId: string) {
 function freshGame(over: Partial<GameRec> = {}): GameRec {
   return {
     id: UUID,
+    code: CODE,
     gameType: TIC_TAC_TOE,
     status: "waiting",
     winner: null,
@@ -131,7 +135,7 @@ describe("handleJoinRoom — seating", () => {
   test("seats a second player and activates the game", async () => {
     const { io, emits } = fakeIo();
     const { socket } = fakeSocket("u2");
-    await call(handleJoinRoom, io, socket, { gameId: UUID });
+    await call(handleJoinRoom, io, socket, { gameId: CODE });
 
     expect(seatCalls).toHaveLength(1);
     expect(seatCalls[0]).toMatchObject({
@@ -146,7 +150,7 @@ describe("handleJoinRoom — seating", () => {
     const { io } = fakeIo();
     const { socket } = fakeSocket("u2");
     await call(handleJoinRoom, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       intent: "spectate",
     });
     expect(seatCalls).toHaveLength(0);
@@ -163,7 +167,7 @@ describe("handleJoinRoom — seating", () => {
     });
     const { io } = fakeIo();
     const { socket } = fakeSocket("u3");
-    await call(handleJoinRoom, io, socket, { gameId: UUID });
+    await call(handleJoinRoom, io, socket, { gameId: CODE });
     expect(seatCalls).toHaveLength(0);
   });
 
@@ -175,11 +179,11 @@ describe("handleJoinRoom — seating", () => {
     });
     const { io } = fakeIo();
     const intruder = fakeSocket("u3");
-    await call(handleJoinRoom, io, intruder.socket, { gameId: UUID });
+    await call(handleJoinRoom, io, intruder.socket, { gameId: CODE });
     expect(seatCalls).toHaveLength(0);
 
     const challenged = fakeSocket("u2");
-    await call(handleJoinRoom, io, challenged.socket, { gameId: UUID });
+    await call(handleJoinRoom, io, challenged.socket, { gameId: CODE });
     expect(seatCalls).toHaveLength(1);
     expect(seatCalls[0]?.player.userId).toBe("u2");
   });
@@ -194,7 +198,7 @@ describe("handleJoinRoom — seating", () => {
     });
     const { io } = fakeIo();
     const { socket } = fakeSocket("u1");
-    await call(handleJoinRoom, io, socket, { gameId: UUID });
+    await call(handleJoinRoom, io, socket, { gameId: CODE });
     expect(seatCalls).toHaveLength(0);
     expect(current.status).toBe("active");
   });
@@ -216,7 +220,7 @@ describe("handleMakeMove — validation", () => {
     const { io } = fakeIo();
     const { socket, emits } = fakeSocket("u3");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 0, col: 0 },
     });
     expect(emits).toContainEqual({
@@ -231,7 +235,7 @@ describe("handleMakeMove — validation", () => {
     const { io } = fakeIo();
     const { socket, emits } = fakeSocket("u1");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 0, col: 0 },
     });
     expect(emits).toContainEqual({
@@ -245,7 +249,7 @@ describe("handleMakeMove — validation", () => {
     const { io } = fakeIo();
     const { socket, emits } = fakeSocket("u1");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 5, col: 0 },
     });
     expect(emits).toContainEqual({
@@ -261,7 +265,7 @@ describe("handleMakeMove — validation", () => {
     const { io } = fakeIo();
     const { socket, emits } = fakeSocket("u1");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 0, col: 0 },
     });
     expect(emits).toContainEqual({
@@ -289,7 +293,7 @@ describe("handleMakeMove — applying moves", () => {
     const { io, emits } = fakeIo();
     const { socket } = fakeSocket("u1");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 1, col: 1 },
     });
 
@@ -313,14 +317,14 @@ describe("handleMakeMove — applying moves", () => {
     const { io, emits } = fakeIo();
     const { socket } = fakeSocket("u1");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 0, col: 2 },
     });
 
     expect(current.status).toBe("completed");
     expect(current.winner).toBe("u1");
     expect(emits).toContainEqual({
-      room: `game:${UUID}`,
+      room: `game:${CODE}`,
       event: "game_over",
       payload: { winner: "u1" },
     });
