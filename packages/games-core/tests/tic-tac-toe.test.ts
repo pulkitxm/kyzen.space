@@ -209,6 +209,49 @@ describe("tic-tac-toe — draw", () => {
   });
 });
 
+describe("tic-tac-toe — winner takes priority over a full board", () => {
+  test("a final move that fills the board AND completes a line is a win, not a draw", () => {
+    const state = playSequence([
+      ["X", 0, 0],
+      ["O", 0, 2],
+      ["X", 0, 1],
+      ["O", 1, 2],
+      ["X", 1, 0],
+      ["O", 2, 0],
+      ["X", 1, 1],
+      ["O", 2, 1],
+    ]);
+    const res = reduce(state, { role: "X" }, { row: 2, col: 2 });
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error(res.error);
+    expect(isBoardFull(res.state.board)).toBe(true);
+    expect(lineWinner(res.state.board)).toBe("X");
+    expect(res.outcome).toEqual({
+      status: "completed",
+      winnerRole: "X",
+      draw: false,
+    });
+  });
+});
+
+describe("tic-tac-toe — board helpers", () => {
+  test("lineWinner is null on an empty and on a non-winning board", () => {
+    expect(lineWinner(emptyBoard())).toBeNull();
+    const board = emptyBoard();
+    board[0] = "X";
+    board[1] = "O";
+    expect(lineWinner(board)).toBeNull();
+  });
+
+  test("isBoardFull is false for empty/partial boards and true when filled", () => {
+    expect(isBoardFull(emptyBoard())).toBe(false);
+    const partial = emptyBoard();
+    partial[0] = "X";
+    expect(isBoardFull(partial)).toBe(false);
+    expect(isBoardFull(emptyBoard().fill("X"))).toBe(true);
+  });
+});
+
 describe("tic-tac-toe — post-game", () => {
   test("no move accepted after a win", () => {
     let state = playSequence([
