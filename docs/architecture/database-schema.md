@@ -105,6 +105,7 @@ The remaining tables are conventional relational shapes — one line each:
 
 ## Where to go next
 
+- [`./generic-game-schema.md`](./generic-game-schema.md) — what actually lives in `game_state` / `move_data` / `config` for a real game, how `GameDefinition` maps to the columns, and worked illustrations for other game types.
 - [`./database.md`](./database.md) — how these tables are **queried**: the postgres-js client, the repository pattern, the `GameRecord` seat join, keyset pagination, and the persist-a-move data flow.
 - [`./games-core-schemas.md`](./games-core-schemas.md) — the Zod `stateSchema` / `moveSchema` / `configSchema` that own the shape of the JSONB this schema stores.
 - [`./auth.md`](./auth.md) — Better Auth and the `user` / `session` / `account` / `verification` tables.
