@@ -1,6 +1,6 @@
 "use client";
 
-import type { Cell, TicTacToeState as TicState } from "@gamelobby/games-core";
+import type { Cell, TicTacToeState as TicState } from "@gamelobby/shared/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaBackwardStep,

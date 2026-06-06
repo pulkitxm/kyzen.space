@@ -1,4 +1,4 @@
-import type { MessageJson } from "@gamelobby/chat-core";
+import type { MessageJson } from "@gamelobby/shared/types";
 
 export function relativeTime(iso: string | null | undefined): string {
   if (!iso) return "";

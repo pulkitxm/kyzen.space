@@ -1,6 +1,6 @@
 import type { AvatarConfig } from "./types";
 
-export const AVATAR_CONFIG_KEYS: (keyof AvatarConfig)[] = [
+export const AVATAR_CONFIG_KEYS = [
   "skinColor",
   "top",
   "hairColor",
@@ -15,7 +15,7 @@ export const AVATAR_CONFIG_KEYS: (keyof AvatarConfig)[] = [
   "eyebrows",
   "mouth",
   "backgroundColor",
-];
+] satisfies (keyof AvatarConfig)[];
 
 export function configsEqual(a: AvatarConfig, b: AvatarConfig): boolean {
   if ((a.style ?? "any") !== (b.style ?? "any")) return false;

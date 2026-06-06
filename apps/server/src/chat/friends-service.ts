@@ -1,5 +1,6 @@
-import { CHAT_EVENTS, type FriendshipJson } from "@gamelobby/chat-core";
-import { friends, notifications, profiles } from "../db";
+import { friends, notifications, profiles } from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { FriendshipJson } from "@gamelobby/shared/types";
 import { getIO } from "../realtime/io";
 import { notify } from "../realtime/notify";
 import { emitToUser } from "../realtime/rooms";

@@ -1,6 +1,6 @@
 "use client";
 
-import type { GifJson } from "@gamelobby/chat-core";
+import type { GifJson } from "@gamelobby/shared/types";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaRegFaceSmile } from "react-icons/fa6";

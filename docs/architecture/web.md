@@ -40,9 +40,14 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/lib/chat-layout.ts` | `ChatLayout` type + `parseChatLayoutCookie` / `normalizeChatLayout` + layout geometry constants; the layout cookie/localStorage contract shared by page, loading, and `GameChatSplit`. |
 | `apps/web/app/chat/[handle]/page.tsx` | SSR conversation page; resolves handle (UUID or username) → conversation + messages. |
 | `apps/web/app/chat/[handle]/conversation-view.tsx` | Client conversation UI: hydrates messages atom, marks read, renders list/composer/typing. |
-| `apps/web/app/settings/page.tsx` | Settings Server Component: appearance section + account/session management. |
+| `apps/web/app/settings/layout.tsx` | Settings shell: header + `SettingsTabs` nav (Account \| Appearance) wrapping the sub-route pages. |
+| `apps/web/app/settings/page.tsx` | Redirects `/settings` → `/settings/account` (the default tab). |
+| `apps/web/app/settings/settings-tabs.tsx` | Client sub-route nav; active tab from `usePathname()`. |
+| `apps/web/app/settings/account/page.tsx` | Account tab: identity form + email + sessions + sign-out/revoke; fetches `/api/profiles/me` to seed the identity form. |
+| `apps/web/app/settings/appearance/page.tsx` | Appearance tab: the Theme/Doodles `AppearanceTabs`. |
+| `apps/web/app/settings/account-identity-form.tsx` | Client form to edit display name + username (debounced live availability check, suggestion chips, cooldown lock). |
 | `apps/web/app/settings/theme-picker.tsx` | Hover-preview palette/color-mode picker driven by the appearance context. |
-| `apps/web/next.config.ts` | `transpilePackages` for both shared packages. |
+| `apps/web/next.config.ts` | `transpilePackages` for the raw-TS workspace packages (`@gamelobby/shared`, `@gamelobby/games-core`, `@gamelobby/games-client`). |
 | `apps/web/app/globals.css` | Tailwind v4 entry; `@source` so Tailwind scans games-client classes. |
 | `packages/games-client/src/registry.ts` | `getGameClient(type)` maps a game type to a `React.lazy` board; `getGameSkeleton(type)` returns its `<Suspense>` fallback (or `DefaultGameSkeleton`). |
 | `packages/games-client/src/types.ts` | `GameClientProps`: the contract every game board receives. |
@@ -271,8 +276,9 @@ Appearance is split across three layers, and which layer owns what is the key to
 - **Color mode (light/dark/system)** is owned by `next-themes` (`apps/web/app/providers.tsx:29`), toggling a `class` on `<html>` with `storageKey="gl-color-mode"`.
 - **Palette** (named color schemes) and **pattern** (background doodles) are owned by `AppearanceProvider` (`apps/web/lib/appearance.tsx:63`), which sets `data-theme` / `data-pattern` attributes on `<html>` in effects and mirrors to `localStorage`.
 - **Persistence** for signed-in users goes back to the server via `clientFetch` PUT to `/api/profiles/me/appearance` (`apps/web/lib/appearance.tsx:34`) — note this is a *client* fetch because it fires from a click handler.
+- **Catalogs & helpers** — the palette/pattern *display* tables (`THEMES` / `PATTERNS`, `getThemeDef` / `getPatternDef`) live in `apps/web/lib/themes.ts` and `apps/web/lib/patterns.ts`. These now **re-export the shared core** from `@gamelobby/shared` — the id catalogs + guards (`THEME_IDS` / `DEFAULT_THEME` / `isValidTheme` from `apps/web/lib/themes.ts:1`, `PATTERN_IDS` / `DEFAULT_PATTERN` / `isValidPattern` from `apps/web/lib/patterns.ts:1`) — and add the web-only color/preview tables on top. So the client and server agree on the *valid set* (one source of truth in `@gamelobby/shared`) while the browser owns the *presentation*. `apps/web/lib/chat-layout.ts` follows the same pattern: it re-exports the shared `ChatMode`/geometry bounds (`MIN_CHAT`, `MAX_CHAT`, `DEFAULT_POPOUT`, …) and keeps the richer client-side `ChatLayout` (minimized / `stashEdge` / icon) plus its clamp/normalize/persist helpers.
 
-`AppearanceProvider` reconciles two sources of truth on mount (`apps/web/lib/appearance.tsx:88`): if signed in, the server-provided `initialPalette`/`initialMode` win and are written to localStorage; if signed out, the locally stored values are restored. `ThemePicker` (`apps/web/app/settings/theme-picker.tsx`) adds a hover-preview flourish — `onMouseEnter`/`onFocus` mutate `data-theme` directly for an instant preview, and `onMouseLeave`/`onBlur` restore the committed value from a ref (`apps/web/app/settings/theme-picker.tsx:43`), only persisting on actual click. The settings page itself (`apps/web/app/settings/page.tsx`) is a Server Component that fetches sessions server-side and embeds the client `AppearanceTabs`.
+`AppearanceProvider` reconciles two sources of truth on mount (`apps/web/lib/appearance.tsx:88`): if signed in, the server-provided `initialPalette`/`initialMode` win and are written to localStorage; if signed out, the locally stored values are restored. `ThemePicker` (`apps/web/app/settings/theme-picker.tsx`) adds a hover-preview flourish — `onMouseEnter`/`onFocus` mutate `data-theme` directly for an instant preview, and `onMouseLeave`/`onBlur` restore the committed value from a ref (`apps/web/app/settings/theme-picker.tsx:43`), only persisting on actual click. The Appearance tab (`apps/web/app/settings/appearance/page.tsx`) is a Server Component that resolves the session server-side and embeds the client `AppearanceTabs`; `settings/page.tsx` itself just `redirect`s to `/settings/account`.
 
 ---
 
@@ -420,7 +426,7 @@ SocketProvider connection + useSocketEvent handlers
 
 Two small but easy-to-trip-over config facts let the shared packages work in the web app.
 
-`next.config.ts` lists both packages in `transpilePackages` (`apps/web/next.config.ts:5`). Because `@gamelobby/games-core` and `@gamelobby/games-client` are shipped as raw TypeScript via `workspace:*` (not pre-compiled), Next must transpile them as part of the web build. Omit one and you get cryptic "unexpected token" errors importing the package.
+`next.config.ts` lists the workspace packages in `transpilePackages` (`apps/web/next.config.ts:5`) — now **three**: `@gamelobby/shared`, `@gamelobby/games-core`, and `@gamelobby/games-client`. Because they are shipped as raw TypeScript via `workspace:*` (not pre-compiled), Next must transpile them as part of the web build. `@gamelobby/shared` was added to the list when the chat/game/appearance contracts moved into it; omit any one and you get cryptic "unexpected token" errors importing the package.
 
 `globals.css` adds `@source "../../../packages/games-client/src/**/*.{ts,tsx}"` (`apps/web/app/globals.css:3`). Tailwind v4 only generates the utility classes it sees referenced in scanned files. The game board components live *outside* `apps/web`, so without this `@source` Tailwind would purge every class used only in `games-client` (e.g. the board cells), and the game UI would render unstyled. The `@source` tells Tailwind to also scan the package's source.
 

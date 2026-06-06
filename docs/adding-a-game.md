@@ -8,31 +8,34 @@ serializers, the web lobby, the conformance tests) reads a game *only* through
 its definition. **Adding a game requires zero changes to platform plumbing**: no
 new web route, API endpoint, database table/column, socket event, or driver.
 
-## The two places a game lives
+## The three places a game lives
 
 | Concern | Package | What you add |
 | --- | --- | --- |
-| Logic, schemas, metadata (server-safe, **no React**) | `@gamelobby/games-core` | a `GameDefinition` in `src/games/<type>/`, appended to the single `GAMES` array |
+| Strict Zod schemas + inferred types (the source of truth) | `@gamelobby/shared` | the slug in `src/constants/games.ts` and `stateSchema`/`moveSchema`/`configSchema` + `z.infer` types in `src/types/games/<type>/schemas.ts` |
+| Engine, metadata, definition (server-safe, **no React**) | `@gamelobby/games-core` | a `GameEngine` + `GameMeta` + a `GameDefinition` in `src/games/<type>/`, appended to the single `GAMES` array |
 | React board UI (web-only) | `@gamelobby/games-client` | a `"use client"` board component (and an optional loading skeleton), registered by `type` |
 
-The split matters: the **server** imports `games-core` to run engines and
-validate moves, so that package must never import React. All UI lives in
-`games-client`.
+The split matters: the schemas and types live in `@gamelobby/shared` so the
+**server**, the **web app**, `games-core`, and `games-client` all validate against
+the very same Zod schemas — `@gamelobby/shared` is the only package that declares
+`zod`. `games-core` imports those schemas to assemble each `GameDefinition` and run
+engines, so it must never import React. All UI lives in `games-client`.
 
 ## The single source of truth
 
 `packages/games-core/src/games/index.ts` exports the one array:
 
 ```ts
-export const GAMES: GameDefinition[] = [ticTacToeDefinition /*, …*/];
+export const GAMES = [ticTacToeDefinition] satisfies GameDefinition[];
 ```
 
 Everything derives from it via `src/registry.ts`: `getDefinition(type)`,
-`getEngine(type)`, `hasEngine(type)`, `listGameTypes()`, `listGameMeta()`,
-`getCategoryGroups()`. There is **no** separate catalog, metadata list, or
-client map to keep in sync — do not reintroduce one.
+`getEngine(type)`, `hasEngine(type)`, `listGameTypes()`, `listDefinitions()`,
+`listGameMeta()`, `getCategoryGroups()`. There is **no** separate catalog,
+metadata list, or client map to keep in sync — do not reintroduce one.
 
-## A `GameDefinition` (see `src/definition.ts`)
+## A `GameDefinition` (see `packages/shared/src/types/games/definition.ts`)
 
 ```ts
 export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
@@ -70,45 +73,56 @@ schemas are the guardrails that make that JSON safe and strongly typed:
 ## Worked example: tic-tac-toe
 
 ```
-packages/games-core/src/game-types.ts                     # TIC_TAC_TOE slug + GAME_TYPES tuple + GameType union + gameTypeSchema
+packages/shared/src/constants/games.ts                       # TIC_TAC_TOE slug + GAME_TYPES tuple
+packages/shared/src/types/games/core.ts                      # GameType union + gameTypeSchema (z.enum(GAME_TYPES))
+packages/shared/src/types/games/tic-tac-toe/schemas.ts       # cell/mark + strict state/move/config schemas, z.infer types
+packages/shared/src/types/games/index.ts                     # re-exports the tic-tac-toe schemas + types
 packages/games-core/src/games/tic-tac-toe/
-  schemas.ts   # cell/mark + strict state/move/config schemas, z.infer types
-  engine.ts    # ticTacToeEngine: createInitialState + reduce (rules only); imports TIC_TAC_TOE from ../../game-types
-  meta.ts      # ticTacToeMeta: GameMeta; imports TIC_TAC_TOE from ../../game-types
-  index.ts     # ticTacToeDefinition: GameDefinition
-packages/games-core/src/games/index.ts   # GAMES array includes ticTacToeDefinition
-packages/games-client/src/games/tic-tac-toe/client.tsx    # board UI
-packages/games-client/src/games/tic-tac-toe/skeleton.tsx  # loading skeleton (optional)
-packages/games-client/src/registry.ts                     # Record<GameType, ...> maps: board + skeleton keyed by TIC_TAC_TOE
+  engine.ts    # ticTacToeEngine: createInitialState + reduce (rules only); imports TIC_TAC_TOE from @gamelobby/shared/constants
+  meta.ts      # ticTacToeMeta: GameMeta; imports TIC_TAC_TOE from @gamelobby/shared/constants
+  index.ts     # ticTacToeDefinition: GameDefinition (engine + meta + the shared schemas)
+packages/games-core/src/games/index.ts                       # GAMES array includes ticTacToeDefinition
+packages/games-client/src/games/tic-tac-toe/client.tsx       # board UI
+packages/games-client/src/games/tic-tac-toe/skeleton.tsx     # loading skeleton (optional)
+packages/games-client/src/registry.ts                        # Record<GameType, ...> maps: board + skeleton keyed by TIC_TAC_TOE
 ```
 
-## The type-safe slug: `game-types.ts`
+## The type-safe slug: `constants/games.ts` + `types/games/core.ts`
 
 Every game's string slug lives **only** in
-`packages/games-core/src/game-types.ts`. That file is the single source of
-truth for the `GameType` union, the `gameTypeSchema` Zod validator, and the
-`GAME_TYPES` tuple:
+`packages/shared/src/constants/games.ts`. That file is the single source of
+truth for the slug constant and the `GAME_TYPES` tuple:
 
 ```ts
 export const TIC_TAC_TOE = "tic-tac-toe";
 
 export const GAME_TYPES = [TIC_TAC_TOE] as const;
+```
 
-export type GameType = (typeof GAME_TYPES)[number];
+`packages/shared/src/types/games/core.ts` then derives the `GameType` union and
+the `gameTypeSchema` Zod validator from that tuple — so the union and the schema
+never drift from the slug list:
+
+```ts
+import { z } from "zod";
+import { GAME_TYPES } from "../../constants/games";
 
 export const gameTypeSchema = z.enum(GAME_TYPES);
+export type GameType = z.infer<typeof gameTypeSchema>;
 ```
 
 When adding a game:
-1. Declare `export const <SLUG> = "<type>";` in `game-types.ts`.
+1. Declare `export const <SLUG> = "<type>";` in
+   `packages/shared/src/constants/games.ts`.
 2. Append it to `GAME_TYPES`: `export const GAME_TYPES = [TIC_TAC_TOE, <SLUG>] as const;`.
-3. Import `<SLUG>` from `../../game-types` in the game's `meta.ts` and
-   `engine.ts` (and anywhere else in the game folder that references the slug).
+3. Import `<SLUG>` from `@gamelobby/shared/constants` in the game's `meta.ts` and
+   `engine.ts` (and anywhere else that references the slug). `GameType` /
+   `gameTypeSchema` pick up the new entry automatically.
    **Never redeclare the string literal in a per-game file.**
 
 `gameTypeSchema` is a `z.enum(GAME_TYPES)` — every wire boundary that carries a
-`gameType` value is validated against it (`gameJsonSchema` in games-core,
-`gameCardMetaSchema` / `clientCreateGameInConversationSchema` in chat-core). The
+`gameType` value is validated against it (`gameJsonSchema`, `gameCardMetaSchema`,
+and `clientCreateGameInConversationSchema`, all in `@gamelobby/shared/types`). The
 conformance suite asserts `GAME_TYPES` matches the `GAMES` registry exactly
 (`"GAME_TYPES matches the registry exactly"` test in
 `packages/games-core/tests/conformance.test.ts`) so the tuple and the array can
@@ -118,14 +132,20 @@ type, `listGameTypes(): GameType[]` returns the narrowed list.
 
 ## Steps to add a game
 
-1. **game-types.ts** — declare the slug constant and append it to `GAME_TYPES`
-   (see above). Both steps happen in `packages/games-core/src/game-types.ts`.
-2. **games-core** — create `src/games/<type>/{schemas,engine,meta,index}.ts`.
-   In `schemas.ts` write the strict Zod schemas + `z.infer` types (no slug here).
-   In `engine.ts` and `meta.ts` import the slug from `../../game-types`.
-   Append the definition to `GAMES` (`src/games/index.ts`) and export the public
-   symbols from `src/index.ts`. Add a category to `src/categories.ts` only if you
-   need a new one.
+1. **shared (slug + schemas)** — declare the slug constant and append it to
+   `GAME_TYPES` in `packages/shared/src/constants/games.ts` (see above). Then
+   create `packages/shared/src/types/games/<type>/schemas.ts` with the strict Zod
+   schemas + `z.infer` types (no slug here) and re-export them from
+   `packages/shared/src/types/games/index.ts`. Inside `@gamelobby/shared` import
+   `z` directly (`import { z } from "zod"`) — it is the only package that declares
+   `zod`. Add a category to `src/constants/categories.ts` (`GAME_CATEGORIES`) only
+   if you need a new one.
+2. **games-core** — create `src/games/<type>/{engine,meta,index}.ts`.
+   In `engine.ts` and `meta.ts` import the slug from `@gamelobby/shared/constants`
+   and the schemas/types from `@gamelobby/shared/types`; `index.ts` assembles the
+   `GameDefinition` from the engine, meta, and the shared schemas. Append the
+   definition to `GAMES` (`src/games/index.ts`) and export the public symbols from
+   `src/index.ts`.
 3. **games-client** — add `src/games/<type>/client.tsx` (`"use client"`, typed
    `GameClientProps`). Model it on `src/games/tic-tac-toe/client.tsx`: the host
    app passes the **one shared Socket.IO connection** plus a `connected` flag via
@@ -156,7 +176,8 @@ type, `listGameTypes(): GameType[]` returns the narrowed list.
 5. **Document** — add `docs/games/<type>.md`, named after the `type` slug (e.g.
    `docs/games/tic-tac-toe.md`): how to play, player count and roles,
    win/draw/illegal-move rules, the state and move shapes (mirroring the Zod
-   schemas), any `configFields`, and a link to `packages/games-core/src/games/<type>/`.
+   schemas in `packages/shared/src/types/games/<type>/schemas.ts`), any
+   `configFields`, and a link to `packages/games-core/src/games/<type>/`.
    Every new game ships this doc.
 6. **Verify** — `bun run type-check`, `bun test` (games-core incl. conformance),
    `bun run check`. Then `bun run dev` and play a full game two-up on `/play/:id`.
@@ -188,8 +209,9 @@ These already work for every game — do not duplicate them:
   `realtime/drivers.ts` **only** for a genuinely different `mode` (e.g. realtime
   `step`-based games).
 - **Database** — the generic `game` (+ `config` JSONB), `move`, and `game_player`
-  tables store every game. Never add a per-game table; the engine owns the typed
-  shape and Zod validates it.
+  tables in `@gamelobby/database` (`packages/database/src/schema.ts`) store every
+  game. Never add a per-game table; the engine owns the typed shape and Zod
+  validates it.
 
 ## Automating it
 

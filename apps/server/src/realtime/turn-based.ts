@@ -1,14 +1,19 @@
 import {
-  type ClientJoinRoom,
-  type ClientMakeMove,
-  getDefinition,
-  type Outcome,
-  type ServerGameStatePayload,
-} from "@gamelobby/games-core";
+  type GamePlayer,
+  type GameRecord,
+  games,
+  profiles,
+} from "@gamelobby/database";
+import { getDefinition } from "@gamelobby/games-core";
+import type {
+  ClientJoinRoom,
+  ClientMakeMove,
+  Outcome,
+  ServerGameStatePayload,
+} from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
 import { broadcastGameCard } from "../chat/game-card-broadcast";
-import { type GamePlayer, type GameRecord, games, profiles } from "../db";
 import { isUuid } from "../lib/uuid";
 import { emitToGame, joinGameRoom } from "./rooms";
 

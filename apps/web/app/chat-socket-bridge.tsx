@@ -1,25 +1,25 @@
 "use client";
 
-import {
-  CHAT_EVENTS,
-  type ConversationJson,
-  type FriendshipJson,
-  type NotificationJson,
-  type ServerConversationNew,
-  type ServerConversationUpdated,
-  type ServerFriendAccepted,
-  type ServerFriendDeclined,
-  type ServerFriendRemoved,
-  type ServerFriendRequest,
-  type ServerMessageDeleted,
-  type ServerMessageNew,
-  type ServerMessageUpdated,
-  type ServerNotificationNew,
-  type ServerNotificationRead,
-  type ServerPresenceSnapshot,
-  type ServerPresenceUpdate,
-  type ServerTypingUpdate,
-} from "@gamelobby/chat-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type {
+  ConversationJson,
+  FriendshipJson,
+  NotificationJson,
+  ServerConversationNew,
+  ServerConversationUpdated,
+  ServerFriendAccepted,
+  ServerFriendDeclined,
+  ServerFriendRemoved,
+  ServerFriendRequest,
+  ServerMessageDeleted,
+  ServerMessageNew,
+  ServerMessageUpdated,
+  ServerNotificationNew,
+  ServerNotificationRead,
+  ServerPresenceSnapshot,
+  ServerPresenceUpdate,
+  ServerTypingUpdate,
+} from "@gamelobby/shared/types";
 import { useStore } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import {

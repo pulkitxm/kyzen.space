@@ -20,7 +20,7 @@ export default async function GameLobbyPage({
 
   return (
     <PageContainer>
-      <BackLink href="/games">← All games</BackLink>
+      <BackLink href="/">← All games</BackLink>
       <div className="mt-6">
         <PageHeader
           title={def.meta.name}

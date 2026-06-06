@@ -1,25 +1,42 @@
 import { seedAvatarConfig, validateAvatarConfig } from "@gamelobby/avatar";
-import { Hono } from "hono";
-import { games, profiles } from "../../db";
-import { validateChatModePref } from "../../lib/chat-layout";
+import { games, profiles } from "@gamelobby/database";
 import {
+  DEFAULT_COLOR_MODE,
   DEFAULT_PATTERN,
-  isValidPattern,
-  type PatternId,
-} from "../../lib/pattern";
+  DEFAULT_THEME,
+  DISPLAY_NAME_MAX_LENGTH,
+} from "@gamelobby/shared/constants";
 import {
   type ColorMode,
-  DEFAULT_COLOR_MODE,
-  DEFAULT_THEME,
+  isReservedUsername,
   isValidColorMode,
+  isValidPattern,
   isValidTheme,
+  isValidUsernameFormat,
+  normalizeUsername,
+  type PatternId,
   type ThemeId,
-} from "../../lib/theme";
+  validateChatModePref,
+} from "@gamelobby/shared/types";
+import { Hono } from "hono";
+import { env } from "../../env";
+import { isUsernameBlocked, suggestUsernames } from "../../username";
+import { usernameEditableAt } from "../../username-rules";
 import { readJson } from "../auth-context";
 import { type AuthEnv, requireAuth } from "../middleware/auth";
 
-const RESERVED = new Set(["api", "auth", "games", "profile", "account"]);
 const RECENT_PAGE_SIZE = 5;
+
+type UnavailableReason = "format" | "reserved" | "taken";
+
+async function usernameUnavailableReason(
+  normalized: string,
+): Promise<UnavailableReason | null> {
+  if (!isValidUsernameFormat(normalized)) return "format";
+  if (isUsernameBlocked(normalized)) return "reserved";
+  if (await profiles.isUsernameTaken(normalized)) return "taken";
+  return null;
+}
 
 function activityRow(g: {
   id: string;
@@ -44,6 +61,12 @@ export const profilesRouter = new Hono<AuthEnv>()
     const profile = await profiles.getProfileByUserId(user.id);
     if (!profile) return c.json({ error: "Profile not found" }, 404);
 
+    const editableAt = usernameEditableAt(
+      profile.usernameChangedAt ?? null,
+      env.usernameChangeCooldownDays,
+      new Date(),
+    );
+
     return c.json({
       profile: {
         userId: profile.userId,
@@ -54,6 +77,8 @@ export const profilesRouter = new Hono<AuthEnv>()
         colorMode: profile.colorMode ?? DEFAULT_COLOR_MODE,
         pattern: profile.pattern ?? DEFAULT_PATTERN,
         chatLayout: profile.chatLayout ?? null,
+        usernameEditableAt: editableAt ? editableAt.toISOString() : null,
+        usernameChangeCooldownDays: env.usernameChangeCooldownDays,
         createdAt: new Date(profile.createdAt).toISOString(),
       },
       user: {
@@ -124,9 +149,77 @@ export const profilesRouter = new Hono<AuthEnv>()
     return c.json({ avatar });
   })
 
+  .put("/me/name", requireAuth, async (c) => {
+    const userId = c.get("userId");
+    const body = await readJson(c);
+    const raw = (body ?? {}) as { name?: unknown };
+    if (typeof raw.name !== "string")
+      return c.json({ error: "Invalid name" }, 400);
+    const name = raw.name.trim();
+    if (name.length < 1 || name.length > DISPLAY_NAME_MAX_LENGTH)
+      return c.json({ error: "Invalid name" }, 400);
+
+    await profiles.setDisplayName(userId, name);
+    return c.json({ name });
+  })
+
+  .get("/me/username-available", requireAuth, async (c) => {
+    const userId = c.get("userId");
+    const normalized = normalizeUsername(c.req.query("u") ?? "");
+    const profile = await profiles.getProfileByUserId(userId);
+
+    if (profile && normalized === profile.username.toLowerCase())
+      return c.json({ available: true });
+
+    const reason = await usernameUnavailableReason(normalized);
+    if (!reason) return c.json({ available: true });
+
+    const suggestions = await suggestUsernames(normalized || "player");
+    return c.json({ available: false, reason, suggestions });
+  })
+
+  .put("/me/username", requireAuth, async (c) => {
+    const userId = c.get("userId");
+    const body = await readJson(c);
+    const raw = (body ?? {}) as { username?: unknown };
+    if (typeof raw.username !== "string")
+      return c.json({ error: "Invalid username" }, 400);
+    const normalized = normalizeUsername(raw.username);
+
+    const profile = await profiles.getProfileByUserId(userId);
+    if (!profile) return c.json({ error: "Profile not found" }, 404);
+    if (normalized === profile.username.toLowerCase())
+      return c.json({ username: profile.username });
+
+    if (!isValidUsernameFormat(normalized))
+      return c.json({ error: "Invalid username" }, 400);
+    if (isUsernameBlocked(normalized))
+      return c.json({ error: "Username not available" }, 400);
+
+    const editableAt = usernameEditableAt(
+      profile.usernameChangedAt ?? null,
+      env.usernameChangeCooldownDays,
+      new Date(),
+    );
+    if (editableAt)
+      return c.json(
+        {
+          error: "Username changed too recently",
+          nextChangeAt: editableAt.toISOString(),
+        },
+        429,
+      );
+
+    if (await profiles.isUsernameTaken(normalized))
+      return c.json({ error: "Username taken" }, 409);
+
+    await profiles.updateUsername(userId, normalized);
+    return c.json({ username: normalized });
+  })
+
   .get("/:username/recent-games", async (c) => {
     const username = c.req.param("username");
-    if (RESERVED.has(username.toLowerCase()))
+    if (isReservedUsername(username.toLowerCase()))
       return c.json({ error: "Not found" }, 404);
 
     const rawOffset = Number.parseInt(c.req.query("offset") ?? "0", 10);
@@ -156,7 +249,7 @@ export const profilesRouter = new Hono<AuthEnv>()
 
   .get("/:username", async (c) => {
     const username = c.req.param("username");
-    if (RESERVED.has(username.toLowerCase()))
+    if (isReservedUsername(username.toLowerCase()))
       return c.json({ error: "Not found" }, 404);
 
     const profile = await profiles.getProfileByUsername(username);

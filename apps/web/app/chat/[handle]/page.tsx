@@ -1,4 +1,4 @@
-import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
+import type { ConversationJson, MessageJson } from "@gamelobby/shared/types";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";
 import { getServerSession } from "@/lib/get-server-session";

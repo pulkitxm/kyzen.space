@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/games-core";
+import { games } from "@gamelobby/database";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 import { createGameInConversation } from "../src/chat/games-in-chat-service";
-import { games } from "../src/db";
 import { createHarness, DB_UP, expectErr, unwrap } from "./harness";
 
 const h = createHarness("gi");
@@ -45,6 +45,7 @@ describe.skipIf(!DB_UP)(
       const res = await createGameInConversation({
         userId: a.id,
         conversationId: convId,
+        // @ts-expect-error unknown game type is rejected at runtime
         gameType: "definitely-not-a-game",
       });
       expectErr(res, 400);

@@ -1,13 +1,4 @@
 import type {
-  ConversationJson,
-  FriendshipJson,
-  MemberJson,
-  MessageJson,
-  NotificationJson,
-  PublicUser,
-} from "@gamelobby/chat-core";
-import type { GameJson, MoveJson } from "@gamelobby/games-core";
-import type {
   ConversationMemberRow,
   ConversationRow,
   FriendshipRow,
@@ -15,8 +6,18 @@ import type {
   MessageRow,
   MoveRow,
   NotificationRow,
-} from "../db";
-import type { PublicUserRow } from "../db/repositories/profiles";
+  PublicUserRow,
+} from "@gamelobby/database";
+import type {
+  ConversationJson,
+  FriendshipJson,
+  GameJson,
+  MemberJson,
+  MessageJson,
+  MoveJson,
+  NotificationJson,
+  PublicUser,
+} from "@gamelobby/shared/types";
 
 function iso(d: Date | null | undefined): string | null {
   return d ? new Date(d).toISOString() : null;

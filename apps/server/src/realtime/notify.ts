@@ -1,10 +1,10 @@
-import {
-  CHAT_EVENTS,
-  type NotificationPayload,
-  type NotificationType,
-} from "@gamelobby/chat-core";
+import { notifications } from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type {
+  NotificationPayload,
+  NotificationType,
+} from "@gamelobby/shared/types";
 import { assembleNotification } from "../chat/assemble";
-import { notifications } from "../db";
 import { getIO } from "./io";
 import { emitToUser } from "./rooms";
 

@@ -1,4 +1,4 @@
-import type { GameCardMeta } from "@gamelobby/chat-core";
+import type { GameCardMeta } from "@gamelobby/shared/types";
 
 export type GameCardSnapshot = {
   status: string;

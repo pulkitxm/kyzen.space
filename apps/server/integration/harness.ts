@@ -1,9 +1,9 @@
 import { expect } from "bun:test";
+import { db, friends, schema } from "@gamelobby/database";
 import { eq, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";
-import type { ServiceResult } from "../src/chat/result";
-import { db, friends, schema } from "../src/db";
+import type { ErrorStatus, ServiceResult } from "../src/chat/result";
 
 export let DB_UP = false;
 try {
@@ -20,7 +20,10 @@ export function unwrap<T>(res: ServiceResult<T>): T {
   return res.value;
 }
 
-export function expectErr<T>(res: ServiceResult<T>, status?: number): void {
+export function expectErr<T>(
+  res: ServiceResult<T>,
+  status?: ErrorStatus,
+): void {
   expect(res.ok).toBe(false);
   if (!res.ok && status !== undefined) expect(res.status).toBe(status);
 }

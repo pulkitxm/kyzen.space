@@ -83,7 +83,7 @@ export function ProfilePageView({
             {isOwnProfile ? (
               <div className="flex shrink-0 items-center gap-2 sm:mb-2">
                 <Link
-                  href="/settings"
+                  href="/settings/account"
                   className="inline-flex items-center rounded-full bg-primary px-5 py-2.5 font-medium text-primary-foreground text-sm shadow-lg shadow-primary/25 transition hover:bg-primary-hover"
                 >
                   Settings
@@ -163,7 +163,7 @@ function ProfileOverflowMenu() {
           My profile
         </Link>
         <Link
-          href="/games"
+          href="/"
           className="block px-4 py-2.5 text-card-foreground transition hover:bg-surface-overlay"
         >
           Games

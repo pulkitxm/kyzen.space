@@ -1,44 +1,58 @@
-import { CHAT_EVENTS, type PresenceStatus } from "@gamelobby/chat-core";
+import * as db from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { PresenceStatus } from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
-import { conversations, friends } from "../db";
+import { childLogger } from "../logger";
+import type { PresenceStore } from "./presence-store";
+import { presenceStore } from "./presence-store-instance";
 import { emitToUser } from "./rooms";
 
-type Presence = { sockets: Set<string>; lastSeen: number | null };
+const log = childLogger({ mod: "realtime:presence" });
 
-const presence = new Map<string, Presence>();
+type PresenceEntry = {
+  userId: string;
+  status: PresenceStatus;
+  lastSeen: string | null;
+};
 
-function entryFor(userId: string): Presence {
-  let p = presence.get(userId);
-  if (!p) {
-    p = { sockets: new Set(), lastSeen: null };
-    presence.set(userId, p);
-  }
-  return p;
-}
+export type PresenceDeps = {
+  store: PresenceStore;
+  acceptedFriendIds: (userId: string) => Promise<string[]>;
+  conversationIdsForUser: (userId: string) => Promise<string[]>;
+  memberIds: (conversationId: string) => Promise<string[]>;
+  getLastSeen: (userIds: string[]) => Promise<Map<string, Date | null>>;
+  touchLastSeen: (userIds: string[], when: Date) => Promise<void>;
+};
 
-export function isOnline(userId: string): boolean {
-  return (presence.get(userId)?.sockets.size ?? 0) > 0;
-}
-
-function payloadFor(userId: string) {
-  const online = isOnline(userId);
-  const lastSeen = presence.get(userId)?.lastSeen ?? null;
+function defaultDeps(): PresenceDeps {
   return {
-    userId,
-    status: (online ? "online" : "offline") as PresenceStatus,
-    lastSeen: online || !lastSeen ? null : new Date(lastSeen).toISOString(),
+    store: presenceStore,
+    acceptedFriendIds: (userId) => db.friends.acceptedFriendIds(userId),
+    conversationIdsForUser: (userId) =>
+      db.conversations.getConversationIdsForUser(userId),
+    memberIds: (conversationId) =>
+      db.conversations.getMemberIds(conversationId),
+    getLastSeen: (userIds) => db.profiles.getLastSeen(userIds),
+    touchLastSeen: (userIds, when) => db.profiles.touchLastSeen(userIds, when),
   };
 }
 
-async function audienceFor(userId: string): Promise<string[]> {
+export function isOnline(userId: string): Promise<boolean> {
+  return presenceStore.isOnline(userId);
+}
+
+async function audienceFor(
+  userId: string,
+  deps: PresenceDeps,
+): Promise<string[]> {
   const audience = new Set<string>();
   const [friendIds, convIds] = await Promise.all([
-    friends.acceptedFriendIds(userId),
-    conversations.getConversationIdsForUser(userId),
+    deps.acceptedFriendIds(userId),
+    deps.conversationIdsForUser(userId),
   ]);
   for (const id of friendIds) audience.add(id);
   for (const cid of convIds) {
-    const ids = await conversations.getMemberIds(cid);
+    const ids = await deps.memberIds(cid);
     for (const id of ids) audience.add(id);
   }
   audience.delete(userId);
@@ -48,20 +62,29 @@ async function audienceFor(userId: string): Promise<string[]> {
 export async function handlePresenceConnect(
   io: IOServer,
   socket: Socket,
+  deps: PresenceDeps = defaultDeps(),
 ): Promise<void> {
   const userId = socket.data.userId;
-  const p = entryFor(userId);
-  const wasOnline = p.sockets.size > 0;
-  p.sockets.add(socket.id);
+  const { wasOnline } = await deps.store.markOnline(userId, socket.id);
+  const audience = await audienceFor(userId, deps);
 
-  const audience = await audienceFor(userId);
-
-  socket.emit(CHAT_EVENTS.presenceSnapshot, {
-    entries: audience.map(payloadFor),
-  });
+  const onlineSet = await deps.store.onlineAmong(audience);
+  const offlineIds = audience.filter((id) => !onlineSet.has(id));
+  const lastSeen = await deps.getLastSeen(offlineIds);
+  const entries: PresenceEntry[] = audience.map(
+    (id): PresenceEntry =>
+      onlineSet.has(id)
+        ? { userId: id, status: "online", lastSeen: null }
+        : {
+            userId: id,
+            status: "offline",
+            lastSeen: lastSeen.get(id)?.toISOString() ?? null,
+          },
+  );
+  socket.emit(CHAT_EVENTS.presenceSnapshot, { entries });
 
   if (!wasOnline) {
-    const mine = payloadFor(userId);
+    const mine: PresenceEntry = { userId, status: "online", lastSeen: null };
     for (const uid of audience) {
       emitToUser(io, uid, CHAT_EVENTS.presenceUpdate, mine);
     }
@@ -71,16 +94,25 @@ export async function handlePresenceConnect(
 export async function handlePresenceDisconnect(
   io: IOServer,
   socket: Socket,
+  deps: PresenceDeps = defaultDeps(),
 ): Promise<void> {
   const userId = socket.data.userId;
-  const p = presence.get(userId);
-  if (!p) return;
-  p.sockets.delete(socket.id);
-  if (p.sockets.size > 0) return;
+  const { stillOnline } = await deps.store.markOffline(userId, socket.id);
+  if (stillOnline) return;
 
-  p.lastSeen = Date.now();
-  const audience = await audienceFor(userId);
-  const mine = payloadFor(userId);
+  const now = new Date();
+  try {
+    await deps.touchLastSeen([userId], now);
+  } catch (err) {
+    log.error({ err, userId }, "touchLastSeen failed");
+  }
+
+  const audience = await audienceFor(userId, deps);
+  const mine: PresenceEntry = {
+    userId,
+    status: "offline",
+    lastSeen: now.toISOString(),
+  };
   for (const uid of audience) {
     emitToUser(io, uid, CHAT_EVENTS.presenceUpdate, mine);
   }

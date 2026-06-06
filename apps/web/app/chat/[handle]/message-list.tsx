@@ -1,6 +1,6 @@
 "use client";
 
-import type { MemberJson, MessageJson } from "@gamelobby/chat-core";
+import type { MemberJson, MessageJson } from "@gamelobby/shared/types";
 import { useStore } from "jotai";
 import { useCallback, useRef, useState } from "react";
 import { FaArrowDown } from "react-icons/fa6";

@@ -1,16 +1,19 @@
-import type { GameEngine, Outcome, ReduceResult, Seat } from "../../engine";
-import { TIC_TAC_TOE } from "../../game-types";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 import {
   type Cell,
+  type GameEngine,
   type Mark,
+  type Outcome,
+  type ReduceResult,
+  type Seat,
   type TicTacToeMove,
   type TicTacToeState,
   ticTacToeMoveSchema,
-} from "./schemas";
+} from "@gamelobby/shared/types";
 
 const BOARD_SIZE = 9;
 
-export const WIN_LINES: readonly (readonly [number, number, number])[] = [
+export const WIN_LINES = [
   [0, 1, 2],
   [3, 4, 5],
   [6, 7, 8],
@@ -19,7 +22,7 @@ export const WIN_LINES: readonly (readonly [number, number, number])[] = [
   [2, 5, 8],
   [0, 4, 8],
   [2, 4, 6],
-];
+] as const satisfies readonly (readonly [number, number, number])[];
 
 export function emptyBoard(): Cell[] {
   return Array.from({ length: BOARD_SIZE }, () => null);
