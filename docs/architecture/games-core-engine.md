@@ -310,7 +310,7 @@ This is the payoff of the whole design — the same engine that informs the clie
 
 So the path is: **client `make_move` -> `turn-based.ts:120` -> `getDefinition` `turn-based.ts:135` -> `moveSchema`/`stateSchema` parse `turn-based.ts:138`/`:140` -> `engine.reduce` `turn-based.ts:143` (which itself re-runs `tic-tac-toe/engine.ts:67`) -> persist + broadcast.** The client supplied data; the engine decided truth.
 
-The seating side mirrors this: `ensureSeated` reads `engine.maxPlayers` to know if a seat is free, `engine.roles[players.length]` to assign the next role, `engine.minPlayers` to flip the game to `active`, and `engine.createInitialState(...)` to mint the starting state on first seat (`apps/server/src/realtime/turn-based.ts:38`–`:67`).
+The seating side mirrors this: `ensureSeated` reads `engine.maxPlayers` to know if a seat is free, `engine.roles[players.length]` to assign the next role, and `engine.minPlayers` to flip the game to `active` (`apps/server/src/realtime/turn-based.ts:38`–`:67`). Its `gameState ?? engine.createInitialState(...)` line is a fallback only — the creator's seat already minted the starting state at creation (`apps/server/src/chat/games-in-chat-service.ts:70`).
 
 ## The conformance suite: invariants every game must satisfy
 

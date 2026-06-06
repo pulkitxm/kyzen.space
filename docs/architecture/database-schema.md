@@ -46,7 +46,7 @@ Two of these carry real weight:
 
 ### The generic game trio
 
-`game` carries the two load-bearing columns — `gameType` (a free-text key like `"tic-tac-toe"` that maps to a `GameDefinition`) and the `game_state` / `config` JSONB:
+`game` carries the two load-bearing columns — `gameType` (a free-text key like `"tic-tac-toe"` that maps to a `GameDefinition`) and the `game_state` / `config` JSONB — alongside lifecycle (`status`, `winner`, `startedAt`, `completedAt`) and seating (`creatorUserId`, `seatingMode`, `challengedUserId`) columns:
 
 ```ts
 export const game = pgTable(
@@ -55,13 +55,21 @@ export const game = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     gameType: text("game_type").notNull(),
     status: text("status").$type<GameStatus>().notNull().default("waiting"),
+    winner: text("winner"),
     gameState: jsonb("game_state").$type<unknown>(),
     config: jsonb("config").$type<unknown>(),
     conversationId: uuid("conversation_id").references(() => conversation.id, {
       onDelete: "set null",
     }),
+    creatorUserId: text("creator_user_id"),
     seatingMode: text("seating_mode").$type<SeatingMode>(),
+    challengedUserId: text("challenged_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => [index("game_conversation_idx").on(t.conversationId)],
 );
@@ -79,7 +87,7 @@ The remaining tables are conventional relational shapes — one line each:
 | Table | `schema.ts` | Notes |
 | --- | --- | --- |
 | `user` / `session` / `account` / `verification` | `:36`–`90` | The shape Better Auth expects; everything else FKs `user.id`. See [`auth.md`](./auth.md). |
-| `userProfile` | `:165` | One per user (`unique` FK): unique `username`, a `stats` JSONB (`ProfileStats`, `:157`), `avatar` JSONB, the three pgEnum appearance columns, a `chatLayout` JSONB, `usernameChangedAt` (cooldown gate), `lastSeenAt` (presence). |
+| `userProfile` | `:165` | One per user (`unique` FK): unique `username`, a `stats` JSONB (`ProfileStats`, `:163`), `avatar` JSONB, the three pgEnum appearance columns, a `chatLayout` JSONB, `usernameChangedAt` (cooldown gate), `lastSeenAt` (presence). |
 | `conversation` / `conversationMember` | `:212` / `:231` | A `dm` or `group`; DMs carry a unique `dmKey`. Membership has per-member read state + a `leftAt` soft-leave; mirrors the `game_player` `unique + userId index` design. |
 | `message` | `:254` | `kind` (`text` / `game_card` / …), nullable `body`, a `metadata` JSONB, an optional `gameId` link, a `deletedAt` soft delete. The composite `(conversationId, createdAt)` index powers keyset pagination. |
 | `friendship` | `:189` | `requester` / `addressee` plus a sorted unique `pairKey` so direction doesn't duplicate; indexed `(addressee, status)` and `(requester, status)`. |
@@ -94,7 +102,7 @@ The remaining tables are conventional relational shapes — one line each:
 
 ## Gotchas & invariants
 
-- **`game_state` / `config` / `move_data` are `unknown` by design.** The DB neither knows nor checks their shape; validity is owned by the game's Zod schemas and enforced at the realtime boundary (`apps/server/src/realtime/turn-based.ts:138`). Treat any `gameState` you read as untrusted until `safeParse`'d.
+- **`game_state` / `config` / `move_data` are `unknown` by design.** The DB neither knows nor checks their shape; validity is owned by the game's Zod schemas and enforced at the realtime boundary (`apps/server/src/realtime/turn-based.ts:140`). Treat any `gameState` you read as untrusted until `safeParse`'d.
 - **`$type<…>()` is compile-time only.** `status`, `seatingMode`, `kind`, `role`, etc. are plain `text`; Postgres will not reject an out-of-union value — the repository must only write legal ones.
 - **Move numbers are dense, unique, and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` is the double-submit backstop.
 - **`game_player` replaced an old `players` JSONB array.** One indexed row per seat is the convention (it powers `game_player_uq` and the `userId` index); don't reintroduce per-game arrays.
