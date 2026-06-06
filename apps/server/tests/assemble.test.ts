@@ -1,31 +1,11 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { dbState, gameCardDbMock } from "./support/game-card-state";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
 const CODE = "K7P2QX";
 
-// biome-ignore lint/suspicious/noExplicitAny: test game record
-let gameById: any = null;
-
-mock.module("@gamelobby/database", () => ({
-  games: { getGameById: async () => gameById },
-  profiles: {
-    getPublicUser: async (id: string) => ({
-      id,
-      username: "alice",
-      displayName: "Alice",
-      avatar: null,
-    }),
-    getPublicUsers: async () => [],
-  },
-  conversations: {},
-  friends: {},
-  messages: {},
-  notifications: {},
-  db: {},
-  schema: {},
-  createDb: () => ({ db: {}, client: {} }),
-}));
+mock.module("@gamelobby/database", gameCardDbMock);
 
 const { assembleMessage } = await import("../src/chat/assemble");
 
@@ -52,12 +32,13 @@ function gameCardRow(over: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-  gameById = null;
+  dbState.game = null;
+  dbState.card = null;
 });
 
 describe("assembleMessage — game-card code/UUID split", () => {
   test("swaps the wire gameId to the game code when the game is found", async () => {
-    gameById = {
+    dbState.game = {
       id: UUID,
       code: CODE,
       status: "active",
@@ -71,14 +52,14 @@ describe("assembleMessage — game-card code/UUID split", () => {
   });
 
   test("leaves the FK gameId untouched when the game is missing", async () => {
-    gameById = null;
+    dbState.game = null;
     // biome-ignore lint/suspicious/noExplicitAny: test message row
     const out = await assembleMessage(gameCardRow() as any);
     expect(out.gameId).toBe(UUID);
   });
 
   test("leaves the FK gameId untouched for a game card with no metadata", async () => {
-    gameById = {
+    dbState.game = {
       id: UUID,
       code: CODE,
       status: "active",
