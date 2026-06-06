@@ -1,4 +1,4 @@
-import type { ClientJoinRoom, ClientMakeMove } from "@gamelobby/games-core";
+import type { ClientJoinRoom, ClientMakeMove } from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { handleJoinRoom, handleMakeMove } from "./turn-based";
 

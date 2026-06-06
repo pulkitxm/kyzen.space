@@ -1,4 +1,3 @@
-import { resolveDbLatencyMs } from "./db/latency";
 import { parseUsernameCsv } from "./username-rules";
 
 function required(name: string): string {
@@ -32,10 +31,6 @@ export const env = {
     (optional("NODE_ENV") === "production" ? "info" : "debug"),
 
   databaseUrl: required("DATABASE_URL"),
-  dbLatencyMs: resolveDbLatencyMs(
-    optional("NODE_ENV", "development"),
-    number("DB_LATENCY_MS", 0),
-  ),
 
   betterAuthSecret: required("BETTER_AUTH_SECRET"),
   betterAuthUrl: optional("BETTER_AUTH_URL", "http://localhost:4000"),

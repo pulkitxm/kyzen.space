@@ -36,7 +36,7 @@ mock.module("../src/auth", () => ({
   }),
 }));
 
-mock.module("../src/db", () => ({
+mock.module("@gamelobby/database", () => ({
   profiles: {
     getProfileByUserId: async () => storedProfile,
     getProfileByUsername: async () => storedProfile,

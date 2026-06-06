@@ -1,16 +1,3 @@
-import type {
-  ConversationJson,
-  FriendshipJson,
-  GameCardMeta,
-  MessageJson,
-  NotificationJson,
-} from "@gamelobby/chat-core";
-import {
-  serializeConversation,
-  serializeFriendship,
-  serializeMessage,
-  serializeNotification,
-} from "../api/serialize";
 import {
   type ConversationRow,
   conversations,
@@ -22,7 +9,20 @@ import {
   messages,
   type NotificationRow,
   profiles,
-} from "../db";
+} from "@gamelobby/database";
+import type {
+  ConversationJson,
+  FriendshipJson,
+  GameCardMeta,
+  MessageJson,
+  NotificationJson,
+} from "@gamelobby/shared/types";
+import {
+  serializeConversation,
+  serializeFriendship,
+  serializeMessage,
+  serializeNotification,
+} from "../api/serialize";
 import { enrichGameCardMeta } from "./game-card";
 
 async function withGameCardStatus(

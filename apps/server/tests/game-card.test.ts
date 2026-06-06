@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import type { GameCardMeta } from "@gamelobby/chat-core";
-import { TIC_TAC_TOE } from "@gamelobby/games-core";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import type { GameCardMeta } from "@gamelobby/shared/types";
 import { enrichGameCardMeta } from "../src/chat/game-card";
 import * as rooms from "../src/realtime/rooms";
 
@@ -86,8 +86,16 @@ describe("enrichGameCardMeta", () => {
 let gameCard: any = null;
 const emitted: Array<{ event: string; payload: unknown }> = [];
 
-mock.module("../src/db/repositories/messages", () => ({
-  getGameCardByGameId: async () => gameCard,
+mock.module("@gamelobby/database", () => ({
+  games: {},
+  profiles: {},
+  conversations: {},
+  friends: {},
+  messages: { getGameCardByGameId: async () => gameCard },
+  notifications: {},
+  db: {},
+  schema: {},
+  createDb: () => ({ db: {}, client: {} }),
 }));
 mock.module("../src/chat/assemble", () => ({
   // biome-ignore lint/suspicious/noExplicitAny: test stub

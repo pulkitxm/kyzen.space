@@ -1,15 +1,13 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import {
-  TIC_TAC_TOE,
-  type TicTacToeState,
-  ticTacToeEngine,
-} from "@gamelobby/games-core";
+import { db, friends, games, schema } from "@gamelobby/database";
+import { ticTacToeEngine } from "@gamelobby/games-core";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import type { TicTacToeState } from "@gamelobby/shared/types";
 import { eq, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";
 import { createGameInConversation } from "../src/chat/games-in-chat-service";
 import type { ServiceResult } from "../src/chat/result";
-import { db, friends, games, schema } from "../src/db";
 
 let DB_UP = false;
 try {

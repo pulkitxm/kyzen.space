@@ -1,33 +1,31 @@
 import { seedAvatarConfig, validateAvatarConfig } from "@gamelobby/avatar";
-import { Hono } from "hono";
-import { games, profiles } from "../../db";
-import { env } from "../../env";
-import { validateChatModePref } from "../../lib/chat-layout";
+import { games, profiles } from "@gamelobby/database";
 import {
+  DEFAULT_COLOR_MODE,
   DEFAULT_PATTERN,
-  isValidPattern,
-  type PatternId,
-} from "../../lib/pattern";
+  DEFAULT_THEME,
+  DISPLAY_NAME_MAX_LENGTH,
+} from "@gamelobby/shared/constants";
 import {
   type ColorMode,
-  DEFAULT_COLOR_MODE,
-  DEFAULT_THEME,
-  isValidColorMode,
-  isValidTheme,
-  type ThemeId,
-} from "../../lib/theme";
-import { isUsernameBlocked, suggestUsernames } from "../../username";
-import {
   isReservedUsername,
+  isValidColorMode,
+  isValidPattern,
+  isValidTheme,
   isValidUsernameFormat,
   normalizeUsername,
-  usernameEditableAt,
-} from "../../username-rules";
+  type PatternId,
+  type ThemeId,
+  validateChatModePref,
+} from "@gamelobby/shared/types";
+import { Hono } from "hono";
+import { env } from "../../env";
+import { isUsernameBlocked, suggestUsernames } from "../../username";
+import { usernameEditableAt } from "../../username-rules";
 import { readJson } from "../auth-context";
 import { type AuthEnv, requireAuth } from "../middleware/auth";
 
 const RECENT_PAGE_SIZE = 5;
-const DISPLAY_NAME_MAX_LENGTH = 50;
 
 type UnavailableReason = "format" | "reserved" | "taken";
 

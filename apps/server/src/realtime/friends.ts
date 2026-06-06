@@ -1,4 +1,4 @@
-import { CHAT_EVENTS } from "@gamelobby/chat-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
 import type { Server as IOServer, Socket } from "socket.io";
 import * as friendsService from "../chat/friends-service";
 import { ack, ackErr, isObj, register, str } from "./socket-util";

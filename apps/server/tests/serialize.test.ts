@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/games-core";
+import type { GameRecord } from "@gamelobby/database";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 import { serializeGame, serializeMove } from "../src/api/serialize";
-import type { GameRecord } from "../src/db";
 
 const baseRow: GameRecord = {
   id: "g1",

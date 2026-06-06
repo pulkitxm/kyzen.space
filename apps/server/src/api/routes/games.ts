@@ -1,5 +1,5 @@
+import { games } from "@gamelobby/database";
 import { Hono } from "hono";
-import { games } from "../../db";
 import { isUuid } from "../../lib/uuid";
 import type { LoggerEnv } from "../middleware/logger";
 import { serializeGame, serializeMove } from "../serialize";

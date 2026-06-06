@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/games-core";
+import { games, profiles } from "@gamelobby/database";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 import { createGameInConversation } from "../src/chat/games-in-chat-service";
-import { games, profiles } from "../src/db";
 import { handleJoinRoom, handleMakeMove } from "../src/realtime/turn-based";
 import { createHarness, DB_UP, type TestUser } from "./harness";
 

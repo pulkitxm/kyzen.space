@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/games-core";
+import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 
 type Conv = { id: string; kind: "dm" | "group"; name: string | null } | null;
 
@@ -12,7 +12,7 @@ const notifyCalls: Array<{ userId: string; type: string }> = [];
 // biome-ignore lint/suspicious/noExplicitAny: test capture of sent message
 const sentMessages: any[] = [];
 
-mock.module("../src/db", () => ({
+mock.module("@gamelobby/database", () => ({
   conversations: {
     getById: async () => conv,
     isMember: async (_cid: string, uid: string) => members.includes(uid),

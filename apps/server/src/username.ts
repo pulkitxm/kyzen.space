@@ -1,16 +1,14 @@
 import { randomAvatarConfig } from "@gamelobby/avatar";
+import { profiles } from "@gamelobby/database";
 import {
-  createProfile,
-  getProfileByUserId,
-  getTakenUsernames,
-} from "./db/repositories/profiles";
+  isReservedUsername,
+  isValidUsernameFormat,
+  normalizeUsername,
+} from "@gamelobby/shared/types";
 import { env } from "./env";
 import { predictAvatarStyle } from "./services/gender-detection";
 import {
   buildUsernameCandidates,
-  isReservedUsername,
-  isValidUsernameFormat,
-  normalizeUsername,
   randomUsernameSuffix,
   selectSuggestions,
   slugifyBase,
@@ -38,7 +36,7 @@ export async function suggestUsernames(
     const normalized = normalizeUsername(candidate);
     return isValidUsernameFormat(normalized) && !isUsernameBlocked(normalized);
   });
-  const taken = await getTakenUsernames(candidates);
+  const taken = await profiles.getTakenUsernames(candidates);
   return selectSuggestions(candidates, taken, count);
 }
 
@@ -46,7 +44,7 @@ export async function ensureUsernameForUser(
   userId: string,
   displayName: string | null | undefined,
 ): Promise<string> {
-  const existing = await getProfileByUserId(userId);
+  const existing = await profiles.getProfileByUserId(userId);
   if (existing) return existing.username;
 
   const style = await predictAvatarStyle(displayName);
@@ -58,11 +56,11 @@ export async function ensureUsernameForUser(
 
   for (let start = 0; start < candidates.length; start += BATCH_SIZE) {
     const batch = candidates.slice(start, start + BATCH_SIZE);
-    const taken = await getTakenUsernames(batch);
+    const taken = await profiles.getTakenUsernames(batch);
     for (const candidate of batch) {
       if (taken.has(candidate.toLowerCase())) continue;
       try {
-        const profile = await createProfile({
+        const profile = await profiles.createProfile({
           userId,
           username: candidate,
           avatar,
@@ -73,7 +71,7 @@ export async function ensureUsernameForUser(
   }
 
   const fallback = `player_${randomUsernameSuffix()}`;
-  const profile = await createProfile({
+  const profile = await profiles.createProfile({
     userId,
     username: fallback,
     avatar,

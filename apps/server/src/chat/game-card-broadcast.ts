@@ -1,6 +1,6 @@
-import { CHAT_EVENTS } from "@gamelobby/chat-core";
+import { messages as messagesRepo } from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
 import type { Server as IOServer } from "socket.io";
-import * as messagesRepo from "../db/repositories/messages";
 import { emitToConv } from "../realtime/rooms";
 import { assembleMessage } from "./assemble";
 

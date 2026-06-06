@@ -1,9 +1,4 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { eq, sql } from "drizzle-orm";
-import * as conversationsService from "../src/chat/conversations-service";
-import * as friendsService from "../src/chat/friends-service";
-import * as messagesService from "../src/chat/messages-service";
-import type { ErrorStatus, ServiceResult } from "../src/chat/result";
 import {
   conversations,
   db,
@@ -11,7 +6,12 @@ import {
   messages,
   notifications,
   schema,
-} from "../src/db";
+} from "@gamelobby/database";
+import { eq, sql } from "drizzle-orm";
+import * as conversationsService from "../src/chat/conversations-service";
+import * as friendsService from "../src/chat/friends-service";
+import * as messagesService from "../src/chat/messages-service";
+import type { ErrorStatus, ServiceResult } from "../src/chat/result";
 
 let DB_UP = false;
 try {

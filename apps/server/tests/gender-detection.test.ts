@@ -16,13 +16,26 @@ mock.module("gender-detection-from-name", () => ({
 
 let createdAvatar: AvatarConfig | null = null;
 let existingProfile: { username: string } | null = null;
-mock.module("../src/db/repositories/profiles", () => ({
-  getProfileByUserId: async () => existingProfile,
-  getTakenUsernames: async () => new Set<string>(),
-  createProfile: async (input: { username: string; avatar: AvatarConfig }) => {
-    createdAvatar = input.avatar;
-    return { username: input.username };
+mock.module("@gamelobby/database", () => ({
+  games: {},
+  profiles: {
+    getProfileByUserId: async () => existingProfile,
+    getTakenUsernames: async () => new Set<string>(),
+    createProfile: async (input: {
+      username: string;
+      avatar: AvatarConfig;
+    }) => {
+      createdAvatar = input.avatar;
+      return { username: input.username };
+    },
   },
+  conversations: {},
+  friends: {},
+  messages: {},
+  notifications: {},
+  db: {},
+  schema: {},
+  createDb: () => ({ db: {}, client: {} }),
 }));
 
 const { detectedToStyle, firstNameOf, genderToStyle, predictAvatarStyle } =
