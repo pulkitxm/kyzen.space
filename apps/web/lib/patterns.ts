@@ -1,7 +1,4 @@
-import {
-  PATTERN_IDS,
-  PATTERN_STORAGE_KEY,
-} from "@gamelobby/shared/constants";
+import { PATTERN_IDS, PATTERN_STORAGE_KEY } from "@gamelobby/shared/constants";
 
 export {
   DEFAULT_PATTERN,

@@ -1,7 +1,4 @@
-import {
-  PALETTE_STORAGE_KEY,
-  THEME_IDS,
-} from "@gamelobby/shared/constants";
+import { PALETTE_STORAGE_KEY, THEME_IDS } from "@gamelobby/shared/constants";
 
 export {
   COLOR_MODES,
@@ -9,8 +6,8 @@ export {
   DEFAULT_THEME,
   getThemeDef,
   PALETTE_STORAGE_KEY,
-  THEMES,
   THEME_IDS,
+  THEMES,
 } from "@gamelobby/shared/constants";
 export {
   type ColorMode,

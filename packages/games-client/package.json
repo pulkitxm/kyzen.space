@@ -20,6 +20,7 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "@gamelobby/games-core": "workspace:*",
     "@types/bun": "^1.1.14",
     "@types/node": "^20",
     "@types/react": "^19",
