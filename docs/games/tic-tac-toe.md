@@ -93,7 +93,8 @@ A loading placeholder, `TicTacToeSkeleton`
 
 ## Source
 
-- Engine, schemas, and meta: `packages/games-core/src/games/tic-tac-toe/`
-- Type slug constant `TIC_TAC_TOE`: `packages/games-core/src/game-types.ts`
+- Engine and meta: `packages/games-core/src/games/tic-tac-toe/`
+- Schemas + types (`stateSchema`/`moveSchema`/`configSchema`): `packages/shared/src/types/games/tic-tac-toe/schemas.ts`
+- Type slug constant `TIC_TAC_TOE`: `packages/shared/src/constants/games.ts`
 - Board UI + skeleton: `packages/games-client/src/games/tic-tac-toe/`
 - Client + skeleton registration: `packages/games-client/src/registry.ts`

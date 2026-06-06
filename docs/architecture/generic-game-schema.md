@@ -10,15 +10,15 @@ If you want to know how the Drizzle declarations look, see [`database-schema.md`
 
 | Path | Responsibility |
 | --- | --- |
-| `apps/server/src/db/schema.ts:98` | `game` table declaration |
-| `apps/server/src/db/schema.ts:123` | `move` table declaration |
-| `apps/server/src/db/schema.ts:138` | `game_player` table declaration |
-| `packages/games-core/src/definition.ts` | `GameDefinition<S,I,C>` — the self-describing game unit |
-| `packages/games-core/src/engine.ts` | `GameEngine<State,Input>` — the `reduce` contract |
-| `packages/games-core/src/games/tic-tac-toe/schemas.ts` | The Zod schemas that own tic-tac-toe's blob shapes |
+| `packages/database/src/schema.ts:96` | `game` table declaration |
+| `packages/database/src/schema.ts:121` | `move` table declaration |
+| `packages/database/src/schema.ts:136` | `game_player` table declaration |
+| `packages/shared/src/types/games/definition.ts` | `GameDefinition<S,I,C>` — the self-describing game unit |
+| `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>` — the `reduce` contract |
+| `packages/shared/src/types/games/tic-tac-toe/schemas.ts` | The Zod schemas that own tic-tac-toe's blob shapes |
 | `packages/games-core/src/games/tic-tac-toe/engine.ts` | The authoritative move reducer |
 | `apps/server/src/chat/games-in-chat-service.ts` | Creates the game: seats the creator and runs `createInitialState` at creation |
-| `apps/server/src/db/repositories/games.ts` | `createGame` / `seatPlayer` / `addMove` / `updateGame` — the persistence calls |
+| `packages/database/src/repositories/games.ts` | `createGame` / `seatPlayer` / `addMove` / `updateGame` — the persistence calls |
 | `apps/server/src/realtime/turn-based.ts` | The driver that ties the three together: validate → reduce → persist |
 
 ## The three tables and what goes in them
@@ -52,7 +52,7 @@ Every JSONB column — `game_state`, `config`, `move_data` — is declared as `j
 
 ## How a `GameDefinition` maps to the columns
 
-Every registered game exports one `GameDefinition<S, I, C>` (`packages/games-core/src/definition.ts`):
+Every registered game exports one `GameDefinition<S, I, C>` (`packages/shared/src/types/games/definition.ts`):
 
 ```ts
 export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
@@ -76,22 +76,26 @@ The mapping to the database is direct:
 | `moveSchema.safeParse(payload.moveData)` result | `move.move_data` | After `reduce` accepts the move |
 | `engine.roles[seatOrder]` | `game_player.role` | Creator at creation; others on join |
 
-The engine and its Zod schemas are the same code the web client imports (`apps/web` → `@gamelobby/games-core`) — the server never has a separate validation step. Zod is the single source of truth for what's a valid `game_state` or `move_data`.
+The engine and its Zod schemas are the same code the web client imports (`apps/web` → `@gamelobby/games-core` for the engine, `@gamelobby/shared` for the schemas + types) — the server never has a separate validation step. Zod is the single source of truth for what's a valid `game_state` or `move_data`.
 
 ## Worked example — tic-tac-toe in the database
 
-Tic-tac-toe's schemas (`packages/games-core/src/games/tic-tac-toe/schemas.ts`):
+Tic-tac-toe's schemas (`packages/shared/src/types/games/tic-tac-toe/schemas.ts`):
 
 ```ts
-export const ticTacToeStateSchema = z.object({
-  board: z.array(cellSchema).length(9),
-  currentTurn: markSchema,
-}).strict();
+export const ticTacToeStateSchema = z
+  .object({
+    board: z.array(cellSchema).length(9),
+    currentTurn: markSchema,
+  })
+  .strict();
 
-export const ticTacToeMoveSchema = z.object({
-  row: z.number().int().min(0).max(2),
-  col: z.number().int().min(0).max(2),
-}).strict();
+export const ticTacToeMoveSchema = z
+  .object({
+    row: z.number().int().min(0).max(2),
+    col: z.number().int().min(0).max(2),
+  })
+  .strict();
 
 export const ticTacToeConfigSchema = z.object({}).strict();
 ```
@@ -102,7 +106,7 @@ The engine (`packages/games-core/src/games/tic-tac-toe/engine.ts`) is a plain ob
 
 ```ts
 export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
-  type: "tic-tac-toe",
+  type: TIC_TAC_TOE,
   mode: "turn-based",
   minPlayers: 2,
   maxPlayers: 2,
@@ -114,7 +118,7 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
 
 ### Phase 1 — Alice creates the game (status: `"waiting"`)
 
-Alice creates the game from a conversation. `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:60`) seats the **creator** as the first player — `firstRole = engine.roles[0]` → `"X"` (`:58`) — and initializes `game_state` in the *same* insert via `engine.createInitialState([{ role: "X" }])` (`:70`). `createGame` writes the `game` row and the creator's `game_player` row in one transaction (`apps/server/src/db/repositories/games.ts:36`). So after creation **two** rows already exist:
+Alice creates the game from a conversation. `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:19`) seats the **creator** as the first player — `firstRole` = `engine.roles[0]` → `"X"` (`const [firstRole] = engine.roles`, `:63`) — and initializes `game_state` in the *same* insert via `engine.createInitialState([{ role: firstRole }])` (`:75`). `createGame` writes the `game` row and the creator's `game_player` row in one transaction (`packages/database/src/repositories/games.ts:20`). So after creation **two** rows already exist:
 
 ```
 game row
@@ -134,11 +138,11 @@ game_player row
   seat_order : 0
 ```
 
-`game_state` is **not** `null` at creation — `createInitialState` runs immediately, so the board exists before the second player arrives. `status` stays `"waiting"` only because the game still needs a second seat to become `"active"`. `config` is `{}` — the result of `ticTacToeConfigSchema.parse({})`, validated at `games-in-chat-service.ts:30`. An empty object is still a legal value; it occupies the column so future games that **do** use config (e.g. a board-size setting) write their validated config here.
+`game_state` is **not** `null` at creation — `createInitialState` runs immediately, so the board exists before the second player arrives. `status` stays `"waiting"` only because the game still needs a second seat to become `"active"`. `config` is `{}` — the result of `definition.configSchema.safeParse({})`, validated at `games-in-chat-service.ts:35`. An empty object is still a legal value; it occupies the column so future games that **do** use config (e.g. a board-size setting) write their validated config here.
 
 ### Phase 2 — Bob joins, the last seat fills (status: `"active"`)
 
-Bob opens the game and the server seats him through `ensureSeated` (`apps/server/src/realtime/turn-based.ts:28`). `players.length` is `1` now, so his role is `engine.roles[1]` → `"O"` (`turn-based.ts:53`), and `seatPlayer` inserts his row (`:58`). Because `nextPlayers.length` (2) reaches `engine.minPlayers`, the game flips to `"active"` and `startedAt` is set (`:59`–`:61`). `game_state` is **left as-is**: the `gameRow.gameState ?? engine.createInitialState(...)` guard (`:62`–`:64`) keeps the state Alice's creation already minted — `createInitialState` does **not** run again here.
+Bob opens the game and the server seats him through `ensureSeated` (`apps/server/src/realtime/turn-based.ts:33`). `players.length` is `1` now, so his role is `engine.roles[1]` → `"O"` (`turn-based.ts:58`), and `seatPlayer` inserts his row (`:63`). Because `nextPlayers.length` (2) reaches `engine.minPlayers`, the game flips to `"active"` and `startedAt` is set (`:64`–`:66`). `game_state` is **left as-is**: the `gameRow.gameState ?? engine.createInitialState(...)` guard (`:67`–`:69`) keeps the state Alice's creation already minted — `createInitialState` does **not** run again here.
 
 ```
 game_player row
@@ -159,16 +163,16 @@ The nine-element `board` array is index-mapped as `board[row * 3 + col]`. All `n
 
 ### Phase 3 — Alice plays `{ row: 0, col: 0 }`
 
-`handleMakeMove` (`turn-based.ts:120`) runs the full validate → reduce → persist cycle:
+`handleMakeMove` (`turn-based.ts:125`) runs the full validate → reduce → persist cycle:
 
-1. **Parse the move** — `def.moveSchema.safeParse({ row: 0, col: 0 })` → ok (`turn-based.ts:138`).
-2. **Parse the stored state** — `def.stateSchema.safeParse(row.gameState)` → ok (`:140`).
-3. **Authoritative reduce** — `def.engine.reduce(state, { role: "X" }, { row: 0, col: 0 })` (`:143`). The context is just `{ role }` (`MoveContext`, `engine.ts:13`) — the engine never sees a user id.
+1. **Parse the move** — `def.moveSchema.safeParse({ row: 0, col: 0 })` → ok (`turn-based.ts:143`).
+2. **Parse the stored state** — `def.stateSchema.safeParse(row.gameState)` → ok (`:145`).
+3. **Authoritative reduce** — `def.engine.reduce(state, { role: "X" }, { row: 0, col: 0 })` (`:148`). The context is just `{ role }` (`MoveContext`, `packages/shared/src/types/games/engine.ts:13`) — the engine never sees a user id.
    - Checks `ctx.role === state.currentTurn` → `"X" === "X"` ✓
    - Checks `board[0]` is `null` ✓
    - Returns `{ board: ["X",null,…], currentTurn: "O" }`.
-4. **Insert move** — `games.addMove(...)` (`:151`); the row's `player_id` holds the mover's user id.
-5. **Update game** — `games.updateGame(...)` (`:158`) with the new `game_state`.
+4. **Insert move** — `games.addMove(...)` (`:156`); the row's `player_id` holds the mover's user id.
+5. **Update game** — `games.updateGame(...)` (`:163`) with the new `game_state`.
 
 ```
 move row
@@ -185,7 +189,7 @@ game row (updated)
 
 ### Phase 4 — Bob replies `{1,0}` then `{2,1}`; Alice completes the top row and wins
 
-Play alternates `X, O, X, O, X`: Bob takes `{1,0}` (move 2), Alice `{0,1}` (move 3), Bob `{2,1}` (move 4), and Alice closes the top row with `{0,2}` (move 5). On that last move `reduce` returns a `ReduceResult` whose `outcome` is `{ status: "completed", winnerRole: "X", draw: false }` (the `Outcome` shape from `engine.ts:1` — a *role* string, **not** a user id). `finalize` (`turn-based.ts:69`) maps `winnerRole` → the winning `user_id`, writes it to `game.winner`, flips `status` to `"completed"`, sets `completedAt`, and bumps each player's stats.
+Play alternates `X, O, X, O, X`: Bob takes `{1,0}` (move 2), Alice `{0,1}` (move 3), Bob `{2,1}` (move 4), and Alice closes the top row with `{0,2}` (move 5). On that last move `reduce` returns a `ReduceResult` whose `outcome` is `{ status: "completed", winnerRole: "X", draw: false }` (the `Outcome` shape from `packages/shared/src/types/games/engine.ts:1` — a *role* string, **not** a user id). `finalize` (`turn-based.ts:74`) maps `winnerRole` → the winning `user_id`, writes it to `game.winner`, flips `status` to `"completed"`, sets `completedAt`, and bumps each player's stats.
 
 ```
 game row (final)
@@ -280,36 +284,36 @@ After `step` resolves the tick, a new `game_state` is written with the outcome a
 
 ```
 creator creates game (seated as the first player)
-  → role = engine.roles[0]                            (games-in-chat-service.ts:58)
-  → game_state = engine.createInitialState([{ role }]) (games-in-chat-service.ts:70)
-  → insert game row + creator's game_player row        (games.ts:36)
+  → role = engine.roles[0]                            (games-in-chat-service.ts:63)
+  → game_state = engine.createInitialState([{ role }]) (games-in-chat-service.ts:75)
+  → insert game row + creator's game_player row        (games.ts:20)
       status "waiting", game_state already set
 
 each additional player joins
-  → role = engine.roles[players.length]               (turn-based.ts:53)
-  → insert game_player row (role, seat_order)          (turn-based.ts:58)
+  → role = engine.roles[players.length]               (turn-based.ts:58)
+  → insert game_player row (role, seat_order)          (turn-based.ts:63)
   → if min players reached:
-      update game row (status "active", startedAt)     (turn-based.ts:59)
-      game_state kept as-is (gameState ?? …)           (turn-based.ts:62)
+      update game row (status "active", startedAt)     (turn-based.ts:64)
+      game_state kept as-is (gameState ?? …)           (turn-based.ts:67)
 
 client emits make_move { gameId, moveData }
-  → def.moveSchema.safeParse(moveData)                (turn-based.ts:138)
-  → def.stateSchema.safeParse(row.gameState)          (turn-based.ts:140)
-  → result = def.engine.reduce(state, { role }, input) (turn-based.ts:143)
-  → insert move row (move_data, move_number)          (turn-based.ts:151)
-  → update game row (game_state: result.state)        (turn-based.ts:158)
-  → if outcome.status === "completed": finalize       (turn-based.ts:159)
+  → def.moveSchema.safeParse(moveData)                (turn-based.ts:143)
+  → def.stateSchema.safeParse(row.gameState)          (turn-based.ts:145)
+  → result = def.engine.reduce(state, { role }, input) (turn-based.ts:148)
+  → insert move row (move_data, move_number)          (turn-based.ts:156)
+  → update game row (game_state: result.state)        (turn-based.ts:163)
+  → if outcome.status === "completed": finalize       (turn-based.ts:164)
       set winner, status "completed", bump stats
 
-server broadcasts move_made + game_state to room      (turn-based.ts:161)
+server broadcasts move_made + game_state to room      (turn-based.ts:166)
 ```
 
 ## Gotchas & invariants
 
 - **`game_state` is `unknown` until `safeParse`'d.** Read the raw row and you have bytes. The repository hands you an `unknown`; the caller is responsible for parsing it through the game's Zod schema before passing it to the engine.
 - **`move_number` is dense and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` rejects a double-submit at the constraint level — the server does not need an advisory lock.
-- **Role assignment is seat-order-dependent.** The creator takes `engine.roles[0]` at creation (`games-in-chat-service.ts:58`); each later joiner takes `engine.roles[players.length]`, evaluated *before* their `game_player` row is inserted (`turn-based.ts:53`). Seat `i` always gets `roles[i]` — you cannot choose your role.
-- **`createInitialState` fires once, at creation.** `createGameInConversation` mints the initial `game_state` in the creating insert (`games-in-chat-service.ts:70`), not when the last seat fills. The `gameRow.gameState ?? engine.createInitialState(...)` guard on join (`turn-based.ts:62`) is a fallback the normal flow never triggers, because the state already exists. Reaching `"active"` only flips `status`; it does not re-mint state.
+- **Role assignment is seat-order-dependent.** The creator takes `engine.roles[0]` at creation (`games-in-chat-service.ts:63`); each later joiner takes `engine.roles[players.length]`, evaluated *before* their `game_player` row is inserted (`turn-based.ts:58`). Seat `i` always gets `roles[i]` — you cannot choose your role.
+- **`createInitialState` fires once, at creation.** `createGameInConversation` mints the initial `game_state` in the creating insert (`games-in-chat-service.ts:75`), not when the last seat fills. The `gameRow.gameState ?? engine.createInitialState(...)` guard on join (`turn-based.ts:67`) is a fallback the normal flow never triggers, because the state already exists. Reaching `"active"` only flips `status`; it does not re-mint state.
 - **`move.player_id` is plain `text`, not a foreign key.** It stores the mover's `user.id` but declares no `references()` constraint — same for `game_player.user_id`. (`user.id` is Better Auth `text`; the game tables hold it without an FK.)
 - **No per-game tables, ever.** If you find yourself thinking "I need a `connect_four_state` column," the answer is: add it to the state schema and let it live in `game_state`.
 
@@ -318,6 +322,7 @@ server broadcasts move_made + game_state to room      (turn-based.ts:161)
 - [`./database-schema.md`](./database-schema.md) — the Drizzle declarations for the three tables: column types, `$type<T>()` semantics, indexes, and `$inferSelect` row types.
 - [`./database.md`](./database.md) — how the repositories read and write these tables: the `GameRecord` join, keyset pagination, and the persist-a-move data flow.
 - [`./games-core-schemas.md`](./games-core-schemas.md) — `GameDefinition<S,I,C>`, the Zod `stateSchema` / `moveSchema` / `configSchema` that own the blob shapes, and the `.strict()` + `z.infer` discipline.
+- [`./shared.md`](./shared.md) — `@gamelobby/shared`, where the per-game schemas, `GameDefinition` / `GameEngine` types, and `GAME_TYPES` constant now live.
 - [`./games-core-engine.md`](./games-core-engine.md) — the `GameEngine` contract, how `reduce` works, and the turn-based vs. realtime split.
 - [`./realtime.md`](./realtime.md) — the Socket.IO driver that orchestrates validate → reduce → persist on every move.
 - [`./README.md`](./README.md) — the architecture index.
