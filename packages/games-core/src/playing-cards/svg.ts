@@ -1,32 +1,26 @@
-const OUT_DIR = `${import.meta.dir}/../apps/web/public/games/playing-cards`;
+import type { JokerVariant, Rank, Suit } from "@gamelobby/shared/types";
 
-const W = 360,
-  H = 504,
-  CX = 180,
-  CY = 252;
+export const CARD_WIDTH = 360;
+export const CARD_HEIGHT = 504;
+export const CARD_VIEWBOX = `0 0 ${CARD_WIDTH} ${CARD_HEIGHT}`;
 
-const SUITS = {
-  spades: { color: "#16161D", dark: true, name: "Spades", sym: "♠" },
-  hearts: { color: "#C8102E", dark: false, name: "Hearts", sym: "♥" },
-  clubs: { color: "#16161D", dark: true, name: "Clubs", sym: "♣" },
-  diamonds: { color: "#C8102E", dark: false, name: "Diamonds", sym: "♦" },
+const CX = 180;
+const CY = 252;
+
+const SUITS: Record<Suit, { color: string; name: string }> = {
+  spades: { color: "#16161D", name: "Spades" },
+  hearts: { color: "#C8102E", name: "Hearts" },
+  clubs: { color: "#16161D", name: "Clubs" },
+  diamonds: { color: "#C8102E", name: "Diamonds" },
 };
-const SUIT_ORDER = ["spades", "hearts", "clubs", "diamonds"];
-const RANKS = [
-  "A",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-  "J",
-  "Q",
-  "K",
-];
+
+const GOLD_BASE = "var(--pc-gold, var(--accent-warm, #c79a3e))";
+const ROBE_BASE = "var(--pc-robe, var(--primary, #c8102e))";
+const BACK_BASE = "var(--pc-back, var(--primary-dark, #6e1226))";
+
+function mix(base: string, pct: number, other: string): string {
+  return `color-mix(in srgb, ${base} ${pct}%, ${other})`;
+}
 
 const PIP = {
   heart:
@@ -35,7 +29,7 @@ const PIP = {
   spade:
     "M16 4 C13 11 4 13 4 20 C4 24 7.4 26.2 11 25.6 C13.5 25.2 15.1 24 16 22.2 C16.9 24 18.5 25.2 21 25.6 C24.6 26.2 28 24 28 20 C28 13 19 11 16 4 Z M12.6 29.2 C15.2 27.6 15.7 25 16 22.4 C16.3 25 16.8 27.6 19.4 29.2 Z",
 };
-function pipPathKey(suit) {
+function pipPathKey(suit: Suit): keyof typeof PIP {
   return suit === "hearts"
     ? "heart"
     : suit === "diamonds"
@@ -44,14 +38,14 @@ function pipPathKey(suit) {
 }
 
 function pip(
-  suit,
-  cx,
-  cy,
-  s,
+  suit: Suit,
+  cx: number,
+  cy: number,
+  s: number,
   rot = 0,
-  color = SUITS[suit].color,
+  color: string = SUITS[suit].color,
   flat = false,
-) {
+): string {
   const t = `translate(${cx} ${cy}) scale(${s}) rotate(${rot}) translate(-16 -16)`;
   const f = flat ? "" : ' filter="url(#emboss)"';
   if (suit === "clubs") {
@@ -64,72 +58,68 @@ function pip(
   return `<g transform="${t}" fill="${color}"${f}><path d="${PIP[pipPathKey(suit)]}"/></g>`;
 }
 
-function defs(dark) {
-  const robe = dark
-    ? `<linearGradient id="robe" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#52638D"/><stop offset="55%" stop-color="#2E3A5C"/><stop offset="100%" stop-color="#19213A"/></linearGradient>
-       <linearGradient id="robeDark" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2A3350"/><stop offset="100%" stop-color="#121931"/></linearGradient>`
-    : `<linearGradient id="robe" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#E2384D"/><stop offset="55%" stop-color="#C8102E"/><stop offset="100%" stop-color="#9C0B23"/></linearGradient>
-       <linearGradient id="robeDark" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#A60D26"/><stop offset="100%" stop-color="#760818"/></linearGradient>`;
+function defs(): string {
   return `<defs>
     <radialGradient id="card" cx="50%" cy="36%" r="85%"><stop offset="0%" stop-color="#FFFDF7"/><stop offset="62%" stop-color="#F8F1E1"/><stop offset="100%" stop-color="#EEE2C8"/></radialGradient>
     <radialGradient id="vignette" cx="50%" cy="48%" r="72%"><stop offset="58%" stop-color="#3A2A08" stop-opacity="0"/><stop offset="100%" stop-color="#3A2A08" stop-opacity="0.14"/></radialGradient>
-    <linearGradient id="goldFoil" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9A7B2E"/><stop offset="18%" stop-color="#F3D77A"/><stop offset="38%" stop-color="#C09838"/><stop offset="52%" stop-color="#FBEFC4"/><stop offset="66%" stop-color="#C09838"/><stop offset="84%" stop-color="#E6CB7E"/><stop offset="100%" stop-color="#8A6B26"/></linearGradient>
+    <linearGradient id="goldFoil" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${mix(GOLD_BASE, 60, "#241a04")}"/><stop offset="20%" stop-color="${mix(GOLD_BASE, 82, "#ffffff")}"/><stop offset="42%" stop-color="${GOLD_BASE}"/><stop offset="58%" stop-color="${mix(GOLD_BASE, 78, "#ffffff")}"/><stop offset="80%" stop-color="${GOLD_BASE}"/><stop offset="100%" stop-color="${mix(GOLD_BASE, 58, "#241a04")}"/></linearGradient>
     <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FCF8EE"/><stop offset="100%" stop-color="#F4EAD2"/></linearGradient>
-    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F6DA82"/><stop offset="50%" stop-color="#E3B23C"/><stop offset="100%" stop-color="#C18C26"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${mix(GOLD_BASE, 80, "#ffffff")}"/><stop offset="50%" stop-color="${GOLD_BASE}"/><stop offset="100%" stop-color="${mix(GOLD_BASE, 74, "#000000")}"/></linearGradient>
     <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#A85C3A"/><stop offset="100%" stop-color="#74391F"/></linearGradient>
     <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F8D8B2"/><stop offset="100%" stop-color="#EBBA8C"/></linearGradient>
     <linearGradient id="cream" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFFBEF"/><stop offset="100%" stop-color="#F2E2BF"/></linearGradient>
     <linearGradient id="flower" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F9DD6E"/><stop offset="100%" stop-color="#E8B238"/></linearGradient>
     <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#EEF2F6"/><stop offset="50%" stop-color="#C2CBD6"/><stop offset="100%" stop-color="#8A97A8"/></linearGradient>
-    ${robe}
-    <filter id="shadow" x="-25%" y="-25%" width="150%" height="160%"><feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="#1c1206" flood-opacity="0.32"/></filter>
-    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11" stitchTiles="stitch" result="t"/><feColorMatrix in="t" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.5 0.5 0.5 0 0"/></filter>
+    <linearGradient id="robe" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${mix(ROBE_BASE, 78, "#ffffff")}"/><stop offset="55%" stop-color="${ROBE_BASE}"/><stop offset="100%" stop-color="${mix(ROBE_BASE, 70, "#000000")}"/></linearGradient>
+    <linearGradient id="robeDark" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${mix(ROBE_BASE, 55, "#000000")}"/><stop offset="100%" stop-color="${mix(ROBE_BASE, 38, "#000000")}"/></linearGradient>
     <filter id="emboss" x="-45%" y="-45%" width="190%" height="190%"><feDropShadow dx="0" dy="0.5" stdDeviation="0.4" flood-color="#FFFFFF" flood-opacity="0.55"/></filter>
     <filter id="gild" x="-55%" y="-55%" width="210%" height="210%"><feDropShadow dx="0.5" dy="0.8" stdDeviation="0.5" flood-color="#B98D34" flood-opacity="0.6"/></filter>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11" stitchTiles="stitch" result="t"/><feColorMatrix in="t" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.5 0.5 0.5 0 0"/></filter>
     <clipPath id="cardClip"><rect x="8" y="8" width="344" height="488" rx="22"/></clipPath>
     <clipPath id="topClip"><rect x="92" y="96" width="176" height="156"/></clipPath>
     <pattern id="diaper" width="26" height="26" patternUnits="userSpaceOnUse" patternTransform="rotate(45 0 0)">
-      <path d="M13 4 L22 13 L13 22 L4 13 Z" fill="none" stroke="#C9A24B" stroke-width="0.8"/>
-      <circle cx="13" cy="13" r="1.1" fill="#C9A24B"/>
+      <path d="M13 4 L22 13 L13 22 L4 13 Z" fill="none" stroke="${GOLD_BASE}" stroke-width="0.8"/>
+      <circle cx="13" cy="13" r="1.1" fill="${GOLD_BASE}"/>
     </pattern>
-    <linearGradient id="backField" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6E1226"/><stop offset="100%" stop-color="#380914"/></linearGradient>
+    <linearGradient id="backField" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${BACK_BASE}"/><stop offset="100%" stop-color="${mix(BACK_BASE, 68, "#000000")}"/></linearGradient>
     <pattern id="backPat" width="34" height="34" patternUnits="userSpaceOnUse" patternTransform="rotate(45 0 0)">
-      <path d="M17 3 L31 17 L17 31 L3 17 Z" fill="none" stroke="#E3B23C" stroke-width="1" opacity="0.5"/>
-      <circle cx="17" cy="17" r="2.3" fill="#E3B23C" opacity="0.45"/>
-      <circle cx="0" cy="0" r="1.3" fill="#E3B23C" opacity="0.4"/><circle cx="34" cy="0" r="1.3" fill="#E3B23C" opacity="0.4"/><circle cx="0" cy="34" r="1.3" fill="#E3B23C" opacity="0.4"/><circle cx="34" cy="34" r="1.3" fill="#E3B23C" opacity="0.4"/>
+      <path d="M17 3 L31 17 L17 31 L3 17 Z" fill="none" stroke="${GOLD_BASE}" stroke-width="1" opacity="0.5"/>
+      <circle cx="17" cy="17" r="2.3" fill="${GOLD_BASE}" opacity="0.45"/>
+      <circle cx="0" cy="0" r="1.3" fill="${GOLD_BASE}" opacity="0.4"/><circle cx="34" cy="0" r="1.3" fill="${GOLD_BASE}" opacity="0.4"/><circle cx="0" cy="34" r="1.3" fill="${GOLD_BASE}" opacity="0.4"/><circle cx="34" cy="34" r="1.3" fill="${GOLD_BASE}" opacity="0.4"/>
     </pattern>
   </defs>`;
 }
 
-function frame() {
+function frame(): string {
   return `<rect x="8" y="8" width="344" height="488" rx="22" fill="url(#card)"/>
   <g clip-path="url(#cardClip)">
     <rect x="8" y="8" width="344" height="488" fill="#000000" filter="url(#grain)" opacity="0.06"/>
     <rect x="8" y="8" width="344" height="488" fill="url(#vignette)"/>
   </g>
   <rect x="8.6" y="8.6" width="342.8" height="486.8" rx="21.4" fill="none" stroke="url(#goldFoil)" stroke-width="2.6"/>
-  <rect x="13" y="13" width="334" height="478" rx="18" fill="none" stroke="#8A6D2F" stroke-width="0.6" opacity="0.5"/>
+  <rect x="13" y="13" width="334" height="478" rx="18" fill="none" stroke="${mix(GOLD_BASE, 70, "#000000")}" stroke-width="0.6" opacity="0.5"/>
   <rect x="17" y="17" width="326" height="470" rx="15" fill="none" stroke="url(#goldFoil)" stroke-width="1.1"/>`;
 }
-function panel(suit) {
+
+function panel(suit: Suit): string {
   return `<rect x="92" y="96" width="176" height="312" rx="11" fill="url(#panel)" stroke="url(#goldFoil)" stroke-width="1.6"/>
-  <rect x="95.5" y="99.5" width="169" height="305" rx="8.5" fill="none" stroke="#8A6D2F" stroke-width="0.5" opacity="0.4"/>
+  <rect x="95.5" y="99.5" width="169" height="305" rx="8.5" fill="none" stroke="${mix(GOLD_BASE, 70, "#000000")}" stroke-width="0.5" opacity="0.4"/>
   <rect x="98" y="102" width="164" height="300" rx="6.5" fill="none" stroke="${SUITS[suit].color}" stroke-width="0.7" opacity="0.3"/>`;
 }
 
-function indexContent(rank, suit) {
+function indexContent(rank: Rank, suit: Suit): string {
   const color = SUITS[suit].color;
-  const fs = rank === "10" ? 30 : 40;
-  const txt = `<text x="42" y="74" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="${fs}" font-weight="600" fill="${color}">${rank}</text>`;
+  const fontSize = rank === "10" ? 30 : 40;
+  const txt = `<text x="42" y="74" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="${fontSize}" font-weight="600" fill="${color}">${rank}</text>`;
   return txt + pip(suit, 42, 93, 0.72, 0, undefined, true);
 }
-function indices(rank, suit) {
+function indices(rank: Rank, suit: Suit): string {
   const g = indexContent(rank, suit);
   return `<g filter="url(#gild)">${g}</g><g filter="url(#gild)" transform="rotate(180 ${CX} ${CY})">${g}</g>`;
 }
 
 const COL = { L: 130, C: 180, R: 230 };
-const LAYOUTS = {
+const LAYOUTS: Record<string, ReadonlyArray<[keyof typeof COL, number]>> = {
   2: [
     ["C", 140],
     ["C", 364],
@@ -203,14 +193,14 @@ const LAYOUTS = {
     ["R", 364],
   ],
 };
-function numberPips(rank, suit) {
-  const S = 1.6;
-  return LAYOUTS[rank]
-    .map(([c, y]) => pip(suit, COL[c], y, S, y > CY ? 180 : 0))
+function numberPips(rank: Rank, suit: Suit): string {
+  const s = 1.6;
+  return (LAYOUTS[rank] ?? [])
+    .map(([c, y]) => pip(suit, COL[c], y, s, y > CY ? 180 : 0))
     .join("");
 }
 
-function aceContent(suit) {
+function aceContent(suit: Suit): string {
   const big = suit === "spades" ? 4.3 : 3.7;
   const flourish = `<circle cx="180" cy="252" r="66" fill="none" stroke="#E0C98A" stroke-width="1.2" opacity="0.6"/>
     <circle cx="180" cy="252" r="59" fill="none" stroke="${SUITS[suit].color}" stroke-width="0.6" opacity="0.25"/>
@@ -220,7 +210,7 @@ function aceContent(suit) {
 }
 
 const FACE = `<path d="M162,180 C162,161 170,152 180,152 C190,152 198,161 198,180 C198,200 190,213 180,213 C170,213 162,200 162,180 Z" fill="url(#skin)"/>`;
-function faceFeatures({ lips = "red", blush = true } = {}) {
+function faceFeatures({ lips = "red", blush = true } = {}): string {
   const lipMarkup =
     lips === "red"
       ? `<path d="M175,199 Q180,196 185,199 Q180,204 175,199 Z" fill="#C8102E"/><path d="M175,199 Q180,201 185,199" stroke="#9C0B23" stroke-width="0.7" fill="none"/>`
@@ -238,15 +228,15 @@ function faceFeatures({ lips = "red", blush = true } = {}) {
   ${blushMarkup}${lipMarkup}`;
 }
 const ROBE = `<path d="M148,214 C148,227 138,239 130,251 C128,253 127,256 126,258 L234,258 C233,256 232,253 230,251 C222,239 212,227 212,214 C198,229 162,229 148,214 Z" fill="url(#robe)" stroke="#000000" stroke-opacity="0.18" stroke-width="1"/>`;
-const ROBE_TRIM = `<path d="M150,220 C146,234 140,248 135,257" stroke="#E3B23C" stroke-width="1.5" fill="none" opacity="0.85"/>
-  <path d="M210,220 C214,234 220,248 225,257" stroke="#E3B23C" stroke-width="1.5" fill="none" opacity="0.85"/>`;
-function bodicePanel(suit, p1 = 0.6, p2 = 0.5) {
+const ROBE_TRIM = `<path d="M150,220 C146,234 140,248 135,257" stroke="${GOLD_BASE}" stroke-width="1.5" fill="none" opacity="0.85"/>
+  <path d="M210,220 C214,234 220,248 225,257" stroke="${GOLD_BASE}" stroke-width="1.5" fill="none" opacity="0.85"/>`;
+function bodicePanel(suit: Suit, p1 = 0.6, p2 = 0.5): string {
   return `<path d="M166,228 L194,228 L200,258 L160,258 Z" fill="#FBF3DD" stroke="#C9912A" stroke-width="0.8"/>
   <path d="M173,234 L187,234 M170,244 L190,244 M167,253 L193,253" stroke="#E0C98A" stroke-width="0.5" opacity="0.7"/>
   ${pip(suit, 180, 240, p1)}${pip(suit, 180, 253, p2)}`;
 }
 
-function queenFigure(suit) {
+function queenFigure(suit: Suit): string {
   return `
   <path d="M165,156 C145,170 143,206 156,234 L169,229 C158,207 160,180 177,165 Z" fill="url(#hair)"/>
   <path d="M195,156 C215,170 217,206 204,234 L191,229 C202,207 200,180 183,165 Z" fill="url(#hair)"/>
@@ -279,7 +269,7 @@ function queenFigure(suit) {
   <circle cx="147" cy="234" r="1.9" fill="#C8102E"/>`;
 }
 
-function kingFigure(suit) {
+function kingFigure(suit: Suit): string {
   return `
   <path d="M163,158 C150,172 150,202 161,228 L171,224 C162,206 163,182 176,168 Z" fill="url(#hair)"/>
   <path d="M197,158 C210,172 210,202 199,228 L189,224 C198,206 197,182 184,168 Z" fill="url(#hair)"/>
@@ -311,7 +301,7 @@ function kingFigure(suit) {
   <circle cx="138" cy="249" r="4" fill="url(#gold)" stroke="#A87C2A" stroke-width="0.6"/>`;
 }
 
-function jackFigure(suit) {
+function jackFigure(suit: Suit): string {
   return `
   <path d="M164,162 C153,174 153,200 163,224 L172,220 C165,202 166,182 177,170 Z" fill="url(#hair)"/>
   <path d="M196,162 C207,174 207,200 197,224 L188,220 C195,202 194,182 183,170 Z" fill="url(#hair)"/>
@@ -334,7 +324,7 @@ function jackFigure(suit) {
   <circle cx="141.5" cy="150" r="2.2" fill="url(#gold)"/>`;
 }
 
-function courtCard(rank, suit) {
+function courtCard(rank: Rank, suit: Suit): string {
   const fig =
     rank === "K"
       ? kingFigure(suit)
@@ -345,31 +335,22 @@ function courtCard(rank, suit) {
   const damask = `<rect x="98" y="102" width="164" height="300" rx="7" fill="url(#diaper)" opacity="0.22"/>`;
   return `${damask}${half}
   <g transform="rotate(180 ${CX} ${CY})">${half}</g>
-  <g stroke="#C9A24B" stroke-width="1"><line x1="100" y1="250" x2="260" y2="250"/><line x1="100" y1="254" x2="260" y2="254"/></g>
-  <circle cx="180" cy="252" r="11" fill="url(#cream)" stroke="#C9A24B" stroke-width="1.4"/>
+  <g stroke="${mix(GOLD_BASE, 80, "#ffffff")}" stroke-width="1"><line x1="100" y1="250" x2="260" y2="250"/><line x1="100" y1="254" x2="260" y2="254"/></g>
+  <circle cx="180" cy="252" r="11" fill="url(#cream)" stroke="${mix(GOLD_BASE, 80, "#ffffff")}" stroke-width="1.4"/>
   ${pip(suit, 180, 252, 0.6)}`;
 }
 
-function buildCard(rank, suit) {
-  let content;
-  if (rank === "A") content = aceContent(suit);
-  else if (rank === "J" || rank === "Q" || rank === "K")
-    content = courtCard(rank, suit);
-  else content = numberPips(rank, suit);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${rank} of ${SUITS[suit].name}">
-${defs(SUITS[suit].dark)}
-${frame()}
-${panel(suit)}
-${indices(rank, suit)}
-${content}
-</svg>`;
+function cardContent(rank: Rank, suit: Suit): string {
+  if (rank === "A") return aceContent(suit);
+  if (rank === "J" || rank === "Q" || rank === "K")
+    return courtCard(rank, suit);
+  return numberPips(rank, suit);
 }
 
-function jokerCard(variant) {
-  const dark = variant === "black";
-  const accent = dark ? "#16161D" : "#C8102E";
-  const lobeA = accent,
-    lobeB = "#2E7D4F";
+function jesterMarkup(variant: JokerVariant): string {
+  const accent = variant === "black" ? "#16161D" : "#C8102E";
+  const lobeA = accent;
+  const lobeB = "#2E7D4F";
   const word = "JOKER"
     .split("")
     .map(
@@ -378,7 +359,6 @@ function jokerCard(variant) {
     )
     .join("");
   const jester = `
-    <!-- hat lobes -->
     <path d="M168,234 C148,230 136,210 139,192 C146,203 158,210 171,216 Z" fill="${lobeB}" stroke="#000" stroke-opacity="0.15"/>
     <path d="M192,234 C212,230 224,210 221,192 C214,203 202,210 189,216 Z" fill="${lobeB}" stroke="#000" stroke-opacity="0.15"/>
     <path d="M171,222 C167,202 176,186 180,178 C184,186 193,202 189,222 Z" fill="${lobeA}" stroke="#000" stroke-opacity="0.15"/>
@@ -386,86 +366,86 @@ function jokerCard(variant) {
     <circle cx="222" cy="190" r="5" fill="url(#gold)" stroke="#A87C2A" stroke-width="0.7"/>
     <circle cx="180" cy="176" r="5" fill="url(#gold)" stroke="#A87C2A" stroke-width="0.7"/>
     <path d="M160,236 Q180,226 200,236 L197,246 Q180,238 163,246 Z" fill="url(#gold)" stroke="#A87C2A" stroke-width="0.8"/>
-    <!-- face -->
     <ellipse cx="180" cy="248" rx="16" ry="18" fill="url(#skin)"/>
     <path d="M170,244 Q174,242 178,244" stroke="#7A4A2E" stroke-width="1.3" fill="none" stroke-linecap="round"/>
     <path d="M182,244 Q186,242 190,244" stroke="#7A4A2E" stroke-width="1.3" fill="none" stroke-linecap="round"/>
     <circle cx="174" cy="247" r="1.6" fill="#5A3A28"/><circle cx="186" cy="247" r="1.6" fill="#5A3A28"/>
     <circle cx="169" cy="253" r="3" fill="#E89C9C" opacity="0.55"/><circle cx="191" cy="253" r="3" fill="#E89C9C" opacity="0.55"/>
     <path d="M172,255 Q180,263 188,255" stroke="${accent}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-    <!-- ruff collar -->
     <path d="M156,268 Q164,260 172,268 Q180,260 188,268 Q196,260 204,268 Q199,278 180,278 Q161,278 156,268 Z" fill="url(#cream)" stroke="#C9912A" stroke-width="1"/>
-    <!-- motley tunic -->
     <path d="M160,276 C150,292 146,312 146,330 L214,330 C214,312 210,292 200,276 Q180,286 160,276 Z" fill="url(#robe)" stroke="#000" stroke-opacity="0.18"/>
     <path d="M180,278 L180,330" stroke="#FBF3DD" stroke-width="1" opacity="0.5"/>
     <g fill="url(#flower)"><path d="M170,294 l5,6 l-5,6 l-5,-6 Z"/><path d="M190,294 l5,6 l-5,6 l-5,-6 Z"/><path d="M180,310 l5,6 l-5,6 l-5,-6 Z"/></g>
-    <!-- marotte (jester's sceptre) -->
     <rect x="210" y="270" width="2.6" height="40" rx="1" fill="#6B4A2A" transform="rotate(18 211 290)"/>
     <circle cx="222" cy="266" r="7" fill="url(#skin)"/>
     <path d="M215,262 q1,-7 7,-6 q6,-1 7,6 q-7,-3 -14,0 Z" fill="${accent}"/>
     <circle cx="216" cy="258" r="2" fill="url(#gold)"/><circle cx="228" cy="258" r="2" fill="url(#gold)"/>`;
   const corners = `<g>${word}</g><g transform="rotate(180 ${CX} ${CY})">${word}</g>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${variant} Joker">
-${defs(dark)}
-${frame()}
-${panel("hearts")}
-${corners}
+  return `${corners}
 ${jester}
-<text x="180" y="372" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="20" font-weight="700" letter-spacing="3" fill="${accent}">JOKER</text>
-</svg>`;
+<text x="180" y="372" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="20" font-weight="700" letter-spacing="3" fill="${accent}">JOKER</text>`;
 }
 
-function backCard() {
-  const G = "#E7C36B";
+function backMarkup(): string {
+  const gold = "#E7C36B";
   const medallion = `
     <circle cx="180" cy="252" r="66" fill="url(#backField)" stroke="url(#goldFoil)" stroke-width="2.2"/>
-    <circle cx="180" cy="252" r="57" fill="none" stroke="#E3B23C" stroke-width="0.9" opacity="0.7"/>
-    <circle cx="180" cy="252" r="51" fill="none" stroke="#E3B23C" stroke-width="0.4" opacity="0.45"/>
-    ${pip("spades", 180, 221, 0.78, 0, G, true)}
-    ${pip("hearts", 211, 252, 0.78, 0, G, true)}
-    ${pip("diamonds", 180, 283, 0.78, 0, G, true)}
-    ${pip("clubs", 149, 252, 0.78, 0, G, true)}
-    <circle cx="180" cy="252" r="14" fill="url(#goldFoil)" stroke="#8A6B26" stroke-width="0.6"/>
-    <circle cx="180" cy="252" r="5.5" fill="#5A0F1E"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Card back">
-${defs(false)}
-${frame()}
-<rect x="24" y="24" width="312" height="456" rx="16" fill="url(#backField)" stroke="url(#goldFoil)" stroke-width="1.8"/>
+    <circle cx="180" cy="252" r="57" fill="none" stroke="${GOLD_BASE}" stroke-width="0.9" opacity="0.7"/>
+    <circle cx="180" cy="252" r="51" fill="none" stroke="${GOLD_BASE}" stroke-width="0.4" opacity="0.45"/>
+    ${pip("spades", 180, 221, 0.78, 0, gold, true)}
+    ${pip("hearts", 211, 252, 0.78, 0, gold, true)}
+    ${pip("diamonds", 180, 283, 0.78, 0, gold, true)}
+    ${pip("clubs", 149, 252, 0.78, 0, gold, true)}
+    <circle cx="180" cy="252" r="14" fill="url(#goldFoil)" stroke="${mix(GOLD_BASE, 70, "#000000")}" stroke-width="0.6"/>
+    <circle cx="180" cy="252" r="5.5" fill="${mix(BACK_BASE, 80, "#000000")}"/>`;
+  return `<rect x="24" y="24" width="312" height="456" rx="16" fill="url(#backField)" stroke="url(#goldFoil)" stroke-width="1.8"/>
 <rect x="28" y="28" width="304" height="448" rx="13" fill="url(#backPat)"/>
-<rect x="31" y="31" width="298" height="442" rx="11" fill="none" stroke="#E3B23C" stroke-width="0.8" opacity="0.55"/>
-${medallion}
-</svg>`;
+<rect x="31" y="31" width="298" height="442" rx="11" fill="none" stroke="${GOLD_BASE}" stroke-width="0.8" opacity="0.55"/>
+${medallion}`;
 }
 
-const RANK_FILE_NUMBER = {
-  A: 1,
-  2: 2,
-  3: 3,
-  4: 4,
-  5: 5,
-  6: 6,
-  7: 7,
-  8: 8,
-  9: 9,
-  10: 10,
-  J: 11,
-  Q: 12,
-  K: 13,
-};
-
-let written = 0;
-for (const suit of SUIT_ORDER) {
-  for (const rank of RANKS) {
-    await Bun.write(
-      `${OUT_DIR}/${suit}/${RANK_FILE_NUMBER[rank]}.svg`,
-      buildCard(rank, suit),
-    );
-    written++;
-  }
+function prefixIds(markup: string, prefix: string): string {
+  if (!prefix) return markup;
+  return markup
+    .replace(/id="([A-Za-z][\w-]*)"/g, `id="${prefix}$1"`)
+    .replace(/url\(#([A-Za-z][\w-]*)\)/g, `url(#${prefix}$1)`);
 }
-await Bun.write(`${OUT_DIR}/joker-red.svg`, jokerCard("red"));
-await Bun.write(`${OUT_DIR}/joker-black.svg`, jokerCard("black"));
-await Bun.write(`${OUT_DIR}/back.svg`, backCard());
-written += 3;
 
-console.log(`Wrote ${written} SVGs to ${OUT_DIR}`);
+function svgDocument(label: string, body: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="${CARD_VIEWBOX}" role="img" aria-label="${label}">${body}</svg>`;
+}
+
+export function cardInner(suit: Suit, rank: Rank, idPrefix = ""): string {
+  const body = `${defs()}${frame()}${panel(suit)}${indices(rank, suit)}${cardContent(rank, suit)}`;
+  return prefixIds(body, idPrefix);
+}
+
+export function cardLabel(suit: Suit, rank: Rank): string {
+  return `${rank} of ${SUITS[suit].name}`;
+}
+
+export function cardSvg(suit: Suit, rank: Rank, idPrefix = ""): string {
+  return svgDocument(cardLabel(suit, rank), cardInner(suit, rank, idPrefix));
+}
+
+export function jokerInner(variant: JokerVariant, idPrefix = ""): string {
+  const body = `${defs()}${frame()}${panel("hearts")}${jesterMarkup(variant)}`;
+  return prefixIds(body, idPrefix);
+}
+
+export function jokerLabel(variant: JokerVariant): string {
+  return `${variant} Joker`;
+}
+
+export function jokerSvg(variant: JokerVariant, idPrefix = ""): string {
+  return svgDocument(jokerLabel(variant), jokerInner(variant, idPrefix));
+}
+
+export function cardBackInner(idPrefix = ""): string {
+  const body = `${defs()}${frame()}${backMarkup()}`;
+  return prefixIds(body, idPrefix);
+}
+
+export function cardBackSvg(idPrefix = ""): string {
+  return svgDocument("Card back", cardBackInner(idPrefix));
+}
