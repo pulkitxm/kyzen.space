@@ -70,7 +70,9 @@ fields are rejected.
 
 `TicTacToeGameClient` (`packages/games-client/src/games/tic-tac-toe/client.tsx`)
 receives a `GameClientProps` (`packages/games-client/src/types.ts`) — including
-`gameId`, `userId`, the **shared** `socket`, `connected`, `initialGame`, and
+`gameId` (the public **room code** from the `/play/<code>` URL, echoed back on
+`join_room`/`make_move`/`leave_room`; the internal game UUID never reaches the
+client), `userId`, the **shared** `socket`, `connected`, `initialGame`, and
 `initialMoves`. It does **not** open its own socket connection; it rides the same
 Socket.IO connection the chat lane uses, passed down as a prop.
 

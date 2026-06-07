@@ -2,6 +2,14 @@ export type {
   default as GameCategoryDef,
   GameCategoryId,
 } from "./categories";
+export {
+  GAME_CODE_ALPHABET,
+  GAME_CODE_LENGTH,
+  gameCodeSchema,
+  generateGameCode,
+  isGameCode,
+  normalizeGameCode,
+} from "./code";
 export { type GameType, gameTypeSchema } from "./core";
 export type {
   ConfigField,
@@ -46,5 +54,4 @@ export {
   type ServerGameStatePayload,
   type ServerMoveMadePayload,
   seatingModeSchema,
-  uuidSchema,
 } from "./wire";

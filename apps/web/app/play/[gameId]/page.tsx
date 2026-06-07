@@ -1,8 +1,10 @@
-import type {
-  ConversationJson,
-  GameJson,
-  MessageJson,
-  MoveJson,
+import {
+  type ConversationJson,
+  type GameJson,
+  isGameCode,
+  type MessageJson,
+  type MoveJson,
+  normalizeGameCode,
 } from "@gamelobby/shared/types";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -18,22 +20,21 @@ import { PlayClient } from "./play-client";
 
 export const dynamic = "force-dynamic";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 export default async function PlayPage({
   params,
 }: {
   params: Promise<{ gameId: string }>;
 }) {
   const { gameId } = await params;
-  if (!UUID_RE.test(gameId)) notFound();
+  if (!isGameCode(gameId)) notFound();
+  const code = normalizeGameCode(gameId);
+  if (code !== gameId) redirect(`/play/${code}`);
 
   const session = await getServerSession();
   if (!session?.user) redirect("/auth");
 
   const data = await serverFetchJson<{ game: GameJson; moves: MoveJson[] }>(
-    `/api/games/${gameId}`,
+    `/api/games/${code}`,
   );
   if (!data) notFound();
 
@@ -69,7 +70,7 @@ export default async function PlayPage({
 
   return (
     <PlayClient
-      gameId={gameId}
+      gameId={code}
       userId={session.user.id}
       gameType={data.game.gameType}
       initialGame={data.game}

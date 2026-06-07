@@ -269,7 +269,7 @@ export function listGameTypes(): GameType[] {
 (`packages/games-core/src/registry.ts:15`). Notes:
 
 - **`hasEngine` is a type guard** — `hasEngine(type: string): type is GameType` narrows a raw string to the `GameType` union when the check passes. The server uses it as a soft "is this a real game?" check before creating a game.
-- **`getDefinition` throws on an unknown type** — a missing game is a programming error, not a recoverable condition. (It still accepts `string` as a defensive DB-boundary measure, since the `gameType` column is `text` in Postgres.) The focused test pins the message: `getEngine("chess")` throws `"Unknown game type: chess"` (`packages/games-core/tests/tic-tac-toe.test.ts:289`).
+- **`getDefinition` throws on an unknown type** — a missing game is a programming error, not a recoverable condition. (It still accepts `string` as a defensive DB-boundary measure, since the `gameType` column is `text` in Postgres.) The focused test pins the message: `getEngine("chess")` throws `"Unknown game type: chess"` (`packages/games-core/tests/tic-tac-toe.test.ts:332`).
 - **`getEngine` erases the generics to `GameEngine<unknown, unknown>`.** See "Type erasure" below.
 - **`listGameMeta()` / `listGameTypes()` / `listDefinitions()`** are simple maps over `GAMES` (`packages/games-core/src/registry.ts:29`–`:39`) — the lobby UI calls `listGameMeta()` to render the catalog. `listGameTypes()` returns `GameType[]`, not `string[]`, and is keyed off `def.meta.type` (which is itself `GameType`).
 
@@ -355,7 +355,7 @@ function minSeats(def: GameDefinition): Seat[] {
 
 (`packages/games-core/tests/conformance.test.ts:8` and `:77`). Note the empty `{}` move: a game must remain immutable even when handed a clearly-invalid input — proof that the guards reject *before* mutating.
 
-The focused `tests/tic-tac-toe.test.ts` complements this with game-specific behavior: turn/role enforcement (`:64`), out-of-bounds and occupied-cell rejection (`:90`), all 8 win lines (`:118`), draw detection (`:188`), no-move-after-win (`:212`), and registry resolution (`:279`). New games should add a similar focused suite — conformance proves the contract, the focused suite proves the *rules*.
+The focused `tests/tic-tac-toe.test.ts` complements this with game-specific behavior: turn/role enforcement (`:64`), out-of-bounds and occupied-cell rejection (`:90`), all 8 win lines (`:118`), draw detection (`:188`), no-move-after-win (`:255`), and registry resolution (`:322`). New games should add a similar focused suite — conformance proves the contract, the focused suite proves the *rules*.
 
 ## Gotchas, invariants & conventions
 

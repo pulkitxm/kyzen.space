@@ -165,7 +165,7 @@ describe.skipIf(!DB_UP)(
       expect(message.kind).toBe("game_card");
       expect(message.gameId).toBe(game.id);
 
-      const loaded = await games.getGameById(game.id);
+      const loaded = await games.getGameByCode(game.id);
       expect(loaded?.seatingMode).toBe("challenge");
       expect(loaded?.challengedUserId).toBe(member.id);
       expect(loaded?.players).toHaveLength(1);
@@ -196,7 +196,7 @@ describe.skipIf(!DB_UP)(
       ]);
       expect(message.kind).toBe("game_card");
 
-      const loaded = await games.getGameById(game.id);
+      const loaded = await games.getGameByCode(game.id);
       expect(loaded?.seatingMode).toBe("open");
       expect(loaded?.challengedUserId).toBeNull();
       expect(loaded?.players).toHaveLength(1);
