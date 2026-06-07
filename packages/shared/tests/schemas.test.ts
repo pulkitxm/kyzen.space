@@ -5,6 +5,8 @@ import {
   clientMakeMoveSchema,
   gameJsonSchema,
   gamePlayerSchema,
+  oldMaidMoveSchema,
+  oldMaidStateSchema,
   ticTacToeMoveSchema,
   ticTacToeStateSchema,
 } from "../src/types";
@@ -67,6 +69,50 @@ describe("tic-tac-toe state schema (strict)", () => {
       ticTacToeStateSchema.safeParse({
         board: Array(9).fill(null),
         currentTurn: "Z",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("old-maid schemas (strict)", () => {
+  const card = { id: "A-H", rank: "A", suit: "H" };
+
+  test("move schema accepts only an integer card index in range", () => {
+    expect(oldMaidMoveSchema.safeParse({ cardIndex: 0 }).success).toBe(true);
+    expect(oldMaidMoveSchema.safeParse({ cardIndex: 52 }).success).toBe(false);
+    expect(oldMaidMoveSchema.safeParse({ cardIndex: 1.5 }).success).toBe(false);
+    expect(
+      oldMaidMoveSchema.safeParse({ cardIndex: 0, peek: true }).success,
+    ).toBe(false);
+  });
+
+  test("state schema validates hands and rejects unknown keys", () => {
+    expect(
+      oldMaidStateSchema.safeParse({
+        activeRoles: ["P1", "P2"],
+        currentTurn: "P1",
+        deckSeed: "seed",
+        discardedPairs: [],
+        hands: {
+          P1: [card],
+          P2: [{ id: "JOKER", rank: "JOKER", suit: "JOKER" }],
+        },
+        lastDraw: null,
+        loserRole: null,
+        winnerRoles: [],
+      }).success,
+    ).toBe(true);
+    expect(
+      oldMaidStateSchema.safeParse({
+        activeRoles: ["P1", "P2"],
+        currentTurn: "P3",
+        deckSeed: "seed",
+        discardedPairs: [],
+        hands: { P1: [card], P2: [] },
+        lastDraw: null,
+        loserRole: null,
+        winnerRoles: [],
+        extra: true,
       }).success,
     ).toBe(false);
   });

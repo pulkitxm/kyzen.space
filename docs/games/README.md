@@ -16,4 +16,5 @@ registry, so adding a game without its doc fails the suite.
 
 ## Current games
 
+- [old-maid](./old-maid.md)
 - [tic-tac-toe](./tic-tac-toe.md)
