@@ -20,6 +20,7 @@ import type {
   ProfileStats,
   SeatingMode,
 } from "@gamelobby/shared/types";
+import { generateGameCode } from "@gamelobby/shared/types";
 import {
   boolean,
   index,
@@ -97,6 +98,10 @@ export const game = pgTable(
   "game",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    code: text("code")
+      .notNull()
+      .unique("game_code_uq")
+      .$defaultFn(() => generateGameCode()),
     gameType: text("game_type").notNull(),
     status: text("status").$type<GameStatus>().notNull().default("waiting"),
     winner: text("winner"),

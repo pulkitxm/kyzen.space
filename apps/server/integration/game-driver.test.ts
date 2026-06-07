@@ -81,6 +81,12 @@ async function createDmGame(creator: TestUser, conversationId: string) {
   return res.value.game.id;
 }
 
+async function listMovesByCode(code: string) {
+  const record = await games.getGameByCode(code);
+  if (!record) throw new Error("game not found");
+  return games.listMoves(record.id);
+}
+
 describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
   it("handleJoinRoom by the creator emits game_state without seating a second player", async () => {
     const x = await h.makeUser("creatorjoin");
@@ -104,7 +110,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
       gameId,
     );
 
-    const stored = await games.getGameById(gameId);
+    const stored = await games.getGameByCode(gameId);
     expect(stored?.status).toBe("waiting");
     expect(stored?.players.length).toBe(1);
   });
@@ -124,7 +130,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
       intent: "play",
     });
 
-    const stored = await games.getGameById(gameId);
+    const stored = await games.getGameByCode(gameId);
     expect(stored?.status).toBe("active");
     expect(stored?.players.length).toBe(2);
     const seat = stored?.players.find((p) => p.userId === o.id);
@@ -154,7 +160,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
     });
 
     expect(socket.rooms.has(`game:${gameId}`)).toBe(true);
-    const stored = await games.getGameById(gameId);
+    const stored = await games.getGameByCode(gameId);
     expect(stored?.players.length).toBe(2);
     expect(stored?.players.some((p) => p.userId === third.id)).toBe(false);
   });
@@ -264,7 +270,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
       moveData: { row: 5, col: 0 },
     });
     expect(lastError(socket)?.payload).toEqual({ message: "Invalid move" });
-    const moves = await games.listMoves(gameId);
+    const moves = await listMovesByCode(gameId);
     expect(moves.length).toBe(0);
   });
 
@@ -278,7 +284,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
       intent: "play",
     });
 
-    const before = await games.listMoves(gameId);
+    const before = await listMovesByCode(gameId);
     const broadcasts: Broadcast[] = [];
     const socket = makeSocket(x.id);
     await handleMakeMove(makeIo(broadcasts) as never, socket as never, {
@@ -287,7 +293,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
     });
 
     expect(lastError(socket)).toBeUndefined();
-    const after = await games.listMoves(gameId);
+    const after = await listMovesByCode(gameId);
     expect(after.length).toBe(before.length + 1);
     expect(after[0]?.moveData).toEqual({ row: 1, col: 1 });
     expect(after[0]?.playerId).toBe(x.id);
@@ -295,7 +301,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
     expect(eventsOf(broadcasts, "move_made").length).toBe(1);
     expect(eventsOf(broadcasts, "game_state").length).toBe(1);
 
-    const stored = await games.getGameById(gameId);
+    const stored = await games.getGameByCode(gameId);
     expect((stored?.gameState as { currentTurn: string }).currentTurn).toBe(
       "O",
     );
@@ -338,7 +344,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
     expect(lastError(xSock)).toBeUndefined();
     expect(lastError(oSock)).toBeUndefined();
 
-    const stored = await games.getGameById(gameId);
+    const stored = await games.getGameByCode(gameId);
     expect(stored?.status).toBe("completed");
     expect(stored?.winner).toBe(x.id);
 
@@ -434,7 +440,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
     expect(lastError(xSock)).toBeUndefined();
     expect(lastError(oSock)).toBeUndefined();
 
-    const stored = await games.getGameById(gameId);
+    const stored = await games.getGameByCode(gameId);
     expect(stored?.status).toBe("completed");
     expect(stored?.winner).toBe("draw");
 
@@ -475,7 +481,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
       gameId,
       intent: "play",
     });
-    let stored = await games.getGameById(gameId);
+    let stored = await games.getGameByCode(gameId);
     expect(stored?.players.length).toBe(1);
     expect(stored?.players.some((p) => p.userId === bystander.id)).toBe(false);
     expect(stored?.status).toBe("waiting");
@@ -485,7 +491,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
       gameId,
       intent: "play",
     });
-    stored = await games.getGameById(gameId);
+    stored = await games.getGameByCode(gameId);
     expect(stored?.players.length).toBe(2);
     const seat = stored?.players.find((p) => p.userId === challenged.id);
     expect(seat?.role).toBe("O");

@@ -8,10 +8,18 @@ import {
   type GameType,
   type GameUpdate,
   type MoveRow,
+  normalizeGameCode,
 } from "@gamelobby/shared/types";
 import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { db } from "../client";
 import { game, gamePlayer, move } from "../schema";
+
+const GAME_CODE_MAX_ATTEMPTS = 5;
+
+function isGameCodeCollision(error: unknown): boolean {
+  const e = error as { code?: string; constraint_name?: string };
+  return e?.code === "23505" && e?.constraint_name === "game_code_uq";
+}
 
 function toGameRecord(row: GameRow, players: GamePlayer[]): GameRecord {
   return { ...row, gameType: row.gameType as GameType, players };
@@ -19,36 +27,43 @@ function toGameRecord(row: GameRow, players: GamePlayer[]): GameRecord {
 
 export async function createGame(input: CreateGameInput): Promise<GameRecord> {
   createGameInputSchema.parse(input);
-  return db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(game)
-      .values({
-        gameType: input.gameType,
-        status: input.status ?? "waiting",
-        gameState: input.gameState,
-        config: input.config ?? null,
-        winner: null,
-        conversationId: input.conversationId ?? null,
-        creatorUserId: input.creatorUserId ?? null,
-        seatingMode: input.seatingMode ?? null,
-        challengedUserId: input.challengedUserId ?? null,
-      })
-      .returning();
-    if (!row) throw new Error("Failed to create game");
-    const created = row;
-    if (input.players.length) {
-      await tx.insert(gamePlayer).values(
-        input.players.map((p, i) => ({
-          gameId: created.id,
-          userId: p.userId,
-          username: p.username,
-          role: p.role,
-          seatOrder: i,
-        })),
-      );
+  for (let attempt = 1; attempt <= GAME_CODE_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(game)
+          .values({
+            gameType: input.gameType,
+            status: input.status ?? "waiting",
+            gameState: input.gameState,
+            config: input.config ?? null,
+            winner: null,
+            conversationId: input.conversationId ?? null,
+            creatorUserId: input.creatorUserId ?? null,
+            seatingMode: input.seatingMode ?? null,
+            challengedUserId: input.challengedUserId ?? null,
+          })
+          .returning();
+        if (!row) throw new Error("Failed to create game");
+        const created = row;
+        if (input.players.length) {
+          await tx.insert(gamePlayer).values(
+            input.players.map((p, i) => ({
+              gameId: created.id,
+              userId: p.userId,
+              username: p.username,
+              role: p.role,
+              seatOrder: i,
+            })),
+          );
+        }
+        return toGameRecord(created, input.players);
+      });
+    } catch (error) {
+      if (!isGameCodeCollision(error)) throw error;
     }
-    return toGameRecord(created, input.players);
-  });
+  }
+  throw new Error("Failed to allocate a unique game code");
 }
 
 export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
@@ -68,6 +83,17 @@ export async function getGameById(id: string): Promise<GameRecord | null> {
   const [row] = await db.select().from(game).where(eq(game.id, id)).limit(1);
   if (!row) return null;
   const players = await getPlayers(id);
+  return toGameRecord(row, players);
+}
+
+export async function getGameByCode(code: string): Promise<GameRecord | null> {
+  const [row] = await db
+    .select()
+    .from(game)
+    .where(eq(game.code, normalizeGameCode(code)))
+    .limit(1);
+  if (!row) return null;
+  const players = await getPlayers(row.id);
   return toGameRecord(row, players);
 }
 

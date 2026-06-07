@@ -11,7 +11,7 @@ import {
   ticTacToeStateSchema,
 } from "../src/types";
 
-const UUID = "11111111-1111-1111-1111-111111111111";
+const CODE = "K7P2QX";
 
 describe("tic-tac-toe move schema (strict)", () => {
   test("accepts in-range integer coordinates", () => {
@@ -119,23 +119,29 @@ describe("old-maid schemas (strict)", () => {
 });
 
 describe("wire payload schemas", () => {
-  test("clientJoinRoom requires a uuid game id", () => {
+  test("clientJoinRoom requires a valid game code", () => {
     expect(clientJoinRoomSchema.safeParse({ gameId: "nope" }).success).toBe(
       false,
     );
-    expect(clientJoinRoomSchema.safeParse({ gameId: UUID }).success).toBe(true);
+    expect(clientJoinRoomSchema.safeParse({ gameId: CODE }).success).toBe(true);
+  });
+
+  test("clientJoinRoom normalizes a lowercase game code", () => {
+    const parsed = clientJoinRoomSchema.safeParse({ gameId: "k7p2qx" });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.gameId).toBe(CODE);
   });
 
   test("clientJoinRoom rejects unknown keys", () => {
     expect(
-      clientJoinRoomSchema.safeParse({ gameId: UUID, evil: 1 }).success,
+      clientJoinRoomSchema.safeParse({ gameId: CODE, evil: 1 }).success,
     ).toBe(false);
   });
 
-  test("clientMakeMove carries opaque moveData with a uuid id", () => {
+  test("clientMakeMove carries opaque moveData with a game code", () => {
     expect(
       clientMakeMoveSchema.safeParse({
-        gameId: UUID,
+        gameId: CODE,
         moveData: { row: 0, col: 0 },
       }).success,
     ).toBe(true);

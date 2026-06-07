@@ -34,6 +34,7 @@ async function withGameCardStatus(
   if (!game) return msg;
   return {
     ...msg,
+    gameId: game.code,
     metadata: enrichGameCardMeta(msg.metadata as GameCardMeta, {
       status: game.status,
       winner: game.winner,

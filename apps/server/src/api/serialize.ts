@@ -25,7 +25,7 @@ function iso(d: Date | null | undefined): string | null {
 
 export function serializeGame(row: GameRecord): GameJson {
   return {
-    id: row.id,
+    id: row.code,
     gameType: row.gameType,
     status: row.status,
     winner: row.winner,
@@ -42,10 +42,10 @@ export function serializeGame(row: GameRecord): GameJson {
   };
 }
 
-export function serializeMove(row: MoveRow): MoveJson {
+export function serializeMove(row: MoveRow, gameCode: string): MoveJson {
   return {
     id: row.id,
-    gameId: row.gameId,
+    gameId: gameCode,
     moveNumber: row.moveNumber,
     playerId: row.playerId,
     moveData: row.moveData,

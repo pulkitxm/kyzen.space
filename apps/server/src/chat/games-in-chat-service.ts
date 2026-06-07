@@ -81,7 +81,7 @@ export async function createGameInConversation(input: {
   });
 
   const metadata: GameCardMeta = {
-    gameId: created.id,
+    gameId: created.code,
     gameType: input.gameType,
     seatingMode,
     challengedUserId,
@@ -106,7 +106,7 @@ export async function createGameInConversation(input: {
         actorId: input.userId,
         payload: {
           conversationId: input.conversationId,
-          gameId: created.id,
+          gameId: created.code,
           gameType: input.gameType,
         },
       },

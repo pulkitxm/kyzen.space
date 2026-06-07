@@ -5,16 +5,16 @@ import {
   profiles,
 } from "@gamelobby/database";
 import { getDefinition } from "@gamelobby/games-core";
-import type {
-  ClientJoinRoom,
-  ClientMakeMove,
-  Outcome,
-  ServerGameStatePayload,
+import {
+  type ClientJoinRoom,
+  type ClientMakeMove,
+  isGameCode,
+  type Outcome,
+  type ServerGameStatePayload,
 } from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
 import { broadcastGameCard } from "../chat/game-card-broadcast";
-import { isUuid } from "../lib/uuid";
 import { emitToGame, joinGameRoom } from "./rooms";
 
 function err(socket: Socket, message: string) {
@@ -25,9 +25,9 @@ async function emitFullState(io: IOServer, gameRow: GameRecord) {
   const moves = await games.listMoves(gameRow.id);
   const payload: ServerGameStatePayload = {
     game: serializeGame(gameRow),
-    moves: moves.map(serializeMove),
+    moves: moves.map((m) => serializeMove(m, gameRow.code)),
   };
-  emitToGame(io, gameRow.id, "game_state", payload);
+  emitToGame(io, gameRow.code, "game_state", payload);
 }
 
 async function ensureSeated(
@@ -106,9 +106,9 @@ export async function handleJoinRoom(
   payload: ClientJoinRoom,
 ): Promise<void> {
   const userId = socket.data.userId;
-  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
+  if (!isGameCode(payload.gameId)) return err(socket, "Invalid game id");
 
-  const gameRow = await games.getGameById(payload.gameId);
+  const gameRow = await games.getGameByCode(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
 
   const { game, changed } = await ensureSeated(
@@ -117,7 +117,7 @@ export async function handleJoinRoom(
     payload.intent ?? "play",
   );
 
-  joinGameRoom(socket, payload.gameId);
+  joinGameRoom(socket, game.code);
   await emitFullState(io, game);
   if (changed) await broadcastGameCard(io, game.id);
 }
@@ -128,9 +128,9 @@ export async function handleMakeMove(
   payload: ClientMakeMove,
 ): Promise<void> {
   const userId = socket.data.userId;
-  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
+  if (!isGameCode(payload.gameId)) return err(socket, "Invalid game id");
 
-  const gameRow = await games.getGameById(payload.gameId);
+  const gameRow = await games.getGameByCode(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
   if (gameRow.status !== "active") return err(socket, "Game is not active");
 
@@ -163,14 +163,14 @@ export async function handleMakeMove(
   let updated = await games.updateGame(gameRow.id, { gameState: result.state });
   updated = await finalize(updated, result.outcome);
 
-  emitToGame(io, gameRow.id, "move_made", {
-    move: serializeMove(moveRow),
+  emitToGame(io, gameRow.code, "move_made", {
+    move: serializeMove(moveRow, gameRow.code),
     gameState: updated.gameState,
   });
   await emitFullState(io, updated);
 
   if (updated.status === "completed") {
-    emitToGame(io, gameRow.id, "game_over", { winner: updated.winner });
+    emitToGame(io, gameRow.code, "game_over", { winner: updated.winner });
     await broadcastGameCard(io, updated.id);
   }
 }

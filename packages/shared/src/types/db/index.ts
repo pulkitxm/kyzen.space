@@ -79,6 +79,7 @@ export type VerificationRow = {
 
 export type GameRow = {
   id: string;
+  code: string;
   gameType: string;
   status: GameStatus;
   winner: string | null;
