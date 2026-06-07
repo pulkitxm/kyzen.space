@@ -11,7 +11,7 @@ import {
 } from "@gamelobby/shared/types";
 import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { db } from "../client";
-import { game, gamePlayer, move } from "../schema";
+import { game, gamePlayer, move, userProfile } from "../schema";
 
 function toGameRecord(row: GameRow, players: GamePlayer[]): GameRecord {
   return { ...row, gameType: row.gameType as GameType, players };
@@ -53,14 +53,21 @@ export async function createGame(input: CreateGameInput): Promise<GameRecord> {
 
 export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
   const rows = await db
-    .select()
+    .select({
+      userId: gamePlayer.userId,
+      username: gamePlayer.username,
+      role: gamePlayer.role,
+      avatar: userProfile.avatar,
+    })
     .from(gamePlayer)
+    .leftJoin(userProfile, eq(userProfile.userId, gamePlayer.userId))
     .where(eq(gamePlayer.gameId, gameId))
     .orderBy(gamePlayer.seatOrder);
   return rows.map((r) => ({
     userId: r.userId,
     username: r.username,
     role: r.role,
+    avatar: r.avatar,
   }));
 }
 

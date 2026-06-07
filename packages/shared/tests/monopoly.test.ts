@@ -62,7 +62,7 @@ describe("monopoly move schema (strict)", () => {
     expect(
       monopolyMoveSchema.safeParse({
         type: "BUILD_HOUSE",
-        payload: { tileId: "mediterranean" },
+        payload: { tileId: "middle_ave" },
       }).success,
     ).toBe(true);
   });

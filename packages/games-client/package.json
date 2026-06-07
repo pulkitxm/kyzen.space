@@ -11,6 +11,9 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@dicebear/collection": "^9.0.0",
+    "@dicebear/core": "^9.0.0",
+    "@gamelobby/avatar": "workspace:*",
     "@gamelobby/shared": "workspace:*"
   },
   "peerDependencies": {

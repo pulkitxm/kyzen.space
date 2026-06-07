@@ -40,54 +40,74 @@ const PIPS: Record<number, [number, number][]> = {
 function DieFace({ value, color }: { value: number; color: string }) {
   const pips = (PIPS[value] ?? PIPS[1]) as [number, number][];
   return (
-    <svg viewBox="0 0 100 100" width="100%" height="100%">
+    <svg viewBox="0 0 100 100" width="100%" height="100%" style={{ display: "block" }}>
       <title>Die {value}</title>
       <rect
-        x="2"
-        y="2"
-        width="96"
-        height="96"
-        rx="16"
-        ry="16"
-        fill="var(--surface-raised)"
+        x="4"
+        y="4"
+        width="92"
+        height="92"
+        rx="18"
+        ry="18"
+        fill="var(--card)"
         stroke={color}
-        strokeWidth="3"
+        strokeWidth="6"
       />
       {pips.map(([cx, cy]) => (
-        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="9" fill={color} />
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="10" fill={color} />
       ))}
     </svg>
   );
 }
 
 const DICE_STYLE = `
-@keyframes diceShake {
-  0%   { transform: translate(0, 0) rotate(0deg); }
-  15%  { transform: translate(-4px, 3px) rotate(-8deg); }
-  30%  { transform: translate(4px, -3px) rotate(8deg); }
-  45%  { transform: translate(-3px, 4px) rotate(-5deg); }
-  60%  { transform: translate(3px, -2px) rotate(5deg); }
-  75%  { transform: translate(-2px, 3px) rotate(-3deg); }
-  90%  { transform: translate(2px, -2px) rotate(3deg); }
-  100% { transform: translate(0, 0) rotate(0deg); }
+.die-container {
+  width: 52px;
+  height: 52px;
+  perspective: 300px;
+  display: inline-block;
+  margin: 0 4px;
 }
-@keyframes diceRoll {
-  0%   { transform: rotate(0deg) scale(1); }
-  25%  { transform: rotate(180deg) scale(1.1); }
-  50%  { transform: rotate(360deg) scale(0.9); }
-  75%  { transform: rotate(540deg) scale(1.05); }
-  100% { transform: rotate(720deg) scale(1); }
+.die-cube {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.3, 1.15);
 }
-@keyframes diceBounce {
-  0%   { transform: translateY(0) scale(1); }
-  30%  { transform: translateY(-6px) scale(1.05); }
-  60%  { transform: translateY(3px) scale(0.97); }
-  80%  { transform: translateY(-2px) scale(1.02); }
-  100% { transform: translateY(0) scale(1); }
+.die-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  backface-visibility: hidden;
+  background: var(--card);
 }
-@keyframes diceGlow {
-  0%, 100% { filter: drop-shadow(0 0 6px currentColor); }
-  50%       { filter: drop-shadow(0 0 14px currentColor); }
+.die-face.face-1 { transform: rotateY(0deg) translateZ(26px); }
+.die-face.face-6 { transform: rotateY(180deg) translateZ(26px); }
+.die-face.face-3 { transform: rotateY(-90deg) translateZ(26px); }
+.die-face.face-4 { transform: rotateY(90deg) translateZ(26px); }
+.die-face.face-2 { transform: rotateX(90deg) translateZ(26px); }
+.die-face.face-5 { transform: rotateX(-90deg) translateZ(26px); }
+
+@keyframes dice3dRoll {
+  0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+  100% { transform: rotateX(720deg) rotateY(1080deg) rotateZ(360deg); }
+}
+@keyframes dice3dShake {
+  0%, 100% { transform: translate(0, 0) rotateX(0deg) rotateY(0deg); }
+  20% { transform: translate(-4px, 3px) rotateX(-25deg) rotateY(35deg); }
+  40% { transform: translate(4px, -3px) rotateX(35deg) rotateY(-25deg); }
+  60% { transform: translate(-3px, 4px) rotateX(-20deg) rotateY(45deg); }
+  80% { transform: translate(3px, -2px) rotateX(30deg) rotateY(-35deg); }
+}
+
+.die-cube.rolling {
+  animation: dice3dRoll 0.5s linear infinite;
+}
+.die-cube.shaking {
+  animation: dice3dShake 0.35s ease-in-out infinite;
 }
 `;
 
@@ -100,6 +120,15 @@ function injectDiceStyle() {
   document.head.appendChild(el);
 }
 
+const rotationMap: Record<number, { rx: number; ry: number }> = {
+  1: { rx: 0, ry: 0 },
+  2: { rx: -90, ry: 0 },
+  3: { rx: 0, ry: 90 },
+  4: { rx: 0, ry: -90 },
+  5: { rx: 90, ry: 0 },
+  6: { rx: 180, ry: 0 },
+};
+
 function Die({
   value,
   phase,
@@ -111,29 +140,29 @@ function Die({
 }) {
   injectDiceStyle();
 
-  const animation: React.CSSProperties = (() => {
-    switch (phase) {
-      case "shaking":
-        return { animation: "diceShake 0.4s ease-in-out infinite" };
-      case "rolling":
-        return {
-          animation: "diceRoll 0.6s cubic-bezier(0.25,0.46,0.45,0.94) infinite",
-        };
-      case "settling":
-        return { animation: "diceBounce 0.3s ease-out forwards" };
-      case "settled":
-        return { animation: "diceGlow 1.5s ease-in-out infinite", color };
-      default:
-        return {};
-    }
-  })();
+  const isRoll = phase === "rolling";
+  const isShake = phase === "shaking";
+  const rot = rotationMap[value] ?? rotationMap[1]!;
+
+  const style: React.CSSProperties = {};
+  if (!isRoll && !isShake) {
+    const rx = rot.rx - 12;
+    const ry = rot.ry + 12;
+    style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+  }
+
+  const cubeClasses = `die-cube ${isRoll ? "rolling" : ""} ${isShake ? "shaking" : ""}`;
 
   return (
-    <div style={{ width: 52, height: 52, ...animation }}>
-      <DieFace
-        value={value}
-        color={phase === "idle" ? "var(--muted-foreground)" : color}
-      />
+    <div className="die-container">
+      <div className={cubeClasses} style={style}>
+        <div className="die-face face-1"><DieFace value={1} color={color} /></div>
+        <div className="die-face face-2"><DieFace value={2} color={color} /></div>
+        <div className="die-face face-3"><DieFace value={3} color={color} /></div>
+        <div className="die-face face-4"><DieFace value={4} color={color} /></div>
+        <div className="die-face face-5"><DieFace value={5} color={color} /></div>
+        <div className="die-face face-6"><DieFace value={6} color={color} /></div>
+      </div>
     </div>
   );
 }

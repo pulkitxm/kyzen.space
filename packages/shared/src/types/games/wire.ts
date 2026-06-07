@@ -17,11 +17,14 @@ export type GameStatusDto = z.infer<typeof gameStatusSchema>;
 export const seatingModeSchema = z.enum(["open", "challenge"]);
 export type SeatingModeDto = z.infer<typeof seatingModeSchema>;
 
+import type { AvatarConfig } from "../avatar";
+
 export const gamePlayerSchema = z
   .object({
     userId: z.string().min(1),
     username: z.string().min(1),
     role: z.string().min(1),
+    avatar: z.custom<AvatarConfig>().nullable().optional(),
   })
   .strict();
 export type GamePlayerDto = z.infer<typeof gamePlayerSchema>;

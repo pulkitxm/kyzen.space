@@ -12,9 +12,10 @@ import type {
   UtilityTile,
 } from "@gamelobby/shared/types";
 import React, { useState } from "react";
-import { GROUP_COLORS } from "./Board";
+import { GROUP_COLORS, PlayerAvatar } from "./Board";
 import { Dice } from "./Dice";
 import type { DiceAnimPhase, UIPhase } from "./useGamePhase";
+import { FaPlus, FaMinus, FaLock, FaUnlock } from "react-icons/fa6";
 
 const CONTROLS_STYLE = `
 @keyframes playerPulse {
@@ -41,7 +42,7 @@ function injectControlsStyle() {
 }
 
 const PHASE_LABELS: Record<UIPhase, { label: string; color: string }> = {
-  WAITING_FOR_ROLL: { label: "Roll Dice", color: "#3b82f6" },
+  WAITING_FOR_ROLL: { label: "Roll Dice", color: "var(--primary)" },
   ROLLING: { label: "Rolling…", color: "#a78bfa" },
   MOVING: { label: "Moving…", color: "#f97316" },
   LANDING: { label: "Landing…", color: "#fbbf24" },
@@ -51,6 +52,7 @@ const PHASE_LABELS: Record<UIPhase, { label: string; color: string }> = {
 
 function PhaseBadge({ phase }: { phase: UIPhase }) {
   const { label, color } = PHASE_LABELS[phase];
+  const isVar = color.startsWith("var(--");
   return (
     <div
       style={{
@@ -59,8 +61,12 @@ function PhaseBadge({ phase }: { phase: UIPhase }) {
         gap: 5,
         padding: "3px 10px",
         borderRadius: 20,
-        background: `${color}18`,
-        border: `1px solid ${color}55`,
+        background: isVar
+          ? `color-mix(in srgb, ${color} 10%, transparent)`
+          : `${color}18`,
+        border: isVar
+          ? `1px solid color-mix(in srgb, ${color} 30%, transparent)`
+          : `1px solid ${color}55`,
         fontSize: 10,
         fontWeight: 700,
         color,
@@ -73,7 +79,7 @@ function PhaseBadge({ phase }: { phase: UIPhase }) {
           height: 6,
           borderRadius: "50%",
           background: color,
-          boxShadow: `0 0 6px ${color}`,
+          boxShadow: `0 0 6px ${isVar ? "var(--primary)" : color}`,
         }}
       />
       {label}
@@ -113,7 +119,12 @@ function PlayerCard({
         animation: isActive ? "playerPulse 2s ease-in-out infinite" : "none",
       }}
     >
-      <span style={{ fontSize: 18 }}>{player.token}</span>
+      <PlayerAvatar
+        avatar={(player as any).avatar}
+        username={player.name}
+        size={24}
+        className={isActive ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : ""}
+      />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -404,7 +415,6 @@ export function Controls({
   isMyTurn,
 }: ControlsProps) {
   injectControlsStyle();
-  const [logOpen, setLogOpen] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
 
   const currentPlayer = state.players[state.currentPlayerIndex];
@@ -566,6 +576,8 @@ export function Controls({
           width: 240,
           flexShrink: 0,
           fontFamily: "'Inter','Segoe UI',sans-serif",
+          height: "100%",
+          paddingRight: 4,
         }}
       >
         <div
@@ -576,6 +588,7 @@ export function Controls({
             border:
               "1px solid color-mix(in srgb, var(--primary) 25%, transparent)",
             animation: "slideUp 0.3s ease",
+            flexShrink: 0,
           }}
         >
           <div
@@ -598,7 +611,11 @@ export function Controls({
             <PhaseBadge phase={uiPhase} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 20 }}>{currentPlayer.token}</span>
+            <PlayerAvatar
+              avatar={(currentPlayer as any).avatar}
+              username={currentPlayer.name}
+              size={24}
+            />
             <div>
               <div
                 style={{
@@ -645,6 +662,7 @@ export function Controls({
             flexDirection: "column",
             alignItems: "center",
             gap: 12,
+            flexShrink: 0,
           }}
         >
           <Dice values={diceDisplay} phase={diceAnimPhase} />
@@ -993,7 +1011,7 @@ export function Controls({
           )}
         </div>
 
-        <div>
+        <div style={{ flexShrink: 0 }}>
           <div
             style={{
               fontSize: 10,
@@ -1018,10 +1036,10 @@ export function Controls({
         {ownedProperties.length > 0 && (
           <div
             style={{
-              padding: "8px 10px",
-              borderRadius: 8,
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
             }}
           >
             <div
@@ -1029,197 +1047,222 @@ export function Controls({
                 fontSize: 9,
                 color: "var(--muted-foreground)",
                 letterSpacing: 1,
-                marginBottom: 4,
+                marginBottom: 6,
+                flexShrink: 0,
               }}
             >
               YOUR PROPERTIES ({ownedProperties.length})
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {ownedProperties.map(({ op, tile }) => (
-                <div
-                  key={op.tileId}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 10,
-                    color: op.isMortgaged
-                      ? "var(--muted-foreground)"
-                      : "var(--foreground)",
-                  }}
-                >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                flex: 1,
+                overflowY: "auto",
+                paddingRight: 2,
+              }}
+            >
+              {ownedProperties.map(({ op, tile }) => {
+                const groupColor =
+                  tile.type === "Property"
+                    ? (GROUP_COLORS[(tile as PropertyTile).group] ?? "#888")
+                    : tile.type === "Railroad"
+                      ? GROUP_COLORS.Railroad
+                      : tile.type === "Utility"
+                        ? GROUP_COLORS.Utility
+                        : "#888";
+
+                return (
                   <div
+                    key={op.tileId}
                     style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 2,
-                      flexShrink: 0,
-                      background:
-                        tile.type === "Property"
-                          ? (GROUP_COLORS[(tile as PropertyTile).group] ??
-                            "#888")
-                          : "#64748b",
-                    }}
-                  />
-                  <span
-                    style={{
-                      flex: 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      padding: "8px",
+                      borderRadius: 8,
+                      background: "var(--card)",
+                      border: "1px solid var(--border)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                     }}
                   >
-                    {op.isMortgaged && "〰 "}
-                    {tile.name}
-                  </span>
-                  <span style={{ color: "var(--success)", fontSize: 9 }}>
-                    {op.houses === 5
-                      ? "🏨"
-                      : op.houses > 0
-                        ? `🏠×${op.houses}`
-                        : ""}
-                  </span>
-                  {tile.type === "Property" && !op.isMortgaged && (
-                    <>
-                      <button
-                        type="button"
-                        disabled={!isMyTurn}
-                        onClick={() => confirmBuildHouse(op.tileId)}
-                        style={smallBtnStyle}
-                        title="Build house"
+                    {/* Header: Color + Name + Badges */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div
+                        style={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: 3,
+                          flexShrink: 0,
+                          background: groupColor,
+                          border: "1px solid var(--border-muted)",
+                        }}
+                      />
+                      <span
+                        style={{
+                          flex: 1,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: op.isMortgaged ? "var(--muted-foreground)" : "var(--foreground)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
                       >
-                        +
-                      </button>
-                      {op.houses > 0 && (
+                        {tile.name}
+                      </span>
+                      {op.isMortgaged ? (
+                        <span
+                          style={{
+                            fontSize: 8,
+                            fontWeight: 800,
+                            padding: "1px 4px",
+                            borderRadius: 4,
+                            background: "color-mix(in srgb, var(--danger) 15%, transparent)",
+                            color: "var(--danger)",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Mtg
+                        </span>
+                      ) : (
+                        op.houses > 0 && (
+                          <span
+                            style={{
+                              fontSize: 8,
+                              fontWeight: 800,
+                              padding: "1px 4px",
+                              borderRadius: 4,
+                              background: "color-mix(in srgb, var(--success) 15%, transparent)",
+                              color: "var(--success)",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            {op.houses === 5 ? "🏨 Hotel" : `🏠 ×${op.houses}`}
+                          </span>
+                        )
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    {isMyTurn && (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        {tile.type === "Property" && !op.isMortgaged && (() => {
+                          const propTile = tile as PropertyTile;
+                          const groupProps = state.board.filter(
+                            (t) => t.type === "Property" && (t as PropertyTile).group === propTile.group
+                          ) as PropertyTile[];
+                          const ownedInGroup = currentPlayer.ownedProperties.filter((o) =>
+                            groupProps.some((gp) => gp.id === o.tileId)
+                          );
+                          const ownsFullGroup = ownedInGroup.length === groupProps.length;
+                          const hasHotel = op.houses >= 5;
+                          const canAfford = currentPlayer.balance >= propTile.houseCost;
+                          const buildDisabled = !ownsFullGroup || hasHotel || !canAfford;
+
+                          let buildTitle = "Build house/hotel";
+                          if (hasHotel) {
+                            buildTitle = "Already built a hotel";
+                          } else if (!ownsFullGroup) {
+                            buildTitle = `Requires owning all properties in the ${propTile.group} group (${ownedInGroup.length}/${groupProps.length})`;
+                          } else if (!canAfford) {
+                            buildTitle = `Insufficient funds (costs $${propTile.houseCost})`;
+                          }
+
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                disabled={buildDisabled}
+                                onClick={() => confirmBuildHouse(op.tileId)}
+                                style={{
+                                  ...actionBtnStyle,
+                                  opacity: buildDisabled ? 0.5 : 1,
+                                  cursor: buildDisabled ? "not-allowed" : "pointer",
+                                }}
+                                title={buildTitle}
+                              >
+                                <FaPlus size={8} /> House
+                              </button>
+                              {op.houses > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => confirmSellHouse(op.tileId)}
+                                  style={actionBtnStyle}
+                                  title="Sell house/hotel"
+                                >
+                                  <FaMinus size={8} /> House
+                                </button>
+                              )}
+                            </>
+                          );
+                        })()}
                         <button
                           type="button"
-                          disabled={!isMyTurn}
-                          onClick={() => confirmSellHouse(op.tileId)}
-                          style={smallBtnStyle}
-                          title="Sell house"
+                          disabled={!op.isMortgaged && op.houses > 0}
+                          onClick={() =>
+                            op.isMortgaged
+                              ? confirmUnmortgage(op.tileId)
+                              : confirmMortgage(op.tileId)
+                          }
+                          style={{
+                            ...actionBtnStyle,
+                            color: op.isMortgaged
+                              ? "var(--success)"
+                              : (!op.isMortgaged && op.houses > 0)
+                                ? "var(--muted-foreground)"
+                                : "var(--danger)",
+                            borderColor: op.isMortgaged
+                              ? "color-mix(in srgb, var(--success) 30%, transparent)"
+                              : (!op.isMortgaged && op.houses > 0)
+                                ? "var(--border)"
+                                : "color-mix(in srgb, var(--danger) 30%, transparent)",
+                            background: op.isMortgaged
+                              ? "color-mix(in srgb, var(--success) 8%, transparent)"
+                              : (!op.isMortgaged && op.houses > 0)
+                                ? "var(--surface)"
+                                : "color-mix(in srgb, var(--danger) 8%, transparent)",
+                            opacity: (!op.isMortgaged && op.houses > 0) ? 0.5 : 1,
+                            cursor: (!op.isMortgaged && op.houses > 0) ? "not-allowed" : "pointer",
+                          }}
+                          title={
+                            (!op.isMortgaged && op.houses > 0)
+                              ? "Must sell houses before mortgaging"
+                              : op.isMortgaged
+                                ? "Lift mortgage"
+                                : "Mortgage property"
+                          }
                         >
-                          −
+                          {op.isMortgaged ? <FaUnlock size={8} /> : <FaLock size={8} />}
+                          {op.isMortgaged ? "Unmortgage" : "Mortgage"}
                         </button>
-                      )}
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    disabled={!isMyTurn}
-                    onClick={() =>
-                      op.isMortgaged
-                        ? confirmUnmortgage(op.tileId)
-                        : confirmMortgage(op.tileId)
-                    }
-                    style={{
-                      ...smallBtnStyle,
-                      color: op.isMortgaged
-                        ? "var(--warning)"
-                        : "var(--muted-foreground)",
-                    }}
-                    title={op.isMortgaged ? "Unmortgage" : "Mortgage"}
-                  >
-                    {op.isMortgaged ? "↑" : "↓"}
-                  </button>
-                </div>
-              ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
-
-        <div
-          style={{
-            borderRadius: 10,
-            border: "1px solid var(--border)",
-            overflow: "hidden",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setLogOpen((v) => !v)}
-            style={{
-              width: "100%",
-              padding: "6px 10px",
-              background: "var(--surface)",
-              border: "none",
-              cursor: "pointer",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 9,
-                color: "var(--muted-foreground)",
-                letterSpacing: 1,
-              }}
-            >
-              GAME LOG
-            </span>
-            <span
-              style={{
-                fontSize: 11,
-                color: "var(--muted-foreground)",
-                transform: logOpen ? "rotate(180deg)" : "none",
-                transition: "transform 0.2s",
-              }}
-            >
-              ▾
-            </span>
-          </button>
-          {logOpen && <GameLogList log={state.log} />}
-        </div>
       </div>
     </>
   );
 }
 
-function GameLogList({ log }: { log: ReadonlyArray<string> }) {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const logLen = log.length;
-  React.useEffect(() => {
-    if (ref.current && logLen >= 0) {
-      ref.current.scrollTop = ref.current.scrollHeight;
-    }
-  }, [logLen]);
-  return (
-    <div
-      ref={ref}
-      style={{
-        maxHeight: 140,
-        overflowY: "auto",
-        padding: "4px 8px 6px",
-        background: "var(--surface-raised)",
-      }}
-    >
-      {log.slice(-30).map((msg, i) => (
-        <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: log items are append-only and stable
-          key={i}
-          style={{
-            padding: "3px 0",
-            borderBottom: "1px solid var(--border)",
-            fontSize: 9,
-            color: "var(--muted-foreground)",
-            lineHeight: 1.5,
-          }}
-        >
-          {msg}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const smallBtnStyle: React.CSSProperties = {
-  padding: "2px 6px",
+const actionBtnStyle: React.CSSProperties = {
+  flex: 1,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 3,
+  padding: "4px 6px",
   fontSize: 9,
-  borderRadius: 4,
+  fontWeight: 700,
+  borderRadius: 6,
   border: "1px solid var(--border)",
   background: "var(--surface)",
   color: "var(--muted-foreground)",
   cursor: "pointer",
-  fontWeight: 700,
-  flexShrink: 0,
+  transition: "all 0.15s ease",
 };

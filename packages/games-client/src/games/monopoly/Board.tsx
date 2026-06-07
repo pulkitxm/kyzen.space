@@ -9,6 +9,55 @@ import type {
 } from "@gamelobby/shared/types";
 import type React from "react";
 import { positionToCell } from "./useGamePhase";
+import { avataaars } from "@dicebear/collection";
+import { createAvatar } from "@dicebear/core";
+import { seedAvatarConfig, toDicebearOptions } from "@gamelobby/avatar";
+
+export function PlayerAvatar({
+  avatar,
+  username,
+  size,
+  className,
+}: {
+  avatar?: any;
+  username: string;
+  size: number;
+  className?: string;
+}) {
+  const resolved = avatar ?? seedAvatarConfig(username || "player");
+  const dataUri = createAvatar(
+    avataaars,
+    toDicebearOptions(resolved) as any,
+  ).toDataUri();
+
+  return (
+    <div
+      className={className}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        overflow: "hidden",
+        backgroundColor: "var(--card)",
+        border: "1px solid var(--border)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+      }}
+    >
+      {/* biome-ignore lint/performance/noImgElement: inline DiceBear URI */}
+      <img
+        src={dataUri}
+        alt={`${username}'s avatar`}
+        width={size}
+        height={size}
+        style={{ display: "block", objectFit: "cover" }}
+      />
+    </div>
+  );
+}
 
 export const GROUP_COLORS: Record<string, string> = {
   Brown: "#92400e",
@@ -49,10 +98,6 @@ const BOARD_STYLE = `
 @keyframes cardStackFloat {
   0%,100% { transform: translateY(0) rotate(-2deg); }
   50%     { transform: translateY(-4px) rotate(2deg); }
-}
-@keyframes menuGlow {
-  0%,100% { text-shadow: 0 0 20px rgba(96,165,250,0.3); }
-  50%     { text-shadow: 0 0 40px rgba(96,165,250,0.8), 0 0 60px rgba(139,92,246,0.4); }
 }
 `;
 
@@ -131,15 +176,35 @@ function TileCell({
     tile.type === "Go"
       ? "🚦"
       : tile.type === "Jail"
-        ? "⚖️"
+        ? (
+            <img
+              src="/games/monopoly/jail.png"
+              alt="Jail"
+              style={{
+                width: Math.max(28, Math.floor(cellSize * 0.65)),
+                height: Math.max(28, Math.floor(cellSize * 0.65)),
+                objectFit: "contain",
+              }}
+            />
+          )
         : tile.type === "FreeParking"
           ? "🅿️"
           : tile.type === "GoToJail"
-            ? "👮"
+            ? (
+                <img
+                  src="/games/monopoly/go-to-jail.png"
+                  alt="Go to Jail"
+                  style={{
+                    width: Math.max(28, Math.floor(cellSize * 0.65)),
+                    height: Math.max(28, Math.floor(cellSize * 0.65)),
+                    objectFit: "contain",
+                  }}
+                />
+              )
             : null;
 
   const scaledPadding = Math.max(2, Math.floor(cellSize * 0.04));
-  const scaledFontSize = Math.max(6, Math.floor(cellSize * 0.11));
+  const scaledFontSize = Math.max(7, Math.floor(cellSize * 0.13));
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: tile cell is informational
@@ -184,9 +249,12 @@ function TileCell({
       {cornerIcon && (
         <div
           style={{
-            fontSize: Math.max(12, Math.floor(cellSize * 0.23)),
+            fontSize: typeof cornerIcon === "string" ? Math.max(12, Math.floor(cellSize * 0.23)) : undefined,
             lineHeight: 1,
             margin: "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           {cornerIcon}
@@ -199,7 +267,7 @@ function TileCell({
             textAlign: "center",
             lineHeight: 1.15,
             fontWeight: 600,
-            fontSize: Math.max(5.5, Math.floor(cellSize * 0.1)),
+            fontSize: Math.max(6.5, Math.floor(cellSize * 0.12)),
             padding: "0 1px",
             color: "var(--foreground)",
             flex: 1,
@@ -214,7 +282,7 @@ function TileCell({
       {"price" in tile && (
         <div
           style={{
-            fontSize: Math.max(5, Math.floor(cellSize * 0.09)),
+            fontSize: Math.max(6, Math.floor(cellSize * 0.11)),
             color: "var(--muted-foreground)",
             marginBottom: 1,
           }}
@@ -241,11 +309,14 @@ function TileCell({
             position: "absolute",
             bottom: Math.max(1, Math.floor(cellSize * 0.03)),
             right: Math.max(1, Math.floor(cellSize * 0.03)),
-            fontSize: Math.max(6.5, Math.floor(cellSize * 0.12)),
             lineHeight: 1,
           }}
         >
-          {owner.token}
+          <PlayerAvatar
+            avatar={(owner as any).avatar}
+            username={owner.name}
+            size={cellSize * 0.22}
+          />
         </div>
       )}
     </div>
@@ -343,14 +414,9 @@ function TokensOverlay({
                 left: x,
                 top: y,
                 transform: "translate(-50%, -50%)",
-                fontSize: cellSize * 0.4,
-                lineHeight: 1,
                 transition: isAnimating
                   ? "left 0.12s ease-in-out, top 0.12s ease-in-out"
                   : "left 0.3s ease, top 0.3s ease",
-                filter: isCurrentPlayer
-                  ? "drop-shadow(0 0 5px rgba(96,165,250,0.9))"
-                  : "drop-shadow(0 2px 3px rgba(0,0,0,0.4))",
                 zIndex: isCurrentPlayer ? 5 : 4,
                 animation: isAnimating
                   ? "tokenMove 0.12s ease-in-out"
@@ -358,7 +424,12 @@ function TokensOverlay({
                 animationDelay: `${idx * 0.3}s`,
               }}
             >
-              {player.token}
+              <PlayerAvatar
+                avatar={(player as any).avatar}
+                username={player.name}
+                size={cellSize * 0.45}
+                className={isCurrentPlayer ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : ""}
+              />
             </div>
           );
         })}
@@ -421,7 +492,6 @@ function CenterOverlay({
             WebkitTextFillColor: "transparent",
             textAlign: "center",
             lineHeight: 1,
-            animation: "menuGlow 3s ease-in-out infinite",
             userSelect: "none",
           }}
         >
@@ -660,12 +730,12 @@ export function Board({
 
   const canBuyTileId =
     state.turnPhase === "LANDED" &&
-    currentPlayer &&
-    !state.players.some((p) =>
-      p.ownedProperties.some(
-        (op) => op.tileId === state.board[currentPlayer.position]?.id,
-      ),
-    )
+      currentPlayer &&
+      !state.players.some((p) =>
+        p.ownedProperties.some(
+          (op) => op.tileId === state.board[currentPlayer.position]?.id,
+        ),
+      )
       ? state.board[currentPlayer.position]?.id
       : null;
 
@@ -687,7 +757,7 @@ export function Board({
       ref={boardRef}
       style={{
         position: "relative",
-        width: "min(100%, calc(100vh - 120px))",
+        width: "min(100%, calc(100vh - 160px))",
         maxWidth: "100%",
         aspectRatio: "1",
       }}

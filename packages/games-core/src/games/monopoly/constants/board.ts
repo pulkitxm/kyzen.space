@@ -18,9 +18,9 @@ export const HOTEL_HOUSES = 5;
 export const BOARD: ReadonlyArray<Tile> = [
   { id: "go", position: 0, name: "GO", type: "Go" },
   {
-    id: "mediterranean",
+    id: "middle_ave",
     position: 1,
-    name: "Mediterranean Ave",
+    name: "Middle Ave",
     type: "Property",
     group: "Brown",
     price: 60,

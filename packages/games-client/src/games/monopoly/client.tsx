@@ -2,6 +2,7 @@
 
 import { applyAction, monopolyEngine } from "@gamelobby/games-core";
 import type {
+  GamePlayer,
   MonopolyMove,
   MonopolyState,
   Tile,
@@ -27,7 +28,7 @@ type GameJson = {
   id: string;
   status: string;
   winner: string | null;
-  players: { userId: string; username: string; role: string }[];
+  players: GamePlayer[];
   gameState: MonopolyState;
 };
 
@@ -389,10 +390,14 @@ export function MonopolyGameClient({
     if (!state) return state;
     return {
       ...state,
-      players: state.players.map((p) => ({
-        ...p,
-        name: game.players.find((gp) => gp.role === p.id)?.username ?? p.name,
-      })),
+      players: state.players.map((p) => {
+        const gp = game.players.find((x) => x.role === p.id);
+        return {
+          ...p,
+          name: gp?.username ?? p.name,
+          avatar: gp?.avatar ?? null,
+        };
+      }),
       log: state.log.map((logMsg) => {
         let msg = logMsg;
         state.players.forEach((p) => {
@@ -505,7 +510,7 @@ export function MonopolyGameClient({
     uiPhase === "LANDING" && activePlayer ? activePlayer.position : null;
 
   return (
-    <div className="flex h-full w-full flex-col justify-start">
+    <div className="flex h-full w-full flex-col justify-start min-h-0 overflow-hidden">
       {isPast ? null : !userId ? (
         <p className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
           Sign in to join this table and play.
@@ -525,19 +530,22 @@ export function MonopolyGameClient({
       <div
         style={{
           display: "flex",
-          gap: 20,
-          padding: "16px 20px",
-          alignItems: "flex-start",
-          overflow: "auto",
+          gap: 24,
+          padding: "8px 12px 16px",
+          alignItems: "stretch",
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
         }}
       >
         <div
           style={{
             flex: "1 1 auto",
             display: "flex",
-            alignItems: "flex-start",
+            alignItems: "center",
             justifyContent: "center",
             minWidth: 0,
+            height: "100%",
             position: "relative",
           }}
         >
@@ -556,7 +564,7 @@ export function MonopolyGameClient({
           <FloatingTexts texts={floatingTexts} boardSize={boardSize} />
         </div>
 
-        <div style={{ flexShrink: 0 }}>
+        <div style={{ flexShrink: 0, height: "100%" }}>
           <Controls
             state={mappedState}
             dispatch={makeMove}
