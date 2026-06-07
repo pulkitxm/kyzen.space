@@ -8,4 +8,5 @@ export const monopolyMeta: GameMeta = {
     "Buy properties, build houses, and bankrupt your opponents in this classic board game.",
   categoryId: "board-classics",
   coverImage: "/games/monopoly-cover.png",
+  layoutWidth: "max-w-6xl",
 };

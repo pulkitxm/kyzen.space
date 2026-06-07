@@ -190,7 +190,6 @@ export type Player = z.infer<typeof playerSchema>;
 export const turnPhaseSchema = z.enum([
   "WAITING_FOR_ROLL",
   "LANDED",
-  "AUCTION",
   "WAITING_FOR_END_TURN",
   "GAME_OVER",
 ]);

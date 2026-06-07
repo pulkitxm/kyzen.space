@@ -49,7 +49,7 @@ export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
 ```
 
 - `meta` — `type` (a `GameType`, not `string`), `name`, `description`,
-  `categoryId`, and an optional `coverImage`.
+  `categoryId`, an optional `coverImage`, and an optional `layoutWidth` (a Tailwind CSS class, e.g. `"max-w-6xl"`, to configure a custom container width for the game board).
 - `engine` — `mode`, `roles`, `min`/`maxPlayers`, `createInitialState`, and
   `reduce`/`step`.
 - `stateSchema` validates the `game_state` JSONB; `moveSchema` validates

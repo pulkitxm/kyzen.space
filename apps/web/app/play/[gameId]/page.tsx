@@ -1,3 +1,4 @@
+import { getDefinition, hasEngine } from "@gamelobby/games-core";
 import type {
   ConversationJson,
   GameJson,
@@ -67,11 +68,16 @@ export default async function PlayPage({
       initialLayout = normalizeChatLayout(me.profile.chatLayout);
   }
 
+  const layoutWidth = hasEngine(data.game.gameType)
+    ? getDefinition(data.game.gameType).meta.layoutWidth
+    : undefined;
+
   return (
     <PlayClient
       gameId={gameId}
       userId={session.user.id}
       gameType={data.game.gameType}
+      layoutWidth={layoutWidth}
       initialGame={data.game}
       initialMoves={data.moves}
       conversation={conversation}

@@ -62,7 +62,7 @@ export const ticTacToeDefinition: GameDefinition<
 };
 ```
 
-`GameMeta` (`packages/shared/src/types/games/definition.ts`) is the display/catalog metadata — `type` (a `GameType` slug, e.g. `"tic-tac-toe"`), `name`, `description`, `categoryId` (joins to `GAME_CATEGORIES`), and an optional `coverImage`. `ConfigField` describes one form control the lobby renders so a creator can configure a game before launch:
+`GameMeta` (`packages/shared/src/types/games/definition.ts`) is the display/catalog metadata — `type` (a `GameType` slug, e.g. `"tic-tac-toe"`), `name`, `description`, `categoryId` (joins to `GAME_CATEGORIES`), an optional `coverImage`, and an optional `layoutWidth` (a Tailwind CSS class, e.g. `"max-w-6xl"`, to configure a custom container width for the game board). `ConfigField` describes one form control the lobby renders so a creator can configure a game before launch:
 
 ```ts
 export type ConfigFieldType = "select" | "number" | "toggle";

@@ -348,7 +348,9 @@ const GameSkeleton = getGameSkeleton(gameType);
 const { socket, status } = useSocket();
 
 const gameNode = GameClient ? (
-  <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
+  <div
+    className={`mx-auto flex h-full w-full flex-col p-4 ${layoutWidth ?? "max-w-2xl"}`}
+  >
     <Suspense fallback={<GameSkeleton />}>
       <GameClient
         gameId={gameId}

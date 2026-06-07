@@ -5,7 +5,6 @@ import {
   getGameClient,
   getGameSkeleton,
 } from "@gamelobby/games-client";
-import { MONOPOLY } from "@gamelobby/shared/constants";
 import type {
   ConversationJson,
   GameType,
@@ -21,6 +20,7 @@ export function PlayClient({
   gameId,
   userId,
   gameType,
+  layoutWidth,
   initialGame,
   initialMoves,
   conversation,
@@ -32,6 +32,7 @@ export function PlayClient({
   gameId: string;
   userId: string;
   gameType: GameType;
+  layoutWidth?: string;
   initialGame: GameClientProps["initialGame"];
   initialMoves: GameClientProps["initialMoves"];
   conversation: ConversationJson | null;
@@ -46,7 +47,7 @@ export function PlayClient({
 
   const gameNode = GameClient ? (
     <div
-      className={`mx-auto flex h-full w-full flex-col p-4 ${gameType === MONOPOLY ? "max-w-6xl" : "max-w-2xl"}`}
+      className={`mx-auto flex h-full w-full flex-col p-4 ${layoutWidth ?? "max-w-2xl"}`}
     >
       <Suspense fallback={<GameSkeleton />}>
         <GameClient

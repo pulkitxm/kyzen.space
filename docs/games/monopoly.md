@@ -63,6 +63,7 @@ Monopoly moves are a discriminated union of type-safe actions:
 The Monopoly UI resides in `packages/games-client/src/games/monopoly/` and is lazy-loaded by the game lobby.
 - **Live play:** Syncs visual state through a local `displayedState`. When a roll is made, walks the player token step-by-step with sound effects. Auto-draws cards and auto-ends turns if the active player is idle.
 - **Replay:** Scrub through match history move-by-move.
+- **Layout:** Declares `layoutWidth: "max-w-6xl"` in `meta.ts` to provide a wider board container on the play screen.
 
 ## Source
 
