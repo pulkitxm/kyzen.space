@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: gamelobby
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
     profiles:
       - redis
     ports:
-      - "6379:6379"
+      - "${REDIS_HOST_PORT:-6379}:6379"
     restart: unless-stopped
 
   # Lightweight DB UI: `bun run db:studio`
@@ -36,7 +36,7 @@ services:
     depends_on:
       - postgres
     ports:
-      - "127.0.0.1:18081:8080"
+      - "127.0.0.1:${ADMINER_HOST_PORT:-18081}:8080"
     restart: unless-stopped
 
 volumes:
