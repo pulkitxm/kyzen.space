@@ -1,26 +1,21 @@
-'use client';
+"use client";
 
-import React from 'react';
-import type { GameState, Tile, Player, Action } from '../types';
-import type { PropertyTile } from '../types';
-import { positionToCell } from './useGamePhase';
-
-// ─── Tile color palette ───────────────────────────────────────────────────────
+import type React from "react";
+import type { Action, GameState, Player, PropertyTile, Tile } from "../types";
+import { positionToCell } from "./useGamePhase";
 
 export const GROUP_COLORS: Record<string, string> = {
-  Brown:    '#92400e',
-  LightBlue:'#38bdf8',
-  Pink:     '#ec4899',
-  Orange:   '#f97316',
-  Red:      '#ef4444',
-  Yellow:   '#eab308',
-  Green:    '#22c55e',
-  DarkBlue: '#3b82f6',
-  Railroad: '#64748b',
-  Utility:  '#a78bfa',
+  Brown: "#92400e",
+  LightBlue: "#38bdf8",
+  Pink: "#ec4899",
+  Orange: "#f97316",
+  Red: "#ef4444",
+  Yellow: "#eab308",
+  Green: "#22c55e",
+  DarkBlue: "#3b82f6",
+  Railroad: "#64748b",
+  Utility: "#a78bfa",
 };
-
-// ─── Keyframes ────────────────────────────────────────────────────────────────
 
 const BOARD_STYLE = `
 @keyframes tilePulse {
@@ -57,17 +52,17 @@ const BOARD_STYLE = `
 
 let styleInjected = false;
 function injectBoardStyle() {
-  if (styleInjected || typeof document === 'undefined') return;
+  if (styleInjected || typeof document === "undefined") return;
   styleInjected = true;
-  const el = document.createElement('style');
+  const el = document.createElement("style");
   el.textContent = BOARD_STYLE;
   document.head.appendChild(el);
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function tileOwner(state: GameState, tileId: string): Player | undefined {
-  return state.players.find((p) => p.ownedProperties.some((op) => op.tileId === tileId));
+  return state.players.find((p) =>
+    p.ownedProperties.some((op) => op.tileId === tileId),
+  );
 }
 
 function tileHouses(state: GameState, tileId: string): number {
@@ -77,8 +72,6 @@ function tileHouses(state: GameState, tileId: string): number {
   }
   return 0;
 }
-
-// ─── Tile cell ────────────────────────────────────────────────────────────────
 
 interface TileCellProps {
   tile: Tile;
@@ -90,115 +83,167 @@ interface TileCellProps {
   cellSize: number;
 }
 
-function TileCell({ tile, state, isLanding, isDestination, canBuy, onClick, cellSize }: TileCellProps) {
+function TileCell({
+  tile,
+  state,
+  isLanding,
+  isDestination,
+  canBuy,
+  onClick,
+  cellSize,
+}: TileCellProps) {
   const owner = tileOwner(state, tile.id);
   const houses = tileHouses(state, tile.id);
   const groupColor =
-    tile.type === 'Property' ? GROUP_COLORS[(tile as PropertyTile).group]
-    : tile.type === 'Railroad' ? GROUP_COLORS.Railroad
-    : tile.type === 'Utility' ? GROUP_COLORS.Utility
-    : undefined;
+    tile.type === "Property"
+      ? GROUP_COLORS[(tile as PropertyTile).group]
+      : tile.type === "Railroad"
+        ? GROUP_COLORS.Railroad
+        : tile.type === "Utility"
+          ? GROUP_COLORS.Utility
+          : undefined;
 
   const isBuyable =
-    tile.type === 'Property' || tile.type === 'Railroad' || tile.type === 'Utility';
+    tile.type === "Property" ||
+    tile.type === "Railroad" ||
+    tile.type === "Utility";
 
-  let animation = 'none';
+  let animation = "none";
   let extraStyle: React.CSSProperties = {};
   if (isLanding) {
-    animation = 'tilePulse 0.5s ease-out';
+    animation = "tilePulse 0.5s ease-out";
   } else if (isDestination) {
-    animation = 'destGlow 0.8s ease-in-out infinite';
-    extraStyle = { background: '#fffbeb' }; // warm highlight on destination
+    animation = "destGlow 0.8s ease-in-out infinite";
+    extraStyle = {
+      background: "color-mix(in srgb, var(--warning) 15%, var(--card))",
+    };
   } else if (canBuy) {
-    animation = 'tileGlowGreen 1.5s ease-in-out infinite';
+    animation = "tileGlowGreen 1.5s ease-in-out infinite";
   }
 
-  // Special corner tiles get icons
   const cornerIcon =
-    tile.type === 'Go' ? '🚦'
-    : tile.type === 'Jail' ? '⚖️'
-    : tile.type === 'FreeParking' ? '🅿️'
-    : tile.type === 'GoToJail' ? '👮'
-    : null;
+    tile.type === "Go"
+      ? "🚦"
+      : tile.type === "Jail"
+        ? "⚖️"
+        : tile.type === "FreeParking"
+          ? "🅿️"
+          : tile.type === "GoToJail"
+            ? "👮"
+            : null;
 
   const scaledPadding = Math.max(2, Math.floor(cellSize * 0.04));
   const scaledFontSize = Math.max(6, Math.floor(cellSize * 0.11));
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: tile cell is informational
+    // biome-ignore lint/a11y/useKeyWithClickEvents: tile cell is informational and key-navigated via main controls
     <div
       onClick={onClick}
       title={tile.name}
       style={{
-        width: '100%', height: '100%',
-        background: '#ffffff',
-        border: `1px solid #d1d5db`,
+        width: "100%",
+        height: "100%",
+        background: "var(--card)",
+        border: "1px solid var(--border)",
         borderRadius: 2,
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'space-between',
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "space-between",
         padding: scaledPadding,
-        boxSizing: 'border-box',
+        boxSizing: "border-box",
         fontSize: scaledFontSize,
-        color: '#374151',
-        overflow: 'hidden',
-        position: 'relative',
-        cursor: isBuyable ? 'pointer' : 'default',
-        transition: 'background 0.15s',
+        color: "var(--muted-foreground)",
+        overflow: "hidden",
+        position: "relative",
+        cursor: isBuyable ? "pointer" : "default",
+        transition: "background 0.15s",
         animation,
         ...extraStyle,
       }}
     >
-      {/* Color band */}
+      {}
       {groupColor && (
-        <div style={{
-          width: '100%', height: Math.max(5, Math.floor(cellSize * 0.12)),
-          background: groupColor,
-          borderRadius: '1px 1px 0 0',
-          flexShrink: 0,
-        }} />
+        <div
+          style={{
+            width: "100%",
+            height: Math.max(5, Math.floor(cellSize * 0.12)),
+            background: groupColor,
+            borderRadius: "1px 1px 0 0",
+            flexShrink: 0,
+          }}
+        />
       )}
 
-      {/* Corner icon */}
+      {}
       {cornerIcon && (
-        <div style={{ fontSize: Math.max(12, Math.floor(cellSize * 0.23)), lineHeight: 1, margin: 'auto' }}>{cornerIcon}</div>
+        <div
+          style={{
+            fontSize: Math.max(12, Math.floor(cellSize * 0.23)),
+            lineHeight: 1,
+            margin: "auto",
+          }}
+        >
+          {cornerIcon}
+        </div>
       )}
 
-      {/* Name */}
+      {}
       {!cornerIcon && (
-        <div style={{
-          textAlign: 'center', lineHeight: 1.15,
-          fontWeight: 600, fontSize: Math.max(5.5, Math.floor(cellSize * 0.10)),
-          padding: '0 1px',
-          color: '#1f2937',
-          flex: 1,
-          display: 'flex', alignItems: 'center',
-        }}>
+        <div
+          style={{
+            textAlign: "center",
+            lineHeight: 1.15,
+            fontWeight: 600,
+            fontSize: Math.max(5.5, Math.floor(cellSize * 0.1)),
+            padding: "0 1px",
+            color: "var(--foreground)",
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
           {tile.name}
         </div>
       )}
 
-      {/* Price */}
-      {'price' in tile && (
-        <div style={{ fontSize: Math.max(5, Math.floor(cellSize * 0.09)), color: '#6b7280', marginBottom: 1 }}>
+      {"price" in tile && (
+        <div
+          style={{
+            fontSize: Math.max(5, Math.floor(cellSize * 0.09)),
+            color: "var(--muted-foreground)",
+            marginBottom: 1,
+          }}
+        >
           ${(tile as PropertyTile).price}
         </div>
       )}
 
-      {/* Houses */}
+      {}
       {houses > 0 && (
-        <div style={{ fontSize: Math.max(6.5, Math.floor(cellSize * 0.12)), color: houses === 5 ? '#f97316' : '#16a34a', lineHeight: 1 }}>
-          {houses === 5 ? '🏨' : '🏠'.repeat(houses)}
+        <div
+          style={{
+            fontSize: Math.max(6.5, Math.floor(cellSize * 0.12)),
+            color: houses === 5 ? "#f97316" : "#16a34a",
+            lineHeight: 1,
+          }}
+        >
+          {houses === 5 ? "🏨" : "🏠".repeat(houses)}
         </div>
       )}
 
-      {/* Owner dot */}
+      {}
       {owner && (
-        <div style={{
-          position: 'absolute',
-          bottom: Math.max(1, Math.floor(cellSize * 0.03)),
-          right: Math.max(1, Math.floor(cellSize * 0.03)),
-          fontSize: Math.max(6.5, Math.floor(cellSize * 0.12)),
-          lineHeight: 1,
-        }}>
+        <div
+          style={{
+            position: "absolute",
+            bottom: Math.max(1, Math.floor(cellSize * 0.03)),
+            right: Math.max(1, Math.floor(cellSize * 0.03)),
+            fontSize: Math.max(6.5, Math.floor(cellSize * 0.12)),
+            lineHeight: 1,
+          }}
+        >
           {owner.token}
         </div>
       )}
@@ -206,42 +251,30 @@ function TileCell({ tile, state, isLanding, isDestination, canBuy, onClick, cell
   );
 }
 
-// ─── Grid builder (9×9 = 32 tiles) ──────────────────────────────────────────
-//
-// Row 0 (top):   pos 16,17,18,19,20,21,22,23,24
-// Col 0 (left):  pos 15,14,13,12,11,10,9  (rows 1-7)
-// Row 8 (bot):   pos 8,7,6,5,4,3,2,1,0
-// Col 8 (right): pos 25,26,27,28,29,30,31 (rows 1-7)
-// Center 7×7 (rows 1-7, cols 1-7) = null
-
 function buildGrid(board: Tile[]): (Tile | null)[][] {
   const COLS = 9;
   const ROWS = 9;
-  const grid: (Tile | null)[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+  const grid: (Tile | null)[][] = Array.from({ length: ROWS }, () =>
+    Array(COLS).fill(null),
+  );
 
   const byPos = Object.fromEntries(board.map((t) => [t.position, t]));
 
-  // Bottom row (row 8): pos 0 (col 8) … pos 8 (col 0)
   for (let col = 0; col <= 8; col++) {
     grid[8][col] = byPos[8 - col] ?? null;
   }
-  // Top row (row 0): pos 16 (col 0) … pos 24 (col 8)
   for (let col = 0; col <= 8; col++) {
     grid[0][col] = byPos[16 + col] ?? null;
   }
-  // Left col (col 0): pos 15 (row 1) … pos 9 (row 7)
   for (let row = 1; row <= 7; row++) {
     grid[row][0] = byPos[16 - row] ?? null;
   }
-  // Right col (col 8): pos 25 (row 1) … pos 31 (row 7)
   for (let row = 1; row <= 7; row++) {
     grid[row][8] = byPos[24 + row] ?? null;
   }
 
   return grid;
 }
-
-// ─── Token overlay ────────────────────────────────────────────────────────────
 
 interface TokensOverlayProps {
   state: GameState;
@@ -250,59 +283,84 @@ interface TokensOverlayProps {
   boardSize: number;
 }
 
-function TokensOverlay({ state, animatedPositions, isMoving, boardSize }: TokensOverlayProps) {
+function TokensOverlay({
+  state,
+  animatedPositions,
+  isMoving,
+  boardSize,
+}: TokensOverlayProps) {
   const cellSize = boardSize / 9;
 
   return (
-    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
-      {state.players.filter((p) => !p.isBankrupt).map((player, idx) => {
-        const pos = animatedPositions[player.id] ?? player.position;
-        const [row, col] = positionToCell(pos);
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        zIndex: 10,
+      }}
+    >
+      {state.players
+        .filter((p) => !p.isBankrupt)
+        .map((player, idx) => {
+          const pos = animatedPositions[player.id] ?? player.position;
+          const [row, col] = positionToCell(pos);
 
-        const sameCell = state.players.filter(
-          (p) => !p.isBankrupt && (animatedPositions[p.id] ?? p.position) === pos
-        );
-        const myIdx = sameCell.findIndex((p) => p.id === player.id);
-        const offsets = [
-          [0, 0], [6, -6], [-6, 6], [6, 6], [-6, -6],
-          [10, 0], [-10, 0], [0, 10], [0, -10],
-        ];
-        const [ox, oy] = offsets[myIdx] ?? [0, 0];
+          const sameCell = state.players.filter(
+            (p) =>
+              !p.isBankrupt && (animatedPositions[p.id] ?? p.position) === pos,
+          );
+          const myIdx = sameCell.findIndex((p) => p.id === player.id);
+          const offsets = [
+            [0, 0],
+            [6, -6],
+            [-6, 6],
+            [6, 6],
+            [-6, -6],
+            [10, 0],
+            [-10, 0],
+            [0, 10],
+            [0, -10],
+          ];
+          const [ox, oy] = offsets[myIdx] ?? [0, 0];
 
-        const x = (col + 0.5) * cellSize + ox;
-        const y = (row + 0.5) * cellSize + oy;
+          const x = (col + 0.5) * cellSize + ox;
+          const y = (row + 0.5) * cellSize + oy;
 
-        const isCurrentPlayer = state.players[state.currentPlayerIndex]?.id === player.id;
-        const isAnimating = isMoving && isCurrentPlayer;
+          const isCurrentPlayer =
+            state.players[state.currentPlayerIndex]?.id === player.id;
+          const isAnimating = isMoving && isCurrentPlayer;
 
-        return (
-          <div
-            key={player.id}
-            style={{
-              position: 'absolute',
-              left: x,
-              top: y,
-              transform: 'translate(-50%, -50%)',
-              fontSize: cellSize * 0.4,
-              lineHeight: 1,
-              transition: isAnimating ? 'left 0.12s ease-in-out, top 0.12s ease-in-out' : 'left 0.3s ease, top 0.3s ease',
-              filter: isCurrentPlayer
-                ? 'drop-shadow(0 0 5px rgba(96,165,250,0.9))'
-                : 'drop-shadow(0 2px 3px rgba(0,0,0,0.4))',
-              zIndex: isCurrentPlayer ? 5 : 4,
-              animation: isAnimating ? 'tokenMove 0.12s ease-in-out' : 'tokenBob 2s ease-in-out infinite',
-              animationDelay: `${idx * 0.3}s`,
-            }}
-          >
-            {player.token}
-          </div>
-        );
-      })}
+          return (
+            <div
+              key={player.id}
+              style={{
+                position: "absolute",
+                left: x,
+                top: y,
+                transform: "translate(-50%, -50%)",
+                fontSize: cellSize * 0.4,
+                lineHeight: 1,
+                transition: isAnimating
+                  ? "left 0.12s ease-in-out, top 0.12s ease-in-out"
+                  : "left 0.3s ease, top 0.3s ease",
+                filter: isCurrentPlayer
+                  ? "drop-shadow(0 0 5px rgba(96,165,250,0.9))"
+                  : "drop-shadow(0 2px 3px rgba(0,0,0,0.4))",
+                zIndex: isCurrentPlayer ? 5 : 4,
+                animation: isAnimating
+                  ? "tokenMove 0.12s ease-in-out"
+                  : "tokenBob 2s ease-in-out infinite",
+                animationDelay: `${idx * 0.3}s`,
+              }}
+            >
+              {player.token}
+            </div>
+          );
+        })}
     </div>
   );
 }
-
-// ─── Center overlay (MONOPOLY logo + card decks) ──────────────────────────────
 
 interface CenterOverlayProps {
   boardSize: number;
@@ -311,103 +369,136 @@ interface CenterOverlayProps {
   dispatch: (a: Action) => void;
 }
 
-function CenterOverlay({ boardSize, mustDrawCard, currentTileType, dispatch }: CenterOverlayProps) {
+function CenterOverlay({
+  boardSize,
+  mustDrawCard,
+  currentTileType,
+  dispatch,
+}: CenterOverlayProps) {
   const cellSize = boardSize / 9;
-  // Center 7×7 region: rows 1-7, cols 1-7
-  const left = cellSize;       // col 1 start
-  const top = cellSize;        // row 1 start
-  const size = cellSize * 7;   // 7 cells wide/tall
+  const left = cellSize;
+  const top = cellSize;
+  const size = cellSize * 7;
 
-  const canDrawChance = mustDrawCard && currentTileType === 'Chance';
-  const canDrawCC = mustDrawCard && currentTileType === 'CommunityChest';
+  const canDrawChance = mustDrawCard && currentTileType === "Chance";
+  const canDrawCC = mustDrawCard && currentTileType === "CommunityChest";
 
   return (
-    <div style={{
-      position: 'absolute',
-      left, top,
-      width: size, height: size,
-      pointerEvents: 'none',
-      zIndex: 8,
-    }}>
-      {/* MONOPOLY text — large, centered */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-      }}>
-        <div style={{
-          fontSize: Math.floor(cellSize * 1.1),
-          fontWeight: 900,
-          letterSpacing: -1,
-          background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 40%, #7c3aed 70%, #4f46e5 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textAlign: 'center',
-          lineHeight: 1,
-          animation: 'monoGlow 3s ease-in-out infinite',
-          userSelect: 'none',
-        }}>
-          MONO<br />POLY
+    <div
+      style={{
+        position: "absolute",
+        left,
+        top,
+        width: size,
+        height: size,
+        pointerEvents: "none",
+        zIndex: 8,
+      }}
+    >
+      {}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 4,
+        }}
+      >
+        <div
+          style={{
+            fontSize: Math.floor(cellSize * 1.1),
+            fontWeight: 900,
+            letterSpacing: -1,
+            background:
+              "linear-gradient(135deg, var(--primary) 0%, var(--accent-warm) 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            textAlign: "center",
+            lineHeight: 1,
+            animation: "monoGlow 3s ease-in-out infinite",
+            userSelect: "none",
+          }}
+        >
+          MONO
+          <br />
+          POLY
         </div>
       </div>
 
-      {/* Chance card stack — top-right diagonal */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: stack is key-navigable via main controls */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: clickable card stack */}
       <div
-        onClick={canDrawChance ? () => dispatch({ type: 'DRAW_CARD' }) : undefined}
+        onClick={
+          canDrawChance ? () => dispatch({ type: "DRAW_CARD" }) : undefined
+        }
         style={{
-          position: 'absolute',
+          position: "absolute",
           right: cellSize * 0.3,
           top: cellSize * 0.3,
           width: cellSize * 1.4,
           height: cellSize * 1.0,
-          pointerEvents: 'all',
-          cursor: canDrawChance ? 'pointer' : 'default',
-          animation: 'cardStackFloat 3s ease-in-out infinite',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
+          pointerEvents: "all",
+          cursor: canDrawChance ? "pointer" : "default",
+          animation: "cardStackFloat 3s ease-in-out infinite",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
           gap: 2,
         }}
       >
-        {/* Stacked cards illusion */}
-        <div style={{
-          width: '100%', height: '100%',
-          position: 'relative',
-        }}>
+        {}
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            position: "relative",
+          }}
+        >
           {[2, 1, 0].map((i) => (
-            <div key={i} style={{
-              position: 'absolute',
-              inset: 0,
-              transform: `translate(${i * 2}px, ${i * -2}px)`,
-              background: canDrawChance
-                ? 'linear-gradient(135deg, #fef3c7, #fde68a)'
-                : 'linear-gradient(135deg, #fef3c7, #fde68a)',
-              border: `1.5px solid ${canDrawChance ? '#f59e0b' : '#d97706'}`,
-              borderRadius: 4,
-              boxShadow: canDrawChance
-                ? `0 0 8px rgba(245,158,11,0.5)`
-                : '0 1px 3px rgba(0,0,0,0.2)',
-              opacity: 1 - i * 0.15,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                inset: 0,
+                transform: `translate(${i * 2}px, ${i * -2}px)`,
+                background:
+                  "linear-gradient(135deg, color-mix(in srgb, var(--warning) 30%, var(--card)), color-mix(in srgb, var(--warning) 60%, var(--card)))",
+                border: `1.5px solid ${canDrawChance ? "var(--warning)" : "color-mix(in srgb, var(--warning) 80%, black)"}`,
+                borderRadius: 4,
+                boxShadow: canDrawChance
+                  ? `0 0 8px color-mix(in srgb, var(--warning) 50%, transparent)`
+                  : "0 1px 3px rgba(0,0,0,0.2)",
+                opacity: 1 - i * 0.15,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               {i === 0 && (
-                <span style={{
-                  fontSize: Math.floor(cellSize * 0.28),
-                  textAlign: 'center',
-                  lineHeight: 1.2,
-                  fontWeight: 800,
-                  color: canDrawChance ? '#92400e' : '#78350f',
-                  padding: '0 4px',
-                }}>
+                <span
+                  style={{
+                    fontSize: Math.floor(cellSize * 0.28),
+                    textAlign: "center",
+                    lineHeight: 1.2,
+                    fontWeight: 800,
+                    color: canDrawChance
+                      ? "var(--warning-foreground)"
+                      : "color-mix(in srgb, var(--warning) 80%, black)",
+                    padding: "0 4px",
+                  }}
+                >
                   ?<br />
-                  <span style={{ fontSize: Math.floor(cellSize * 0.14), fontWeight: 600, display: 'block' }}>
+                  <span
+                    style={{
+                      fontSize: Math.floor(cellSize * 0.14),
+                      fontWeight: 600,
+                      display: "block",
+                    }}
+                  >
                     CHANCE
                   </span>
                 </span>
@@ -416,74 +507,94 @@ function CenterOverlay({ boardSize, mustDrawCard, currentTileType, dispatch }: C
           ))}
         </div>
         {canDrawChance && (
-          <div style={{
-            position: 'absolute',
-            bottom: -14,
-            fontSize: Math.floor(cellSize * 0.16),
-            color: '#f59e0b',
-            fontWeight: 700,
-            whiteSpace: 'nowrap',
-            background: 'rgba(255,255,255,0.9)',
-            borderRadius: 4,
-            padding: '1px 4px',
-            border: '1px solid #f59e0b',
-            pointerEvents: 'none',
-          }}>
+          <div
+            style={{
+              position: "absolute",
+              bottom: -14,
+              fontSize: Math.floor(cellSize * 0.16),
+              color: "var(--warning)",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              background: "var(--card)",
+              borderRadius: 4,
+              padding: "1px 4px",
+              border: "1px solid var(--warning)",
+              pointerEvents: "none",
+            }}
+          >
             Click to draw!
           </div>
         )}
       </div>
 
-      {/* Community Chest card stack — bottom-left diagonal */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: stack is key-navigable via main controls */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: clickable card stack */}
       <div
-        onClick={canDrawCC ? () => dispatch({ type: 'DRAW_CARD' }) : undefined}
+        onClick={canDrawCC ? () => dispatch({ type: "DRAW_CARD" }) : undefined}
         style={{
-          position: 'absolute',
+          position: "absolute",
           left: cellSize * 0.3,
           bottom: cellSize * 0.3,
           width: cellSize * 1.4,
           height: cellSize * 1.0,
-          pointerEvents: 'all',
-          cursor: canDrawCC ? 'pointer' : 'default',
-          animation: 'cardStackFloat 3.5s ease-in-out infinite 0.5s',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
+          pointerEvents: "all",
+          cursor: canDrawCC ? "pointer" : "default",
+          animation: "cardStackFloat 3.5s ease-in-out infinite 0.5s",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
           gap: 2,
         }}
       >
-        <div style={{
-          width: '100%', height: '100%',
-          position: 'relative',
-        }}>
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            position: "relative",
+          }}
+        >
           {[2, 1, 0].map((i) => (
-            <div key={i} style={{
-              position: 'absolute',
-              inset: 0,
-              transform: `translate(${-i * 2}px, ${i * 2}px)`,
-              background: 'linear-gradient(135deg, #dbeafe, #bfdbfe)',
-              border: `1.5px solid ${canDrawCC ? '#3b82f6' : '#60a5fa'}`,
-              borderRadius: 4,
-              boxShadow: canDrawCC
-                ? `0 0 8px rgba(59,130,246,0.5)`
-                : '0 1px 3px rgba(0,0,0,0.2)',
-              opacity: 1 - i * 0.15,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                inset: 0,
+                transform: `translate(${-i * 2}px, ${i * 2}px)`,
+                background:
+                  "linear-gradient(135deg, color-mix(in srgb, var(--primary) 30%, var(--card)), color-mix(in srgb, var(--primary) 60%, var(--card)))",
+                border: `1.5px solid ${canDrawCC ? "var(--primary)" : "color-mix(in srgb, var(--primary) 60%, var(--card))"}`,
+                borderRadius: 4,
+                boxShadow: canDrawCC
+                  ? `0 0 8px color-mix(in srgb, var(--primary) 50%, transparent)`
+                  : "0 1px 3px rgba(0,0,0,0.2)",
+                opacity: 1 - i * 0.15,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               {i === 0 && (
-                <span style={{
-                  fontSize: Math.floor(cellSize * 0.24),
-                  textAlign: 'center',
-                  lineHeight: 1.1,
-                  fontWeight: 800,
-                  color: canDrawCC ? '#1e40af' : '#1d4ed8',
-                  padding: '0 3px',
-                }}>
+                <span
+                  style={{
+                    fontSize: Math.floor(cellSize * 0.24),
+                    textAlign: "center",
+                    lineHeight: 1.1,
+                    fontWeight: 800,
+                    color: canDrawCC
+                      ? "var(--primary-foreground)"
+                      : "var(--primary)",
+                    padding: "0 3px",
+                  }}
+                >
                   🏛<br />
-                  <span style={{ fontSize: Math.floor(cellSize * 0.11), fontWeight: 600, display: 'block' }}>
+                  <span
+                    style={{
+                      fontSize: Math.floor(cellSize * 0.11),
+                      fontWeight: 600,
+                      display: "block",
+                    }}
+                  >
                     COMMUNITY
                   </span>
                 </span>
@@ -492,19 +603,21 @@ function CenterOverlay({ boardSize, mustDrawCard, currentTileType, dispatch }: C
           ))}
         </div>
         {canDrawCC && (
-          <div style={{
-            position: 'absolute',
-            bottom: -14,
-            fontSize: Math.floor(cellSize * 0.16),
-            color: '#3b82f6',
-            fontWeight: 700,
-            whiteSpace: 'nowrap',
-            background: 'rgba(255,255,255,0.9)',
-            borderRadius: 4,
-            padding: '1px 4px',
-            border: '1px solid #3b82f6',
-            pointerEvents: 'none',
-          }}>
+          <div
+            style={{
+              position: "absolute",
+              bottom: -14,
+              fontSize: Math.floor(cellSize * 0.16),
+              color: "var(--primary)",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              background: "var(--card)",
+              borderRadius: 4,
+              padding: "1px 4px",
+              border: "1px solid var(--primary)",
+              pointerEvents: "none",
+            }}
+          >
             Click to draw!
           </div>
         )}
@@ -512,8 +625,6 @@ function CenterOverlay({ boardSize, mustDrawCard, currentTileType, dispatch }: C
     </div>
   );
 }
-
-// ─── Board component ──────────────────────────────────────────────────────────
 
 interface BoardProps {
   state: GameState;
@@ -529,9 +640,16 @@ interface BoardProps {
 }
 
 export function Board({
-  state, animatedPositions, isMoving,
-  landingPosition, destinationCell, mustDrawCard,
-  onTileClick, dispatch, boardRef, boardSize,
+  state,
+  animatedPositions,
+  isMoving,
+  landingPosition,
+  destinationCell,
+  mustDrawCard,
+  onTileClick,
+  dispatch,
+  boardRef,
+  boardSize,
 }: BoardProps) {
   injectBoardStyle();
 
@@ -539,8 +657,12 @@ export function Board({
   const currentPlayer = state.players[state.currentPlayerIndex];
 
   const canBuyTileId =
-    state.turnPhase === 'LANDED' &&
-    !state.players.some((p) => p.ownedProperties.some((op) => op.tileId === state.board[currentPlayer.position]?.id))
+    state.turnPhase === "LANDED" &&
+    !state.players.some((p) =>
+      p.ownedProperties.some(
+        (op) => op.tileId === state.board[currentPlayer.position]?.id,
+      ),
+    )
       ? state.board[currentPlayer.position]?.id
       : null;
 
@@ -549,34 +671,43 @@ export function Board({
     : null;
 
   const cellSize = boardSize / 9;
+  const flatGrid = grid.flatMap((row, rIdx) =>
+    row.map((tile, cIdx) => ({
+      tile,
+      key: tile ? tile.id : `empty-${rIdx}-${cIdx}`,
+    })),
+  );
 
   return (
-    <div ref={boardRef} style={{
-      position: 'relative',
-      width: 'min(calc(100vw - 360px), calc(100vh - 100px))',
-      maxWidth: '100%',
-      aspectRatio: '1',
-    }}>
-      {/* Board grid */}
+    <div
+      ref={boardRef}
+      style={{
+        position: "relative",
+        width: "min(calc(100vw - 360px), calc(100vh - 100px))",
+        maxWidth: "100%",
+        aspectRatio: "1",
+      }}
+    >
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(9, 1fr)',
-          gridTemplateRows: 'repeat(9, 1fr)',
-          width: '100%',
-          aspectRatio: '1',
+          display: "grid",
+          gridTemplateColumns: "repeat(9, 1fr)",
+          gridTemplateRows: "repeat(9, 1fr)",
+          width: "100%",
+          aspectRatio: "1",
           gap: 2,
-          background: '#1e293b',
+          background: "var(--border)",
           borderRadius: 10,
           padding: 4,
-          border: '2px solid #334155',
-          boxShadow: '0 0 50px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05)',
+          border: "2px solid var(--border)",
+          boxShadow:
+            "0 10px 30px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05)",
         }}
       >
-        {grid.flat().map((tile, idx) =>
+        {flatGrid.map(({ tile, key }) =>
           tile ? (
             <TileCell
-              key={tile.id}
+              key={key}
               tile={tile}
               state={state}
               isLanding={landingPosition === tile.position}
@@ -587,16 +718,15 @@ export function Board({
             />
           ) : (
             <div
-              key={`empty-${idx}`}
+              key={key}
               style={{
-                background: 'transparent',
+                background: "transparent",
               }}
             />
-          )
+          ),
         )}
       </div>
 
-      {/* Center overlay: MONOPOLY + card decks */}
       <CenterOverlay
         boardSize={boardSize}
         mustDrawCard={mustDrawCard}
@@ -604,7 +734,6 @@ export function Board({
         dispatch={dispatch}
       />
 
-      {/* Token overlay */}
       <TokensOverlay
         state={state}
         animatedPositions={animatedPositions}

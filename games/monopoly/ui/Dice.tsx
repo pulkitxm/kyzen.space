@@ -1,33 +1,64 @@
-'use client';
+"use client";
 
-import React from 'react';
-import type { DiceAnimPhase } from './useGamePhase';
-
-// ─── SVG pip layouts per face ─────────────────────────────────────────────────
+import type React from "react";
+import type { DiceAnimPhase } from "./useGamePhase";
 
 const PIPS: Record<number, [number, number][]> = {
   1: [[50, 50]],
-  2: [[25, 25], [75, 75]],
-  3: [[25, 25], [50, 50], [75, 75]],
-  4: [[25, 25], [75, 25], [25, 75], [75, 75]],
-  5: [[25, 25], [75, 25], [50, 50], [25, 75], [75, 75]],
-  6: [[25, 22], [75, 22], [25, 50], [75, 50], [25, 78], [75, 78]],
+  2: [
+    [25, 25],
+    [75, 75],
+  ],
+  3: [
+    [25, 25],
+    [50, 50],
+    [75, 75],
+  ],
+  4: [
+    [25, 25],
+    [75, 25],
+    [25, 75],
+    [75, 75],
+  ],
+  5: [
+    [25, 25],
+    [75, 25],
+    [50, 50],
+    [25, 75],
+    [75, 75],
+  ],
+  6: [
+    [25, 22],
+    [75, 22],
+    [25, 50],
+    [75, 50],
+    [25, 78],
+    [75, 78],
+  ],
 };
 
 function DieFace({ value, color }: { value: number; color: string }) {
   const pips = PIPS[value] ?? PIPS[1];
   return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: decorative svg
     <svg viewBox="0 0 100 100" width="100%" height="100%">
-      <rect x="2" y="2" width="96" height="96" rx="16" ry="16"
-        fill="#1e2235" stroke={color} strokeWidth="3" />
-      {pips.map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r="9" fill={color} />
+      <rect
+        x="2"
+        y="2"
+        width="96"
+        height="96"
+        rx="16"
+        ry="16"
+        fill="var(--surface-raised)"
+        stroke={color}
+        strokeWidth="3"
+      />
+      {pips.map(([cx, cy]) => (
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="9" fill={color} />
       ))}
     </svg>
   );
 }
-
-// ─── CSS animation keyframes (injected once) ──────────────────────────────────
 
 const DICE_STYLE = `
 @keyframes diceShake {
@@ -62,36 +93,50 @@ const DICE_STYLE = `
 
 let styleInjected = false;
 function injectDiceStyle() {
-  if (styleInjected || typeof document === 'undefined') return;
+  if (styleInjected || typeof document === "undefined") return;
   styleInjected = true;
-  const el = document.createElement('style');
+  const el = document.createElement("style");
   el.textContent = DICE_STYLE;
   document.head.appendChild(el);
 }
 
-// ─── Single die ───────────────────────────────────────────────────────────────
-
-function Die({ value, phase, color }: { value: number; phase: DiceAnimPhase; color: string }) {
+function Die({
+  value,
+  phase,
+  color,
+}: {
+  value: number;
+  phase: DiceAnimPhase;
+  color: string;
+}) {
   injectDiceStyle();
 
   const animation: React.CSSProperties = (() => {
     switch (phase) {
-      case 'shaking':  return { animation: 'diceShake 0.4s ease-in-out infinite' };
-      case 'rolling':  return { animation: 'diceRoll 0.6s cubic-bezier(0.25,0.46,0.45,0.94) infinite' };
-      case 'settling': return { animation: 'diceBounce 0.3s ease-out forwards' };
-      case 'settled':  return { animation: 'diceGlow 1.5s ease-in-out infinite', color };
-      default:         return {};
+      case "shaking":
+        return { animation: "diceShake 0.4s ease-in-out infinite" };
+      case "rolling":
+        return {
+          animation: "diceRoll 0.6s cubic-bezier(0.25,0.46,0.45,0.94) infinite",
+        };
+      case "settling":
+        return { animation: "diceBounce 0.3s ease-out forwards" };
+      case "settled":
+        return { animation: "diceGlow 1.5s ease-in-out infinite", color };
+      default:
+        return {};
     }
   })();
 
   return (
     <div style={{ width: 52, height: 52, ...animation }}>
-      <DieFace value={value} color={phase === 'idle' ? '#4b5563' : color} />
+      <DieFace
+        value={value}
+        color={phase === "idle" ? "var(--muted-foreground)" : color}
+      />
     </div>
   );
 }
-
-// ─── Dice pair component ──────────────────────────────────────────────────────
 
 interface DiceProps {
   values: [number, number];
@@ -99,26 +144,42 @@ interface DiceProps {
 }
 
 export function Dice({ values, phase }: DiceProps) {
-  const sum = values[0] + values[1];
   const isDoubles = values[0] === values[1];
-  const accentColor = isDoubles ? '#a78bfa' : '#60a5fa';
+  const accentColor = isDoubles ? "var(--primary)" : "var(--accent-warm)";
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <Die value={values[0]} phase={phase} color={accentColor} />
-        <span style={{ color: '#4b5563', fontSize: 18, fontWeight: 700 }}>+</span>
+        <span
+          style={{
+            color: "var(--muted-foreground)",
+            fontSize: 18,
+            fontWeight: 700,
+          }}
+        >
+          +
+        </span>
         <Die value={values[1]} phase={phase} color={accentColor} />
       </div>
 
-      {(phase === 'settled' || phase === 'settling') && isDoubles && (
-        <div style={{
-          fontSize: 13,
-          fontWeight: 700,
-          color: '#a78bfa',
-          letterSpacing: 1,
-          animation: 'diceFadeIn 0.3s ease',
-        }}>
+      {(phase === "settled" || phase === "settling") && isDoubles && (
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: "var(--primary)",
+            letterSpacing: 1,
+            animation: "diceFadeIn 0.3s ease",
+          }}
+        >
           🎯 Doubles!
         </div>
       )}

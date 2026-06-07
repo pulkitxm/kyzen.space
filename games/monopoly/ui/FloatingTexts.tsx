@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React, { useEffect, useRef } from 'react';
-import type { FloatingText } from './useGamePhase';
+import React, { useEffect, useRef } from "react";
+import type { FloatingText } from "./useGamePhase";
 
 const FLOAT_STYLE = `
 @keyframes floatUp {
@@ -13,16 +13,15 @@ const FLOAT_STYLE = `
 
 let styleInjected = false;
 function injectStyle() {
-  if (styleInjected || typeof document === 'undefined') return;
+  if (styleInjected || typeof document === "undefined") return;
   styleInjected = true;
-  const el = document.createElement('style');
+  const el = document.createElement("style");
   el.textContent = FLOAT_STYLE;
   document.head.appendChild(el);
 }
 
 interface FloatingTextsProps {
   texts: FloatingText[];
-  /** Pixel dimensions of the board container (for absolute positioning) */
   boardSize: number;
 }
 
@@ -34,31 +33,30 @@ export function FloatingTexts({ texts, boardSize }: FloatingTextsProps) {
   return (
     <div
       style={{
-        position: 'absolute',
+        position: "absolute",
         inset: 0,
-        pointerEvents: 'none',
+        pointerEvents: "none",
         zIndex: 50,
-        overflow: 'hidden',
+        overflow: "hidden",
       }}
     >
       {texts.map((ft) => {
-        // Center of the grid cell
         const left = (ft.col + 0.5) * cellSize;
-        const top  = (ft.row + 0.5) * cellSize;
+        const top = (ft.row + 0.5) * cellSize;
         return (
           <div
             key={ft.id}
             style={{
-              position: 'absolute',
+              position: "absolute",
               left,
               top,
-              transform: 'translate(-50%, -50%)',
+              transform: "translate(-50%, -50%)",
               color: ft.color,
               fontWeight: 800,
               fontSize: 15,
               textShadow: `0 0 8px ${ft.color}88`,
-              animation: 'floatUp 1.8s ease-out forwards',
-              whiteSpace: 'nowrap',
+              animation: "floatUp 1.8s ease-out forwards",
+              whiteSpace: "nowrap",
               fontFamily: "'Inter', sans-serif",
             }}
           >
@@ -69,8 +67,6 @@ export function FloatingTexts({ texts, boardSize }: FloatingTextsProps) {
     </div>
   );
 }
-
-// ─── Board size tracker hook ──────────────────────────────────────────────────
 
 export function useBoardSize() {
   const ref = useRef<HTMLDivElement>(null);
