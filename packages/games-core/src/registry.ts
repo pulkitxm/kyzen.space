@@ -42,10 +42,12 @@ export function getCategoryGroups(): {
   category: GameCategoryDef;
   games: GameMeta[];
 }[] {
-  return GAME_CATEGORIES.map((category) => ({
-    category,
-    games: GAMES.filter((def) => def.meta.categoryId === category.id).map(
-      (def) => def.meta,
-    ),
-  })).filter((group) => group.games.length > 0);
+  return Object.values(GAME_CATEGORIES)
+    .map((category) => ({
+      category,
+      games: GAMES.filter((def) => def.meta.categoryId === category.id).map(
+        (def) => def.meta,
+      ),
+    }))
+    .filter((group) => group.games.length > 0);
 }

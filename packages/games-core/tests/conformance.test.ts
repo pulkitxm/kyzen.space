@@ -3,7 +3,9 @@ import { GAME_CATEGORIES, GAME_TYPES } from "@gamelobby/shared/constants";
 import type { GameDefinition, Seat } from "@gamelobby/shared/types";
 import { GAMES, listGameTypes } from "../src/index";
 
-const CATEGORY_IDS = new Set(GAME_CATEGORIES.map((category) => category.id));
+const CATEGORY_IDS = new Set<string>(
+  Object.values(GAME_CATEGORIES).map((category) => category.id),
+);
 
 function minSeats(def: GameDefinition): Seat[] {
   return def.engine.roles

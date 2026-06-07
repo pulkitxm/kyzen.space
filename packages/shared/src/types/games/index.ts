@@ -1,4 +1,7 @@
-export type { default as GameCategoryDef } from "./categories";
+export type {
+  default as GameCategoryDef,
+  GameCategoryId,
+} from "./categories";
 export { type GameType, gameTypeSchema } from "./core";
 export type {
   ConfigField,

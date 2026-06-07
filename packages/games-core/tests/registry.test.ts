@@ -11,7 +11,9 @@ import {
 } from "../src/index";
 
 const knownTypes = GAMES.map((def) => def.meta.type);
-const categoryIds = new Set(GAME_CATEGORIES.map((category) => category.id));
+const categoryIds = new Set<string>(
+  Object.values(GAME_CATEGORIES).map((category) => category.id),
+);
 const UNKNOWN_TYPE = "definitely-not-a-real-game";
 
 describe("getDefinition", () => {
