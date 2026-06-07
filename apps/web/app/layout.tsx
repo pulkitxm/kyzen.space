@@ -18,6 +18,7 @@ import {
   DEFAULT_PATTERN,
   PATTERN_BOOT_SCRIPT,
   type PatternId,
+  patternVars,
 } from "@/lib/patterns";
 import {
   parseSidebarPrefsCookieValue,
@@ -111,6 +112,14 @@ export default async function RootLayout({
 
   const profileHref = signedIn ? "/profile" : "/auth";
 
+  const initialPatternVars = patternVars(userPattern ?? DEFAULT_PATTERN);
+  const patternStyle = initialPatternVars
+    ? ({
+        "--pattern-url": initialPatternVars.url,
+        "--pattern-tile": initialPatternVars.tile,
+      } as React.CSSProperties)
+    : undefined;
+
   const cookieStore = await cookies();
   const prefCookieRaw = cookieStore.get(SIDEBAR_PREFS_COOKIE)?.value;
   const sidebarPrefsTrusted =
@@ -123,6 +132,7 @@ export default async function RootLayout({
       suppressHydrationWarning
       data-theme={userTheme ?? DEFAULT_THEME}
       data-pattern={userPattern ?? DEFAULT_PATTERN}
+      style={patternStyle}
       className={`${geistSans.variable} ${geistMono.variable} ${gamePaused.variable} h-full antialiased`}
     >
       <head>

@@ -51,22 +51,9 @@ html[data-theme="csk"] {
   --v: #fdb913;
 }
 
-:root,
-html[data-pattern="doodles"] {
+:root {
   --pattern-url: url("/patterns/doodles.svg");
-  --pattern-tile: 360px 360px;
-}
-html[data-pattern="games"] {
-  --pattern-url: url("/patterns/games.svg");
   --pattern-tile: 320px 320px;
-}
-html[data-pattern="shapes"] {
-  --pattern-url: url("/patterns/shapes.svg");
-  --pattern-tile: 360px 360px;
-}
-html[data-pattern="nature"] {
-  --pattern-url: url("/patterns/nature.svg");
-  --pattern-tile: 360px 360px;
 }
 
 html:not(.dark) {

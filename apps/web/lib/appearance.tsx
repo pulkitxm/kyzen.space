@@ -13,6 +13,7 @@ import {
 
 import { clientFetch } from "@/lib/api-client";
 import {
+  applyPattern,
   DEFAULT_PATTERN,
   isValidPattern,
   PATTERN_STORAGE_KEY,
@@ -81,7 +82,7 @@ export function AppearanceProvider({
     document.documentElement.setAttribute("data-theme", palette);
   }, [palette]);
   useEffect(() => {
-    document.documentElement.setAttribute("data-pattern", pattern);
+    applyPattern(document.documentElement, pattern);
   }, [pattern]);
 
   const synced = useRef(false);

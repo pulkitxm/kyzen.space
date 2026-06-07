@@ -19,7 +19,7 @@ Enforcement: `bun run strip-comments` removes every non-directive comment in pla
 - **Pack preference (in order):** Font Awesome 6 (`react-icons/fa6`) is the project default — reach for it first. If FA6 has no good match, use another `react-icons` pack: Lucide (`react-icons/lu`) for thin outline glyphs, or brand/flat-color logos (`react-icons/fc`, e.g. `FcGoogle` for the authentic multicolor Google mark). **Only when no library icon fits is a raw inline `<svg>` acceptable** — that fallback is allowed, not forbidden.
 - **Stay on `fa6`, not the legacy `fa` (FA5).** Mind the FA6 renames: `FaCog`→`FaGear`, `FaUserFriends`→`FaUserGroup`, `FaRegSmile`→`FaRegFaceSmile`.
 - **`games-client`** declares `react-icons` as a peer + dev dependency, so game UIs draw from the same icon set as the web app.
-- **Not icons — leave as SVG:** generated/decorative art (`apps/web/scripts/gen-doodle-tile.ts`, `public/` pattern tiles), DiceBear avatar rendering, and SVG used in tests.
+- **Not icons — leave as SVG:** generated/decorative art (`apps/web/scripts/gen-pattern-tiles.ts`, `public/` pattern tiles), DiceBear avatar rendering, and SVG used in tests.
 
 ## Commands
 
