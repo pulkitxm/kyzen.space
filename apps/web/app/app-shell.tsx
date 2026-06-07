@@ -7,7 +7,7 @@ import type {
   NotificationJson,
 } from "@gamelobby/shared/types";
 import { Provider } from "jotai";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { FaChevronRight } from "react-icons/fa6";
 
 import { ChatSocketBridge } from "@/app/chat-socket-bridge";
@@ -15,6 +15,7 @@ import { Sidebar } from "@/app/sidebar";
 import { TooltipProvider } from "@/app/ui/tooltip";
 import type { SidebarPrefs } from "@/lib/sidebar-prefs";
 import { SocketProvider } from "@/lib/socket/socket-context";
+import { useScrollRestoration } from "@/lib/use-scroll-restoration";
 
 export function AppShellClient({
   children,
@@ -49,6 +50,9 @@ export function AppShellClient({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const closeMobile = useCallback(() => setMobileOpen(false), []);
+
+  const mainRef = useRef<HTMLElement>(null);
+  useScrollRestoration(mainRef);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -96,7 +100,10 @@ export function AppShellClient({
               profileHref={profileHref}
             />
 
-            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
+            <main
+              ref={mainRef}
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
+            >
               {children}
             </main>
           </div>

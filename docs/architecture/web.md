@@ -163,6 +163,8 @@ See `apps/web/app/layout.tsx:121`. For *signed-out* users (whose preference live
 
 See `apps/web/app/app-shell.tsx:54`. The Jotai `<Provider>` must wrap `ChatSocketBridge` (so the bridge has a store to write into) and `SocketProvider` must wrap it too (so it has a socket to listen on). `enabled={signedIn}` means the socket only connects for authenticated users. The only `useState` in this file is `mobileOpen` (`apps/web/app/app-shell.tsx:50`) — a textbook case of component-private state that correctly stays out of Jotai.
 
+**The shell scrolls an inner element, not the document.** The shell is `h-screen overflow-hidden` with a fixed `Sidebar` and a `<main className="… overflow-auto">` that owns the page scroll — this is what lets chat (pinned composer + reverse-scroll list) and the play/game pages (full-height boards) bound themselves to the viewport. The cost is that the browser's native scroll restoration (which only tracks the *document* scroller) can't restore position on reload. `useScrollRestoration` (`apps/web/lib/use-scroll-restoration.ts`) closes that gap: it persists `<main>`'s `scrollTop` to `sessionStorage` keyed by `pathname` and restores it in an isomorphic layout effect on mount / route change (a no-op on the full-viewport pages, where `<main>` itself never scrolls).
+
 ---
 
 ## Realtime client: one socket, ack-promises, event hooks
