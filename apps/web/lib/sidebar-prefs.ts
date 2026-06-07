@@ -16,10 +16,10 @@ export type SidebarPrefs = {
   width: number;
 };
 
-export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
+export const DEFAULT_SIDEBAR_PREFS = {
   collapsed: false,
   width: DEFAULT_SIDEBAR_WIDTH,
-};
+} satisfies SidebarPrefs;
 
 function parsePrefsFromEncoded(raw: string | undefined): SidebarPrefs | null {
   if (!raw?.trim()) return null;
@@ -61,6 +61,7 @@ export function encodeSidebarPrefsCookieValue(prefs: SidebarPrefs): string {
 export function persistSidebarPrefsToCookie(prefs: SidebarPrefs): void {
   try {
     const v = encodeSidebarPrefsCookieValue(prefs);
+    // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API is not universally supported; SSR reads this cookie for sidebar hydration
     document.cookie = `${SIDEBAR_PREFS_COOKIE}=${v}; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
   } catch {}
 }

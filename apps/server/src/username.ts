@@ -1,39 +1,66 @@
 import { randomAvatarConfig } from "@gamelobby/avatar";
+import { profiles } from "@gamelobby/database";
 import {
-  createProfile,
-  getProfileByUserId,
-  isUsernameTaken,
-} from "./db/repositories/profiles";
+  isReservedUsername,
+  isValidUsernameFormat,
+  normalizeUsername,
+} from "@gamelobby/shared/types";
+import { env } from "./env";
+import { predictAvatarStyle } from "./services/gender-detection";
+import {
+  buildUsernameCandidates,
+  randomUsernameSuffix,
+  selectSuggestions,
+  slugifyBase,
+} from "./username-rules";
 
-function slugifyBase(name: string): string {
+const CANDIDATE_COUNT = 20;
+const BATCH_SIZE = 5;
+const SUGGESTION_POOL = 30;
+
+export function isUsernameBlocked(normalized: string): boolean {
   return (
-    name
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_]/g, "")
-      .slice(0, 30) || "player"
+    isReservedUsername(normalized) ||
+    env.notAllowedUsernames.includes(normalized)
   );
 }
 
-function randomSuffix(): string {
-  return Math.random().toString(36).slice(2, 8);
+export async function suggestUsernames(
+  base: string,
+  count = 5,
+): Promise<string[]> {
+  const candidates = buildUsernameCandidates(
+    slugifyBase(base),
+    SUGGESTION_POOL,
+  ).filter((candidate) => {
+    const normalized = normalizeUsername(candidate);
+    return isValidUsernameFormat(normalized) && !isUsernameBlocked(normalized);
+  });
+  const taken = await profiles.getTakenUsernames(candidates);
+  return selectSuggestions(candidates, taken, count);
 }
 
 export async function ensureUsernameForUser(
   userId: string,
   displayName: string | null | undefined,
 ): Promise<string> {
-  const existing = await getProfileByUserId(userId);
+  const existing = await profiles.getProfileByUserId(userId);
   if (existing) return existing.username;
 
-  const avatar = randomAvatarConfig(userId);
+  const style = await predictAvatarStyle(displayName);
+  const avatar = randomAvatarConfig(userId, style);
   const base = slugifyBase(displayName ?? "player");
-  let candidate = base;
-  for (let i = 0; i < 20; i++) {
-    if (!(await isUsernameTaken(candidate))) {
+  const candidates = buildUsernameCandidates(base, CANDIDATE_COUNT).filter(
+    (candidate) => !isUsernameBlocked(normalizeUsername(candidate)),
+  );
+
+  for (let start = 0; start < candidates.length; start += BATCH_SIZE) {
+    const batch = candidates.slice(start, start + BATCH_SIZE);
+    const taken = await profiles.getTakenUsernames(batch);
+    for (const candidate of batch) {
+      if (taken.has(candidate.toLowerCase())) continue;
       try {
-        const profile = await createProfile({
+        const profile = await profiles.createProfile({
           userId,
           username: candidate,
           avatar,
@@ -41,12 +68,12 @@ export async function ensureUsernameForUser(
         return profile.username;
       } catch {}
     }
-    candidate = `${base}_${randomSuffix()}`;
   }
-  candidate = `player_${randomSuffix()}`;
-  const profile = await createProfile({
+
+  const fallback = `player_${randomUsernameSuffix()}`;
+  const profile = await profiles.createProfile({
     userId,
-    username: candidate,
+    username: fallback,
     avatar,
   });
   return profile.username;

@@ -1,7 +1,18 @@
-import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
-import type { GameJson, MoveJson } from "@gamelobby/games-core";
+import type {
+  ConversationJson,
+  GameJson,
+  MessageJson,
+  MoveJson,
+} from "@gamelobby/shared/types";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";
+import {
+  CHAT_LAYOUT_COOKIE,
+  type ChatLayout,
+  normalizeChatLayout,
+  parseChatLayoutCookie,
+} from "@/lib/chat-layout";
 import { getServerSession } from "@/lib/get-server-session";
 import { PlayClient } from "./play-client";
 
@@ -26,7 +37,6 @@ export default async function PlayPage({
   );
   if (!data) notFound();
 
-  // Pull in the linked conversation (if any, and if the viewer can see it).
   let conversation: ConversationJson | null = null;
   let messages: MessageJson[] = [];
   let nextCursor: string | null = null;
@@ -45,6 +55,18 @@ export default async function PlayPage({
     }
   }
 
+  const layoutCookie = (await cookies()).get(CHAT_LAYOUT_COOKIE)?.value;
+  const layoutTrusted =
+    typeof layoutCookie === "string" && layoutCookie.length > 0;
+  let initialLayout = parseChatLayoutCookie(layoutCookie);
+  if (!layoutTrusted) {
+    const me = await serverFetchJson<{
+      profile: { chatLayout: ChatLayout | null };
+    }>("/api/profiles/me");
+    if (me?.profile?.chatLayout)
+      initialLayout = normalizeChatLayout(me.profile.chatLayout);
+  }
+
   return (
     <PlayClient
       gameId={gameId}
@@ -55,6 +77,8 @@ export default async function PlayPage({
       conversation={conversation}
       initialMessages={messages}
       initialNextCursor={nextCursor}
+      initialLayout={initialLayout}
+      layoutTrusted={layoutTrusted}
     />
   );
 }

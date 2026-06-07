@@ -1,15 +1,12 @@
 "use client";
 
-import {
-  CHAT_EVENTS,
-  type ConversationJson,
-  type MessageJson,
-} from "@gamelobby/chat-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { ConversationJson, MessageJson } from "@gamelobby/shared/types";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft } from "react-icons/fa6";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
 import {
   activeConversationIdAtom,
@@ -42,8 +39,6 @@ export function ConversationView({
   const { socket } = useSocket();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // Hydrate server-fetched history (newest-first -> chronological) synchronously,
-  // before first paint, so there's no empty-state flicker.
   const initialReversed = useMemo(
     () => [...initialMessages].reverse(),
     [initialMessages],
@@ -53,13 +48,11 @@ export function ConversationView({
   );
   const messages = useAtomValue(messagesAtomFamily(conversationId));
 
-  // Prefer the live conversation so member/name changes reflect immediately.
   const liveConv = useAtomValue(conversationsAtom).find(
     (c) => c.id === conversationId,
   );
   const conversation = liveConv ?? initialConversation;
 
-  // Ensure this conversation is present in the inbox list (e.g. on deep-link).
   useEffect(() => {
     store.set(conversationsAtom, (prev) =>
       prev.some((c) => c.id === conversationId)
@@ -73,7 +66,6 @@ export function ConversationView({
     return () => setActive(null);
   }, [conversationId, setActive]);
 
-  // Mark read whenever the latest delivered message changes.
   const last = messages[messages.length - 1];
   const lastId = last && !last.pending ? last.id : null;
   useEffect(() => {

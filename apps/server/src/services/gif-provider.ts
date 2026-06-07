@@ -1,9 +1,6 @@
-import type { GifJson } from "@gamelobby/chat-core";
+import type { GifJson } from "@gamelobby/shared/types";
 import { env } from "../env";
 
-// Klipy GIF API (verified live). Auth is in the URL path; the key never reaches
-// the browser. Per-item shape: { id, title, type, blur_preview,
-// file: { hd|md|sm|xs: { gif|webp|jpg|mp4|webm: { url, width, height } } } }.
 type KlipyVariant = { url?: string; width?: number; height?: number };
 type KlipySizes = Record<string, Record<string, KlipyVariant>>;
 type KlipyItem = {
@@ -26,7 +23,6 @@ export function isGifConfigured(): boolean {
 
 function normalize(item: KlipyItem): GifJson | null {
   const file = item.file ?? {};
-  // small animated for the grid; medium gif for the message.
   const preview = file.sm?.webp ?? file.sm?.gif ?? file.md?.webp;
   const full = file.md?.gif ?? file.hd?.gif ?? file.sm?.gif;
   if (!preview?.url || !full?.url) return null;
@@ -57,7 +53,7 @@ async function fetchKlipy(
     throw new Error("Unexpected Klipy response");
   }
   const gifs = json.data.data
-    .filter((i) => (i.type ?? "gif") === "gif") // drop sponsored/ad items
+    .filter((i) => (i.type ?? "gif") === "gif")
     .map(normalize)
     .filter((g): g is GifJson => g !== null);
   return { gifs, hasNext: Boolean(json.data.has_next) };

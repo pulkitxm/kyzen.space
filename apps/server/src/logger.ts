@@ -2,7 +2,7 @@ import { pino } from "pino";
 import { env } from "./env";
 
 export const logger = pino({
-  level: env.logLevel,
+  level: env.logLevel || "info",
   base: { service: "gamelobby-server" },
   timestamp: pino.stdTimeFunctions.isoTime,
   redact: {

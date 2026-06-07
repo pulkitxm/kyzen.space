@@ -1,4 +1,4 @@
-import type { ClientJoinRoom } from "@gamelobby/games-core";
+import type { ClientJoinRoom, ClientMakeMove } from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { handleJoinRoom, handleMakeMove } from "./turn-based";
 
@@ -12,7 +12,7 @@ export interface RealtimeDriver {
   makeMove(
     io: IOServer,
     socket: Socket,
-    payload: { gameId: string; moveData: unknown },
+    payload: ClientMakeMove,
   ): Promise<void>;
 }
 

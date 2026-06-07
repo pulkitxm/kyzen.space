@@ -1,7 +1,11 @@
 import type { Server as HTTPServer } from "node:http";
+import { games } from "@gamelobby/database";
+import {
+  clientJoinRoomSchema,
+  clientMakeMoveSchema,
+} from "@gamelobby/shared/types";
 import { Server as IOServer } from "socket.io";
 import { getAuth } from "../auth";
-import { games } from "../db";
 import { env } from "../env";
 import { childLogger } from "../logger";
 import { attachChatHandlers, joinUserRooms } from "./chat";
@@ -10,29 +14,12 @@ import { attachFriendHandlers } from "./friends";
 import { attachGameChatHandlers } from "./games-in-chat";
 import { setIO } from "./io";
 import { handlePresenceConnect, handlePresenceDisconnect } from "./presence";
+import { startPresenceHeartbeats } from "./presence-heartbeat";
 import { attachRedisAdapter } from "./redis";
+import { leaveGameRoom } from "./rooms";
 import { attachTypingHandlers } from "./typing";
 
 const log = childLogger({ mod: "realtime" });
-
-function isJoinPayload(
-  p: unknown,
-): p is { gameId: string; intent?: "play" | "spectate" } {
-  return (
-    !!p &&
-    typeof p === "object" &&
-    typeof (p as { gameId?: unknown }).gameId === "string"
-  );
-}
-
-function isMovePayload(p: unknown): p is { gameId: string; moveData: unknown } {
-  return (
-    isJoinPayload(p) &&
-    "moveData" in p &&
-    (p as { moveData?: unknown }).moveData !== undefined &&
-    (p as { moveData?: unknown }).moveData !== null
-  );
-}
 
 export function attachRealtime(httpServer: HTTPServer): IOServer {
   const io = new IOServer(httpServer, {
@@ -43,6 +30,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
 
   attachRedisAdapter(io);
   setIO(io);
+  startPresenceHeartbeats(io);
 
   io.use(async (socket, next) => {
     try {
@@ -67,7 +55,6 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
     const slog = log.child({ socketId: socket.id, userId: socket.data.userId });
     slog.info("socket connected");
 
-    // Chat lane: join personal + conversation rooms, register chat/friend handlers.
     void joinUserRooms(socket);
     attachChatHandlers(io, socket);
     attachFriendHandlers(io, socket);
@@ -77,21 +64,23 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
 
     socket.on("join_room", (payload: unknown, cb?: (err?: string) => void) => {
       void (async () => {
-        if (!isJoinPayload(payload)) {
+        const parsed = clientJoinRoomSchema.safeParse(payload);
+        if (!parsed.success) {
           slog.warn({ payload }, "invalid join_room payload");
           cb?.("Invalid payload");
           socket.emit("game_error", { message: "Invalid join_room payload" });
           return;
         }
+        const data = parsed.data;
         const start = performance.now();
         try {
-          const gameRow = await games.getGameById(payload.gameId);
+          const gameRow = await games.getGameById(data.gameId);
           const driver = getDriver(gameRow?.gameType ?? "");
-          await driver.joinRoom(io, socket, payload);
+          await driver.joinRoom(io, socket, data);
           slog.info(
             {
               event: "join_room",
-              gameId: payload.gameId,
+              gameId: data.gameId,
               durationMs: Math.round((performance.now() - start) * 100) / 100,
             },
             "join_room handled",
@@ -99,7 +88,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
           cb?.();
         } catch (err) {
           const msg = err instanceof Error ? err.message : "join_room failed";
-          slog.error({ err, gameId: payload.gameId }, "join_room failed");
+          slog.error({ err, gameId: data.gameId }, "join_room failed");
           cb?.(msg);
           socket.emit("game_error", { message: msg });
         }
@@ -108,21 +97,23 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
 
     socket.on("make_move", (payload: unknown, cb?: (err?: string) => void) => {
       void (async () => {
-        if (!isMovePayload(payload)) {
+        const parsed = clientMakeMoveSchema.safeParse(payload);
+        if (!parsed.success) {
           slog.warn({ payload }, "invalid make_move payload");
           cb?.("Invalid payload");
           socket.emit("game_error", { message: "Invalid make_move payload" });
           return;
         }
+        const data = parsed.data;
         const start = performance.now();
         try {
-          const gameRow = await games.getGameById(payload.gameId);
+          const gameRow = await games.getGameById(data.gameId);
           const driver = getDriver(gameRow?.gameType ?? "");
-          await driver.makeMove(io, socket, payload);
+          await driver.makeMove(io, socket, data);
           slog.info(
             {
               event: "make_move",
-              gameId: payload.gameId,
+              gameId: data.gameId,
               durationMs: Math.round((performance.now() - start) * 100) / 100,
             },
             "make_move handled",
@@ -130,11 +121,26 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
           cb?.();
         } catch (err) {
           const msg = err instanceof Error ? err.message : "make_move failed";
-          slog.error({ err, gameId: payload.gameId }, "make_move failed");
+          slog.error({ err, gameId: data.gameId }, "make_move failed");
           cb?.(msg);
           socket.emit("game_error", { message: msg });
         }
       })();
+    });
+
+    socket.on("leave_room", (payload: unknown, cb?: (err?: string) => void) => {
+      const parsed = clientJoinRoomSchema.safeParse(payload);
+      if (!parsed.success) {
+        slog.warn({ payload }, "invalid leave_room payload");
+        cb?.("Invalid payload");
+        return;
+      }
+      leaveGameRoom(socket, parsed.data.gameId);
+      slog.info(
+        { event: "leave_room", gameId: parsed.data.gameId },
+        "leave_room handled",
+      );
+      cb?.();
     });
 
     socket.on("disconnect", (reason) => {

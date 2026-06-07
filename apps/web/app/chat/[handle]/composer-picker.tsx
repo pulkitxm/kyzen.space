@@ -1,9 +1,9 @@
 "use client";
 
-import type { GifJson } from "@gamelobby/chat-core";
+import type { GifJson } from "@gamelobby/shared/types";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaRegSmile } from "react-icons/fa";
+import { FaRegFaceSmile } from "react-icons/fa6";
 import { clientFetchJson } from "@/lib/api-client";
 import { gifCacheAtom, recentEmojisAtom } from "@/lib/chat/atoms";
 import { type EmojiGroup, loadEmojiGroups } from "@/lib/chat/emoji";
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { BlurImage } from "./blur-image";
 
 const MAX_RECENT = 24;
-const EMOJI_STRIP = 16; // two rows of 8 for the merged search view
+const EMOJI_STRIP = 16;
 const GIF_PAGE = 24;
 const NEAR_BOTTOM = 360;
 
@@ -27,7 +27,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   flags: "Flags",
 };
 
-// Stable, varied skeleton heights so loading GIFs read as a masonry grid.
 const SKELETON_HEIGHTS = [120, 88, 150, 104, 78, 140, 96, 132];
 
 const SECTION_LABEL =
@@ -53,9 +52,9 @@ function EmojiGrid({
 }) {
   return (
     <div className="grid grid-cols-8 gap-0.5">
-      {emojis.map((e, i) => (
+      {emojis.map((e) => (
         <button
-          key={`${e.id}-${i}`}
+          key={e.id}
           type="button"
           title={e.id}
           onClick={() => onPick(e.native)}
@@ -161,13 +160,6 @@ function GifResults({
   );
 }
 
-/**
- * Composer attachment menu. By default it's a full emoji browser with an
- * Emoji / GIFs tab strip at the bottom; the GIFs tab swaps in a masonry grid.
- * Typing a query merges both — matching emojis fill the top two rows and GIF
- * results fill the rest. Fetched GIF pages are cached globally so re-opening
- * (or repeating a search) is instant.
- */
 export function ComposerPicker({
   onEmoji,
   onGif,
@@ -233,7 +225,7 @@ export function ComposerPicker({
           gifs: GifJson[];
           nextOffset: number | null;
         }>(url);
-        if (reqId !== reqIdRef.current) return; // a newer request superseded us
+        if (reqId !== reqIdRef.current) return;
         setCache((prev) => {
           const next = new Map(prev);
           const base = append ? (prev.get(value)?.gifs ?? []) : [];
@@ -263,8 +255,6 @@ export function ComposerPicker({
     [setCache],
   );
 
-  // Load the first GIF page only when GIFs are actually visible (the GIFs tab,
-  // or any active search), and only if it isn't already cached.
   useEffect(() => {
     const value = q.trim();
     const needGifs = value.length > 0 || tab === "gif";
@@ -300,7 +290,7 @@ export function ComposerPicker({
     !error && gifs.length === 0 && (loading || !cache.has(query));
 
   return (
-    <div className="flex h-[32rem] w-[26rem] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+    <div className="flex h-128 w-104 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
@@ -380,7 +370,7 @@ export function ComposerPicker({
                 : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
-            <FaRegSmile className="size-4" />
+            <FaRegFaceSmile className="size-4" />
             Emoji
           </button>
           <button

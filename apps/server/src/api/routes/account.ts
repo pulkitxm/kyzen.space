@@ -19,10 +19,12 @@ export const accountRouter = new Hono()
       sessions: sorted,
     });
   })
+
   .post("/sign-out", async (c) => {
     await getAuth().api.signOut({ headers: c.req.raw.headers });
     return c.json({ ok: true });
   })
+
   .post("/revoke-others", async (c) => {
     const auth = getAuth();
     const headers = c.req.raw.headers;
@@ -31,6 +33,7 @@ export const accountRouter = new Hono()
     await auth.api.revokeOtherSessions({ headers });
     return c.json({ ok: true });
   })
+
   .post("/revoke-session", async (c) => {
     const auth = getAuth();
     const headers = c.req.raw.headers;

@@ -1,10 +1,11 @@
-import { GAMES } from "@/lib/games";
+import { listGameMeta } from "@gamelobby/games-core";
+import type { GameType } from "@gamelobby/shared/types";
 
 export const PROFILE_ACTIVITY_PAGE_SIZE = 5;
 
 export type ProfileActivityApiRow = {
   id: string;
-  gameType: string;
+  gameType: GameType;
   status: string;
   updatedAt: string;
 };
@@ -21,7 +22,7 @@ export type ProfileActivityGameRow = {
 export function mapApiRowToActivity(
   row: ProfileActivityApiRow,
 ): ProfileActivityGameRow {
-  const entry = GAMES.find((g) => g.id === row.gameType);
+  const entry = listGameMeta().find((m) => m.type === row.gameType);
   return {
     id: row.id,
     href: `/games/${row.gameType}/${row.id}`,

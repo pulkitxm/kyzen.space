@@ -1,5 +1,5 @@
 import Link from "next/link";
-import * as React from "react";
+import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 export function PageContainer({
@@ -28,11 +28,11 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+        <h1 className="font-semibold text-2xl text-foreground tracking-tight">
           {title}
         </h1>
         {description ? (
-          <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-2 text-muted-foreground text-sm">{description}</p>
         ) : null}
       </div>
       {children}
@@ -50,7 +50,7 @@ export function BackLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 transition hover:text-foreground hover:underline"
+      className="inline-flex items-center gap-1 text-muted-foreground text-sm underline-offset-4 transition hover:text-foreground hover:underline"
     >
       {children}
     </Link>

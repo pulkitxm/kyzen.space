@@ -1,25 +1,27 @@
-import { CHAT_EVENTS } from "@gamelobby/chat-core";
 import {
-  type ClientJoinRoom,
-  type ClientMakeMove,
-  getEngine,
-  type Outcome,
-  type ServerGameStatePayload,
-  type ServerGameUpdatePayload,
-} from "@gamelobby/games-core";
+  type GamePlayer,
+  type GameRecord,
+  games,
+  profiles,
+} from "@gamelobby/database";
+import { getDefinition } from "@gamelobby/games-core";
+import type {
+  ClientJoinRoom,
+  ClientMakeMove,
+  Outcome,
+  ServerGameStatePayload,
+} from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
-import { type GamePlayer, type GameRow, games, profiles } from "../db";
-import { emitToConv, emitToGame, joinGameRoom } from "./rooms";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { broadcastGameCard } from "../chat/game-card-broadcast";
+import { isUuid } from "../lib/uuid";
+import { emitToGame, joinGameRoom } from "./rooms";
 
 function err(socket: Socket, message: string) {
   socket.emit("game_error", { message });
 }
 
-async function emitFullState(io: IOServer, gameRow: GameRow) {
+async function emitFullState(io: IOServer, gameRow: GameRecord) {
   const moves = await games.listMoves(gameRow.id);
   const payload: ServerGameStatePayload = {
     game: serializeGame(gameRow),
@@ -28,38 +30,17 @@ async function emitFullState(io: IOServer, gameRow: GameRow) {
   emitToGame(io, gameRow.id, "game_state", payload);
 }
 
-/** Broadcast lightweight live status to the game's conversation, so in-chat
- * game cards update without anyone opening the game. No-op for legacy games. */
-function emitGameUpdate(io: IOServer, gameRow: GameRow): void {
-  if (!gameRow.conversationId) return;
-  const payload: ServerGameUpdatePayload = {
-    gameId: gameRow.id,
-    status: gameRow.status,
-    winner: gameRow.winner,
-    players: (gameRow.players ?? []) as GamePlayer[],
-  };
-  emitToConv(io, gameRow.conversationId, CHAT_EVENTS.gameUpdate, payload);
-}
-
-/**
- * Resolve the caller into a seat or a spectator. Already-seated players rejoin
- * unchanged. With intent "spectate", or when the game is full/active, or when
- * a "challenge" seat is reserved for someone else, the caller joins read-only
- * (no seat) — `make_move` already rejects non-players, so this is the
- * server-side guard against seat theft. Returns `changed: true` only when a new
- * player was actually seated.
- */
 async function ensureSeated(
-  gameRow: GameRow,
+  gameRow: GameRecord,
   userId: string,
   intent: "play" | "spectate",
-): Promise<{ game: GameRow; changed: boolean }> {
-  const players = (gameRow.players ?? []) as GamePlayer[];
+): Promise<{ game: GameRecord; changed: boolean }> {
+  const players = gameRow.players;
   if (players.some((p) => p.userId === userId)) {
     return { game: gameRow, changed: false };
   }
 
-  const engine = getEngine(gameRow.gameType);
+  const { engine } = getDefinition(gameRow.gameType);
   const seatFree =
     gameRow.status === "waiting" && players.length < engine.maxPlayers;
   const challengeReserved =
@@ -67,19 +48,20 @@ async function ensureSeated(
     !!gameRow.challengedUserId &&
     userId !== gameRow.challengedUserId;
 
-  // Anything that isn't a free, claimable seat falls through to spectating.
   if (intent === "spectate" || !seatFree || challengeReserved) {
     return { game: gameRow, changed: false };
   }
 
   const profile = await profiles.getProfileByUserId(userId);
   const username = profile?.username ?? "player";
+  // biome-ignore lint/style/noNonNullAssertion: seatFree guarantees players.length < maxPlayers, so a role exists for the next seat
   const role = engine.roles[players.length]!;
-  const nextPlayers = [...players, { userId, username, role }];
+  const newPlayer: GamePlayer = { userId, username, role };
+  const nextPlayers = [...players, newPlayer];
   const becomesActive = nextPlayers.length >= engine.minPlayers;
 
+  await games.seatPlayer(gameRow.id, newPlayer, players.length);
   const game = await games.updateGame(gameRow.id, {
-    players: nextPlayers,
     status: becomesActive ? "active" : "waiting",
     startedAt: becomesActive ? new Date() : gameRow.startedAt,
     gameState:
@@ -89,10 +71,13 @@ async function ensureSeated(
   return { game, changed: true };
 }
 
-async function finalize(gameRow: GameRow, outcome: Outcome): Promise<GameRow> {
+async function finalize(
+  gameRow: GameRecord,
+  outcome: Outcome,
+): Promise<GameRecord> {
   if (outcome.status !== "completed") return gameRow;
 
-  const players = (gameRow.players ?? []) as GamePlayer[];
+  const players = gameRow.players;
   let winnerUserId: string | null = null;
   if (!outcome.draw && outcome.winnerRole) {
     winnerUserId =
@@ -121,7 +106,7 @@ export async function handleJoinRoom(
   payload: ClientJoinRoom,
 ): Promise<void> {
   const userId = socket.data.userId;
-  if (!UUID_RE.test(payload.gameId)) return err(socket, "Invalid game id");
+  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
 
   const gameRow = await games.getGameById(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
@@ -134,7 +119,7 @@ export async function handleJoinRoom(
 
   joinGameRoom(socket, payload.gameId);
   await emitFullState(io, game);
-  if (changed) emitGameUpdate(io, game);
+  if (changed) await broadcastGameCard(io, game.id);
 }
 
 export async function handleMakeMove(
@@ -143,23 +128,27 @@ export async function handleMakeMove(
   payload: ClientMakeMove,
 ): Promise<void> {
   const userId = socket.data.userId;
-  if (!UUID_RE.test(payload.gameId)) return err(socket, "Invalid game id");
+  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
 
   const gameRow = await games.getGameById(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
   if (gameRow.status !== "active") return err(socket, "Game is not active");
 
-  const players = (gameRow.players ?? []) as GamePlayer[];
-  const player = players.find((p) => p.userId === userId);
+  const player = gameRow.players.find((p) => p.userId === userId);
   if (!player) return err(socket, "Not a player in this game");
 
-  const engine = getEngine(gameRow.gameType);
-  if (!engine.reduce) return err(socket, "Game does not accept moves");
+  const def = getDefinition(gameRow.gameType);
+  if (!def.engine.reduce) return err(socket, "Game does not accept moves");
 
-  const result = engine.reduce(
-    gameRow.gameState,
+  const parsedMove = def.moveSchema.safeParse(payload.moveData);
+  if (!parsedMove.success) return err(socket, "Invalid move");
+  const parsedState = def.stateSchema.safeParse(gameRow.gameState);
+  if (!parsedState.success) return err(socket, "Corrupt game state");
+
+  const result = def.engine.reduce(
+    parsedState.data,
     { role: player.role },
-    payload.moveData,
+    parsedMove.data,
   );
   if (!result.ok) return err(socket, result.error);
 
@@ -168,7 +157,7 @@ export async function handleMakeMove(
     gameId: gameRow.id,
     moveNumber,
     playerId: userId,
-    moveData: payload.moveData,
+    moveData: parsedMove.data,
   });
 
   let updated = await games.updateGame(gameRow.id, { gameState: result.state });
@@ -182,6 +171,6 @@ export async function handleMakeMove(
 
   if (updated.status === "completed") {
     emitToGame(io, gameRow.id, "game_over", { winner: updated.winner });
-    emitGameUpdate(io, updated);
+    await broadcastGameCard(io, updated.id);
   }
 }

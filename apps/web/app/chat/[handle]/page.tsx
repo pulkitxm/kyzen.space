@@ -1,4 +1,4 @@
-import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
+import type { ConversationJson, MessageJson } from "@gamelobby/shared/types";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";
 import { getServerSession } from "@/lib/get-server-session";
@@ -18,8 +18,6 @@ export default async function ConversationPage({
   if (!session?.user) redirect("/auth");
   const { handle } = await params;
 
-  // A handle is either a conversation UUID (any conversation, incl. groups) or
-  // a username (resolve / open the DM with that user).
   const conv = UUID_RE.test(handle)
     ? await serverFetchJson<{ conversation: ConversationJson }>(
         `/api/conversations/${handle}`,

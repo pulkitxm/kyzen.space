@@ -31,6 +31,7 @@ function mulberry32(seed: number): () => number {
 }
 
 function pickFrom<T>(arr: T[], rnd: () => number): T {
+  // biome-ignore lint/style/noNonNullAssertion: rnd() is in [0,1) so the index is always in range for the non-empty arrays every caller passes
   return arr[Math.floor(rnd() * arr.length)]!;
 }
 
@@ -97,28 +98,57 @@ export function validateAvatarConfig(input: unknown): AvatarConfig | null {
     return typeof v === "string" && AVATAR_COLORS[key].includes(v) ? v : null;
   };
 
-  const fields: AvatarConfig = {
-    skinColor: col("skinColor")!,
-    top: opt("top")!,
-    hairColor: col("hairColor")!,
-    hatColor: col("hatColor")!,
-    accessories: opt("accessories")!,
-    accessoriesColor: col("accessoriesColor")!,
-    facialHair: opt("facialHair")!,
-    facialHairColor: col("facialHairColor")!,
-    clothing: opt("clothing")!,
-    clothesColor: col("clothesColor")!,
-    eyes: opt("eyes")!,
-    eyebrows: opt("eyebrows")!,
-    mouth: opt("mouth")!,
-    backgroundColor: col("backgroundColor")!,
+  const skinColor = col("skinColor");
+  const top = opt("top");
+  const hairColor = col("hairColor");
+  const hatColor = col("hatColor");
+  const accessories = opt("accessories");
+  const accessoriesColor = col("accessoriesColor");
+  const facialHair = opt("facialHair");
+  const facialHairColor = col("facialHairColor");
+  const clothing = opt("clothing");
+  const clothesColor = col("clothesColor");
+  const eyes = opt("eyes");
+  const eyebrows = opt("eyebrows");
+  const mouth = opt("mouth");
+  const backgroundColor = col("backgroundColor");
+
+  if (
+    skinColor === null ||
+    top === null ||
+    hairColor === null ||
+    hatColor === null ||
+    accessories === null ||
+    accessoriesColor === null ||
+    facialHair === null ||
+    facialHairColor === null ||
+    clothing === null ||
+    clothesColor === null ||
+    eyes === null ||
+    eyebrows === null ||
+    mouth === null ||
+    backgroundColor === null
+  ) {
+    return null;
+  }
+
+  return {
+    skinColor,
+    top,
+    hairColor,
+    hatColor,
+    accessories,
+    accessoriesColor,
+    facialHair,
+    facialHairColor,
+    clothing,
+    clothesColor,
+    eyes,
+    eyebrows,
+    mouth,
+    backgroundColor,
     style: isAvatarStyle(o.style) ? o.style : "any",
   };
-
-  for (const value of Object.values(fields)) {
-    if (value === null) return null;
-  }
-  return fields;
 }
 
 export interface DicebearAvataaarsOptions {

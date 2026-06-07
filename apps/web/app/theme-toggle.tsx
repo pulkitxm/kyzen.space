@@ -1,10 +1,10 @@
 "use client";
 
-import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
-import { FaMoon, FaSun } from "react-icons/fa";
+import { FaMoon, FaSun } from "react-icons/fa6";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
+import { useColorModeSetting } from "@/lib/appearance";
 
 function cn(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
@@ -12,6 +12,7 @@ function cn(...classes: (string | false | null | undefined)[]): string {
 
 export interface ThemeToggleProps {
   collapsed: boolean;
+  signedIn: boolean;
   className?: string;
 }
 
@@ -23,22 +24,30 @@ function useHydrated() {
   );
 }
 
-export function ThemeToggle({ collapsed, className }: ThemeToggleProps) {
+export function ThemeToggle({
+  collapsed,
+  signedIn,
+  className,
+}: ThemeToggleProps) {
   const mounted = useHydrated();
-  const { resolvedTheme, setTheme } = useTheme();
+  const { resolvedMode, setMode } = useColorModeSetting(signedIn);
 
-  const isDark = resolvedTheme === "dark";
+  const isDark = resolvedMode !== "light";
   const label = isDark ? "Switch to light mode" : "Switch to dark mode";
 
   const button = (
     <button
       type="button"
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      onClick={() => setMode(isDark ? "light" : "dark")}
       className={cn(
-        "flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg text-sidebar-foreground/70 outline-none transition-[gap,padding] duration-250 ease-in-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-        collapsed ? "justify-center px-0" : "px-2.5",
+        "flex h-9 w-full cursor-pointer items-center rounded-lg text-sidebar-foreground/70 outline-none transition-[gap,padding] duration-250 ease-in-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
         className,
       )}
+      style={{
+        gap: collapsed ? 0 : 10,
+        paddingLeft: collapsed ? 12 : 10,
+        paddingRight: collapsed ? 12 : 10,
+      }}
     >
       <span className="flex size-7 shrink-0 items-center justify-center">
         {!mounted ? (

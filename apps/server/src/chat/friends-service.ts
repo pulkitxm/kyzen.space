@@ -1,5 +1,6 @@
-import { CHAT_EVENTS, type FriendshipJson } from "@gamelobby/chat-core";
-import { friends, notifications, profiles } from "../db";
+import { friends, notifications, profiles } from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { FriendshipJson } from "@gamelobby/shared/types";
 import { getIO } from "../realtime/io";
 import { notify } from "../realtime/notify";
 import { emitToUser } from "../realtime/rooms";
@@ -20,14 +21,12 @@ export async function sendFriendRequest(
   if (existing) {
     if (existing.status === "accepted") return fail("Already friends", 409);
     if (existing.status === "pending") {
-      // The other person already requested me -> sending back accepts it.
       if (existing.addresseeId === requesterId) {
         row = await friends.setStatus(existing.id, "accepted");
       } else {
         return fail("Friend request already sent", 409);
       }
     } else {
-      // declined -> reopen with the current direction
       row = await friends.reopenRequest(existing.id, requesterId, addresseeId);
     }
   } else {
@@ -85,7 +84,6 @@ export async function respondToRequest(
   );
   if (!updated) return fail("Failed to update request", 500);
 
-  // the actionable "you have a friend request" notification is now resolved
   await notifications.resolveByRequestId(userId, "friend_request", requestId);
 
   const requesterId = row.requesterId;

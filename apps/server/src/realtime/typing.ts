@@ -1,10 +1,10 @@
-import { CHAT_EVENTS, type TypingUser } from "@gamelobby/chat-core";
+import { conversations, profiles } from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { TypingUser } from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
-import { conversations, profiles } from "../db";
 import { convRoom } from "./rooms";
 import { isObj, str } from "./socket-util";
 
-// Ephemeral per-conversation typing state. conversationId -> userId -> entry.
 type Entry = { user: TypingUser; timeout: ReturnType<typeof setTimeout> };
 const typing = new Map<string, Map<string, Entry>>();
 const TYPING_TTL_MS = 5000;
@@ -39,7 +39,7 @@ function clearTyper(conversationId: string, userId: string): boolean {
 
 export function attachTypingHandlers(io: IOServer, socket: Socket): void {
   const userId = socket.data.userId;
-  const active = new Set<string>(); // convs this socket is typing in
+  const active = new Set<string>();
 
   socket.on(CHAT_EVENTS.typingStart, (payload: unknown) => {
     void (async () => {

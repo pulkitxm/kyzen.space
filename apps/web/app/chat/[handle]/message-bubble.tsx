@@ -6,7 +6,7 @@ import type {
   GifMeta,
   MessageMetadata,
   SystemMeta,
-} from "@gamelobby/chat-core";
+} from "@gamelobby/shared/types";
 import type { ReactNode } from "react";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import type { ChatMessage } from "@/lib/chat/atoms";
@@ -38,11 +38,6 @@ function systemText(
   }
 }
 
-/**
- * A GIF message: edge-to-edge (no bubble), click to open in the lightbox.
- * Reserves its exact box from the GIF's dimensions and shows a skeleton until
- * the (often slow) GIF finishes loading, so the layout never shifts.
- */
 function GifMessage({
   gif,
   pending,
@@ -69,7 +64,7 @@ function GifMessage({
         }
         aria-label={gif.title ? `Open GIF: ${gif.title}` : "Open GIF"}
         className={cn(
-          "block overflow-hidden rounded-xl outline-none transition hover:opacity-90",
+          "block max-w-full overflow-hidden rounded-xl outline-none transition hover:opacity-90",
           pending && "opacity-60",
         )}
         style={{ width }}
@@ -88,14 +83,11 @@ function GifMessage({
   );
 }
 
-// Split on http(s) URLs; the capture group lands matches on odd indices.
 const URL_RE = /(https?:\/\/[^\s]+)/g;
 
-/** Render plaintext, turning bare URLs into clickable links. */
 function linkify(text: string, own: boolean): ReactNode {
   return text.split(URL_RE).map((part, i) => {
     if (i % 2 === 0) return part;
-    // Trim trailing punctuation that's almost never part of the URL.
     const trailing = part.match(/[.,!?)]+$/)?.[0] ?? "";
     const href = trailing ? part.slice(0, -trailing.length) : part;
     return (
@@ -188,7 +180,7 @@ export function MessageBubble({
           <GifMessage gif={gif} pending={message.pending} stamp={stamp} />
         ) : (
           <div className={bubbleClass}>
-            <span className="whitespace-pre-wrap break-words">
+            <span className="wrap-break-word whitespace-pre-wrap">
               {linkify(message.body ?? "", own)}
             </span>
             <div

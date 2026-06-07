@@ -1,6 +1,7 @@
 "use client";
 
 import type { AvatarConfig } from "@gamelobby/avatar";
+import { getCategoryGroups } from "@gamelobby/games-core";
 import { useAtom } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
@@ -17,13 +18,13 @@ import {
   FaChevronLeft,
   FaChevronRight,
   FaGamepad,
+  FaGear,
   FaUser,
-} from "react-icons/fa";
+} from "react-icons/fa6";
+import { NotificationsPopover } from "@/app/notifications-popover";
 import { SidebarSocialNav } from "@/app/sidebar-social-nav";
-import { ThemeToggle } from "@/app/theme-toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
 import { Character } from "@/components/ui";
-import { getCategoryGroups } from "@/lib/games";
 import {
   clampWidthSafe,
   DEFAULT_SIDEBAR_WIDTH,
@@ -88,7 +89,10 @@ export function Sidebar({
   const hasResizedThisGestureRef = useRef(false);
   const resizeStartedFromCollapsedRef = useRef(false);
 
-  const groups = getCategoryGroups();
+  const groups = getCategoryGroups().map(({ category, games }) => ({
+    category,
+    games: games.map((game) => ({ ...game, href: `/games/${game.type}` })),
+  }));
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => !prev);
@@ -213,7 +217,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "relative flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar",
+        "relative flex shrink-0 flex-col border-sidebar-border border-r bg-sidebar",
         "fixed inset-y-0 left-0 z-50 w-64 md:relative md:z-auto md:w-(--sidebar-width)",
         !mobileOpen && "hidden md:flex",
       )}
@@ -251,7 +255,7 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="flex items-center gap-2 overflow-hidden border-b border-sidebar-border px-3 py-3.5">
+      <div className="flex items-center gap-2 overflow-hidden border-sidebar-border border-b px-3 py-3.5">
         <Link
           href="/"
           onClick={onCloseMobile}
@@ -261,7 +265,7 @@ export function Sidebar({
             paddingLeft: displayCollapsed ? 8 : 0,
           }}
         >
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-sm font-bold select-none">
+          <span className="flex size-7 shrink-0 select-none items-center justify-center rounded-lg bg-sidebar-primary font-bold text-sidebar-primary-foreground text-sm">
             GL
           </span>
           <span
@@ -291,6 +295,7 @@ export function Sidebar({
         {signedIn ? (
           <SidebarSocialNav
             collapsed={displayCollapsed}
+            collapsedPad={centeredPad}
             onNavigate={onCloseMobile}
           />
         ) : null}
@@ -319,9 +324,9 @@ export function Sidebar({
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                       !displayCollapsed &&
                         isActive &&
-                        "border-l-2 border-sidebar-primary",
+                        "border-sidebar-primary border-l-2",
                       !(displayCollapsed || isActive) &&
-                        "border-l-2 border-transparent",
+                        "border-transparent border-l-2",
                     )}
                     style={{
                       paddingLeft: displayCollapsed
@@ -361,9 +366,59 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="border-t border-sidebar-border px-2 py-3">
+      <div className="border-sidebar-border border-t px-2 py-3">
+        {signedIn ? (
+          <div className="mb-2">
+            <NotificationsPopover
+              collapsed={displayCollapsed}
+              onNavigate={onCloseMobile}
+            />
+          </div>
+        ) : null}
         <div className="mb-2">
-          <ThemeToggle collapsed={displayCollapsed} />
+          {(() => {
+            const isActive = pathname.startsWith("/settings");
+            const settingsLink = (
+              <Link
+                href="/settings/account"
+                onClick={onCloseMobile}
+                className={cn(
+                  "flex h-9 w-full cursor-pointer items-center rounded-lg outline-none transition-[gap,padding,background-color] duration-250 ease-in-out focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-foreground"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                )}
+                style={{
+                  gap: displayCollapsed ? 0 : 10,
+                  paddingLeft: displayCollapsed ? 12 : 10,
+                  paddingRight: displayCollapsed ? 12 : 10,
+                }}
+                aria-label="Settings"
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center">
+                  <FaGear className="size-4 shrink-0" aria-hidden />
+                </span>
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sidebar-foreground/90 text-sm transition-[opacity,max-width,filter] duration-250 ease-in-out",
+                    displayCollapsed
+                      ? "max-w-0 opacity-0 blur-[2px]"
+                      : "max-w-48 opacity-100 blur-0",
+                  )}
+                >
+                  Settings
+                </span>
+              </Link>
+            );
+            return displayCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>{settingsLink}</TooltipTrigger>
+                <TooltipContent side="right">Settings</TooltipContent>
+              </Tooltip>
+            ) : (
+              settingsLink
+            );
+          })()}
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -380,7 +435,7 @@ export function Sidebar({
             >
               <div
                 className={cn(
-                  "flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-medium",
+                  "flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full font-medium text-xs",
                   signedIn
                     ? "bg-sidebar-primary/15 text-sidebar-primary"
                     : "bg-sidebar-accent text-sidebar-foreground/60",

@@ -6,11 +6,11 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/drizzle/**", "!**/bun.lock", "!**/*.css"]
+    "includes": ["**", "!**/drizzle", "!**/bun.lock"]
   },
   "css": {
-    "formatter": { "enabled": false },
-    "parser": { "cssModules": false }
+    "formatter": { "enabled": true },
+    "parser": { "cssModules": false, "tailwindDirectives": true }
   },
   "formatter": {
     "enabled": true,
@@ -26,7 +26,35 @@
     }
   },
   "linter": {
-    "enabled": false
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        "noNonNullAssertion": "error",
+        "useImportType": "error"
+      },
+      "suspicious": {
+        "noExplicitAny": "error",
+        "noArrayIndexKey": "error"
+      },
+      "complexity": {
+        "useOptionalChain": "error"
+      },
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "noUnusedFunctionParameters": "error"
+      },
+      "nursery": {
+        "useSortedClasses": {
+          "level": "error",
+          "options": {
+            "attributes": ["className"],
+            "functions": []
+          }
+        }
+      }
+    }
   },
   "javascript": {
     "formatter": {

@@ -1,8 +1,8 @@
-import { resolveDbLatencyMs } from "./db/latency";
+import { parseUsernameCsv } from "./username-rules";
 
 function required(name: string): string {
   const v = process.env[name];
-  if (!v || !v.trim()) {
+  if (!v?.trim()) {
     throw new Error(`Missing required env var: ${name}`);
   }
   return v.trim();
@@ -31,10 +31,6 @@ export const env = {
     (optional("NODE_ENV") === "production" ? "info" : "debug"),
 
   databaseUrl: required("DATABASE_URL"),
-  dbLatencyMs: resolveDbLatencyMs(
-    optional("NODE_ENV", "development"),
-    number("DB_LATENCY_MS", 0),
-  ),
 
   betterAuthSecret: required("BETTER_AUTH_SECRET"),
   betterAuthUrl: optional("BETTER_AUTH_URL", "http://localhost:4000"),
@@ -48,8 +44,15 @@ export const env = {
     optional("PUBLIC_REALTIME_URL") ||
     optional("BETTER_AUTH_URL", "http://localhost:4000"),
 
-  // Klipy GIF API — server-only, proxied so the browser never sees the key.
   klipyApiKey: optional("KLIPY_API_KEY"),
+  genderizeApiKey: optional("GENDERIZE_API_KEY"),
+
+  notAllowedUsernames: parseUsernameCsv(optional("NOT_ALLOWED_USERNAMES")),
+  usernameChangeCooldownDays: number("USERNAME_CHANGE_COOLDOWN_DAYS", 30),
+
+  presenceHeartbeatMs: number("PRESENCE_HEARTBEAT_MS", 10000),
+  presenceStaleMs: number("PRESENCE_STALE_MS", 25000),
+  presenceLastSeenPersistMs: number("PRESENCE_LASTSEEN_PERSIST_MS", 60000),
 } as const;
 
 export function googleConfigured(): boolean {

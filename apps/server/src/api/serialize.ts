@@ -1,35 +1,35 @@
 import type {
-  ConversationJson,
-  FriendshipJson,
-  MemberJson,
-  MessageJson,
-  NotificationJson,
-  PublicUser,
-} from "@gamelobby/chat-core";
-import type { GameJson, MoveJson } from "@gamelobby/games-core";
-import type {
   ConversationMemberRow,
   ConversationRow,
   FriendshipRow,
-  GamePlayer,
-  GameRow,
+  GameRecord,
   MessageRow,
   MoveRow,
   NotificationRow,
-} from "../db";
-import type { PublicUserRow } from "../db/repositories/profiles";
+  PublicUserRow,
+} from "@gamelobby/database";
+import type {
+  ConversationJson,
+  FriendshipJson,
+  GameJson,
+  MemberJson,
+  MessageJson,
+  MoveJson,
+  NotificationJson,
+  PublicUser,
+} from "@gamelobby/shared/types";
 
 function iso(d: Date | null | undefined): string | null {
   return d ? new Date(d).toISOString() : null;
 }
 
-export function serializeGame(row: GameRow): GameJson {
+export function serializeGame(row: GameRecord): GameJson {
   return {
     id: row.id,
     gameType: row.gameType,
     status: row.status,
     winner: row.winner,
-    players: (row.players ?? []) as GamePlayer[],
+    players: row.players,
     gameState: row.gameState ?? null,
     conversationId: row.conversationId,
     creatorUserId: row.creatorUserId,

@@ -1,31 +1,26 @@
-import {
-  CHAT_EVENTS,
-  type ClientCreateGameInConversation,
-} from "@gamelobby/chat-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { clientCreateGameInConversationSchema } from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { createGameInConversation } from "../chat/games-in-chat-service";
 
-/** Sockets-first path for "start a game in this conversation" (ack-based). */
 export function attachGameChatHandlers(_io: IOServer, socket: Socket): void {
   socket.on(
     CHAT_EVENTS.createGameInConversation,
-    (payload: ClientCreateGameInConversation, ack?: (res: unknown) => void) => {
+    (payload: unknown, ack?: (res: unknown) => void) => {
       void (async () => {
-        if (!payload || typeof payload.conversationId !== "string") {
+        const parsed = clientCreateGameInConversationSchema.safeParse(payload);
+        if (!parsed.success) {
           ack?.({ ok: false, error: "Invalid payload" });
           return;
         }
+        const data = parsed.data;
         const res = await createGameInConversation({
           userId: socket.data.userId,
-          conversationId: payload.conversationId,
-          gameType:
-            typeof payload.gameType === "string" ? payload.gameType : "",
-          seatingMode:
-            payload.seatingMode === "open" ||
-            payload.seatingMode === "challenge"
-              ? payload.seatingMode
-              : undefined,
-          challengedUserId: payload.challengedUserId ?? null,
+          conversationId: data.conversationId,
+          gameType: data.gameType,
+          seatingMode: data.seatingMode,
+          challengedUserId: data.challengedUserId ?? null,
+          config: data.config,
         });
         if (!res.ok) {
           ack?.({ ok: false, error: res.error });

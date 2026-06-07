@@ -1,10 +1,8 @@
-import { CHAT_EVENTS } from "@gamelobby/chat-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
 import type { Server as IOServer, Socket } from "socket.io";
 import * as friendsService from "../chat/friends-service";
 import { ack, ackErr, isObj, register, str } from "./socket-util";
 
-// Friend mutations over the socket (sockets-first). Each acks the initiator and
-// the service broadcasts to the other party's user room + sends a notification.
 export function attachFriendHandlers(_io: IOServer, socket: Socket): void {
   const userId = socket.data.userId;
 

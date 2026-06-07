@@ -1,13 +1,11 @@
-import { CHAT_EVENTS } from "@gamelobby/chat-core";
+import { conversations, notifications } from "@gamelobby/database";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
 import type { Server as IOServer, Socket } from "socket.io";
 import * as conversationsService from "../chat/conversations-service";
 import * as messagesService from "../chat/messages-service";
-import { conversations, notifications } from "../db";
 import { convRoom, joinConvRoom, leaveConvRoom, userRoom } from "./rooms";
 import { ack, ackErr, isObj, register, str, strArray } from "./socket-util";
 
-/** Join the user's personal room + all conversation rooms on connect, so they
- * receive messages/notifications without an explicit client-side join. */
 export async function joinUserRooms(socket: Socket): Promise<void> {
   const userId = socket.data.userId;
   void socket.join(userRoom(userId));

@@ -8,8 +8,10 @@
   },
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gamelobby/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",

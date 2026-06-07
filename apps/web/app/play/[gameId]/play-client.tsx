@@ -1,8 +1,19 @@
 "use client";
 
-import type { ConversationJson, MessageJson } from "@gamelobby/chat-core";
+import {
+  type GameClientProps,
+  getGameClient,
+  getGameSkeleton,
+} from "@gamelobby/games-client";
+import type {
+  ConversationJson,
+  GameType,
+  MessageJson,
+} from "@gamelobby/shared/types";
+import { Suspense } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
-import { type GameClientProps, getGameClient } from "@/lib/game-clients";
+import type { ChatLayout } from "@/lib/chat-layout";
+import { useSocket } from "@/lib/socket/socket-context";
 import { GameChatSplit } from "./game-chat-split";
 
 export function PlayClient({
@@ -14,26 +25,36 @@ export function PlayClient({
   conversation,
   initialMessages,
   initialNextCursor,
+  initialLayout,
+  layoutTrusted,
 }: {
   gameId: string;
   userId: string;
-  gameType: string;
+  gameType: GameType;
   initialGame: GameClientProps["initialGame"];
   initialMoves: GameClientProps["initialMoves"];
   conversation: ConversationJson | null;
   initialMessages: MessageJson[];
   initialNextCursor: string | null;
+  initialLayout: ChatLayout;
+  layoutTrusted: boolean;
 }) {
   const GameClient = getGameClient(gameType);
+  const GameSkeleton = getGameSkeleton(gameType);
+  const { socket, status } = useSocket();
 
   const gameNode = GameClient ? (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
-      <GameClient
-        gameId={gameId}
-        userId={userId}
-        initialGame={initialGame}
-        initialMoves={initialMoves}
-      />
+      <Suspense fallback={<GameSkeleton />}>
+        <GameClient
+          gameId={gameId}
+          userId={userId}
+          socket={socket}
+          connected={status === "connected"}
+          initialGame={initialGame}
+          initialMoves={initialMoves}
+        />
+      </Suspense>
     </div>
   ) : (
     <div className="p-6 text-center text-muted-foreground text-sm">
@@ -41,13 +62,15 @@ export function PlayClient({
     </div>
   );
 
-  // Legacy game with no conversation (or viewer can't see it) → game only.
   if (!conversation) {
     return <div className="h-full min-h-0">{gameNode}</div>;
   }
 
   return (
     <GameChatSplit
+      conversationId={conversation.id}
+      initialLayout={initialLayout}
+      layoutTrusted={layoutTrusted}
       game={gameNode}
       chat={
         <ConversationView

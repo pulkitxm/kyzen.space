@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { searchGifs, trendingGifs } from "../../services/gif-provider";
-import { getUserId } from "../auth-context";
+import { type AuthEnv, requireAuth } from "../middleware/auth";
 
 function clampLimit(raw: string | undefined): number {
   const n = Number.parseInt(raw ?? "24", 10);
@@ -12,10 +12,11 @@ function readOffset(raw: string | undefined): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-export const gifsRouter = new Hono()
+export const gifsRouter = new Hono<AuthEnv>()
+  .use("*", requireAuth)
+
   .get("/trending", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const limit = clampLimit(c.req.query("limit"));
     const offset = readOffset(c.req.query("offset"));
     try {
@@ -29,9 +30,9 @@ export const gifsRouter = new Hono()
       return c.json({ error: "GIF service unavailable" }, 502);
     }
   })
+
   .get("/search", async (c) => {
-    const userId = await getUserId(c);
-    if (!userId) return c.json({ error: "Unauthorized" }, 401);
+    const userId = c.get("userId");
     const q = (c.req.query("q") ?? "").trim();
     if (!q) return c.json({ gifs: [], nextOffset: null });
     const limit = clampLimit(c.req.query("limit"));

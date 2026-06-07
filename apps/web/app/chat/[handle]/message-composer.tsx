@@ -1,16 +1,16 @@
 "use client";
 
-import {
-  CHAT_EVENTS,
-  type ConversationJson,
-  type GifJson,
-  type GifMeta,
-  type MemberJson,
-} from "@gamelobby/chat-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type {
+  ConversationJson,
+  GifJson,
+  GifMeta,
+  MemberJson,
+} from "@gamelobby/shared/types";
 import { useStore } from "jotai";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FaRegSmile } from "react-icons/fa";
+import { FaPaperPlane, FaRegFaceSmile } from "react-icons/fa6";
 import {
   type ChatMessage,
   messagesAtomFamily,
@@ -26,7 +26,6 @@ const ComposerPicker = dynamic(
   { ssr: false },
 );
 
-// Cap auto-grow at ~6 lines; keep in sync with the `max-h-40` class below.
 const MAX_TEXTAREA_HEIGHT = 160;
 
 export function MessageComposer({
@@ -51,16 +50,12 @@ export function MessageComposer({
     });
   }, []);
 
-  // Grow the textarea to fit its content (Shift+Enter newlines, wrapping),
-  // up to MAX_TEXTAREA_HEIGHT; collapses back when text is cleared. With
-  // border-box sizing, scrollHeight excludes the border, so add it back —
-  // otherwise the content overflows by the border width and a scrollbar shows
-  // permanently. Only allow scrolling once we actually hit the cap.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: text is the intended trigger to recompute the textarea height even though the body reads it via the ref
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    const borderY = ta.offsetHeight - ta.clientHeight; // top + bottom border
+    const borderY = ta.offsetHeight - ta.clientHeight;
     const full = ta.scrollHeight + borderY;
     ta.style.height = `${Math.min(full, MAX_TEXTAREA_HEIGHT)}px`;
     ta.style.overflowY = full > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
@@ -92,12 +87,10 @@ export function MessageComposer({
     }, 3000);
   }, [socket, conversationId]);
 
-  // Stop typing when leaving the conversation / unmounting.
   useEffect(() => stopTyping, [stopTyping]);
 
   const onType = useCallback(
     (value: string, caret: number) => {
-      // WhatsApp-style `:code ` -> emoji replacement.
       if (shortcodesRef.current && value[caret - 1] === " ") {
         const replaced = replaceShortcodeBeforeSpace(value, caret, (c) =>
           shortcodesRef.current?.get(c),
@@ -125,7 +118,6 @@ export function MessageComposer({
       const end = ta?.selectionEnd ?? start;
       const next = text.slice(0, start) + native + text.slice(end);
       setText(next);
-      // Keep the picker open so several emojis can be added in a row.
       requestAnimationFrame(() => {
         ta?.focus();
         const pos = start + native.length;
@@ -248,7 +240,7 @@ export function MessageComposer({
         />
       ) : null}
       {pickerOpen ? (
-        <div className="absolute bottom-full left-3 z-20 mb-2">
+        <div className="absolute right-3 bottom-full z-20 mb-2">
           <ComposerPicker onEmoji={insertEmoji} onGif={sendGif} />
         </div>
       ) : null}
@@ -259,7 +251,7 @@ export function MessageComposer({
           aria-label="Emoji & GIFs"
           className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-surface-overlay hover:text-foreground"
         >
-          <FaRegSmile className="size-5" />
+          <FaRegFaceSmile className="size-5" />
         </button>
         {me ? (
           <GameLauncher conversation={conversation} userId={me.id} />
@@ -287,9 +279,10 @@ export function MessageComposer({
           type="button"
           onClick={() => void send()}
           disabled={!text.trim()}
-          className="h-11 shrink-0 rounded-2xl bg-primary px-5 font-medium text-primary-foreground text-sm transition hover:bg-primary-hover disabled:opacity-50"
+          aria-label="Send"
+          className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition hover:bg-primary-hover disabled:opacity-50"
         >
-          Send
+          <FaPaperPlane className="size-4" />
         </button>
       </div>
     </div>

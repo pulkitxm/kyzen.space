@@ -1,135 +1,184 @@
 @import "tailwindcss";
 
+@source "../../../packages/games-client/src/**/*.{ts,tsx}";
+
 :root {
-  --palette-pine: #122417;
-  --palette-mezzo: #1a4a24;
-  --palette-lucky: #dbedcc;
-  --palette-gold: #a38554;
-  --palette-nemo: #ff5524;
+  --d: #02060e;
+  --v: #0356c5;
+}
+html[data-theme="sangria"] {
+  --d: #021c4f;
+  --v: #c50337;
+}
+html[data-theme="crimson-nights"] {
+  --d: #02182b;
+  --v: #d7263d;
+}
+html[data-theme="midnight-blue"] {
+  --d: #02060e;
+  --v: #0356c5;
+}
+html[data-theme="royal-ember"] {
+  --d: #013f4a;
+  --v: #068562;
+}
+html[data-theme="forest"] {
+  --d: #05140d;
+  --v: #22a559;
+}
+html[data-theme="violet"] {
+  --d: #0d0a1f;
+  --v: #7c3aed;
+}
+html[data-theme="slate"] {
+  --d: #0f1319;
+  --v: #4f8fd6;
+}
+html[data-theme="amber"] {
+  --d: #1a0f04;
+  --v: #e0921f;
+}
+html[data-theme="rose"] {
+  --d: #1f0712;
+  --v: #e84d8a;
+}
+html[data-theme="cyan"] {
+  --d: #03161a;
+  --v: #06b6d4;
+}
+html[data-theme="csk"] {
+  --d: #0a1b40;
+  --v: #fdb913;
+}
 
-  --primary: var(--palette-mezzo);
-  --primary-dark: var(--palette-pine);
-  --primary-hover: color-mix(in srgb, var(--palette-mezzo) 88%, black);
-  --primary-foreground: var(--palette-lucky);
+:root,
+html[data-pattern="doodles"] {
+  --pattern-url: url("/patterns/doodles.svg");
+  --pattern-tile: 360px 360px;
+}
+html[data-pattern="games"] {
+  --pattern-url: url("/patterns/games.svg");
+  --pattern-tile: 320px 320px;
+}
+html[data-pattern="shapes"] {
+  --pattern-url: url("/patterns/shapes.svg");
+  --pattern-tile: 360px 360px;
+}
+html[data-pattern="nature"] {
+  --pattern-url: url("/patterns/nature.svg");
+  --pattern-tile: 360px 360px;
+}
 
-  --success: var(--palette-mezzo);
-  --success-foreground: var(--palette-lucky);
-  --warning: var(--palette-gold);
-  --warning-foreground: var(--palette-pine);
-  --danger: #c0392b;
+html:not(.dark) {
+  --primary: color-mix(in srgb, var(--v) 78%, var(--d));
+  --primary-dark: var(--d);
+  --primary-hover: color-mix(in srgb, var(--v) 64%, var(--d));
+  --primary-foreground: #ffffff;
+
+  --success: #1f8a5b;
+  --success-foreground: #ffffff;
+  --warning: #c98a1e;
+  --warning-foreground: #2a1c05;
+  --danger: #dc2626;
   --danger-foreground: #ffffff;
 
-  --background: color-mix(in srgb, var(--palette-lucky) 86%, white);
-  --foreground: var(--palette-pine);
+  --background: color-mix(in srgb, var(--v) 4%, #fbfbfc);
+  --foreground: #1b1f27;
 
-  --surface: var(--palette-lucky);
+  --surface: color-mix(in srgb, var(--v) 5%, #ffffff);
   --surface-raised: #ffffff;
-  --surface-overlay: color-mix(in srgb, var(--palette-lucky) 76%, white);
-  --surface-hover: color-mix(
-    in srgb,
-    var(--palette-lucky) 80%,
-    var(--palette-gold)
-  );
+  --surface-overlay: #ffffff;
+  --surface-hover: color-mix(in srgb, var(--v) 9%, #ffffff);
 
   --card: #ffffff;
-  --card-foreground: var(--palette-pine);
+  --card-foreground: #1b1f27;
 
-  --muted-foreground: color-mix(
-    in srgb,
-    var(--palette-pine) 70%,
-    var(--palette-gold)
-  );
+  --muted-foreground: #5b6472;
 
-  --border: color-mix(in srgb, var(--palette-gold) 30%, var(--palette-lucky));
-  --ring: var(--palette-nemo);
+  --border: color-mix(in srgb, var(--v) 14%, #e3e6eb);
+  --ring: var(--v);
 
-  --banner-from: var(--palette-lucky);
-  --banner-via: var(--palette-gold);
-  --banner-to: var(--palette-mezzo);
-  --banner-fade: rgb(219 237 204 / 0.92);
+  --banner-from: color-mix(in srgb, var(--v) 10%, white);
+  --banner-via: color-mix(in srgb, var(--v) 35%, white);
+  --banner-to: var(--v);
+  --banner-fade: color-mix(in srgb, white 92%, transparent);
   --banner-curve: var(--surface);
 
-  --sidebar: var(--palette-pine);
-  --sidebar-foreground: var(--palette-lucky);
-  --sidebar-primary: var(--palette-nemo);
-  --sidebar-primary-foreground: var(--palette-pine);
-  --sidebar-accent: var(--palette-mezzo);
-  --sidebar-accent-foreground: var(--palette-lucky);
-  --sidebar-border: color-mix(in srgb, var(--palette-lucky) 12%, transparent);
-  --sidebar-ring: var(--palette-nemo);
+  --sidebar: color-mix(in srgb, var(--d) 82%, #ffffff);
+  --sidebar-foreground: #eef1f8;
+  --sidebar-primary: var(--v);
+  --sidebar-primary-foreground: #f7f9fd;
+  --sidebar-accent: color-mix(in srgb, var(--d) 70%, var(--v));
+  --sidebar-accent-foreground: #eef1f8;
+  --sidebar-border: color-mix(in srgb, #ffffff 12%, transparent);
+  --sidebar-ring: var(--v);
 
-  --accent-warm: var(--palette-nemo);
-  --page-ambient: color-mix(in srgb, var(--primary) 14%, transparent);
-  --success-border: color-mix(in srgb, var(--palette-mezzo) 42%, transparent);
-  --success-bg: color-mix(in srgb, var(--palette-mezzo) 10%, transparent);
-  --success-label-bg: color-mix(in srgb, var(--palette-gold) 22%, transparent);
-  --success-label-text: var(--palette-pine);
+  --accent-warm: color-mix(in srgb, var(--v) 82%, var(--d));
+  --page-ambient: color-mix(in srgb, var(--v) 8%, transparent);
+  --success-border: color-mix(in srgb, #1f8a5b 42%, transparent);
+  --success-bg: color-mix(in srgb, #1f8a5b 10%, transparent);
+  --success-label-bg: color-mix(in srgb, var(--v) 16%, transparent);
+  --success-label-text: var(--d);
+
+  --pattern-ink: color-mix(in srgb, #11151c 88%, var(--v));
+  --pattern-opacity: 0.09;
 
   color-scheme: light;
 }
 
 html.dark {
-  --primary: var(--palette-gold);
-  --primary-dark: var(--palette-nemo);
-  --primary-hover: color-mix(in srgb, var(--palette-gold) 85%, white);
-  --primary-foreground: var(--palette-pine);
+  --primary: var(--v);
+  --primary-dark: var(--d);
+  --primary-hover: color-mix(in srgb, var(--v) 85%, white);
+  --primary-foreground: #f7f9fd;
 
-  --success: color-mix(in srgb, var(--palette-mezzo) 64%, var(--palette-lucky));
-  --success-foreground: var(--palette-pine);
-  --warning: var(--palette-gold);
-  --warning-foreground: var(--palette-pine);
-  --danger: #e06a5b;
-  --danger-foreground: #1a0f0d;
+  --success: #3fae7c;
+  --success-foreground: #06231a;
+  --warning: #e0a93b;
+  --warning-foreground: #2a1c05;
+  --danger: #f0607e;
+  --danger-foreground: #1a0510;
 
-  --background: var(--palette-pine);
-  --foreground: var(--palette-lucky);
+  --background: var(--d);
+  --foreground: #eef1f8;
 
-  --surface: color-mix(in srgb, var(--palette-pine) 88%, var(--palette-mezzo));
-  --surface-raised: color-mix(
-    in srgb,
-    var(--palette-pine) 70%,
-    var(--palette-mezzo)
-  );
-  --surface-overlay: var(--palette-mezzo);
-  --surface-hover: color-mix(
-    in srgb,
-    var(--palette-mezzo) 84%,
-    var(--palette-gold)
-  );
+  --surface: color-mix(in srgb, var(--d) 84%, var(--v));
+  --surface-raised: color-mix(in srgb, var(--d) 72%, var(--v));
+  --surface-overlay: color-mix(in srgb, var(--d) 70%, var(--v));
+  --surface-hover: color-mix(in srgb, var(--d) 76%, var(--v));
 
-  --card: color-mix(in srgb, var(--palette-pine) 64%, var(--palette-mezzo));
-  --card-foreground: var(--palette-lucky);
+  --card: color-mix(in srgb, var(--d) 78%, var(--v));
+  --card-foreground: #eef1f8;
 
-  --muted-foreground: color-mix(
-    in srgb,
-    var(--palette-lucky) 58%,
-    var(--palette-gold)
-  );
+  --muted-foreground: color-mix(in srgb, #eef1f8 62%, var(--v));
 
-  --border: color-mix(in srgb, var(--palette-lucky) 13%, transparent);
-  --ring: var(--palette-nemo);
+  --border: color-mix(in srgb, #ffffff 13%, transparent);
+  --ring: var(--v);
 
-  --banner-from: var(--palette-pine);
-  --banner-via: var(--palette-mezzo);
-  --banner-to: var(--palette-gold);
-  --banner-fade: rgb(18 36 23 / 0.92);
+  --banner-from: var(--d);
+  --banner-via: color-mix(in srgb, var(--d) 45%, var(--v));
+  --banner-to: var(--v);
+  --banner-fade: color-mix(in srgb, var(--d) 92%, transparent);
   --banner-curve: var(--surface);
 
-  --sidebar: color-mix(in srgb, var(--palette-pine) 94%, black);
-  --sidebar-foreground: var(--palette-lucky);
-  --sidebar-primary: var(--palette-nemo);
-  --sidebar-primary-foreground: var(--palette-pine);
-  --sidebar-accent: var(--palette-mezzo);
-  --sidebar-accent-foreground: var(--palette-lucky);
-  --sidebar-border: color-mix(in srgb, var(--palette-lucky) 12%, transparent);
-  --sidebar-ring: var(--palette-nemo);
+  --sidebar: color-mix(in srgb, var(--d) 90%, black);
+  --sidebar-foreground: #eef1f8;
+  --sidebar-primary: var(--v);
+  --sidebar-primary-foreground: #f7f9fd;
+  --sidebar-accent: color-mix(in srgb, var(--d) 70%, var(--v));
+  --sidebar-accent-foreground: #eef1f8;
+  --sidebar-border: color-mix(in srgb, #ffffff 12%, transparent);
+  --sidebar-ring: var(--v);
 
-  --accent-warm: var(--palette-nemo);
-  --page-ambient: color-mix(in srgb, var(--primary) 14%, transparent);
-  --success-border: color-mix(in srgb, var(--palette-gold) 42%, transparent);
-  --success-bg: color-mix(in srgb, var(--palette-gold) 12%, transparent);
-  --success-label-bg: color-mix(in srgb, var(--palette-gold) 20%, transparent);
-  --success-label-text: var(--palette-lucky);
+  --accent-warm: var(--v);
+  --page-ambient: color-mix(in srgb, var(--v) 16%, transparent);
+  --success-border: color-mix(in srgb, #3fae7c 42%, transparent);
+  --success-bg: color-mix(in srgb, #3fae7c 14%, transparent);
+  --success-label-bg: color-mix(in srgb, var(--v) 22%, transparent);
+  --success-label-text: #eef1f8;
+
+  --pattern-ink: color-mix(in srgb, #ffffff 62%, var(--v));
+  --pattern-opacity: 0.1;
 
   color-scheme: dark;
 }
@@ -179,14 +228,38 @@ html.dark {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-game-paused: var(--font-game-paused-face);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+.app-canvas {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--background);
+}
+
+.app-canvas::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--pattern-ink);
+  opacity: var(--pattern-opacity);
+  -webkit-mask: var(--pattern-url) repeat;
+  mask: var(--pattern-url) repeat;
+  -webkit-mask-size: var(--pattern-tile);
+  mask-size: var(--pattern-tile);
+}
+
+html[data-pattern="none"] .app-canvas::before {
+  display: none;
 }
 
 @layer base {
@@ -203,8 +276,6 @@ body {
     cursor: not-allowed;
   }
 
-  /* Don't show a focus ring for pointer (mouse/touch) interactions; keep it
-     for keyboard navigation via :focus-visible. */
   :focus:not(:focus-visible) {
     outline: none;
   }
@@ -219,7 +290,6 @@ body {
       opacity: 1;
     }
   }
-  /* Smoothly reveal media over its blurred placeholder (CSS-only, no JS). */
   .animate-gif-fade-in {
     animation: gif-fade-in 0.45s ease-out both;
   }

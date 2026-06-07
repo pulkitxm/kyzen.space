@@ -1,6 +1,7 @@
 "use client";
 
-import { CHAT_EVENTS, type ConversationJson } from "@gamelobby/chat-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import type { ConversationJson, GameType } from "@gamelobby/shared/types";
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -8,20 +9,18 @@ import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
 import { conversationsAtom, friendsAtom } from "@/lib/chat/atoms";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 
-const GAME_TYPE = "tic-tac-toe";
 const ROW =
   "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm outline-none transition hover:bg-surface-overlay disabled:opacity-50";
 
-/**
- * "Play with…" picker: choose an existing DM/group (groups then ask open vs
- * challenge), or a friend to start a fresh DM. Creating posts the game card in
- * that conversation and navigates the creator to the side-by-side /play view.
- */
 export function ConversationPicker({
   userId,
+  gameType,
+  config,
   onClose,
 }: {
   userId: string;
+  gameType: GameType;
+  config?: unknown;
   onClose: () => void;
 }) {
   const conversations = useAtomValue(conversationsAtom);
@@ -42,7 +41,7 @@ export function ConversationPicker({
       const res = await emitAck<{ game: { id: string } }>(
         socket,
         CHAT_EVENTS.createGameInConversation,
-        { conversationId, gameType: GAME_TYPE, seatingMode, challengedUserId },
+        { conversationId, gameType, seatingMode, challengedUserId, config },
       );
       onClose();
       router.push(`/play/${res.game.id}`);
@@ -65,8 +64,9 @@ export function ConversationPicker({
         CHAT_EVENTS.createGameInConversation,
         {
           conversationId: dm.conversation.id,
-          gameType: GAME_TYPE,
+          gameType,
           seatingMode: "open",
+          config,
         },
       );
       onClose();

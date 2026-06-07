@@ -10,12 +10,25 @@ type Profile = {
   username: string;
   stats: Record<string, unknown>;
   avatar: AvatarConfig | null;
+  theme: string;
+  colorMode: string;
+  usernameChangedAt: Date | null;
   createdAt: Date;
 } | null;
 
 let currentSession: Session = null;
 let storedProfile: Profile = null;
+let usernameTaken = false;
+let blockedUsernames = new Set<string>();
+let suggestions: string[] = ["alt_1", "alt_2"];
+let cooldownDays = 30;
 const updateAvatarCalls: Array<{ userId: string; avatar: AvatarConfig }> = [];
+const updateAppearanceCalls: Array<{
+  userId: string;
+  patch: { theme?: string; colorMode?: string; pattern?: string };
+}> = [];
+const setDisplayNameCalls: Array<{ userId: string; name: string }> = [];
+const updateUsernameCalls: Array<{ userId: string; username: string }> = [];
 
 mock.module("../src/auth", () => ({
   getAuth: () => ({
@@ -23,18 +36,45 @@ mock.module("../src/auth", () => ({
   }),
 }));
 
-mock.module("../src/db", () => ({
+mock.module("@gamelobby/database", () => ({
   profiles: {
     getProfileByUserId: async () => storedProfile,
     getProfileByUsername: async () => storedProfile,
     getDisplayName: async () => "Display Name",
+    isUsernameTaken: async () => usernameTaken,
     updateAvatar: async (userId: string, avatar: AvatarConfig) => {
       updateAvatarCalls.push({ userId, avatar });
+    },
+    updateAppearance: async (
+      userId: string,
+      patch: { theme?: string; colorMode?: string; pattern?: string },
+    ) => {
+      updateAppearanceCalls.push({ userId, patch });
+    },
+    setDisplayName: async (userId: string, name: string) => {
+      setDisplayNameCalls.push({ userId, name });
+    },
+    updateUsername: async (userId: string, username: string) => {
+      updateUsernameCalls.push({ userId, username });
     },
   },
   games: {
     gamesForUser: async () => [],
   },
+}));
+
+mock.module("../src/env", () => ({
+  env: {
+    get usernameChangeCooldownDays() {
+      return cooldownDays;
+    },
+    notAllowedUsernames: [] as string[],
+  },
+}));
+
+mock.module("../src/username", () => ({
+  isUsernameBlocked: (normalized: string) => blockedUsernames.has(normalized),
+  suggestUsernames: async () => suggestions,
 }));
 
 const { profilesRouter } = await import("../src/api/routes/profiles");
@@ -49,6 +89,9 @@ function makeProfile(
     username: "tester",
     stats: {},
     avatar: VALID_AVATAR,
+    theme: "sangria",
+    colorMode: "dark",
+    usernameChangedAt: null,
     createdAt: new Date("2024-01-01T00:00:00Z"),
     ...over,
   };
@@ -65,7 +108,101 @@ function put(body: string | object, contentType = "application/json") {
 beforeEach(() => {
   currentSession = null;
   storedProfile = null;
+  usernameTaken = false;
+  blockedUsernames = new Set<string>();
+  suggestions = ["alt_1", "alt_2"];
+  cooldownDays = 30;
   updateAvatarCalls.length = 0;
+  updateAppearanceCalls.length = 0;
+  setDisplayNameCalls.length = 0;
+  updateUsernameCalls.length = 0;
+});
+
+function putAppearance(body: string | object) {
+  return profilesRouter.request("/me/appearance", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
+describe("PUT /me/appearance", () => {
+  it("returns 401 when unauthenticated", async () => {
+    const res = await putAppearance({ theme: "sangria" });
+    expect(res.status).toBe(401);
+    expect(updateAppearanceCalls).toHaveLength(0);
+  });
+
+  describe("when authenticated", () => {
+    beforeEach(() => {
+      currentSession = { user: { id: "user-9", name: "T", email: "t@e.com" } };
+    });
+
+    it("returns 400 on malformed JSON", async () => {
+      const res = await putAppearance("{ not json");
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("rejects an invalid theme", async () => {
+      const res = await putAppearance({ theme: "neon" });
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("rejects an invalid colorMode", async () => {
+      const res = await putAppearance({ colorMode: "sepia" });
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("rejects an invalid pattern", async () => {
+      const res = await putAppearance({ pattern: "scribbles" });
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("persists a valid pattern", async () => {
+      const res = await putAppearance({ pattern: "games" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ pattern: "games" });
+      expect(updateAppearanceCalls[0]?.patch).toEqual({ pattern: "games" });
+    });
+
+    it("returns 400 when nothing is provided", async () => {
+      const res = await putAppearance({});
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("persists a valid theme with the session user id", async () => {
+      const res = await putAppearance({ theme: "midnight-blue" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ theme: "midnight-blue" });
+      expect(updateAppearanceCalls).toHaveLength(1);
+      expect(updateAppearanceCalls[0]?.userId).toBe("user-9");
+      expect(updateAppearanceCalls[0]?.patch).toEqual({
+        theme: "midnight-blue",
+      });
+    });
+
+    it("persists theme and colorMode together", async () => {
+      const res = await putAppearance({
+        theme: "royal-ember",
+        colorMode: "light",
+      });
+      expect(res.status).toBe(200);
+      expect(updateAppearanceCalls[0]?.patch).toEqual({
+        theme: "royal-ember",
+        colorMode: "light",
+      });
+    });
+
+    it("ignores a client-supplied userId", async () => {
+      await putAppearance({ theme: "sangria", userId: "attacker" });
+      expect(updateAppearanceCalls[0]?.userId).toBe("user-9");
+    });
+  });
 });
 
 describe("PUT /me/avatar — auth gate", () => {
@@ -122,23 +259,23 @@ describe("PUT /me/avatar — success", () => {
   it("calls updateAvatar with the session user id (not a client-supplied id)", async () => {
     await put({ ...VALID_AVATAR, userId: "attacker-controlled" });
     expect(updateAvatarCalls).toHaveLength(1);
-    expect(updateAvatarCalls[0]!.userId).toBe("user-42");
+    expect(updateAvatarCalls[0]?.userId).toBe("user-42");
   });
 
   it("strips unknown keys before persisting", async () => {
     await put({ ...VALID_AVATAR, injected: "x" });
-    expect(updateAvatarCalls[0]!.avatar).toEqual(VALID_AVATAR);
-    expect(updateAvatarCalls[0]!.avatar).not.toHaveProperty("injected");
+    expect(updateAvatarCalls[0]?.avatar).toEqual(VALID_AVATAR);
+    expect(updateAvatarCalls[0]?.avatar).not.toHaveProperty("injected");
   });
 
   it("accepts a valid style and persists it", async () => {
     await put({ ...VALID_AVATAR, style: "feminine" });
-    expect(updateAvatarCalls[0]!.avatar.style).toBe("feminine");
+    expect(updateAvatarCalls[0]?.avatar.style).toBe("feminine");
   });
 
   it("coerces an invalid style to 'any'", async () => {
     await put({ ...VALID_AVATAR, style: "nonsense" });
-    expect(updateAvatarCalls[0]!.avatar.style).toBe("any");
+    expect(updateAvatarCalls[0]?.avatar.style).toBe("any");
   });
 });
 
@@ -170,6 +307,222 @@ describe("GET /me", () => {
     const res = await profilesRouter.request("/me");
     const json = (await res.json()) as { profile: { avatar: AvatarConfig } };
     expect(json.profile.avatar).toEqual(seedAvatarConfig("lonely"));
+  });
+});
+
+function authed(userId = "user-1", over: Partial<NonNullable<Profile>> = {}) {
+  currentSession = { user: { id: userId, name: "T", email: "t@e.com" } };
+  storedProfile = makeProfile({ userId, ...over });
+}
+
+function getAvailable(u: string) {
+  return profilesRouter.request(
+    `/me/username-available?u=${encodeURIComponent(u)}`,
+  );
+}
+
+function putUsername(body: object) {
+  return profilesRouter.request("/me/username", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function putName(body: object) {
+  return profilesRouter.request("/me/name", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("GET /me — usernameEditableAt", () => {
+  it("is null when the username was never changed", async () => {
+    authed("user-1", { usernameChangedAt: null });
+    const res = await profilesRouter.request("/me");
+    const json = (await res.json()) as {
+      profile: { usernameEditableAt: string | null };
+    };
+    expect(json.profile.usernameEditableAt).toBeNull();
+  });
+
+  it("is a future ISO date while inside the cooldown", async () => {
+    cooldownDays = 30;
+    authed("user-1", { usernameChangedAt: new Date(Date.now() - 86_400_000) });
+    const res = await profilesRouter.request("/me");
+    const json = (await res.json()) as {
+      profile: { usernameEditableAt: string | null };
+    };
+    expect(typeof json.profile.usernameEditableAt).toBe("string");
+    expect(
+      new Date(json.profile.usernameEditableAt as string).getTime(),
+    ).toBeGreaterThan(Date.now());
+  });
+
+  it("exposes the configured cooldown window", async () => {
+    cooldownDays = 14;
+    authed();
+    const res = await profilesRouter.request("/me");
+    const json = (await res.json()) as {
+      profile: { usernameChangeCooldownDays: number };
+    };
+    expect(json.profile.usernameChangeCooldownDays).toBe(14);
+  });
+});
+
+describe("GET /me/username-available", () => {
+  it("returns 401 when unauthenticated", async () => {
+    const res = await getAvailable("freebie");
+    expect(res.status).toBe(401);
+  });
+
+  it("reports an available name", async () => {
+    authed();
+    const res = await getAvailable("freebie");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ available: true });
+  });
+
+  it("treats the caller's current username as available", async () => {
+    authed("user-1", { username: "tester" });
+    usernameTaken = true;
+    const res = await getAvailable("TESTER");
+    expect(await res.json()).toEqual({ available: true });
+  });
+
+  it("reports a format failure with suggestions", async () => {
+    authed();
+    const res = await getAvailable("ab");
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      available: boolean;
+      reason: string;
+      suggestions: string[];
+    };
+    expect(json.available).toBe(false);
+    expect(json.reason).toBe("format");
+    expect(json.suggestions).toEqual(["alt_1", "alt_2"]);
+  });
+
+  it("reports a reserved/blocked name", async () => {
+    authed();
+    blockedUsernames = new Set(["blockedname"]);
+    const res = await getAvailable("blockedname");
+    const json = (await res.json()) as { available: boolean; reason: string };
+    expect(json.available).toBe(false);
+    expect(json.reason).toBe("reserved");
+  });
+
+  it("reports a taken name with suggestions", async () => {
+    authed();
+    usernameTaken = true;
+    const res = await getAvailable("popular");
+    const json = (await res.json()) as {
+      available: boolean;
+      reason: string;
+      suggestions: string[];
+    };
+    expect(json.available).toBe(false);
+    expect(json.reason).toBe("taken");
+    expect(json.suggestions.length).toBeGreaterThan(0);
+  });
+});
+
+describe("PUT /me/username", () => {
+  it("returns 401 when unauthenticated", async () => {
+    const res = await putUsername({ username: "newname" });
+    expect(res.status).toBe(401);
+    expect(updateUsernameCalls).toHaveLength(0);
+  });
+
+  it("rejects an invalid format with 400", async () => {
+    authed();
+    const res = await putUsername({ username: "ab" });
+    expect(res.status).toBe(400);
+    expect(updateUsernameCalls).toHaveLength(0);
+  });
+
+  it("rejects a blocked name with 400", async () => {
+    authed();
+    blockedUsernames = new Set(["blockedname"]);
+    const res = await putUsername({ username: "blockedname" });
+    expect(res.status).toBe(400);
+    expect(updateUsernameCalls).toHaveLength(0);
+  });
+
+  it("rejects with 429 while inside the cooldown", async () => {
+    cooldownDays = 30;
+    authed("user-1", {
+      username: "tester",
+      usernameChangedAt: new Date(Date.now() - 86_400_000),
+    });
+    const res = await putUsername({ username: "freshname" });
+    expect(res.status).toBe(429);
+    const json = (await res.json()) as { nextChangeAt: string };
+    expect(typeof json.nextChangeAt).toBe("string");
+    expect(updateUsernameCalls).toHaveLength(0);
+  });
+
+  it("rejects a taken name with 409", async () => {
+    authed();
+    usernameTaken = true;
+    const res = await putUsername({ username: "freshname" });
+    expect(res.status).toBe(409);
+    expect(updateUsernameCalls).toHaveLength(0);
+  });
+
+  it("persists a valid, free name lowercased with the session user id", async () => {
+    authed("user-42", { username: "tester" });
+    const res = await putUsername({ username: "NewName" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ username: "newname" });
+    expect(updateUsernameCalls).toHaveLength(1);
+    expect(updateUsernameCalls[0]).toEqual({
+      userId: "user-42",
+      username: "newname",
+    });
+  });
+
+  it("is a no-op when the name matches the current username", async () => {
+    authed("user-1", { username: "tester" });
+    const res = await putUsername({ username: "Tester" });
+    expect(res.status).toBe(200);
+    expect(updateUsernameCalls).toHaveLength(0);
+  });
+});
+
+describe("PUT /me/name", () => {
+  it("returns 401 when unauthenticated", async () => {
+    const res = await putName({ name: "Alice" });
+    expect(res.status).toBe(401);
+    expect(setDisplayNameCalls).toHaveLength(0);
+  });
+
+  it("rejects an empty name with 400", async () => {
+    authed();
+    const res = await putName({ name: "   " });
+    expect(res.status).toBe(400);
+    expect(setDisplayNameCalls).toHaveLength(0);
+  });
+
+  it("rejects an over-long name with 400", async () => {
+    authed();
+    const res = await putName({ name: "x".repeat(51) });
+    expect(res.status).toBe(400);
+    expect(setDisplayNameCalls).toHaveLength(0);
+  });
+
+  it("trims and persists a valid name with the session user id", async () => {
+    authed("user-7");
+    const res = await putName({ name: "  Alice Doe  " });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ name: "Alice Doe" });
+    expect(setDisplayNameCalls).toHaveLength(1);
+    expect(setDisplayNameCalls[0]).toEqual({
+      userId: "user-7",
+      name: "Alice Doe",
+    });
   });
 });
 
