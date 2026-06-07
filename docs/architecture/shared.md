@@ -29,10 +29,12 @@ This is also why the chat contract no longer has its own package: the former `@g
 | `packages/shared/src/constants/games.ts` | `TIC_TAC_TOE` and the canonical `GAME_TYPES` list. |
 | `packages/shared/src/constants/categories.ts` | `GAME_CATEGORIES`. |
 | `packages/shared/src/constants/chat.ts` | `CHAT_EVENTS` — the socket event-name registry. |
+| `packages/shared/src/constants/playing-cards.ts` | `CARD_SUITS` and `CARD_RANKS` — the 4 suits + 13 ranks for the playing-card renderer (see [playing-cards.md](./playing-cards.md)). |
 | `packages/shared/src/types/index.ts` | Barrel for all types + schemas (avatar, chat, chat-layout, db, games, pattern, theme, username) and the re-exported `z`. |
 | `packages/shared/src/types/z.ts` | `export { z } from "zod"` (+ `ZodType` / `ZodTypeAny`) — the single import point for Zod. |
 | `packages/shared/src/types/theme.ts` / `pattern.ts` / `chat-layout.ts` / `username.ts` | Per-area schemas + inferred types + small guards/helpers (`isValidTheme`, `validateChatModePref`, `normalizeUsername`, …). |
 | `packages/shared/src/types/avatar.ts` | Re-exports `AvatarConfig` (and friends) from `@gamelobby/avatar`. |
+| `packages/shared/src/types/playing-cards.ts` | `Suit` / `Rank` / `JokerVariant` for the playing-card renderer (see [playing-cards.md](./playing-cards.md)). |
 | `packages/shared/src/types/chat/` | The former `chat-core`: `dto.ts` (DTOs), `schemas.ts` (`gameCardMetaSchema`, `clientCreateGameInConversationSchema`, …), `socket-events.ts` (client/server payload types + `Ack`). |
 | `packages/shared/src/types/games/` | `core.ts` (`gameTypeSchema` + `GameType`), `code.ts` (`gameCodeSchema`/`generateGameCode`/`normalizeGameCode`/`isGameCode` — the public room code), `definition.ts` (`GameDefinition`/`GameMeta`/`ConfigField`), `engine.ts` (`GameEngine`/`Outcome`/`Seat`/`MoveContext`), `wire.ts` (`GameJson`/`MoveJson`/`gamePlayerSchema`/`clientJoinRoom`/`clientMakeMove`), and per-game schemas under `games/<type>/`. |
 | `packages/shared/src/types/db/` | The DB layer's currency: hand-written row + domain types (`index.ts`) and the repository-input Zod schemas (`io.ts`). |
