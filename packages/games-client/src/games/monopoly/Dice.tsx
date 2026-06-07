@@ -38,10 +38,10 @@ const PIPS: Record<number, [number, number][]> = {
 };
 
 function DieFace({ value, color }: { value: number; color: string }) {
-  const pips = PIPS[value] ?? PIPS[1];
+  const pips = (PIPS[value] ?? PIPS[1]) as [number, number][];
   return (
-    // biome-ignore lint/a11y/noSvgWithoutTitle: decorative svg
     <svg viewBox="0 0 100 100" width="100%" height="100%">
+      <title>Die {value}</title>
       <rect
         x="2"
         y="2"
@@ -157,7 +157,7 @@ export function Dice({ values, phase }: DiceProps) {
       }}
     >
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <Die value={values[0]} phase={phase} color={accentColor} />
+        <Die value={values[0] ?? 1} phase={phase} color={accentColor} />
         <span
           style={{
             color: "var(--muted-foreground)",
@@ -167,7 +167,7 @@ export function Dice({ values, phase }: DiceProps) {
         >
           +
         </span>
-        <Die value={values[1]} phase={phase} color={accentColor} />
+        <Die value={values[1] ?? 1} phase={phase} color={accentColor} />
       </div>
 
       {(phase === "settled" || phase === "settling") && isDoubles && (

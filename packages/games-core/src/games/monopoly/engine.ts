@@ -1,3 +1,18 @@
+import { MONOPOLY } from "@gamelobby/shared/constants";
+import {
+  type GameEngine,
+  type MonopolyMove,
+  type MonopolyState,
+  monopolyMoveSchema,
+  type OwnedProperty,
+  type Player,
+  type PropertyTile,
+  type RailroadTile,
+  type ReduceResult,
+  type Seat,
+  type Tile,
+  type UtilityTile,
+} from "@gamelobby/shared/types";
 import {
   BOARD,
   BOARD_SIZE,
@@ -9,23 +24,33 @@ import {
   MORTGAGE_RATE,
   TILE_BY_ID,
   UNMORTGAGE_RATE,
-} from "../constants/board";
-import type {
-  Action,
-  GameState,
-  OwnedProperty,
-  Player,
-  PropertyTile,
-  RailroadTile,
-  Tile,
-  UtilityTile,
-} from "../types";
+} from "./constants/board";
+import { CHANCE_CARDS, COMMUNITY_CHEST_CARDS } from "./constants/cards";
+
+function shuffle<T>(
+  arr: ReadonlyArray<T>,
+  rand: () => number = Math.random,
+): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    const temp = copy[i];
+    if (temp !== undefined) {
+      const target = copy[j];
+      if (target !== undefined) {
+        copy[i] = target;
+        copy[j] = temp;
+      }
+    }
+  }
+  return copy;
+}
 
 function updatePlayer(
-  state: GameState,
+  state: MonopolyState,
   playerId: string,
   patch: Partial<Player>,
-): GameState {
+): MonopolyState {
   return {
     ...state,
     players: state.players.map((p) =>
@@ -34,15 +59,11 @@ function updatePlayer(
   };
 }
 
-function addLog(state: GameState, msg: string): GameState {
+function addLog(state: MonopolyState, msg: string): MonopolyState {
   return { ...state, log: [...state.log, msg] };
 }
 
-function currentPlayer(state: GameState): Player {
-  return state.players[state.currentPlayerIndex];
-}
-
-function ownerOf(state: GameState, tileId: string): Player | undefined {
+function ownerOf(state: MonopolyState, tileId: string): Player | undefined {
   return state.players.find((p) =>
     p.ownedProperties.some((op) => op.tileId === tileId),
   );
@@ -56,7 +77,7 @@ function getOwnedProp(
 }
 
 function countGroupOwned(
-  state: GameState,
+  state: MonopolyState,
   group: string,
   playerId: string,
 ): number {
@@ -78,7 +99,7 @@ function groupSize(group: string): number {
 function calcPropertyRent(
   tile: PropertyTile,
   owner: Player,
-  state: GameState,
+  state: MonopolyState,
 ): number {
   const op = getOwnedProp(owner, tile.id);
   if (!op || op.isMortgaged) return 0;
@@ -86,56 +107,60 @@ function calcPropertyRent(
   const monopoly =
     countGroupOwned(state, tile.group, owner.id) === groupSize(tile.group);
   if (houses === 0) return monopoly ? tile.rent[0] * 2 : tile.rent[0];
-  return tile.rent[Math.min(houses, 5)];
+  const value = tile.rent[Math.min(houses, 5)];
+  return value !== undefined ? value : 0;
 }
 
 function calcRailroadRent(
   tile: RailroadTile,
   owner: Player,
-  state: GameState,
+  state: MonopolyState,
 ): number {
   const op = getOwnedProp(owner, tile.id);
   if (!op || op.isMortgaged) return 0;
   const count = state.players
     .find((p) => p.id === owner.id)
-    ?.ownedProperties.filter(
-      (op2) => (TILE_BY_ID[op2.tileId] as Tile).type === "Railroad",
-    ).length;
-  return tile.rent[count ?? 0] ?? 0;
+    ?.ownedProperties.filter((op2) => {
+      const t = TILE_BY_ID[op2.tileId];
+      return t !== undefined && t.type === "Railroad";
+    }).length;
+  const val = tile.rent[count ?? 0];
+  return val !== undefined ? val : 0;
 }
 
 function calcUtilityRent(
   owner: Player,
-  _state: GameState,
+  _state: MonopolyState,
   diceTotal: number,
 ): number {
-  const utilsOwned = owner.ownedProperties.filter(
-    (op) =>
-      (TILE_BY_ID[op.tileId] as Tile).type === "Utility" && !op.isMortgaged,
-  ).length;
+  const utilsOwned = owner.ownedProperties.filter((op) => {
+    const t = TILE_BY_ID[op.tileId];
+    return t !== undefined && t.type === "Utility" && !op.isMortgaged;
+  }).length;
   return diceTotal * (utilsOwned === 2 ? 10 : 4);
 }
 
 function movePlayerTo(
-  state: GameState,
+  state: MonopolyState,
   player: Player,
   newPos: number,
   collectGo = true,
-): GameState {
+): MonopolyState {
   const passedGo = collectGo && newPos < player.position;
   let next = updatePlayer(state, player.id, {
     position: newPos,
     balance: passedGo ? player.balance + GO_SALARY : player.balance,
   });
-  if (passedGo)
+  if (passedGo) {
     next = addLog(
       next,
       `${player.name} passed GO and collected $${GO_SALARY}.`,
     );
+  }
   return next;
 }
 
-function sendToJail(state: GameState, player: Player): GameState {
+function sendToJail(state: MonopolyState, player: Player): MonopolyState {
   let next = updatePlayer(state, player.id, {
     position: JAIL_POSITION,
     inJail: true,
@@ -145,8 +170,9 @@ function sendToJail(state: GameState, player: Player): GameState {
   return { ...next, turnPhase: "WAITING_FOR_END_TURN", doublesCount: 0 };
 }
 
-function handleLanding(state: GameState, player: Player): GameState {
+function handleLanding(state: MonopolyState, player: Player): MonopolyState {
   const tile = state.board[player.position];
+  if (!tile) return state;
   let next = state;
 
   switch (tile.type) {
@@ -198,11 +224,13 @@ function handleLanding(state: GameState, player: Player): GameState {
       }
       const diceTotal = next.dice[0] + next.dice[1];
       let rent = 0;
-      if (tile.type === "Property")
+      if (tile.type === "Property") {
         rent = calcPropertyRent(tile as PropertyTile, owner, next);
-      else if (tile.type === "Railroad")
+      } else if (tile.type === "Railroad") {
         rent = calcRailroadRent(tile as RailroadTile, owner, next);
-      else rent = calcUtilityRent(owner, next, diceTotal);
+      } else {
+        rent = calcUtilityRent(owner, next, diceTotal);
+      }
 
       next = updatePlayer(next, player.id, { balance: player.balance - rent });
       next = updatePlayer(next, owner.id, { balance: owner.balance + rent });
@@ -218,15 +246,15 @@ function handleLanding(state: GameState, player: Player): GameState {
 }
 
 function drawCard(
-  state: GameState,
+  state: MonopolyState,
   player: Player,
   deckKey: "chanceDeck" | "communityDeck",
-): GameState {
+): MonopolyState {
   const deck = [...state[deckKey]];
   const [card, ...rest] = deck;
   if (!card) return state;
 
-  let next: GameState = { ...state, [deckKey]: [...rest, card] };
+  let next: MonopolyState = { ...state, [deckKey]: [...rest, card] };
   next = addLog(next, `${player.name} drew: "${card.text}"`);
 
   const { effect } = card;
@@ -262,11 +290,13 @@ function drawCard(
       const positions = BOARD.filter((t) => t.type === effect.tileType).map(
         (t) => t.position,
       );
+      const firstPos = positions[0];
+      if (firstPos === undefined) return next;
       const nearest = positions.reduce((best, pos) => {
         const dist = (pos - player.position + BOARD_SIZE) % BOARD_SIZE;
         const bestDist = (best - player.position + BOARD_SIZE) % BOARD_SIZE;
         return dist < bestDist ? pos : best;
-      }, positions[0]);
+      }, firstPos);
       next = movePlayerTo(next, player, nearest, true);
       const movedPlayer =
         next.players.find((p) => p.id === player.id) ?? player;
@@ -323,20 +353,25 @@ function drawCard(
   }
 }
 
-function checkWin(state: GameState): GameState {
+function checkWin(state: MonopolyState): MonopolyState {
   const active = state.players.filter((p) => !p.isBankrupt);
-  if (active.length === 1) {
+  const winner = active[0];
+  if (active.length === 1 && winner !== undefined) {
     return {
-      ...addLog(state, `${active[0].name} wins the game!`),
+      ...addLog(state, `${winner.name} wins the game!`),
       turnPhase: "GAME_OVER",
-      winnerId: active[0].id,
+      winnerId: winner.id,
     };
   }
   return state;
 }
 
-export function applyAction(state: GameState, action: Action): GameState {
-  const player = currentPlayer(state);
+function applyAction(
+  state: MonopolyState,
+  action: MonopolyMove,
+): MonopolyState {
+  const player = state.players[state.currentPlayerIndex];
+  if (!player) return state;
   let next = state;
 
   switch (action.type) {
@@ -393,15 +428,16 @@ export function applyAction(state: GameState, action: Action): GameState {
           ? movedPlayer.balance + GO_SALARY
           : movedPlayer.balance,
       });
-      if (passedGo)
+      if (passedGo) {
         next = addLog(
           next,
           `${player.name} passed GO and collected $${GO_SALARY}.`,
         );
-      next = addLog(
-        next,
-        `${player.name} moved to ${state.board[newPos].name}.`,
-      );
+      }
+      const tile = state.board[newPos];
+      if (tile) {
+        next = addLog(next, `${player.name} moved to ${tile.name}.`);
+      }
 
       const newDoublesCount = isDoubles ? state.doublesCount + 1 : 0;
       if (isDoubles && newDoublesCount >= 3) {
@@ -430,16 +466,19 @@ export function applyAction(state: GameState, action: Action): GameState {
       if (state.turnPhase !== "LANDED") return state;
       const tile = state.board[player.position];
       if (
-        tile.type !== "Property" &&
-        tile.type !== "Railroad" &&
-        tile.type !== "Utility"
-      )
+        !tile ||
+        (tile.type !== "Property" &&
+          tile.type !== "Railroad" &&
+          tile.type !== "Utility")
+      ) {
         return state;
+      }
       if (ownerOf(state, tile.id)) return state;
 
       const price = (tile as PropertyTile | RailroadTile | UtilityTile).price;
-      if (player.balance < price)
+      if (player.balance < price) {
         return addLog(state, `${player.name} cannot afford ${tile.name}.`);
+      }
 
       const newProp: OwnedProperty = {
         tileId: tile.id,
@@ -456,10 +495,10 @@ export function applyAction(state: GameState, action: Action): GameState {
 
     case "DECLINE_PURCHASE": {
       if (state.turnPhase !== "LANDED") return state;
-      next = addLog(
-        next,
-        `${player.name} declined to buy ${state.board[player.position].name}.`,
-      );
+      const tile = state.board[player.position];
+      if (tile) {
+        next = addLog(next, `${player.name} declined to buy ${tile.name}.`);
+      }
       return { ...next, turnPhase: "WAITING_FOR_END_TURN" };
     }
 
@@ -469,20 +508,23 @@ export function applyAction(state: GameState, action: Action): GameState {
       if (tile?.type !== "Property") return state;
       const op = getOwnedProp(player, tileId);
       if (!op || op.isMortgaged) return state;
-      if (op.houses >= HOTEL_HOUSES)
+      if (op.houses >= HOTEL_HOUSES) {
         return addLog(state, `${tile.name} already has a hotel.`);
+      }
       if (
         countGroupOwned(next, tile.group, player.id) !== groupSize(tile.group)
-      )
+      ) {
         return addLog(
           state,
           `${player.name} does not own the full ${tile.group} group.`,
         );
-      if (player.balance < tile.houseCost)
+      }
+      if (player.balance < tile.houseCost) {
         return addLog(
           state,
           `${player.name} cannot afford a house on ${tile.name}.`,
         );
+      }
 
       const updatedProps = player.ownedProperties.map((p) =>
         p.tileId === tileId ? { ...p, houses: p.houses + 1 } : p,
@@ -503,8 +545,9 @@ export function applyAction(state: GameState, action: Action): GameState {
       const tile = TILE_BY_ID[tileId] as PropertyTile;
       if (tile?.type !== "Property") return state;
       const op = getOwnedProp(player, tileId);
-      if (!op || op.houses === 0)
+      if (!op || op.houses === 0) {
         return addLog(state, `No houses to sell on ${tile.name}.`);
+      }
 
       const refund = Math.floor(tile.houseCost / 2);
       const updatedProps = player.ownedProperties.map((p) =>
@@ -555,11 +598,12 @@ export function applyAction(state: GameState, action: Action): GameState {
       const unmortgageCost = Math.floor(
         (tile as PropertyTile).price * UNMORTGAGE_RATE,
       );
-      if (player.balance < unmortgageCost)
+      if (player.balance < unmortgageCost) {
         return addLog(
           state,
           `${player.name} cannot afford to unmortgage ${tile.name}.`,
         );
+      }
       const updatedProps = player.ownedProperties.map((p) =>
         p.tileId === tileId ? { ...p, isMortgaged: false } : p,
       );
@@ -574,10 +618,12 @@ export function applyAction(state: GameState, action: Action): GameState {
     }
 
     case "PAY_JAIL_FINE": {
-      if (!player.inJail || state.turnPhase !== "WAITING_FOR_ROLL")
+      if (!player.inJail || state.turnPhase !== "WAITING_FOR_ROLL") {
         return state;
-      if (player.balance < JAIL_FINE)
+      }
+      if (player.balance < JAIL_FINE) {
         return addLog(state, `${player.name} cannot afford the fine.`);
+      }
       next = updatePlayer(next, player.id, {
         balance: player.balance - JAIL_FINE,
         inJail: false,
@@ -601,11 +647,12 @@ export function applyAction(state: GameState, action: Action): GameState {
 
     case "END_TURN": {
       if (state.turnPhase !== "WAITING_FOR_END_TURN") return state;
-      const nextIndex =
-        (state.currentPlayerIndex + 1) %
-        state.players.filter((p) => !p.isBankrupt).length;
       const activePlayers = state.players.filter((p) => !p.isBankrupt);
+      const nextIndex =
+        (activePlayers.findIndex((p) => p.id === player.id) + 1) %
+        activePlayers.length;
       const nextPlayer = activePlayers[nextIndex];
+      if (nextPlayer === undefined) return state;
       const realIndex = state.players.findIndex((p) => p.id === nextPlayer.id);
       next = {
         ...next,
@@ -627,8 +674,9 @@ export function applyAction(state: GameState, action: Action): GameState {
     case "DRAW_CARD": {
       if (state.turnPhase !== "LANDED") return state;
       const tile = state.board[player.position];
-      if (tile.type !== "Chance" && tile.type !== "CommunityChest")
+      if (!tile || (tile.type !== "Chance" && tile.type !== "CommunityChest")) {
         return state;
+      }
 
       const deckKey = tile.type === "Chance" ? "chanceDeck" : "communityDeck";
       next = drawCard(next, player, deckKey);
@@ -636,6 +684,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       const updatedPlayer =
         next.players.find((p) => p.id === player.id) ?? player;
       const newTile = next.board[updatedPlayer.position];
+      if (!newTile) return next;
 
       const isUnownedProperty =
         (newTile.type === "Property" ||
@@ -649,12 +698,87 @@ export function applyAction(state: GameState, action: Action): GameState {
 
       if (isUnownedProperty || isNewCardSpace) {
         return { ...next, turnPhase: "LANDED" };
-      } else {
-        return { ...next, turnPhase: "WAITING_FOR_END_TURN" };
       }
+      return { ...next, turnPhase: "WAITING_FOR_END_TURN" };
     }
 
     default:
       return state;
   }
 }
+
+export const monopolyEngine: GameEngine<MonopolyState, MonopolyMove> = {
+  type: MONOPOLY,
+  mode: "turn-based",
+  minPlayers: 2,
+  maxPlayers: 8,
+  roles: ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"],
+
+  createInitialState(seats: Seat[]): MonopolyState {
+    const playerTokens = ["🎩", "🚗", "🐶", "👢", "⛵", "🎲", "🏖️", "🚂"];
+    const players: Player[] = seats.map((seat, i) => ({
+      id: seat.role,
+      name: `Player ${i + 1}`,
+      token: playerTokens[i % playerTokens.length] ?? "🎩",
+      balance: 1500,
+      position: 0,
+      inJail: false,
+      jailTurnsUsed: 0,
+      outOfJailCards: 0,
+      isBankrupt: false,
+      ownedProperties: [],
+    }));
+
+    return {
+      board: BOARD as Tile[],
+      players,
+      currentPlayerIndex: 0,
+      turnPhase: "WAITING_FOR_ROLL",
+      dice: [1, 1],
+      doublesCount: 0,
+      chanceDeck: shuffle(CHANCE_CARDS),
+      communityDeck: shuffle(COMMUNITY_CHEST_CARDS),
+      log: [
+        `Game started with ${players.map((p) => p.name).join(", ")}. ${players[0]?.name ?? "Player 1"}'s turn.`,
+      ],
+      winnerId: null,
+    };
+  },
+
+  reduce(state, ctx, input): ReduceResult<MonopolyState> {
+    if (state.turnPhase === "GAME_OVER") {
+      return { ok: false, error: "Game is over" };
+    }
+    const player = state.players[state.currentPlayerIndex];
+    if (!player) {
+      return { ok: false, error: "Player not found" };
+    }
+    if (player.id !== ctx.role) {
+      return { ok: false, error: "Not your turn" };
+    }
+
+    const parsed = monopolyMoveSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: "Invalid move format" };
+    }
+
+    const nextState = applyAction(state, parsed.data);
+    let outcomeStatus: "active" | "completed" = "active";
+    let winnerRole: string | null = null;
+    if (nextState.turnPhase === "GAME_OVER") {
+      outcomeStatus = "completed";
+      winnerRole = nextState.winnerId;
+    }
+
+    return {
+      ok: true,
+      state: nextState,
+      outcome: {
+        status: outcomeStatus,
+        winnerRole,
+        draw: false,
+      },
+    };
+  },
+};
+export { applyAction };

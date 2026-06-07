@@ -22,6 +22,7 @@ let usernameTaken = false;
 let blockedUsernames = new Set<string>();
 let suggestions: string[] = ["alt_1", "alt_2"];
 let cooldownDays = 30;
+let createProfileShouldThrow = false;
 const updateAvatarCalls: Array<{ userId: string; avatar: AvatarConfig }> = [];
 const updateAppearanceCalls: Array<{
   userId: string;
@@ -42,6 +43,22 @@ mock.module("@gamelobby/database", () => ({
     getProfileByUsername: async () => storedProfile,
     getDisplayName: async () => "Display Name",
     isUsernameTaken: async () => usernameTaken,
+    getTakenUsernames: async (_usernames: string[]) => new Set<string>(),
+    createProfile: async (input: {
+      userId: string;
+      username: string;
+      avatar?: AvatarConfig | null;
+    }) => {
+      if (createProfileShouldThrow) {
+        throw new Error("Failed to create profile");
+      }
+      storedProfile = makeProfile({
+        userId: input.userId,
+        username: input.username,
+        avatar: input.avatar ?? null,
+      });
+      return storedProfile;
+    },
     updateAvatar: async (userId: string, avatar: AvatarConfig) => {
       updateAvatarCalls.push({ userId, avatar });
     },
@@ -112,6 +129,7 @@ beforeEach(() => {
   blockedUsernames = new Set<string>();
   suggestions = ["alt_1", "alt_2"];
   cooldownDays = 30;
+  createProfileShouldThrow = false;
   updateAvatarCalls.length = 0;
   updateAppearanceCalls.length = 0;
   setDisplayNameCalls.length = 0;
@@ -285,11 +303,22 @@ describe("GET /me", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 404 when the user has no profile", async () => {
+  it("returns 404 when the user has no profile and provisioning fails", async () => {
+    currentSession = { user: { id: "user-1", name: "T", email: "t@e.com" } };
+    storedProfile = null;
+    createProfileShouldThrow = true;
+    const res = await profilesRouter.request("/me");
+    expect(res.status).toBe(404);
+  });
+
+  it("lazy-provisions a profile when the user has no profile and provisioning succeeds", async () => {
     currentSession = { user: { id: "user-1", name: "T", email: "t@e.com" } };
     storedProfile = null;
     const res = await profilesRouter.request("/me");
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { profile: { username: string } };
+    expect(json.profile.username).toBeDefined();
+    expect(storedProfile).not.toBeNull();
   });
 
   it("returns the stored avatar when present", async () => {

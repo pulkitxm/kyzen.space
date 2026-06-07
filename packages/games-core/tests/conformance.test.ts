@@ -81,7 +81,14 @@ for (const def of GAMES) {
       const role = def.engine.roles[0];
       expect(role).toBeDefined();
       if (role === undefined) throw new Error("engine must declare a role");
-      def.engine.reduce(state, { role }, {} as never);
+      const engine = def.engine as {
+        reduce: (
+          state: unknown,
+          ctx: { role: string },
+          input: unknown,
+        ) => { ok: boolean; state: unknown; outcome: unknown };
+      };
+      engine.reduce(state, { role }, {} as unknown);
       expect(state).toEqual(snapshot);
     });
 

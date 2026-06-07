@@ -1,4 +1,4 @@
-import type { Tile } from "../types";
+import type { Tile } from "@gamelobby/shared/types";
 
 export const BOARD_SIZE = 32;
 export const GO_POSITION = 0;
@@ -17,7 +17,6 @@ export const HOTEL_HOUSES = 5;
 
 export const BOARD: ReadonlyArray<Tile> = [
   { id: "go", position: 0, name: "GO", type: "Go" },
-
   {
     id: "mediterranean",
     position: 1,
@@ -70,9 +69,7 @@ export const BOARD: ReadonlyArray<Tile> = [
     houseCost: 50,
   },
   { id: "chance1", position: 7, name: "Chance", type: "Chance" },
-
   { id: "jail", position: 8, name: "Jail / Just Visiting", type: "Jail" },
-
   {
     id: "st_charles",
     position: 9,
@@ -134,14 +131,12 @@ export const BOARD: ReadonlyArray<Tile> = [
     name: "Community Chest",
     type: "CommunityChest",
   },
-
   {
     id: "free_parking",
     position: 16,
     name: "Free Parking",
     type: "FreeParking",
   },
-
   {
     id: "kentucky",
     position: 17,
@@ -198,9 +193,7 @@ export const BOARD: ReadonlyArray<Tile> = [
     rent: [24, 120, 360, 850, 1025, 1200],
     houseCost: 150,
   },
-
   { id: "go_to_jail", position: 24, name: "Go To Jail", type: "GoToJail" },
-
   {
     id: "pacific",
     position: 25,

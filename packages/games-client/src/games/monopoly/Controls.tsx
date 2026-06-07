@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import { TILE_BY_ID } from "../constants/board";
+import { TILE_BY_ID } from "@gamelobby/games-core";
 import type {
-  Action,
   Card,
-  GameState,
+  MonopolyMove,
+  MonopolyState,
   Player,
   PropertyTile,
   RailroadTile,
+  Tile,
   UtilityTile,
-} from "../types";
+} from "@gamelobby/shared/types";
+import React, { useState } from "react";
 import { GROUP_COLORS } from "./Board";
 import { Dice } from "./Dice";
 import type { DiceAnimPhase, UIPhase } from "./useGamePhase";
@@ -94,30 +95,30 @@ function PlayerCard({
         | PropertyTile
         | RailroadTile
         | UtilityTile;
-      return s + ("price" in tile ? Math.floor(tile.price * 0.5) : 0);
+      return s + (tile && "price" in tile ? Math.floor(tile.price * 0.5) : 0);
     }, 0);
   return (
     <div
       style={{
-        padding: "10px 12px",
-        borderRadius: 10,
+        padding: "8px 10px",
+        borderRadius: 8,
         background: isActive
           ? "color-mix(in srgb, var(--primary) 15%, transparent)"
           : "var(--surface)",
         border: `1px solid ${isActive ? "var(--primary)" : "var(--border)"}`,
         display: "flex",
         alignItems: "center",
-        gap: 10,
+        gap: 8,
         transition: "all 0.3s",
         animation: isActive ? "playerPulse 2s ease-in-out infinite" : "none",
       }}
     >
-      <span style={{ fontSize: 22 }}>{player.token}</span>
+      <span style={{ fontSize: 18 }}>{player.token}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
             fontWeight: 700,
-            fontSize: 13,
+            fontSize: 12,
             color: isActive
               ? "var(--primary)"
               : player.isBankrupt
@@ -132,7 +133,7 @@ function PlayerCard({
         </div>
         <div
           style={{
-            fontSize: 11,
+            fontSize: 10,
             color: "var(--muted-foreground)",
             marginTop: 1,
           }}
@@ -149,11 +150,11 @@ function PlayerCard({
         </div>
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontSize: 10, color: "var(--muted-foreground)" }}>
+        <div style={{ fontSize: 9, color: "var(--muted-foreground)" }}>
           Net Worth
         </div>
         <div
-          style={{ fontSize: 12, fontWeight: 700, color: "var(--foreground)" }}
+          style={{ fontSize: 11, fontWeight: 700, color: "var(--foreground)" }}
         >
           ${netWorth.toLocaleString()}
         </div>
@@ -198,8 +199,8 @@ function ActionBtn({
       onClick={onClick}
       disabled={disabled}
       style={{
-        padding: "11px 18px",
-        borderRadius: 10,
+        padding: "9px 14px",
+        borderRadius: 8,
         border:
           variant === "outline"
             ? `1px solid ${disabled ? "var(--border)" : `color-mix(in srgb, ${color} 40%, transparent)`}`
@@ -213,7 +214,7 @@ function ActionBtn({
             : `color-mix(in srgb, ${color} 10%, transparent)`,
         color: foregroundColor,
         fontWeight: 700,
-        fontSize: 13,
+        fontSize: 12,
         cursor: disabled ? "not-allowed" : "pointer",
         transition: "all 0.2s",
         width: fullWidth ? "100%" : undefined,
@@ -228,7 +229,7 @@ function ActionBtn({
 }
 
 interface PendingAction {
-  action: Action;
+  action: MonopolyMove;
   title: string;
   details: { label: string; value: string }[];
   confirmLabel: string;
@@ -376,8 +377,8 @@ function ConfirmDialog({
 }
 
 interface ControlsProps {
-  state: GameState;
-  dispatch: (action: Action) => void;
+  state: MonopolyState;
+  dispatch: (action: MonopolyMove) => void;
   onRoll: () => void;
   uiPhase: UIPhase;
   diceAnimPhase: DiceAnimPhase;
@@ -386,6 +387,7 @@ interface ControlsProps {
   endTurnCountdown: number | null;
   drawnCard: { card: Card; type: "Chance" | "CommunityChest" } | null;
   onDrawCard: () => void;
+  isMyTurn: boolean;
 }
 
 export function Controls({
@@ -399,37 +401,46 @@ export function Controls({
   endTurnCountdown,
   drawnCard,
   onDrawCard,
+  isMyTurn,
 }: ControlsProps) {
   injectControlsStyle();
   const [logOpen, setLogOpen] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
 
   const currentPlayer = state.players[state.currentPlayerIndex];
+  if (!currentPlayer) return null;
   const currentTile = state.board[currentPlayer.position];
+  if (!currentTile) return null;
 
   const canBuy =
     state.turnPhase === "LANDED" &&
+    isMyTurn &&
     (currentTile.type === "Property" ||
       currentTile.type === "Railroad" ||
       currentTile.type === "Utility") &&
     !state.players.some((p) =>
       p.ownedProperties.some((op) => op.tileId === currentTile.id),
     );
+
   const mustDrawCard =
     state.turnPhase === "LANDED" &&
     (currentTile.type === "Chance" || currentTile.type === "CommunityChest");
+
   const isLocked =
     uiPhase === "ROLLING" || uiPhase === "MOVING" || uiPhase === "LANDING";
 
-  const ownedProperties = currentPlayer.ownedProperties.map((op) => ({
-    op,
-    tile: TILE_BY_ID[op.tileId],
-  }));
+  const ownedProperties = currentPlayer.ownedProperties
+    .map((op) => ({
+      op,
+      tile: TILE_BY_ID[op.tileId] as Tile,
+    }))
+    .filter((x) => x.tile !== undefined);
 
   function confirmBuildHouse(tileId: string) {
+    if (!isMyTurn) return;
     const tile = TILE_BY_ID[tileId] as PropertyTile;
-    const op = currentPlayer.ownedProperties.find((o) => o.tileId === tileId);
-    if (!op) return;
+    const op = currentPlayer?.ownedProperties.find((o) => o.tileId === tileId);
+    if (!op || !currentPlayer) return;
     const nextHouses = op.houses + 1;
     const isHotel = nextHouses === 5;
     setPending({
@@ -460,9 +471,10 @@ export function Controls({
   }
 
   function confirmSellHouse(tileId: string) {
+    if (!isMyTurn) return;
     const tile = TILE_BY_ID[tileId] as PropertyTile;
-    const op = currentPlayer.ownedProperties.find((o) => o.tileId === tileId);
-    if (!op) return;
+    const op = currentPlayer?.ownedProperties.find((o) => o.tileId === tileId);
+    if (!op || !currentPlayer) return;
     const refund = Math.floor(tile.houseCost / 2);
     setPending({
       action: { type: "SELL_HOUSE", payload: { tileId } },
@@ -481,21 +493,22 @@ export function Controls({
   }
 
   function confirmMortgage(tileId: string) {
+    if (!isMyTurn) return;
     const tile = TILE_BY_ID[tileId] as
       | PropertyTile
       | RailroadTile
       | UtilityTile;
-    const price = (tile as PropertyTile).price ?? 0;
-    const mortgageVal = Math.floor(price * 0.5);
+    const pValue = (tile as PropertyTile).price ?? 0;
+    const mortgageVal = Math.floor(pValue * 0.5);
     setPending({
       action: { type: "MORTGAGE_PROPERTY", payload: { tileId } },
       title: `Mortgage ${tile.name}`,
       details: [
-        { label: "Property Value", value: `$${price}` },
+        { label: "Property Value", value: `$${pValue}` },
         { label: "Mortgage Value (50%)", value: `$${mortgageVal}` },
         {
           label: "Your Balance",
-          value: `$${currentPlayer.balance.toLocaleString()}`,
+          value: `$${currentPlayer?.balance.toLocaleString() ?? "0"}`,
         },
         { label: "Note", value: "No rent while mortgaged" },
       ],
@@ -505,23 +518,27 @@ export function Controls({
   }
 
   function confirmUnmortgage(tileId: string) {
+    if (!isMyTurn) return;
     const tile = TILE_BY_ID[tileId] as
       | PropertyTile
       | RailroadTile
       | UtilityTile;
-    const price = (tile as PropertyTile).price ?? 0;
-    const cost = Math.floor(price * 0.6);
+    const pValue = (tile as PropertyTile).price ?? 0;
+    const cost = Math.floor(pValue * 0.6);
     setPending({
       action: { type: "UNMORTGAGE_PROPERTY", payload: { tileId } },
       title: `Lift Mortgage on ${tile.name}`,
       details: [
-        { label: "Property Value", value: `$${price}` },
+        { label: "Property Value", value: `$${pValue}` },
         { label: "Cost to Unmortgage (60%)", value: `$${cost}` },
         {
           label: "Your Balance",
-          value: `$${currentPlayer.balance.toLocaleString()}`,
+          value: `$${currentPlayer?.balance.toLocaleString() ?? "0"}`,
         },
-        { label: "Balance After", value: `$${currentPlayer.balance - cost}` },
+        {
+          label: "Balance After",
+          value: `$${(currentPlayer?.balance ?? 0) - cost}`,
+        },
       ],
       confirmLabel: `Pay $${cost} to Unmortgage`,
       confirmColor: "var(--success)",
@@ -546,15 +563,15 @@ export function Controls({
           display: "flex",
           flexDirection: "column",
           gap: 10,
-          width: 300,
+          width: 240,
           flexShrink: 0,
           fontFamily: "'Inter','Segoe UI',sans-serif",
         }}
       >
         <div
           style={{
-            padding: "14px 16px",
-            borderRadius: 12,
+            padding: "10px 12px",
+            borderRadius: 10,
             background: "color-mix(in srgb, var(--primary) 8%, transparent)",
             border:
               "1px solid color-mix(in srgb, var(--primary) 25%, transparent)",
@@ -566,7 +583,7 @@ export function Controls({
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 8,
+              marginBottom: 6,
             }}
           >
             <div
@@ -580,21 +597,21 @@ export function Controls({
             </div>
             <PhaseBadge phase={uiPhase} />
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 26 }}>{currentPlayer.token}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 20 }}>{currentPlayer.token}</span>
             <div>
               <div
                 style={{
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: 800,
                   color: "var(--foreground)",
                 }}
               >
-                {currentPlayer.name}
+                {currentPlayer.name} {isMyTurn && "(You)"}
               </div>
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: 11,
                   color: "var(--muted-foreground)",
                   marginTop: 1,
                 }}
@@ -620,7 +637,7 @@ export function Controls({
 
         <div
           style={{
-            padding: "16px",
+            padding: "10px",
             borderRadius: 12,
             background: "var(--surface)",
             border: "1px solid var(--border)",
@@ -635,7 +652,7 @@ export function Controls({
 
         <div
           style={{
-            height: 140,
+            height: 120,
             width: "100%",
             flexShrink: 0,
             position: "relative",
@@ -659,7 +676,7 @@ export function Controls({
             >
               <div
                 style={{
-                  padding: "8px 12px",
+                  padding: "6px 10px",
                   background:
                     drawnCard.type === "Chance"
                       ? "var(--warning)"
@@ -669,7 +686,7 @@ export function Controls({
                       ? "var(--warning-foreground)"
                       : "var(--primary-foreground)",
                   fontWeight: 800,
-                  fontSize: 12,
+                  fontSize: 10,
                   letterSpacing: 1,
                   textAlign: "center",
                   textTransform: "uppercase",
@@ -682,12 +699,12 @@ export function Controls({
               <div
                 style={{
                   flex: 1,
-                  padding: "12px 14px",
+                  padding: "8px 10px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   textAlign: "center",
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: 600,
                   color: "var(--foreground)",
                   lineHeight: 1.4,
@@ -759,17 +776,24 @@ export function Controls({
                       <button
                         type="button"
                         onClick={onRoll}
+                        disabled={!isMyTurn}
                         style={{
                           width: "100%",
-                          padding: "12px 0",
-                          borderRadius: 10,
+                          padding: "10px 0",
+                          borderRadius: 8,
                           border: "none",
-                          background: "var(--primary)",
-                          color: "var(--primary-foreground)",
+                          background: isMyTurn
+                            ? "var(--primary)"
+                            : "var(--surface-hover)",
+                          color: isMyTurn
+                            ? "var(--primary-foreground)"
+                            : "var(--muted-foreground)",
                           fontWeight: 800,
-                          fontSize: 14,
-                          cursor: "pointer",
-                          boxShadow: "0 4px 15px var(--page-ambient)",
+                          fontSize: 12,
+                          cursor: isMyTurn ? "pointer" : "not-allowed",
+                          boxShadow: isMyTurn
+                            ? "0 4px 15px var(--page-ambient)"
+                            : "none",
                           transition: "all 0.2s",
                         }}
                       >
@@ -785,7 +809,7 @@ export function Controls({
                             color="var(--warning)"
                             variant="outline"
                             onClick={() => dispatch({ type: "PAY_JAIL_FINE" })}
-                            disabled={currentPlayer.balance < 50}
+                            disabled={!isMyTurn || currentPlayer.balance < 50}
                             fullWidth
                           />
                           {currentPlayer.outOfJailCards > 0 && (
@@ -796,6 +820,7 @@ export function Controls({
                               onClick={() =>
                                 dispatch({ type: "USE_OUT_OF_JAIL_CARD" })
                               }
+                              disabled={!isMyTurn}
                               fullWidth
                             />
                           )}
@@ -821,8 +846,9 @@ export function Controls({
                         color="var(--success)"
                         onClick={() => dispatch({ type: "BUY_PROPERTY" })}
                         disabled={
+                          !isMyTurn ||
                           currentPlayer.balance <
-                          ((currentTile as PropertyTile).price ?? 0)
+                            ((currentTile as PropertyTile).price ?? 0)
                         }
                         fullWidth
                       />
@@ -831,6 +857,7 @@ export function Controls({
                         color="var(--muted-foreground)"
                         variant="outline"
                         onClick={() => dispatch({ type: "DECLINE_PURCHASE" })}
+                        disabled={!isMyTurn}
                         fullWidth
                       />
                     </>
@@ -859,24 +886,31 @@ export function Controls({
                       <button
                         type="button"
                         onClick={onDrawCard}
+                        disabled={!isMyTurn}
                         style={{
                           width: "100%",
-                          padding: "10px 0",
-                          borderRadius: 10,
+                          padding: "8px 0",
+                          borderRadius: 8,
                           border: "none",
-                          background: "var(--warning)",
-                          color: "var(--warning-foreground)",
+                          background: isMyTurn
+                            ? "var(--warning)"
+                            : "var(--surface-hover)",
+                          color: isMyTurn
+                            ? "var(--warning-foreground)"
+                            : "var(--muted-foreground)",
                           fontWeight: 800,
-                          fontSize: 13,
-                          cursor: "pointer",
-                          boxShadow: "0 4px 12px var(--page-ambient)",
+                          fontSize: 12,
+                          cursor: isMyTurn ? "pointer" : "not-allowed",
+                          boxShadow: isMyTurn
+                            ? "0 4px 12px var(--page-ambient)"
+                            : "none",
                         }}
                       >
                         🃏 Draw Card ({cardDrawCountdown ?? 3}s)
                       </button>
                       <div
                         style={{
-                          fontSize: 10,
+                          fontSize: 9,
                           color: "var(--muted-foreground)",
                           textAlign: "center",
                         }}
@@ -891,17 +925,24 @@ export function Controls({
                       <button
                         type="button"
                         onClick={() => dispatch({ type: "DECLARE_BANKRUPTCY" })}
+                        disabled={!isMyTurn}
                         style={{
                           width: "100%",
-                          padding: "12px 0",
-                          borderRadius: 10,
+                          padding: "10px 0",
+                          borderRadius: 8,
                           border: "none",
-                          background: "var(--danger)",
-                          color: "var(--danger-foreground)",
+                          background: isMyTurn
+                            ? "var(--danger)"
+                            : "var(--surface-hover)",
+                          color: isMyTurn
+                            ? "var(--danger-foreground)"
+                            : "var(--muted-foreground)",
                           fontWeight: 800,
-                          fontSize: 14,
-                          cursor: "pointer",
-                          boxShadow: "0 4px 15px var(--page-ambient)",
+                          fontSize: 12,
+                          cursor: isMyTurn ? "pointer" : "not-allowed",
+                          boxShadow: isMyTurn
+                            ? "0 4px 15px var(--page-ambient)"
+                            : "none",
                         }}
                       >
                         💀 Declare Bankruptcy
@@ -910,17 +951,24 @@ export function Controls({
                       <button
                         type="button"
                         onClick={() => dispatch({ type: "END_TURN" })}
+                        disabled={!isMyTurn}
                         style={{
                           width: "100%",
-                          padding: "12px 0",
-                          borderRadius: 10,
+                          padding: "10px 0",
+                          borderRadius: 8,
                           border: "none",
-                          background: "var(--primary)",
-                          color: "var(--primary-foreground)",
+                          background: isMyTurn
+                            ? "var(--primary)"
+                            : "var(--surface-hover)",
+                          color: isMyTurn
+                            ? "var(--primary-foreground)"
+                            : "var(--muted-foreground)",
                           fontWeight: 800,
-                          fontSize: 14,
-                          cursor: "pointer",
-                          boxShadow: "0 4px 15px var(--page-ambient)",
+                          fontSize: 12,
+                          cursor: isMyTurn ? "pointer" : "not-allowed",
+                          boxShadow: isMyTurn
+                            ? "0 4px 15px var(--page-ambient)"
+                            : "none",
                         }}
                       >
                         ➡ End Turn ({endTurnCountdown ?? 3}s)
@@ -970,18 +1018,18 @@ export function Controls({
         {ownedProperties.length > 0 && (
           <div
             style={{
-              padding: "10px 12px",
-              borderRadius: 10,
+              padding: "8px 10px",
+              borderRadius: 8,
               background: "var(--surface)",
               border: "1px solid var(--border)",
             }}
           >
             <div
               style={{
-                fontSize: 10,
+                fontSize: 9,
                 color: "var(--muted-foreground)",
                 letterSpacing: 1,
-                marginBottom: 6,
+                marginBottom: 4,
               }}
             >
               YOUR PROPERTIES ({ownedProperties.length})
@@ -994,7 +1042,7 @@ export function Controls({
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
-                    fontSize: 11,
+                    fontSize: 10,
                     color: op.isMortgaged
                       ? "var(--muted-foreground)"
                       : "var(--foreground)",
@@ -1024,7 +1072,7 @@ export function Controls({
                     {op.isMortgaged && "〰 "}
                     {tile.name}
                   </span>
-                  <span style={{ color: "var(--success)", fontSize: 10 }}>
+                  <span style={{ color: "var(--success)", fontSize: 9 }}>
                     {op.houses === 5
                       ? "🏨"
                       : op.houses > 0
@@ -1035,6 +1083,7 @@ export function Controls({
                     <>
                       <button
                         type="button"
+                        disabled={!isMyTurn}
                         onClick={() => confirmBuildHouse(op.tileId)}
                         style={smallBtnStyle}
                         title="Build house"
@@ -1044,6 +1093,7 @@ export function Controls({
                       {op.houses > 0 && (
                         <button
                           type="button"
+                          disabled={!isMyTurn}
                           onClick={() => confirmSellHouse(op.tileId)}
                           style={smallBtnStyle}
                           title="Sell house"
@@ -1055,6 +1105,7 @@ export function Controls({
                   )}
                   <button
                     type="button"
+                    disabled={!isMyTurn}
                     onClick={() =>
                       op.isMortgaged
                         ? confirmUnmortgage(op.tileId)
@@ -1088,7 +1139,7 @@ export function Controls({
             onClick={() => setLogOpen((v) => !v)}
             style={{
               width: "100%",
-              padding: "9px 12px",
+              padding: "6px 10px",
               background: "var(--surface)",
               border: "none",
               cursor: "pointer",
@@ -1099,7 +1150,7 @@ export function Controls({
           >
             <span
               style={{
-                fontSize: 10,
+                fontSize: 9,
                 color: "var(--muted-foreground)",
                 letterSpacing: 1,
               }}
@@ -1108,7 +1159,7 @@ export function Controls({
             </span>
             <span
               style={{
-                fontSize: 12,
+                fontSize: 11,
                 color: "var(--muted-foreground)",
                 transform: logOpen ? "rotate(180deg)" : "none",
                 transition: "transform 0.2s",
@@ -1126,16 +1177,19 @@ export function Controls({
 
 function GameLogList({ log }: { log: ReadonlyArray<string> }) {
   const ref = React.useRef<HTMLDivElement>(null);
+  const logLen = log.length;
   React.useEffect(() => {
-    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
-  }, [log]);
+    if (ref.current && logLen >= 0) {
+      ref.current.scrollTop = ref.current.scrollHeight;
+    }
+  }, [logLen]);
   return (
     <div
       ref={ref}
       style={{
-        maxHeight: 200,
+        maxHeight: 140,
         overflowY: "auto",
-        padding: "6px 10px 8px",
+        padding: "4px 8px 6px",
         background: "var(--surface-raised)",
       }}
     >
@@ -1146,7 +1200,7 @@ function GameLogList({ log }: { log: ReadonlyArray<string> }) {
           style={{
             padding: "3px 0",
             borderBottom: "1px solid var(--border)",
-            fontSize: 10,
+            fontSize: 9,
             color: "var(--muted-foreground)",
             lineHeight: 1.5,
           }}

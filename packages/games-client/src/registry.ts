@@ -1,6 +1,7 @@
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { MONOPOLY, TIC_TAC_TOE } from "@gamelobby/shared/constants";
 import type { GameType } from "@gamelobby/shared/types";
 import { type ComponentType, lazy } from "react";
+import { MonopolySkeleton } from "./games/monopoly/skeleton";
 import { TicTacToeSkeleton } from "./games/tic-tac-toe/skeleton";
 import { DefaultGameSkeleton } from "./skeletons";
 import type { GameClientProps } from "./types";
@@ -11,10 +12,16 @@ const REGISTRY: Record<GameType, ComponentType<GameClientProps>> = {
       default: m.TicTacToeGameClient,
     })),
   ),
+  [MONOPOLY]: lazy(() =>
+    import("./games/monopoly/client").then((m) => ({
+      default: m.MonopolyGameClient,
+    })),
+  ),
 };
 
 const SKELETON_REGISTRY: Record<GameType, ComponentType> = {
   [TIC_TAC_TOE]: TicTacToeSkeleton,
+  [MONOPOLY]: MonopolySkeleton,
 };
 
 export function getGameClient(

@@ -1,4 +1,4 @@
-import type { Card } from "../types";
+import type { Card } from "@gamelobby/shared/types";
 
 export const CHANCE_CARDS: ReadonlyArray<Card> = [
   {

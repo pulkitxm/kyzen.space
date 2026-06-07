@@ -1,7 +1,13 @@
 "use client";
 
+import type {
+  MonopolyMove,
+  MonopolyState,
+  Player,
+  PropertyTile,
+  Tile,
+} from "@gamelobby/shared/types";
 import type React from "react";
-import type { Action, GameState, Player, PropertyTile, Tile } from "../types";
 import { positionToCell } from "./useGamePhase";
 
 export const GROUP_COLORS: Record<string, string> = {
@@ -44,7 +50,7 @@ const BOARD_STYLE = `
   0%,100% { transform: translateY(0) rotate(-2deg); }
   50%     { transform: translateY(-4px) rotate(2deg); }
 }
-@keyframes monoGlow {
+@keyframes menuGlow {
   0%,100% { text-shadow: 0 0 20px rgba(96,165,250,0.3); }
   50%     { text-shadow: 0 0 40px rgba(96,165,250,0.8), 0 0 60px rgba(139,92,246,0.4); }
 }
@@ -59,13 +65,13 @@ function injectBoardStyle() {
   document.head.appendChild(el);
 }
 
-function tileOwner(state: GameState, tileId: string): Player | undefined {
+function tileOwner(state: MonopolyState, tileId: string): Player | undefined {
   return state.players.find((p) =>
     p.ownedProperties.some((op) => op.tileId === tileId),
   );
 }
 
-function tileHouses(state: GameState, tileId: string): number {
+function tileHouses(state: MonopolyState, tileId: string): number {
   for (const p of state.players) {
     const op = p.ownedProperties.find((o) => o.tileId === tileId);
     if (op) return op.houses;
@@ -75,7 +81,7 @@ function tileHouses(state: GameState, tileId: string): number {
 
 interface TileCellProps {
   tile: Tile;
-  state: GameState;
+  state: MonopolyState;
   isLanding: boolean;
   isDestination: boolean;
   canBuy: boolean;
@@ -163,7 +169,6 @@ function TileCell({
         ...extraStyle,
       }}
     >
-      {}
       {groupColor && (
         <div
           style={{
@@ -176,7 +181,6 @@ function TileCell({
         />
       )}
 
-      {}
       {cornerIcon && (
         <div
           style={{
@@ -189,7 +193,6 @@ function TileCell({
         </div>
       )}
 
-      {}
       {!cornerIcon && (
         <div
           style={{
@@ -220,7 +223,6 @@ function TileCell({
         </div>
       )}
 
-      {}
       {houses > 0 && (
         <div
           style={{
@@ -233,7 +235,6 @@ function TileCell({
         </div>
       )}
 
-      {}
       {owner && (
         <div
           style={{
@@ -260,24 +261,27 @@ function buildGrid(board: Tile[]): (Tile | null)[][] {
 
   const byPos = Object.fromEntries(board.map((t) => [t.position, t]));
 
-  for (let col = 0; col <= 8; col++) {
-    grid[8][col] = byPos[8 - col] ?? null;
-  }
-  for (let col = 0; col <= 8; col++) {
-    grid[0][col] = byPos[16 + col] ?? null;
+  const row8 = grid[8];
+  const row0 = grid[0];
+  if (row8 && row0) {
+    for (let col = 0; col <= 8; col++) {
+      row8[col] = byPos[8 - col] ?? null;
+      row0[col] = byPos[16 + col] ?? null;
+    }
   }
   for (let row = 1; row <= 7; row++) {
-    grid[row][0] = byPos[16 - row] ?? null;
-  }
-  for (let row = 1; row <= 7; row++) {
-    grid[row][8] = byPos[24 + row] ?? null;
+    const r = grid[row];
+    if (r) {
+      r[0] = byPos[16 - row] ?? null;
+      r[8] = byPos[24 + row] ?? null;
+    }
   }
 
   return grid;
 }
 
 interface TokensOverlayProps {
-  state: GameState;
+  state: MonopolyState;
   animatedPositions: Record<string, number>;
   isMoving: boolean;
   boardSize: number;
@@ -322,7 +326,7 @@ function TokensOverlay({
             [0, 10],
             [0, -10],
           ];
-          const [ox, oy] = offsets[myIdx] ?? [0, 0];
+          const [ox, oy] = (offsets[myIdx] ?? [0, 0]) as [number, number];
 
           const x = (col + 0.5) * cellSize + ox;
           const y = (row + 0.5) * cellSize + oy;
@@ -366,7 +370,7 @@ interface CenterOverlayProps {
   boardSize: number;
   mustDrawCard: boolean;
   currentTileType: string | null;
-  dispatch: (a: Action) => void;
+  dispatch: (a: MonopolyMove) => void;
 }
 
 function CenterOverlay({
@@ -395,7 +399,6 @@ function CenterOverlay({
         zIndex: 8,
       }}
     >
-      {}
       <div
         style={{
           position: "absolute",
@@ -418,7 +421,7 @@ function CenterOverlay({
             WebkitTextFillColor: "transparent",
             textAlign: "center",
             lineHeight: 1,
-            animation: "monoGlow 3s ease-in-out infinite",
+            animation: "menuGlow 3s ease-in-out infinite",
             userSelect: "none",
           }}
         >
@@ -450,7 +453,6 @@ function CenterOverlay({
           gap: 2,
         }}
       >
-        {}
         <div
           style={{
             width: "100%",
@@ -627,14 +629,14 @@ function CenterOverlay({
 }
 
 interface BoardProps {
-  state: GameState;
+  state: MonopolyState;
   animatedPositions: Record<string, number>;
   isMoving: boolean;
   landingPosition: number | null;
   destinationCell: number | null;
   mustDrawCard: boolean;
   onTileClick: (tile: Tile) => void;
-  dispatch: (a: Action) => void;
+  dispatch: (a: MonopolyMove) => void;
   boardRef: React.RefObject<HTMLDivElement | null>;
   boardSize: number;
 }
@@ -658,6 +660,7 @@ export function Board({
 
   const canBuyTileId =
     state.turnPhase === "LANDED" &&
+    currentPlayer &&
     !state.players.some((p) =>
       p.ownedProperties.some(
         (op) => op.tileId === state.board[currentPlayer.position]?.id,
@@ -666,9 +669,10 @@ export function Board({
       ? state.board[currentPlayer.position]?.id
       : null;
 
-  const currentTileType = mustDrawCard
-    ? (state.board[currentPlayer.position]?.type ?? null)
-    : null;
+  const currentTileType =
+    mustDrawCard && currentPlayer
+      ? (state.board[currentPlayer.position]?.type ?? null)
+      : null;
 
   const cellSize = boardSize / 9;
   const flatGrid = grid.flatMap((row, rIdx) =>
@@ -683,7 +687,7 @@ export function Board({
       ref={boardRef}
       style={{
         position: "relative",
-        width: "min(calc(100vw - 360px), calc(100vh - 100px))",
+        width: "min(100%, calc(100vh - 120px))",
         maxWidth: "100%",
         aspectRatio: "1",
       }}

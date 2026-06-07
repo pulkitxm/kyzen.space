@@ -5,6 +5,7 @@ import {
   getGameClient,
   getGameSkeleton,
 } from "@gamelobby/games-client";
+import { MONOPOLY } from "@gamelobby/shared/constants";
 import type {
   ConversationJson,
   GameType,
@@ -44,7 +45,9 @@ export function PlayClient({
   const { socket, status } = useSocket();
 
   const gameNode = GameClient ? (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
+    <div
+      className={`mx-auto flex h-full w-full flex-col p-4 ${gameType === MONOPOLY ? "max-w-6xl" : "max-w-2xl"}`}
+    >
       <Suspense fallback={<GameSkeleton />}>
         <GameClient
           gameId={gameId}

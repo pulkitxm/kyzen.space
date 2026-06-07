@@ -1,14 +1,14 @@
 "use client";
 
 import type {
-  Action,
-  GameState,
+  MonopolyMove,
+  MonopolyState,
   Player,
   PropertyTile,
   RailroadTile,
   Tile,
   UtilityTile,
-} from "../types";
+} from "@gamelobby/shared/types";
 import { GROUP_COLORS } from "./Board";
 
 const PANEL_STYLE = `
@@ -80,12 +80,12 @@ function RentRow({
 
 interface PropertyPanelProps {
   tile: Tile;
-  state: GameState;
-  dispatch: (a: Action) => void;
+  state: MonopolyState;
+  dispatch: (a: MonopolyMove) => void;
   onClose: () => void;
 }
 
-function ownerOf(state: GameState, tileId: string): Player | undefined {
+function ownerOf(state: MonopolyState, tileId: string): Player | undefined {
   return state.players.find((p) =>
     p.ownedProperties.some((op) => op.tileId === tileId),
   );
@@ -102,11 +102,12 @@ export function PropertyPanel({
   const currentPlayer = state.players[state.currentPlayerIndex];
   const owner = ownerOf(state, tile.id);
   const isOwned = !!owner;
-  const isCurrentPlayerOwner = owner?.id === currentPlayer.id;
+  const isCurrentPlayerOwner = owner?.id === currentPlayer?.id;
   const ownedProp = owner?.ownedProperties.find((op) => op.tileId === tile.id);
 
   const canBuy =
     state.turnPhase === "LANDED" &&
+    currentPlayer &&
     currentPlayer.position === tile.position &&
     !isOwned &&
     (tile.type === "Property" ||
@@ -361,13 +362,13 @@ export function PropertyPanel({
                 <RentRow
                   key={n}
                   label={`${n} Railroad${n > 1 ? "s" : ""}`}
-                  amount={(tile as RailroadTile).rent[n]}
+                  amount={(tile as RailroadTile).rent[n] ?? 0}
                 />
               ))}
             </div>
           )}
 
-          {canBuy && (
+          {canBuy && currentPlayer && (
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="button"
@@ -447,7 +448,7 @@ function injectCardStyle() {
 
 interface CardModalProps {
   tileType: "Chance" | "CommunityChest";
-  dispatch: (a: Action) => void;
+  dispatch: (a: MonopolyMove) => void;
 }
 
 export function CardModal({ tileType, dispatch }: CardModalProps) {

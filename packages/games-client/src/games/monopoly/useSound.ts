@@ -97,7 +97,7 @@ export function useSound() {
     if (!ctx) return;
     const t = ctx.currentTime;
     playTone(ctx, 440, "triangle", 0.15, t, 0.18);
-    playTone(ctx, 554, "triangle", 0.12, t + 0.02, 0.16);
+    playTone(ctx, 554, "triangle", 0.02, t + 0.02, 0.16);
     playTone(ctx, 659, "triangle", 0.1, t + 0.04, 0.2);
   }, [getCtx]);
 
@@ -117,8 +117,8 @@ export function useSound() {
     const notes = [523, 659, 784, 659, 1047];
     const times = [0, 0.12, 0.24, 0.36, 0.44];
     notes.forEach((freq, i) => {
-      playTone(ctx, freq, "square", 0.1, t + times[i], 0.14);
-      playTone(ctx, freq * 0.5, "sine", 0.06, t + times[i], 0.14);
+      playTone(ctx, freq, "square", 0.1, t + (times[i] ?? 0), 0.14);
+      playTone(ctx, freq * 0.5, "sine", 0.06, t + (times[i] ?? 0), 0.14);
     });
   }, [getCtx]);
 

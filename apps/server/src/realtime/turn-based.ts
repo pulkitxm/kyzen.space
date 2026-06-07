@@ -64,9 +64,10 @@ async function ensureSeated(
   const game = await games.updateGame(gameRow.id, {
     status: becomesActive ? "active" : "waiting",
     startedAt: becomesActive ? new Date() : gameRow.startedAt,
-    gameState:
-      gameRow.gameState ??
-      engine.createInitialState(nextPlayers.map((p) => ({ role: p.role }))),
+    gameState: becomesActive
+      ? engine.createInitialState(nextPlayers.map((p) => ({ role: p.role })))
+      : (gameRow.gameState ??
+        engine.createInitialState(nextPlayers.map((p) => ({ role: p.role })))),
   });
   return { game, changed: true };
 }
