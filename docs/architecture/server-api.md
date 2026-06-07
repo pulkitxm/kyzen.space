@@ -73,7 +73,7 @@ server.all(/^\/api(\/.*)?$/, (req, res) => {
 
 Things to notice (`apps/server/src/index.ts:10`):
 
-- **Express is the outer shell.** It owns CORS (`apps/server/src/index.ts:12`) with `credentials: true` so the browser will send the Better Auth session cookie cross-origin (`apps/server/src/env.ts:42` supplies `env.webUrl`). It serves `/health` directly (`apps/server/src/index.ts:19`) — a cheap liveness check that does not touch the DB.
+- **Express is the outer shell.** It owns CORS (`apps/server/src/index.ts:12`) with `credentials: true` so the browser will send the Better Auth session cookie cross-origin (`apps/server/src/env.ts:37` supplies `env.webUrl`). It serves `/health` directly (`apps/server/src/index.ts:19`) — a cheap liveness check that does not touch the DB.
 - **Hono is mounted as a sub-application, not as Express middleware.** `getRequestListener(honoApp.fetch)` (`apps/server/src/index.ts:23`) adapts Hono's web-standard `fetch` handler into a Node `(req, res)` listener via `@hono/node-server`. Every request whose path matches `^/api(/.*)?$` is forwarded to Hono (`apps/server/src/index.ts:24`). Why this split? Hono gives us a clean web-standard `Request`/`Response` model (which Better Auth's `handler(c.req.raw)` consumes directly) while Express remains the boring, battle-tested HTTP front door. The two never fight over the same path because Express only delegates `/api/*`.
 - **Socket.IO rides the *same* Node HTTP server.** `createServer(server)` wraps the Express app into a raw `http.Server` (`apps/server/src/index.ts:28`), and `attachRealtime(httpServer)` (`apps/server/src/index.ts:30`) attaches Socket.IO to it. That is why REST and WebSocket share one port (`env.port`, default 4000) and one cookie: the socket handshake carries the same Better Auth cookie the REST calls do.
 - **Listen + crash safety.** The server binds `env.port`/`env.host` (`apps/server/src/index.ts:37`) and logs readiness. A `once("error")` handler exits on bind failure, and process-level `unhandledRejection`/`uncaughtException` handlers (`apps/server/src/index.ts:44`) log and (for uncaught exceptions) hard-exit so a supervisor can restart cleanly.
@@ -84,7 +84,7 @@ Things to notice (`apps/server/src/index.ts:10`):
 
 Two username vars feed profile editing: `NOT_ALLOWED_USERNAMES` (a comma-separated blocklist parsed by `parseUsernameCsv` from `username-rules.ts` into `env.notAllowedUsernames`) and `USERNAME_CHANGE_COOLDOWN_DAYS` (default `30`, `0` disables the cooldown). Both are optional. The realtime layer adds its own optional vars: `REDIS_URL` (enables the Socket.IO Redis adapter and the Redis-backed presence store), `PUBLIC_REALTIME_URL`, and the presence-timer tunables `PRESENCE_HEARTBEAT_MS` (default `10000`), `PRESENCE_STALE_MS` (default `25000`), and `PRESENCE_LASTSEEN_PERSIST_MS` (default `60000`) — see [realtime.md](./realtime.md).
 
-`googleConfigured()` (`apps/server/src/env.ts:63`) returns whether both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. This is the gate `auth.ts` uses to decide whether to register the Google social provider at all (`apps/server/src/auth.ts:15`) — Google OAuth is optional, so a dev `.env` without Google keys still boots with email/session auth.
+`googleConfigured()` (`apps/server/src/env.ts:58`) returns whether both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. This is the gate `auth.ts` uses to decide whether to register the Google social provider at all (`apps/server/src/auth.ts:15`) — Google OAuth is optional, so a dev `.env` without Google keys still boots with email/session auth.
 
 Per the repo's CLAUDE.md, Turbo declares all env vars in `globalEnv`; adding a new var here without adding it to `turbo.json` means builds won't see it.
 
@@ -159,7 +159,7 @@ Routers whose every route needs a session apply it once at the top — `new Hono
 
 Two surfaces deliberately keep their own `getSession` calls instead of `requireAuth`: Better Auth owns `/api/auth/*` end-to-end, and `account` (`apps/server/src/api/routes/account.ts`) is session-management itself — it reads the `session` token, calls `listSessions`/`revokeSession`, and signs out, so the session object is its domain payload, not just a gate.
 
-`readJson(c)` (`apps/server/src/api/auth-context.ts`) is the body helper: it `try/catch`-parses the JSON body and returns `null` on failure or a non-object, so routes write `const body = await readJson(c)` and then defensively pull fields. `isUuid(value)` (`apps/server/src/lib/uuid.ts`) is the shared UUID guard used by the conversation/game routes and the realtime game lane.
+`readJson(c)` (`apps/server/src/api/auth-context.ts`) is the body helper: it `try/catch`-parses the JSON body and returns `null` on failure or a non-object, so routes write `const body = await readJson(c)` and then defensively pull fields. `isUuid(value)` (`apps/server/src/lib/uuid.ts`) is the shared UUID guard used by the conversation routes; the **game** route and the realtime game lane instead validate the public room **code** with `isGameCode` (`@gamelobby/shared/types`).
 
 ## Row -> DTO serialization (`serialize.ts`)
 
@@ -168,7 +168,7 @@ Two surfaces deliberately keep their own `getSession` calls instead of `requireA
 ```ts
 export function serializeGame(row: GameRecord): GameJson {
   return {
-    id: row.id,
+    id: row.code,
     gameType: row.gameType,
     status: row.status,
     winner: row.winner,
@@ -188,6 +188,7 @@ export function serializeGame(row: GameRecord): GameJson {
 
 Two conventions worth internalizing:
 
+- **`GameJson.id` is the public room `code`, not the UUID.** `serializeGame` sets `id: row.code` (`apps/server/src/api/serialize.ts:28`), so the internal `game.id` UUID is never serialized — clients only ever see the short shareable code (and `serializeMove(row, gameCode)` likewise sets `gameId: gameCode`, `serialize.ts:48`). The web builds `/play/<code>` from it and sends it back as the socket `gameId`.
 - **`Date -> ISO string` happens exactly here**, via the `iso()` helper (`apps/server/src/api/serialize.ts:22`), which returns `null` for nullish dates. DTOs are JSON-safe by construction, so nothing downstream needs to know about `Date` objects.
 - **The DTO types are imported from `@gamelobby/shared/types`** — `GameJson`/`MoveJson` and `ConversationJson`/`MessageJson`/etc. all live there now, while the DB **row** types (`GameRecord`, `MessageRow`, …) come from `@gamelobby/database` (`apps/server/src/api/serialize.ts:1`). This is the same insight that powers move validation: the wire shapes live in `packages/`, so the web client and the server agree on them by construction. The serializer's job is just to project a DB row onto that shared shape.
 
@@ -238,9 +239,9 @@ Why a hand-rolled `Result` type instead of throwing? Three reasons. (1) **The HT
 
 There's a fourth layer that sits *beside* services on the read path. Repository rows are skeletal (foreign keys, not embedded objects). The **assemblers** in `chat/assemble.ts` turn those skeletons into rich DTOs by resolving related data, then calling the pure `serialize*` functions.
 
-For example `assembleConversation` (`apps/server/src/chat/assemble.ts:70`) fetches member rows, resolves each member's public user, finds the last message, computes the viewer's unread count, and only then calls `serializeConversation`. The batch variant `assembleMessages` (`apps/server/src/chat/assemble.ts:52`) avoids N+1 queries by collecting all distinct `senderId`s and fetching them in one `profiles.getPublicUsers(ids)` call.
+For example `assembleConversation` (`apps/server/src/chat/assemble.ts:71`) fetches member rows, resolves each member's public user, finds the last message, computes the viewer's unread count, and only then calls `serializeConversation`. The batch variant `assembleMessages` (`apps/server/src/chat/assemble.ts:53`) avoids N+1 queries by collecting all distinct `senderId`s and fetching them in one `profiles.getPublicUsers(ids)` call.
 
-The most subtle assembler is `withGameCardStatus` (`apps/server/src/chat/assemble.ts:28`): when a message is a `game_card`, it loads the referenced game and merges live `status`/`winner`/`players` into the card's metadata via `enrichGameCardMeta`. This is why a game card in chat always shows the *current* game state even though the message row was written once at creation time — the live status is computed at read time, not stored on the message.
+The most subtle assembler is `withGameCardStatus` (`apps/server/src/chat/assemble.ts:28`): when a message is a `game_card`, it loads the referenced game (by the FK `row.gameId`, which is the internal UUID) and merges live `status`/`winner`/`players` into the card's metadata via `enrichGameCardMeta`. It also rewrites the wire `gameId` to the game's public `code` (`apps/server/src/chat/assemble.ts:37`) so the client links to `/play/<code>`, even though the message's `game_id` FK column stays the UUID. This is why a game card in chat always shows the *current* game state even though the message row was written once at creation time — the live status is computed at read time, not stored on the message.
 
 ## Why `GET /api/games/:gameId` is the only game REST endpoint
 
@@ -248,14 +249,14 @@ The most subtle assembler is `withGameCardStatus` (`apps/server/src/chat/assembl
 
 ```ts
 export const gamesRouter = new Hono<LoggerEnv>().get("/:gameId", async (c) => {
-  const id = c.req.param("gameId");
-  if (!isUuid(id)) return c.json({ error: "Not found" }, 404);
-  const found = await games.getGameById(id);
+  const code = c.req.param("gameId");
+  if (!isGameCode(code)) return c.json({ error: "Not found" }, 404);
+  const found = await games.getGameByCode(code);
   if (!found) return c.json({ error: "Not found" }, 404);
-  const moves = await games.listMoves(id);
+  const moves = await games.listMoves(found.id);
   return c.json({
     game: serializeGame(found),
-    moves: moves.map(serializeMove),
+    moves: moves.map((m) => serializeMove(m, found.code)),
   });
 });
 ```
@@ -264,7 +265,7 @@ There is **no** `POST /api/games`, no `PATCH`, no move endpoint. The reason is t
 
 - **Creation** goes through `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:19`). That service is reachable two ways — `POST /api/conversations/:id/games` (`apps/server/src/api/routes/conversations.ts:120`) for the "create a game in this chat" REST action, and the `CHAT_EVENTS.createGameInConversation` socket event (`apps/server/src/realtime/games-in-chat.ts:8`). Both transports first narrow the client-supplied `gameType` to a registered game: the REST route does `gameTypeSchema.safeParse(body?.gameType)` (`apps/server/src/api/routes/conversations.ts:125`, the registry-backed `z.enum` exported from `@gamelobby/shared/types`) and returns `400 Unsupported game type` on a miss, so the service's `gameType` parameter is a typed `GameType`, not a free-form string. Either way it then validates the config with the game's own Zod schema, seeds the initial state from the engine, persists, and posts a game-card message. It is *not* a generic game-resource POST; it's a chat action that happens to spawn a game.
 - **Playing** (making moves) happens exclusively over the socket `make_move` event (`apps/server/src/realtime/index.ts:98`), routed through a driver that re-validates the move and stored state against the game's Zod schemas before applying `reduce`. A move is inherently a low-latency, broadcast-to-the-room operation; modeling it as an idempotent HTTP resource would be the wrong shape and would also bypass the realtime fan-out every other player needs.
-- **Reading** is the one thing that genuinely benefits from a plain request/response: the web app's `/play/[gameId]` page does an SSR/RSC fetch of the current game + move history to render the board before the socket connects. That's exactly what this endpoint serves. It guards against non-UUID ids (cheap rejection of garbage) and returns `404` for unknown ids so it never leaks whether an id format is valid-but-missing vs. malformed.
+- **Reading** is the one thing that genuinely benefits from a plain request/response: the web app's `/play/[gameId]` page does an SSR/RSC fetch of the current game + move history to render the board before the socket connects. That's exactly what this endpoint serves. The `:gameId` path param is the game's public room **code**, so the route guards with `isGameCode` (cheap rejection of garbage) and resolves via `getGameByCode`, returning `404` for unknown codes so it never leaks whether an id format is valid-but-missing vs. malformed.
 
 In short: HTTP is for fetching durable, cacheable read state; the socket is for the live, authoritative, broadcast lifecycle. The same engine and schemas back both lanes, so neither lane trusts the client.
 
@@ -326,7 +327,7 @@ A concrete trace from HTTP request to broadcast, showing every layer:
 6. Handler validates the path id is a UUID (`isUuid`) and parses the body with `readJson` — `apps/server/src/api/routes/conversations.ts`.
 7. Handler calls the service: `messagesService.sendMessage({ conversationId, senderId, kind, body, ... })` — `apps/server/src/chat/messages-service.ts:14`.
 8. Service enforces the rule (`conversations.isMember` -> `403` if not a member), rejects empty text, then inserts via the `messages` repository and `conversations.touchLastMessage` — `apps/server/src/chat/messages-service.ts:24`.
-9. Service hydrates the row into a DTO via `assembleMessage` (resolves sender, applies game-card status) — `apps/server/src/chat/assemble.ts:45`.
+9. Service hydrates the row into a DTO via `assembleMessage` (resolves sender, applies game-card status) — `apps/server/src/chat/assemble.ts:46`.
 10. Service broadcasts over the socket: `emitToConv(io, conversationId, CHAT_EVENTS.messageNew, { message, clientId })` reaches every other connected member in the `conv:<id>` room — `apps/server/src/chat/messages-service.ts:49`.
 11. Service returns `ok(message)` — `apps/server/src/chat/messages-service.ts:54`.
 12. Handler maps the `ServiceResult`: `return c.json({ message: res.value }, 201)` — `apps/server/src/api/routes/conversations.ts:117`.
@@ -345,7 +346,7 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 - **`getIO()` can return `null`.** Services guard `if (io)` before emitting (`apps/server/src/chat/messages-service.ts:48`). This is deliberate so service functions are unit-testable without a running socket server; don't assume `io` is non-null.
 - **Games have no write REST endpoint.** Do not add `POST /api/games` or a move endpoint. Creation routes through `createGameInConversation` (REST `POST /api/conversations/:id/games` *or* the socket event); moves go through the socket `make_move` lane only.
 - **The same service is multi-transport.** `createGameInConversation` is called from both REST and socket; keep its contract a `ServiceResult` (not thrown errors) so both callers can handle failures uniformly.
-- **Manual UUID gating.** Routes call the shared `isUuid` guard (`apps/server/src/lib/uuid.ts`) to reject malformed ids with `404` *before* hitting the DB — e.g. `apps/server/src/api/routes/games.ts:9` and the many `if (!isUuid(id))` checks in `conversations.ts`. New id-taking routes should follow suit.
+- **Manual id gating.** Routes reject malformed ids with `404` *before* hitting the DB: conversation routes call the shared `isUuid` guard (`apps/server/src/lib/uuid.ts`) — the many `if (!isUuid(id))` checks in `conversations.ts` — while the game route guards the public room **code** with `isGameCode` (`apps/server/src/api/routes/games.ts:9`). New id-taking routes should follow suit with the matching guard.
 - **Logs redact secrets.** The pino config (`apps/server/src/logger.ts:8`) redacts cookies/auth headers/`*.token`/`*.secret`. Don't log raw request headers expecting to see the session — it's `[redacted]`.
 - **`game_card` status is computed at read time.** It's merged in by `withGameCardStatus`/`enrichGameCardMeta` during assembly, not stored on the message row. When a game ends, push the updated card with `broadcastGameCard` (`apps/server/src/chat/game-card-broadcast.ts:7`).
 - **GIF and profile-config validation are intentionally allow-list based.** Reject unknown themes/patterns/layouts with `400`; clamp GIF limits; never pass user strings straight to the provider or DB.

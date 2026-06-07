@@ -74,7 +74,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
         const data = parsed.data;
         const start = performance.now();
         try {
-          const gameRow = await games.getGameById(data.gameId);
+          const gameRow = await games.getGameByCode(data.gameId);
           const driver = getDriver(gameRow?.gameType ?? "");
           await driver.joinRoom(io, socket, data);
           slog.info(
@@ -107,7 +107,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
         const data = parsed.data;
         const start = performance.now();
         try {
-          const gameRow = await games.getGameById(data.gameId);
+          const gameRow = await games.getGameByCode(data.gameId);
           const driver = getDriver(gameRow?.gameType ?? "");
           await driver.makeMove(io, socket, data);
           slog.info(

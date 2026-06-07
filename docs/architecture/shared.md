@@ -34,7 +34,7 @@ This is also why the chat contract no longer has its own package: the former `@g
 | `packages/shared/src/types/theme.ts` / `pattern.ts` / `chat-layout.ts` / `username.ts` | Per-area schemas + inferred types + small guards/helpers (`isValidTheme`, `validateChatModePref`, `normalizeUsername`, …). |
 | `packages/shared/src/types/avatar.ts` | Re-exports `AvatarConfig` (and friends) from `@gamelobby/avatar`. |
 | `packages/shared/src/types/chat/` | The former `chat-core`: `dto.ts` (DTOs), `schemas.ts` (`gameCardMetaSchema`, `clientCreateGameInConversationSchema`, …), `socket-events.ts` (client/server payload types + `Ack`). |
-| `packages/shared/src/types/games/` | `core.ts` (`gameTypeSchema` + `GameType`), `definition.ts` (`GameDefinition`/`GameMeta`/`ConfigField`), `engine.ts` (`GameEngine`/`Outcome`/`Seat`/`MoveContext`), `wire.ts` (`GameJson`/`MoveJson`/`gamePlayerSchema`/`clientJoinRoom`/`clientMakeMove`/`uuidSchema`), and per-game schemas under `games/<type>/`. |
+| `packages/shared/src/types/games/` | `core.ts` (`gameTypeSchema` + `GameType`), `code.ts` (`gameCodeSchema`/`generateGameCode`/`normalizeGameCode`/`isGameCode` — the public room code), `definition.ts` (`GameDefinition`/`GameMeta`/`ConfigField`), `engine.ts` (`GameEngine`/`Outcome`/`Seat`/`MoveContext`), `wire.ts` (`GameJson`/`MoveJson`/`gamePlayerSchema`/`clientJoinRoom`/`clientMakeMove`), and per-game schemas under `games/<type>/`. |
 | `packages/shared/src/types/db/` | The DB layer's currency: hand-written row + domain types (`index.ts`) and the repository-input Zod schemas (`io.ts`). |
 
 ## The two subpaths
@@ -62,7 +62,7 @@ The split is a convention, not a hard wall (the root `.` export re-exports both)
 
 The two directories reference each other, but **without a runtime cycle**, because the direction of each reference is chosen deliberately:
 
-- `constants/` imports from `types/` **type-only**, purely to give a constant a strict annotation. `constants/theme.ts:1` does `import type { ColorMode, ThemeId } from "../types/theme";`, then `constants/theme.ts:17` writes `export const DEFAULT_THEME: ThemeId = "amber";`. The `import type` is erased at runtime, so this is not a real dependency.
+- `constants/` imports from `types/` **type-only**, purely to type-check a constant against its declared type. `constants/theme.ts:1` does `import type { ColorMode, ThemeDef, ThemeId } from "../types/theme";`, then `constants/theme.ts:17` writes `export const DEFAULT_THEME = "amber" as const satisfies ThemeId;`. The `import type` is erased at runtime, so this is not a real dependency.
 - `types/` imports the **values** from `constants/` to build the schemas. `types/theme.ts:2` does `import { COLOR_MODES, THEME_IDS } from "../constants/theme";`, then `types/theme.ts:4` writes `export const themeIdSchema = z.enum(THEME_IDS);` and `types/theme.ts:5` derives `export type ThemeId = z.infer<typeof themeIdSchema>;`.
 
 So the runtime edge is one-way (`types` → `constants`), while the type edge points back (`constants` → `types`, erased). The literal list lives in `constants/`; the schema and the inferred type live in `types/`; and the constant that needs the type for its annotation reaches *back* for it as a pure type. The same shape repeats for pattern, chat-layout, username, and games.
@@ -71,7 +71,7 @@ So the runtime edge is one-way (`types` → `constants`), while the type edge po
 
 `THEME_IDS` (`constants/theme.ts:3`, a `readonly` tuple) is the seed everything else derives from:
 
-`THEME_IDS` (`constants/theme.ts:3`) -> `themeIdSchema = z.enum(THEME_IDS)` (`types/theme.ts:4`) -> `type ThemeId = z.infer<typeof themeIdSchema>` (`types/theme.ts:5`) -> `DEFAULT_THEME: ThemeId = "amber"` (annotated by that type, `constants/theme.ts:17`) -> consumed by the Postgres enum `themeEnum = pgEnum("app_theme", THEME_IDS)` in `@gamelobby/database` (`packages/database/src/schema.ts:36`) **and** by the web palette table (`apps/web/lib/themes.ts`, which re-exports the shared core and adds the presentation-only palette).
+`THEME_IDS` (`constants/theme.ts:3`) -> `themeIdSchema = z.enum(THEME_IDS)` (`types/theme.ts:4`) -> `type ThemeId = z.infer<typeof themeIdSchema>` (`types/theme.ts:5`) -> `DEFAULT_THEME = "amber" as const satisfies ThemeId` (checked against that type, `constants/theme.ts:17`) -> consumed by the Postgres enum `themeEnum = pgEnum("app_theme", THEME_IDS)` in `@gamelobby/database` (`packages/database/src/schema.ts:37`) **and** by the web palette table (`apps/web/lib/themes.ts`, which re-exports the shared core and adds the presentation-only palette).
 
 One tuple, and the DB enum, the Zod validator, the TS union, and the default value can never disagree.
 
@@ -80,16 +80,17 @@ One tuple, and the DB enum, the Zod validator, the TS union, and the default val
 The game contract that the engine (`@gamelobby/games-core`) and the boards (`@gamelobby/games-client`) build on is all here:
 
 - `core.ts:4` — `gameTypeSchema = z.enum(GAME_TYPES)` and `type GameType = z.infer<…>` (`:5`). The literal union derives from the `GAME_TYPES` constant (`constants/games.ts:3`), so `GameType` is the registry of valid game-type strings.
+- `code.ts` — the **public game room code**: `GAME_CODE_ALPHABET` (`:3`, Crockford base32 minus I/L/O/U) + `GAME_CODE_LENGTH` (`:4`, 6), `generateGameCode()` (`:8`, unbiased `crypto.getRandomValues`), `normalizeGameCode()` (`:16`, uppercases and maps I/L→1, O→0 so typed codes are forgiving), `isGameCode()` (`:20`), and `gameCodeSchema` (`:24`, normalizes then validates `^[0-9A-HJKMNP-TV-Z]{6}$`). The code is the game id clients see in URLs and socket payloads; the UUID `game.id` stays internal — see [`generic-game-schema.md`](./generic-game-schema.md).
 - `definition.ts:25` — `GameDefinition<S, I, C>` (`meta`, `engine`, `stateSchema`, `moveSchema`, `configSchema`, optional `configFields`), plus `GameMeta` (`:5`) and `ConfigField` (`:15`).
 - `engine.ts:15` — `GameEngine<State, Input>` (`createInitialState` + optional `reduce` / `step`), with `Outcome` (`:1`), `Seat` (`:5`), `ReduceResult` (`:7`), and `MoveContext` (`:13`).
-- `wire.ts` — the socket/wire DTOs and their schemas: `uuidSchema` (`:7`), `gamePlayerSchema` (`:20`), `clientJoinRoomSchema` (`:29`), `clientMakeMoveSchema` (`:37`), `gameJsonSchema`/`GameJson` (`:45`/`:61`), `moveJsonSchema`/`MoveJson` (`:63`/`:71`), and the server payload types.
+- `wire.ts` — the socket/wire DTOs and their schemas: `gamePlayerSchema` (`:16`), `clientJoinRoomSchema` (`:25`), `clientMakeMoveSchema` (`:33`), `gameJsonSchema`/`GameJson` (`:41`/`:57`), `moveJsonSchema`/`MoveJson` (`:59`/`:67`), and the server payload types. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`), not a UUID schema.
 - `games/<type>/schemas.ts` — one folder per registered game holds its strict Zod `stateSchema` / `moveSchema` / `configSchema` and the `z.infer` types (e.g. `games/tic-tac-toe/schemas.ts`).
 
 `@gamelobby/games-core` then imports these to assemble each `GameDefinition` and to derive its registry; it holds the engines and the `GAMES` array, but no schemas. See [`games-core-schemas.md`](./games-core-schemas.md) and [`games-core-engine.md`](./games-core-engine.md).
 
 ## What lives under `types/db/`
 
-`@gamelobby/database` is server-only (it pulls in `drizzle-orm` + `postgres`), so the **row and domain types it returns are declared here** instead, where `apps/web` can read them without importing the database package. `types/db/index.ts` hand-writes `GameRow` (`:80`), `MoveRow`, `GamePlayerRow`, `UserProfileRow`, the auth rows, plus domain aggregates like `GameRecord` (`:192`), `CreateGameInput` (`:197`), and `GameUpdate` (`:209`). `types/db/io.ts` holds the **repository-input Zod schemas** — `createGameInputSchema` (`:20`), `addMoveInputSchema` (`:32`), `createMessageInputSchema`, `appearancePatchSchema` (`:61`) — which the repositories `parse()` before writing. The schema-vs-type agreement is enforced by `drift-guard.ts` in `@gamelobby/database` (see [`database-schema.md`](./database-schema.md)).
+`@gamelobby/database` is server-only (it pulls in `drizzle-orm` + `postgres`), so the **row and domain types it returns are declared here** instead, where `apps/web` can read them without importing the database package. `types/db/index.ts` hand-writes `GameRow` (`:80`), `MoveRow`, `GamePlayerRow`, `UserProfileRow`, the auth rows, plus domain aggregates like `GameRecord` (`:193`), `CreateGameInput` (`:198`), and `GameUpdate` (`:210`). `types/db/io.ts` holds the **repository-input Zod schemas** — `createGameInputSchema` (`:20`), `addMoveInputSchema` (`:32`), `createMessageInputSchema`, `appearancePatchSchema` (`:61`) — which the repositories `parse()` before writing. The schema-vs-type agreement is enforced by `drift-guard.ts` in `@gamelobby/database` (see [`database-schema.md`](./database-schema.md)).
 
 ## What lives under `types/chat/`
 

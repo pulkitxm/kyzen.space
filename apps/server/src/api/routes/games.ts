@@ -1,17 +1,17 @@
 import { games } from "@gamelobby/database";
+import { isGameCode } from "@gamelobby/shared/types";
 import { Hono } from "hono";
-import { isUuid } from "../../lib/uuid";
 import type { LoggerEnv } from "../middleware/logger";
 import { serializeGame, serializeMove } from "../serialize";
 
 export const gamesRouter = new Hono<LoggerEnv>().get("/:gameId", async (c) => {
-  const id = c.req.param("gameId");
-  if (!isUuid(id)) return c.json({ error: "Not found" }, 404);
-  const found = await games.getGameById(id);
+  const code = c.req.param("gameId");
+  if (!isGameCode(code)) return c.json({ error: "Not found" }, 404);
+  const found = await games.getGameByCode(code);
   if (!found) return c.json({ error: "Not found" }, 404);
-  const moves = await games.listMoves(id);
+  const moves = await games.listMoves(found.id);
   return c.json({
     game: serializeGame(found),
-    moves: moves.map(serializeMove),
+    moves: moves.map((m) => serializeMove(m, found.code)),
   });
 });
