@@ -80,7 +80,7 @@ Things to notice (`apps/server/src/index.ts:10`):
 
 ### Environment (`env.ts`)
 
-`env.ts` is the single typed gateway to `process.env`. It exposes three tiny parsers — `required` (throws if missing, `apps/server/src/env.ts:4`), `optional` (trims, defaults, `apps/server/src/env.ts:12`), and `number` (`apps/server/src/env.ts:16`) — and assembles one frozen `as const` object (`apps/server/src/env.ts:23`). Two of these required vars (`DATABASE_URL`, `BETTER_AUTH_SECRET`) make the process refuse to start if absent, which is the desired fail-fast behavior.
+`env.ts` is the single typed gateway to `process.env`. It exposes three tiny parsers — `required` (throws if missing, `apps/server/src/env.ts:3`), `optional` (trims, defaults, `apps/server/src/env.ts:11`), and `number` (`apps/server/src/env.ts:15`) — and assembles one frozen `as const` object (`apps/server/src/env.ts:22`). Two of these required vars (`DATABASE_URL`, `BETTER_AUTH_SECRET`) make the process refuse to start if absent, which is the desired fail-fast behavior.
 
 Two username vars feed profile editing: `NOT_ALLOWED_USERNAMES` (a comma-separated blocklist parsed by `parseUsernameCsv` from `username-rules.ts` into `env.notAllowedUsernames`) and `USERNAME_CHANGE_COOLDOWN_DAYS` (default `30`, `0` disables the cooldown). Both are optional. The realtime layer adds its own optional vars: `REDIS_URL` (enables the Socket.IO Redis adapter and the Redis-backed presence store), `PUBLIC_REALTIME_URL`, and the presence-timer tunables `PRESENCE_HEARTBEAT_MS` (default `10000`), `PRESENCE_STALE_MS` (default `25000`), and `PRESENCE_LASTSEEN_PERSIST_MS` (default `60000`) — see [realtime.md](./realtime.md).
 
@@ -326,7 +326,7 @@ A concrete trace from HTTP request to broadcast, showing every layer:
 5. Hono matches the `POST /:id/messages` handler, which reads `c.get("userId")` — `apps/server/src/api/routes/conversations.ts`.
 6. Handler validates the path id is a UUID (`isUuid`) and parses the body with `readJson` — `apps/server/src/api/routes/conversations.ts`.
 7. Handler calls the service: `messagesService.sendMessage({ conversationId, senderId, kind, body, ... })` — `apps/server/src/chat/messages-service.ts:14`.
-8. Service enforces the rule (`conversations.isMember` -> `403` if not a member), rejects empty text, then inserts via the `messages` repository and `conversations.touchLastMessage` — `apps/server/src/chat/messages-service.ts:24`.
+8. Service enforces the rule (`conversations.isMember` -> `403` if not a member), rejects empty text, then inserts via the `messages` repository and `conversations.touchLastMessage` — `apps/server/src/chat/messages-service.ts:23`.
 9. Service hydrates the row into a DTO via `assembleMessage` (resolves sender, applies game-card status) — `apps/server/src/chat/assemble.ts:46`.
 10. Service broadcasts over the socket: `emitToConv(io, conversationId, CHAT_EVENTS.messageNew, { message, clientId })` reaches every other connected member in the `conv:<id>` room — `apps/server/src/chat/messages-service.ts:49`.
 11. Service returns `ok(message)` — `apps/server/src/chat/messages-service.ts:54`.

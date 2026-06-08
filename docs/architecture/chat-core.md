@@ -20,7 +20,7 @@ The chat contracts are the social counterpart to the game contracts that also li
 | `packages/shared/src/types/chat/schemas.ts` | The three Zod schemas: `gameCardMetaSchema` (game-card JSONB), `notificationPayloadSchema` (notification JSONB), and `clientCreateGameInConversationSchema` (the one untrusted client payload). |
 | `packages/shared/src/types/chat/socket-events.ts` | The `Client*` / `Server*` payload types and the generic `Ack`/`AckResult` helpers. (The `CHAT_EVENTS` name registry itself lives in `constants/chat.ts`.) |
 | `packages/shared/src/constants/chat.ts` | `CHAT_EVENTS` — the frozen event-name registry, `as const`. Surfaced via `@gamelobby/shared/constants`. |
-| `packages/shared/src/types/chat/index.ts` | Barrel that re-exports the chat types + schemas; folded into `@gamelobby/shared/types` (`packages/shared/src/types/index.ts:2`). |
+| `packages/shared/src/types/chat/index.ts` | Barrel that re-exports the chat types + schemas; folded into `@gamelobby/shared/types` (`packages/shared/src/types/index.ts:3`). |
 | `packages/shared/package.json` | Declares `@gamelobby/shared`; the only runtime deps are `zod` and `@gamelobby/avatar`. No React. |
 
 Key **consumers** outside the package (the contract in action):
@@ -169,7 +169,7 @@ export type ClientCreateGameInConversation = z.infer<
 
 ### `Ack` / `AckResult`: the request/response convention
 
-Socket.IO supports acknowledgement callbacks, and chat-core standardizes their shape:
+Socket.IO supports acknowledgement callbacks, and the shared chat contracts standardize their shape:
 
 ```ts
 export type AckResult<T = Record<string, never>> =
@@ -183,7 +183,7 @@ This is a discriminated union on `ok`: success carries the extra payload `T`; fa
 
 ## Game cards: how a game gets embedded in a conversation
 
-This is the most interesting flow chat-core enables, and it's where the chat lane and the game lane meet. A game card is a regular `"game_card"` message whose `metadata` is a `GameCardMeta` and whose `gameId` points at a real row in the `game` table. Because the card carries a `gameId`, its *live* fields (status, winner, players) can always be refreshed from the authoritative game.
+This is the most interesting flow these chat contracts enable, and it's where the chat lane and the game lane meet. A game card is a regular `"game_card"` message whose `metadata` is a `GameCardMeta` and whose `gameId` points at a real row in the `game` table. Because the card carries a `gameId`, its *live* fields (status, winner, players) can always be refreshed from the authoritative game.
 
 ### Creation walkthrough (client → server)
 
@@ -237,7 +237,7 @@ async function withGameCardStatus(
 }
 ```
 
-(`apps/server/src/chat/assemble.ts:28`). Two things happen on read. First, the function looks up the game by the message's FK `row.gameId` — the internal **UUID** — but **rewrites the serialized `gameId` to `game.code`** (`assemble.ts:37`), so the wire DTO carries the public **room code** the client opens at `/play/<code>` while the `message.game_id` column itself stays the UUID. `apps/server/tests/assemble.test.ts` pins exactly this split: the wire `gameId` becomes the code when the game is found, and stays the UUID when the game is missing or the card has no metadata. Second, `enrichGameCardMeta` (`apps/server/src/chat/game-card.ts:9`) spreads the live `status` / `winner` / `players` onto the base metadata and resolves the winner's user id to a `winnerUsername` (returning `null` for a draw or an unknown winner — exercised in `apps/server/tests/game-card.test.ts:34` and `:74`). The key insight: **the card never goes stale because its status fields aren't authoritative — the `game` row is.** The card is just a denormalized view, recomputed on read.
+(`apps/server/src/chat/assemble.ts:28`). Two things happen on read. First, the function looks up the game by the message's FK `row.gameId` — the internal **UUID** — but **rewrites the serialized `gameId` to `game.code`** (`assemble.ts:37`), so the wire DTO carries the public **room code** the client opens at `/play/<code>` while the `message.game_id` column itself stays the UUID. `apps/server/tests/assemble.test.ts` pins exactly this split: the wire `gameId` becomes the code when the game is found, and stays the UUID when the game is missing or the card has no metadata. Second, `enrichGameCardMeta` (`apps/server/src/chat/game-card.ts:9`) spreads the live `status` / `winner` / `players` onto the base metadata and resolves the winner's user id to a `winnerUsername` (returning `null` for a draw or an unknown winner — exercised in `apps/server/tests/game-card.test.ts:35` and `:75`). The key insight: **the card never goes stale because its status fields aren't authoritative — the `game` row is.** The card is just a denormalized view, recomputed on read.
 
 ### Cross-lane re-broadcast: the game lane updates the chat card
 
@@ -267,7 +267,7 @@ Putting the DTO + socket pieces together for an ordinary text message:
 4. It emits `CHAT_EVENTS.messageNew` with a `ServerMessageNew` (`{ message, clientId }`) to the conversation room (`messages-service.ts:49`).
 5. The web `ChatSocketBridge` is subscribed via `useSocketEvent<ServerMessageNew>(CHAT_EVENTS.messageNew, ...)` (`apps/web/app/chat-socket-bridge.tsx:80`); it `upsertMessage`s into `messagesAtomFamily(conversationId)` (a Jotai atom typed `ChatMessage = MessageJson & { pending?; clientId? }`, `apps/web/lib/chat/atoms.ts:21`) and bumps the conversation's `unreadCount`.
 
-At no point does either side re-declare the message shape — `MessageJson` and `CHAT_EVENTS.messageNew` are the single definitions, imported on both ends. The `clientId` echoed back is how the client reconciles its optimistic "pending" bubble with the server's canonical row (`upsertMessage`, `apps/web/lib/chat/atoms.ts:54`).
+At no point does either side re-declare the message shape — `MessageJson` and `CHAT_EVENTS.messageNew` are the single definitions, imported on both ends. The `clientId` echoed back is how the client reconciles its optimistic "pending" bubble with the server's canonical row (`upsertMessage`, `apps/web/lib/chat/atoms.ts:62`).
 
 ## Gotchas, invariants & conventions
 
@@ -288,7 +288,7 @@ At no point does either side re-declare the message shape — `MessageJson` and 
 - **[Architecture overview](./README.md)** — the system shape and the shared-logic insight that this package embodies on the chat side.
 - **[Realtime / Socket.IO lanes](./realtime.md)** — how the chat lane and game lane share one connection, how `CHAT_EVENTS` handlers are attached per-connection, and rooms/broadcast helpers.
 - **[Server API & services](./server-api.md)** — the `chat/` service layer (`assemble.ts`, `messages-service.ts`, `games-in-chat-service.ts`) and `api/serialize.ts` that turn rows into the DTOs defined here.
-- **[Database schema](./database-schema.md)** — the Drizzle `message` / `conversation` / `notification` / `friendship` tables whose columns are typed by chat-core unions and JSONB shapes.
+- **[Database schema](./database-schema.md)** — the Drizzle `message` / `conversation` / `notification` / `friendship` tables whose columns are typed by the shared chat unions and JSONB shapes.
 - **[games-core: schemas](./games-core-schemas.md)** — the game-side mirror of this package: the strict Zod schemas (including `configSchema`) that validate the `config` a game card carries.
 - **[games-core: engine](./games-core-engine.md)** — `createInitialState` / `reduce`, called when a game card spawns a real game.
 - **[games-client](./games-client.md)** — the React board UIs that a card's "Open"/"Join" link routes to.

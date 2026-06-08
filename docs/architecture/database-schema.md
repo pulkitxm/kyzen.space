@@ -40,7 +40,7 @@ Two of these carry real weight:
 - **`$type<…>()` is a cast, not a guard.** `status`, `seatingMode`, `kind`, `role`, etc. are stored as plain `text` narrowed to a TS union (e.g. `GameStatus`, used at `schema.ts:106`); `game_state` is `jsonb` narrowed to `unknown`. Postgres will not stop you writing an illegal value — the repository is responsible for only inserting legal ones, and a JSONB blob stays untrusted until a Zod `safeParse`.
 - **pgEnums are derived from app constants.** `app_theme` / `color_mode` / `app_pattern` (`schema.ts:37`–`39`) take their values from `THEME_IDS` / `COLOR_MODES` / `PATTERN_IDS` in `@gamelobby/shared/constants`, so the DB enum can never disagree with the app's notion of valid values. They back `userProfile.theme` / `colorMode` / `pattern`.
 
-Unlike most Drizzle setups, the `*Row` types are **not** derived with `$inferSelect`. They are hand-written interfaces in `@gamelobby/shared/types` (`types/db/index.ts:80`+) so that `apps/web` — which never imports `@gamelobby/database` (drizzle-orm + `postgres` are server-only) — can still speak the same row shapes. `drift-guard.ts` closes the loop: a list of `Expect<Equal<typeof table.$inferSelect, XRow>>` assertions (`drift-guard.ts:39`) is a compile-time tripwire that fails `type-check` the moment a table and its hand-written row type disagree. `@gamelobby/database` then re-exports those row types so they remain the currency the data-access layer speaks.
+Unlike most Drizzle setups, the `*Row` types are **not** derived with `$inferSelect`. They are hand-written interfaces in `@gamelobby/shared/types` (`types/db/index.ts:39`+) so that `apps/web` — which never imports `@gamelobby/database` (drizzle-orm + `postgres` are server-only) — can still speak the same row shapes. `drift-guard.ts` closes the loop: a list of `Expect<Equal<typeof table.$inferSelect, XRow>>` assertions (`drift-guard.ts:39`) is a compile-time tripwire that fails `type-check` the moment a table and its hand-written row type disagree. `@gamelobby/database` then re-exports those row types so they remain the currency the data-access layer speaks.
 
 ## The tables
 
@@ -101,7 +101,7 @@ The remaining tables are conventional relational shapes — one line each:
 
 ## Migrations: generate vs. push
 
-`drizzle.config.ts` (`:3`) wires drizzle-kit: `dialect: "postgresql"`, `schema: "./packages/database/src/schema.ts"`, `out: "./packages/database/drizzle"`, `strict: true`.
+`drizzle.config.ts` (`:4`) wires drizzle-kit: `dialect: "postgresql"`, `schema: "./packages/database/src/schema.ts"`, `out: "./packages/database/drizzle"`, `strict: true`.
 
 - **`bun run db:generate`** diffs the schema and emits a numbered SQL migration into `packages/database/drizzle` (the repo has `0000_*.sql` … `0007_*.sql`). **`bun run db:migrate`** runs `packages/database/src/migrate.ts` (`:7`), which applies that folder against `db` and exits.
 - **The local dev DB is push-managed.** It was set up with **`bun run db:push`** (drizzle-kit applies the schema directly, leaving the migration ledger empty), so `db:migrate` has no baseline to apply locally — apply schema/enum changes in dev with `db:push` or direct SQL. The numbered migrations exist for reproducible / prod-style application.

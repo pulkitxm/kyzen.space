@@ -33,13 +33,13 @@ Because jotai is a singleton across the workspace (`transpilePackages`, see
 | --- | --- |
 | `packages/shared/src/constants/audio.ts` | Storage keys (`GAME_SFX_STORAGE_KEY`, `GAME_MUSIC_STORAGE_KEY`), default volumes, `VOLUME_MIN`/`MAX`/`STEP`. |
 | `packages/shared/src/types/audio.ts` | `AudioChannelPrefs = { volume, muted }` — the per-channel shape used on both sides. |
-| `packages/games-client/src/audio/engine.ts` | `GameAudioEngine` (lazy `AudioContext`; file SFX decoded to buffers through an `sfxGain`; a crossfaded streamed music track through `musicGain`) + `getGameAudioEngine()` singleton + pure helpers `clampVolume` / `stepVolume` / `shouldPlayMusic`. |
+| `packages/games-client/src/audio/engine.ts` | `GameAudioEngine` (lazy `AudioContext`; file SFX decoded to buffers through an `sfxGain`; a single looping streamed music track that fades out/in at the loop boundary through `musicGain`) + `getGameAudioEngine()` singleton + pure helpers `clampVolume` / `stepVolume` / `shouldPlayMusic`. |
 | `packages/games-client/src/audio/use-game-audio.ts` | `useGameAudio()` → stable `{ playHover, playTouch, playWin, playDraw, unlock }` bound to the singleton. |
 | `apps/web/lib/audio/atoms.ts` | `gameSfxAtom` / `gameMusicAtom` (`atomWithStorage`, SSR-safe noop storage), seeded from the shared defaults. |
-| `apps/web/lib/audio/use-audio-bridge.ts` | `useGameAudioBridge(musicUrl?)` — registers the SFX file URLs, sets the per-game music source, syncs both atoms into the engine, marks music active for the play screen's lifetime, and registers a one-time gesture `unlock`. |
+| `apps/web/lib/audio/use-audio-bridge.ts` | `useGameAudioBridge(musicUrl?)` — registers the SFX file URLs, sets the per-game music source, syncs both atoms into the engine, marks music active for the play screen's lifetime, and registers gesture-`unlock` listeners that live for the screen's lifetime. |
 | `apps/web/lib/audio/music-sources.ts` | `gameMusicSource(gameType)` — maps a game type to its background-music asset URL (tic-tac-toe → `/sounds/tic-tac-toe-bg.ogg`); `null` (no music) for the rest. |
 | `apps/web/public/sounds/` | The Opus `.ogg` audio assets: `tic-tac-toe-bg.ogg` (background music) and `hover.ogg` / `click.ogg` / `win.ogg` / `draw.ogg` (SFX), each served at `/sounds/<name>`. |
-| `apps/web/app/play/[gameId]/game-settings-gear.tsx` | The `FaGear` button; slides via `motion/react` and opens the settings popup. |
+| `apps/web/app/play/[gameId]/game-settings-gear.tsx` | The `FaGear` button; CSS slide via the `md:gear-shift` utility + `--gear-shift` var and opens the settings popup. |
 | `apps/web/app/play/[gameId]/game-settings-panel.tsx` | Modal body: per-channel mute toggle, −/+ buttons, range slider, % readout. |
 
 ## The engine (`games-client`)
@@ -59,9 +59,10 @@ module is safe to import during SSR; `getGameAudioEngine()` returns `null` when
   tic-tac-toe's `/sounds/tic-tac-toe-bg.ogg`) it plays via an `HTMLAudioElement`
   → a per-track fade gain → `musicGain`. Streaming (rather than decoding the whole
   file) keeps memory low for multi-minute tracks (the jazz clip is ~5 min). The
-  loop is **crossfaded**: a `timeupdate` handler ramps the fade gain down over the
-  last `MUSIC_FADE_S` seconds and back up at the start of each pass (and on
-  resume), so the wrap doesn't feel like a hard repeat. A game with no registered
+  loop is **fade-out/fade-in at the loop boundary** (a single looping element's
+  per-track fade gain, not two overlapping playbacks): a `timeupdate` handler ramps
+  the fade gain down over the last `MUSIC_FADE_S` seconds and back up at the start of
+  each pass (and on resume), so the wrap doesn't feel like a hard repeat. A game with no registered
   track simply has no music. `reconcileMusic` centralizes the "should it be
   playing?" decision via the pure `shouldPlayMusic({ active, muted, volume,
   running })` predicate, so volume/mute/active/source/unlock changes all converge
@@ -75,10 +76,12 @@ pure functions, unit-tested in `packages/games-client/tests/audio.test.ts`
 ### Browser autoplay & the gesture unlock
 
 Browsers refuse to start an `AudioContext` before a user gesture. The bridge
-registers one-time `pointerdown`/`keydown` listeners that call `engine.unlock()`
-(resume the context, `reconcileMusic`, and preload the SFX buffers), so music
-begins right after the first interaction and SFX are decoded ahead of the first
-tap. SFX `play*` methods also opportunistically `resume()`.
+registers `pointerdown`/`keydown` listeners (added in an effect, removed only on
+unmount) that call the idempotent `engine.unlock()` (resume the context,
+`reconcileMusic`, and preload the SFX buffers), so music begins right after the
+first interaction and SFX are decoded ahead of the first tap. `unlock()` is safe
+to call on every gesture — repeat calls just no-op once the context is running.
+SFX `play*` methods also opportunistically `resume()`.
 
 ## Preferences, the bridge & live updates (`apps/web`)
 
@@ -169,8 +172,9 @@ never plays in replay (it's gated to the live status transition).
 - **Audio is client-only.** No DB, no game schema, no socket event. The win
   signal is derived from the existing `game.status`/`game.winner` the board
   already receives.
-- **One gesture unlock.** Music can't start before a user interaction; that's a
-  browser policy, handled by the bridge's unlock listeners — not a bug.
+- **Gesture unlock.** Music can't start before a user interaction; that's a
+  browser policy, handled by the bridge's `pointerdown`/`keydown` listeners
+  calling the idempotent `engine.unlock()` — not a bug.
 - **Defaults:** game sound `0.6`, music `0.3`, both unmuted, persisted per-device
   under the `gl-game-sfx` / `gl-game-music` keys.
 
