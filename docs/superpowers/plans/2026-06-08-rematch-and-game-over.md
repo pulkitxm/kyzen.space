@@ -1912,9 +1912,50 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
+## Phase F — Maintainers, review & PR
+
+### Task 18: Run the docs-maintainer and test-maintainer agents
+
+- [ ] **Step 1: docs-maintainer**
+
+Run the `docs-maintainer` agent (`.claude/agents/docs-maintainer.md`) against the whole change set so every `docs/` page + the root README reflect the rematch/series/game-over behavior (not just the Phase E pages). Apply its fixes, then `bun run check`, and commit any doc edits.
+
+- [ ] **Step 2: test-maintainer**
+
+Run the `test-maintainer` agent (`.claude/agents/test-maintainer.md`) to audit the new + existing suites and add missing edge-case coverage for the rematch/series logic (de-dupe, draw seating, abandoned games, series score with abandoned games, one-live across game types). Apply its additions, run the affected suites green, and commit.
+
+- [ ] **Step 3: Final adversarial review**
+
+Dispatch a final code review across the whole branch diff (spec compliance + correctness + quality). Fix anything it surfaces before opening the PR.
+
+### Task 19: Open the PR and drive CI to green
+
+- [ ] **Step 1: Final local gate**
+
+```bash
+bun run type-check
+bun run check
+bun run test
+bun run db:start && cd apps/server && bun run test:integration && cd ../..
+```
+
+All must pass.
+
+- [ ] **Step 2: Push + open PR**
+
+```bash
+git push -u origin feat/rematch-and-game-over
+gh pr create --base main --head feat/rematch-and-game-over --title "feat: rematch + game-over experience" --body "<summary + spec/plan links + test notes>"
+```
+
+- [ ] **Step 3: Drive checks green + resolve review comments**
+
+Monitor `gh pr checks` until all are green; fix any failures and push. Resolve every review comment (including CodeRabbit) — address the feedback in code or reply with rationale, push, and re-check — so that when the user returns there are **no unresolved review threads and all checks pass**.
+
 ## Final verification
 
 - [ ] `bun run type-check` (all workspaces) passes.
 - [ ] `bun run check` passes (no comments introduced; Tailwind classes sorted).
 - [ ] `bun test` passes across workspaces; `apps/server` integration tests pass with `db:start`.
 - [ ] Manual: full DM flow — play → game-over overlay → rematch (loser first) → scoreboard from game 2 → View series modal with working links → one-live rule routes to existing game.
+- [ ] docs-maintainer + test-maintainer agents run; PR opened; all CI checks green; no unresolved review comments.
