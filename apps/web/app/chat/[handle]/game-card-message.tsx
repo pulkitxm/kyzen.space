@@ -54,14 +54,6 @@ export function GameCardMessage({
   if (status === "active") {
     statusText = "In progress";
     tone = "bg-emerald-500/15 text-emerald-600";
-  } else if (status === "completed") {
-    tone = "bg-surface-overlay text-muted-foreground";
-    statusText =
-      meta.winner === "draw"
-        ? "Draw"
-        : meta.winner
-          ? `${meta.winnerUsername ?? "Someone"} won`
-          : "Finished";
   }
 
   const href =
@@ -98,9 +90,13 @@ export function GameCardMessage({
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-2">
-        <span className={cn("rounded-full px-2 py-0.5 text-[11px]", tone)}>
-          {statusText}
-        </span>
+        {status === "completed" ? (
+          <span />
+        ) : (
+          <span className={cn("rounded-full px-2 py-0.5 text-[11px]", tone)}>
+            {statusText}
+          </span>
+        )}
         <Link
           href={href}
           className="rounded-lg bg-primary px-3.5 py-1.5 font-medium text-primary-foreground text-xs outline-none transition hover:bg-primary-hover"
