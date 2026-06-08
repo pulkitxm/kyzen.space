@@ -2,11 +2,9 @@ import { Skeleton } from "@/components/ui";
 
 export function ProfileSkeleton() {
   return (
-    <div className="min-h-full bg-surface text-card-foreground">
+    <div className="min-h-screen shrink-0 bg-surface text-card-foreground">
       <div className="relative mx-auto max-w-5xl px-4 pt-8 pb-20">
-        <Skeleton className="h-4 w-20" />
-
-        <header className="mt-8">
+        <header>
           <Skeleton className="h-38 w-full rounded-2xl sm:h-48" />
           <div className="relative z-10 mx-3 -mt-9 flex flex-col gap-6 rounded-2xl border border-border bg-card/95 p-4 shadow-black/5 shadow-xl backdrop-blur sm:mx-6 sm:flex-row sm:items-end sm:justify-between sm:gap-8 sm:p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-5">
