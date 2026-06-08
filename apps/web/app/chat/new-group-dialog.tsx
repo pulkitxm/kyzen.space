@@ -40,13 +40,13 @@ export function NewGroupDialog({
     if (!trimmed || selected.size === 0) return;
     setCreating(true);
     try {
-      const res = await emitAck<{ conversation: { id: string } }>(
+      await emitAck<{ conversation: { id: string } }>(
         socket,
         CHAT_EVENTS.createGroup,
         { name: trimmed, memberIds: [...selected] },
       );
       onClose();
-      router.push(`/chat/${res.conversation.id}`);
+      router.push(`/chat/group/${encodeURIComponent(trimmed)}`);
     } catch {
       setCreating(false);
     }

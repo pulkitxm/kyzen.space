@@ -210,3 +210,32 @@ describe.skipIf(!DB_UP)("getMemberRole and createGroup roles", () => {
     expect(await conversations.getMemberRole(gid, owner.id)).toBe("owner");
   });
 });
+
+describe.skipIf(!DB_UP)("group name uniqueness + resolution", () => {
+  it("rejects a second group with the same name", async () => {
+    const a = await h.makeUser("gua");
+    const name = `Unique ${crypto.randomUUID().slice(0, 8)}`;
+    await h.makeGroup(a, name, []);
+    const dup = await conversationsService.createGroup(a.id, name, []);
+    expect(dup.ok).toBe(false);
+    if (!dup.ok) expect(dup.error).toMatch(/already exists/i);
+  });
+
+  it("resolves a group by exact name", async () => {
+    const a = await h.makeUser("gra");
+    const name = `Resolve ${crypto.randomUUID().slice(0, 8)}`;
+    const gid = await h.makeGroup(a, name, []);
+    const found = await conversations.findGroupByName(name);
+    expect(found?.id).toBe(gid);
+  });
+
+  it("rename rejects a name already taken by another group", async () => {
+    const a = await h.makeUser("grn");
+    const taken = `Taken ${crypto.randomUUID().slice(0, 8)}`;
+    const other = `Other ${crypto.randomUUID().slice(0, 8)}`;
+    await h.makeGroup(a, taken, []);
+    const gid = await h.makeGroup(a, other, []);
+    const res = await conversationsService.renameGroup(a.id, gid, taken);
+    expect(res.ok).toBe(false);
+  });
+});

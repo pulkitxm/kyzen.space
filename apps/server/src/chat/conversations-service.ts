@@ -57,6 +57,9 @@ export async function createGroup(
 ): Promise<ServiceResult<ConversationJson>> {
   const trimmed = name.trim();
   if (!trimmed) return fail("Group name is required");
+  if (await conversations.findGroupByName(trimmed)) {
+    return fail("A group with this name already exists");
+  }
 
   const candidates = Array.from(new Set(memberIds)).filter(
     (id) => id !== userId,
@@ -161,6 +164,10 @@ export async function renameGroup(
   }
   const trimmed = name.trim();
   if (!trimmed) return fail("Group name is required");
+  const existing = await conversations.findGroupByName(trimmed);
+  if (existing && existing.id !== conversationId) {
+    return fail("A group with this name already exists");
+  }
 
   await conversations.renameGroup(conversationId, trimmed);
   const memberIds = await conversations.getMemberIds(conversationId);

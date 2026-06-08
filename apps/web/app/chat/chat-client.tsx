@@ -7,6 +7,7 @@ import { FaUserGroup, FaUsers } from "react-icons/fa6";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
 import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import { conversationsAtom, presenceAtom } from "@/lib/chat/atoms";
+import { conversationHref } from "@/lib/chat/conversation-href";
 import { messagePreview, relativeTime } from "@/lib/chat/format";
 import { NewGroupDialog } from "./new-group-dialog";
 
@@ -52,10 +53,7 @@ export function ChatListClient({ userId }: { userId: string }) {
               c.kind === "group"
                 ? (c.name ?? "Group")
                 : (c.name ?? others[0]?.username ?? "Direct message");
-            const href =
-              c.kind === "dm" && others[0]
-                ? `/chat/${others[0].username}`
-                : `/chat/${c.id}`;
+            const href = conversationHref(c, userId);
             return (
               <Link
                 key={c.id}

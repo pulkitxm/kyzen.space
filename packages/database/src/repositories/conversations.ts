@@ -88,6 +88,17 @@ export async function createGroup(input: {
   });
 }
 
+export async function findGroupByName(
+  name: string,
+): Promise<ConversationRow | null> {
+  const [row] = await db
+    .select()
+    .from(conversation)
+    .where(and(eq(conversation.kind, "group"), eq(conversation.name, name)))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function isMember(
   conversationId: string,
   userId: string,

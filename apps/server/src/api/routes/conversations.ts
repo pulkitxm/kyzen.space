@@ -68,6 +68,16 @@ export const conversationsRouter = new Hono<AuthEnv>()
     return c.json({ conversation: res.value });
   })
 
+  .get("/group/:name", async (c) => {
+    const userId = c.get("userId");
+    const group = await conversations.findGroupByName(c.req.param("name"));
+    if (!group) return c.json({ error: "Not found" }, 404);
+    if (!(await conversations.isMember(group.id, userId))) {
+      return c.json({ error: "Not found" }, 404);
+    }
+    return c.json({ conversation: await assembleConversation(group, userId) });
+  })
+
   .get("/:id", async (c) => {
     const userId = c.get("userId");
     const id = c.req.param("id");
