@@ -1,0 +1,15 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GameLobby favicon">
+  <defs>
+    <linearGradient id="mark" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366F1" />
+      <stop offset="1" stop-color="#8B5CF6" />
+    </linearGradient>
+  </defs>
+  <rect x="6" y="8" width="52" height="36" rx="13" fill="url(#mark)" />
+  <path d="M22 42 L22 56 L36 43 Z" fill="url(#mark)" />
+  <g stroke="#ffffff" stroke-width="4.2" stroke-linecap="round">
+    <line x1="16" y1="20" x2="26" y2="30" />
+    <line x1="26" y1="20" x2="16" y2="30" />
+  </g>
+  <circle cx="43" cy="25" r="6" fill="none" stroke="#F59E0B" stroke-width="4.2" />
+</svg>

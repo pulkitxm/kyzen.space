@@ -12,7 +12,7 @@ import {
 } from "@gamelobby/shared/types";
 import { desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { db } from "../client";
-import { game, gamePlayer, move } from "../schema";
+import { game, gamePlayer, move, userProfile } from "../schema";
 
 const GAME_CODE_MAX_ATTEMPTS = 5;
 
@@ -68,14 +68,21 @@ export async function createGame(input: CreateGameInput): Promise<GameRecord> {
 
 export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
   const rows = await db
-    .select()
+    .select({
+      userId: gamePlayer.userId,
+      username: gamePlayer.username,
+      role: gamePlayer.role,
+      avatar: userProfile.avatar,
+    })
     .from(gamePlayer)
+    .leftJoin(userProfile, eq(userProfile.userId, gamePlayer.userId))
     .where(eq(gamePlayer.gameId, gameId))
     .orderBy(gamePlayer.seatOrder);
   return rows.map((r) => ({
     userId: r.userId,
     username: r.username,
     role: r.role,
+    avatar: r.avatar ?? null,
   }));
 }
 

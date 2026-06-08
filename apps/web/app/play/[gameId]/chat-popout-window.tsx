@@ -1,7 +1,6 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
-import { FaCompress, FaExpand, FaXmark } from "react-icons/fa6";
 import {
   type ChatMode,
   clampGeometry,
@@ -10,6 +9,7 @@ import {
   type PopoutGeometry,
 } from "@/lib/chat-layout";
 import { cn } from "@/lib/utils";
+import { ChatWindowControls } from "./chat-window-controls";
 
 export function ChatPopoutWindow({
   mode,
@@ -20,6 +20,7 @@ export function ChatPopoutWindow({
   onPopOut,
   onDock,
   onMinimize,
+  onClose,
   onGeometryChange,
   onCommit,
   children,
@@ -32,6 +33,7 @@ export function ChatPopoutWindow({
   onPopOut: () => void;
   onDock: () => void;
   onMinimize: () => void;
+  onClose: () => void;
   onGeometryChange: (next: PopoutGeometry) => void;
   onCommit: () => void;
   children: ReactNode;
@@ -143,54 +145,34 @@ export function ChatPopoutWindow({
       <div
         onMouseDown={startDrag}
         className={cn(
-          "shrink-0 cursor-move select-none items-center justify-between rounded-t-xl border-border border-b bg-muted/40 px-3 py-2",
+          "relative shrink-0 cursor-move select-none items-center rounded-t-xl border-border border-b bg-muted/40 px-3 py-2",
           isPopout ? "flex" : "hidden",
         )}
       >
-        <span className="font-medium text-muted-foreground text-xs">Chat</span>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onDock}
-            className="text-muted-foreground outline-none transition hover:text-foreground"
-            aria-label="Dock chat"
-          >
-            <FaCompress className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onMinimize}
-            className="text-muted-foreground outline-none transition hover:text-foreground"
-            aria-label="Minimize chat"
-          >
-            <FaXmark className="size-4" />
-          </button>
-        </div>
+        <ChatWindowControls
+          isPopout
+          onClose={onClose}
+          onMinimize={onMinimize}
+          onZoom={onDock}
+        />
+        <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 font-medium text-muted-foreground text-xs">
+          Chat
+        </span>
       </div>
 
       {}
       <div
         className={cn(
-          "absolute top-3 right-3 z-10 flex items-center gap-1.5",
-          isPopout ? "hidden" : "hidden md:flex",
+          "absolute top-3 right-3 z-10 rounded-full bg-background/80 px-2 py-1.5 backdrop-blur",
+          isPopout ? "hidden" : "hidden md:block",
         )}
       >
-        <button
-          type="button"
-          onClick={onPopOut}
-          aria-label="Pop out chat"
-          className="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground outline-none backdrop-blur transition hover:text-foreground"
-        >
-          <FaExpand className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={onMinimize}
-          aria-label="Minimize chat"
-          className="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground outline-none backdrop-blur transition hover:text-foreground"
-        >
-          <FaXmark className="size-3.5" />
-        </button>
+        <ChatWindowControls
+          isPopout={false}
+          onClose={onClose}
+          onMinimize={onMinimize}
+          onZoom={onPopOut}
+        />
       </div>
 
       {}

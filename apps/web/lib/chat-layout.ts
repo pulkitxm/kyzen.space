@@ -31,12 +31,17 @@ export type ChatLayout = {
   mode: ChatMode;
   minimized: boolean;
   stashEdge: StashEdge | null;
+  lastStashEdge: StashEdge;
   chatWidth: number;
   popout: PopoutGeometry;
   icon: IconPos;
 };
 
+export const DEFAULT_STASH_EDGE: StashEdge = "right";
+
 export const POPOUT_MARGIN = 16;
+
+export const RESIZE_HANDLE_W = 6;
 
 export const ICON_SIZE = 56;
 export const ICON_MARGIN = 16;
@@ -51,6 +56,7 @@ export const DEFAULT_CHAT_LAYOUT = {
   mode: "mounted",
   minimized: false,
   stashEdge: null,
+  lastStashEdge: DEFAULT_STASH_EDGE,
   chatWidth: DEFAULT_CHAT_W,
   popout: DEFAULT_POPOUT,
   icon: DEFAULT_ICON,
@@ -160,6 +166,7 @@ export function normalizeChatLayout(o: unknown): ChatLayout {
     mode: r.mode === "popout" ? "popout" : "mounted",
     minimized: r.minimized === true,
     stashEdge: validStashEdge(r.stashEdge),
+    lastStashEdge: validStashEdge(r.lastStashEdge) ?? DEFAULT_STASH_EDGE,
     chatWidth: clampNum(r.chatWidth, MIN_CHAT, MAX_CHAT, DEFAULT_CHAT_W),
     popout: {
       x: finiteOr(p.x, DEFAULT_POPOUT.x),

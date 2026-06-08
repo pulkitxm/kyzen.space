@@ -22,6 +22,7 @@
     "better-auth": "^1.6.9",
     "jotai": "^2.19.1",
     "jotai-family": "^1.0.2",
+    "motion": "^12.40.0",
     "next": "16.2.4",
     "next-themes": "^0.4.6",
     "photoswipe": "^5.4.4",

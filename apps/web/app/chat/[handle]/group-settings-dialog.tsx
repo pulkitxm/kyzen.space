@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
+import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import { conversationsAtom, friendsAtom, presenceAtom } from "@/lib/chat/atoms";
 import { presenceLabel } from "@/lib/chat/presence";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
@@ -128,12 +129,23 @@ export function GroupSettingsDialog({
                   : presence.get(m.id);
               return (
                 <li key={m.id} className="flex items-center gap-3 px-1 py-1.5">
-                  <PresenceAvatar
-                    config={m.avatar}
-                    seed={m.username}
-                    size={32}
-                    online={p?.online ? true : undefined}
-                  />
+                  {m.id === userId ? (
+                    <PresenceAvatar
+                      config={m.avatar}
+                      seed={m.username}
+                      size={32}
+                      online={p?.online ? true : undefined}
+                    />
+                  ) : (
+                    <ProfilePopupTrigger user={m} className="shrink-0">
+                      <PresenceAvatar
+                        config={m.avatar}
+                        seed={m.username}
+                        size={32}
+                        online={p?.online ? true : undefined}
+                      />
+                    </ProfilePopupTrigger>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm">
                       {m.displayName ?? m.username}

@@ -5,7 +5,8 @@ export function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
     <div
       aria-hidden
       className={cn(
-        "animate-pulse rounded-md bg-foreground/30 dark:bg-surface-overlay",
+        "animate-pulse bg-foreground/30 dark:bg-surface-overlay",
+        className?.includes("rounded") ? null : "rounded-md",
         className,
       )}
       {...props}

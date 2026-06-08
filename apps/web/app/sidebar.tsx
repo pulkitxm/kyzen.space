@@ -24,7 +24,7 @@ import {
 import { NotificationsPopover } from "@/app/notifications-popover";
 import { SidebarSocialNav } from "@/app/sidebar-social-nav";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
-import { Character } from "@/components/ui";
+import { Character, Logo } from "@/components/ui";
 import {
   clampWidthSafe,
   DEFAULT_SIDEBAR_WIDTH,
@@ -265,17 +265,12 @@ export function Sidebar({
             paddingLeft: displayCollapsed ? 8 : 0,
           }}
         >
-          <span className="flex size-7 shrink-0 select-none items-center justify-center rounded-lg bg-sidebar-primary font-bold text-sidebar-primary-foreground text-sm">
-            GL
-          </span>
-          <span
-            className={cn(
-              "font-semibold text-sidebar-foreground text-sm",
-              textClasses,
-            )}
-          >
-            GameLobby
-          </span>
+          <Logo variant="icon" iconClassName="size-7" label="GameLobby" />
+          <Logo
+            variant="text"
+            decorative
+            className={cn("text-sidebar-foreground text-sm", textClasses)}
+          />
         </Link>
         <div className="flex-1" />
         <button

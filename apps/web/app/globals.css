@@ -51,22 +51,9 @@ html[data-theme="csk"] {
   --v: #fdb913;
 }
 
-:root,
-html[data-pattern="doodles"] {
+:root {
   --pattern-url: url("/patterns/doodles.svg");
-  --pattern-tile: 360px 360px;
-}
-html[data-pattern="games"] {
-  --pattern-url: url("/patterns/games.svg");
   --pattern-tile: 320px 320px;
-}
-html[data-pattern="shapes"] {
-  --pattern-url: url("/patterns/shapes.svg");
-  --pattern-tile: 360px 360px;
-}
-html[data-pattern="nature"] {
-  --pattern-url: url("/patterns/nature.svg");
-  --pattern-tile: 360px 360px;
 }
 
 html:not(.dark) {
@@ -282,18 +269,6 @@ html[data-pattern="none"] .app-canvas::before {
 }
 
 @layer utilities {
-  @keyframes gif-fade-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  .animate-gif-fade-in {
-    animation: gif-fade-in 0.45s ease-out both;
-  }
-
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -309,4 +284,8 @@ html[data-pattern="none"] .app-canvas::before {
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: var(--sidebar-primary);
   }
+}
+
+@utility gear-shift {
+  transform: translateX(var(--gear-shift, 0px));
 }

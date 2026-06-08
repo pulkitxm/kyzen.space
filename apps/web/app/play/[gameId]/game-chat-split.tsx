@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { clientFetch } from "@/lib/api-client";
-import { messagesAtomFamily } from "@/lib/chat/atoms";
+import { conversationUnreadAtomFamily } from "@/lib/chat/atoms";
 import {
   type ChatLayout,
   type ChatMode,
@@ -18,12 +18,14 @@ import {
   type IconPos,
   type PopoutGeometry,
   persistChatLayout,
+  RESIZE_HANDLE_W,
   readChatLayout,
   type StashEdge,
 } from "@/lib/chat-layout";
 import { cn } from "@/lib/utils";
 import { ChatFloatingIcon } from "./chat-floating-icon";
 import { ChatPopoutWindow } from "./chat-popout-window";
+import { GameSettingsGear } from "./game-settings-gear";
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -36,7 +38,7 @@ export function GameChatSplit({
 }: {
   conversationId: string;
   game: ReactNode;
-  chat: ReactNode;
+  chat: (visible: boolean) => ReactNode;
   initialLayout: ChatLayout;
   layoutTrusted: boolean;
 }) {
@@ -51,6 +53,9 @@ export function GameChatSplit({
   const [stashEdge, setStashEdge] = useState<StashEdge | null>(
     initialLayout.stashEdge,
   );
+  const [lastStashEdge, setLastStashEdge] = useState<StashEdge>(
+    initialLayout.lastStashEdge,
+  );
   const [icon, setIcon] = useState<IconPos>(initialLayout.icon);
   const [tab, setTab] = useState<"game" | "chat">("game");
 
@@ -59,12 +64,14 @@ export function GameChatSplit({
   const geomRef = useRef(geometry);
   const minimizedRef = useRef(minimized);
   const stashRef = useRef(stashEdge);
+  const lastStashRef = useRef(lastStashEdge);
   const iconRef = useRef(icon);
   modeRef.current = mode;
   widthRef.current = chatWidth;
   geomRef.current = geometry;
   minimizedRef.current = minimized;
   stashRef.current = stashEdge;
+  lastStashRef.current = lastStashEdge;
   iconRef.current = icon;
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,6 +83,7 @@ export function GameChatSplit({
         override?.stashEdge !== undefined
           ? override.stashEdge
           : stashRef.current,
+      lastStashEdge: override?.lastStashEdge ?? lastStashRef.current,
       chatWidth: override?.chatWidth ?? widthRef.current,
       popout: override?.popout ?? geomRef.current,
       icon: override?.icon ?? iconRef.current,
@@ -107,6 +115,7 @@ export function GameChatSplit({
         setGeometry(ls.popout);
         setMinimized(isDesktop ? ls.minimized : false);
         setStashEdge(ls.stashEdge);
+        setLastStashEdge(ls.lastStashEdge);
         setIcon(ls.icon);
         return;
       }
@@ -185,33 +194,34 @@ export function GameChatSplit({
     persist({ mode: "mounted" });
   }, [persist]);
 
-  const messages = useAtomValue(messagesAtomFamily(conversationId));
-  const unreadBaseRef = useRef(messages.length);
-  const [unread, setUnread] = useState(0);
-  useEffect(() => {
-    if (!minimized) return;
-    setUnread(Math.max(0, messages.length - unreadBaseRef.current));
-  }, [messages.length, minimized]);
+  const unread = useAtomValue(conversationUnreadAtomFamily(conversationId));
 
   const minimize = useCallback(() => {
-    unreadBaseRef.current = messages.length;
-    setUnread(0);
     setMinimized(true);
-    persist({ minimized: true });
-  }, [persist, messages.length]);
+    setStashEdge(null);
+    persist({ minimized: true, stashEdge: null });
+  }, [persist]);
+
+  const closeToSide = useCallback(() => {
+    const edge = lastStashRef.current;
+    setMinimized(true);
+    setStashEdge(edge);
+    persist({ minimized: true, stashEdge: edge });
+  }, [persist]);
 
   const restore = useCallback(() => {
     setMinimized(false);
     setStashEdge(null);
-    setUnread(0);
     persist({ minimized: false, stashEdge: null });
   }, [persist]);
 
   const changeStash = useCallback((edge: StashEdge | null) => {
     setStashEdge(edge);
+    if (edge) setLastStashEdge(edge);
   }, []);
 
   const isPopout = mode === "popout";
+  const gearShifted = mode === "mounted" && !minimized;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -252,7 +262,7 @@ export function GameChatSplit({
           onMouseDown={startDrag}
           className={cn(
             "w-1.5 shrink-0 cursor-col-resize bg-border/40 outline-none transition hover:bg-primary",
-            isPopout ? "hidden" : "hidden md:block",
+            isPopout || minimized ? "hidden" : "hidden md:block",
           )}
         />
 
@@ -265,10 +275,11 @@ export function GameChatSplit({
           onPopOut={popOut}
           onDock={dock}
           onMinimize={minimize}
+          onClose={closeToSide}
           onGeometryChange={setGeometry}
           onCommit={persist}
         >
-          <div className="min-h-0 w-full">{chat}</div>
+          <div className="min-h-0 w-full">{chat(!minimized)}</div>
         </ChatPopoutWindow>
 
         {minimized && (
@@ -282,6 +293,11 @@ export function GameChatSplit({
             onCommit={persist}
           />
         )}
+
+        <GameSettingsGear
+          shifted={gearShifted}
+          offset={chatWidth + RESIZE_HANDLE_W}
+        />
       </div>
     </div>
   );

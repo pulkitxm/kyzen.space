@@ -16,7 +16,12 @@ import type { ColorMode, ThemeId } from "../theme";
 
 export * from "./io";
 
-export type GamePlayer = { userId: string; username: string; role: string };
+export type GamePlayer = {
+  userId: string;
+  username: string;
+  role: string;
+  avatar?: AvatarConfig | null;
+};
 
 export type GameStatus = GameStatusDto;
 

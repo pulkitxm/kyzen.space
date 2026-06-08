@@ -9,6 +9,7 @@ import type {
 } from "@gamelobby/shared/types";
 import type { ReactNode } from "react";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
+import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import type { ChatMessage } from "@/lib/chat/atoms";
 import { timeOfDay } from "@/lib/chat/format";
 import { openImageLightbox } from "@/lib/chat/lightbox";
@@ -151,11 +152,17 @@ export function MessageBubble({
     >
       {!own ? (
         showAvatar ? (
-          <PresenceAvatar
-            config={message.sender?.avatar ?? null}
-            seed={message.sender?.username ?? "?"}
-            size={28}
-          />
+          message.sender ? (
+            <ProfilePopupTrigger user={message.sender} className="shrink-0">
+              <PresenceAvatar
+                config={message.sender.avatar}
+                seed={message.sender.username}
+                size={28}
+              />
+            </ProfilePopupTrigger>
+          ) : (
+            <PresenceAvatar config={null} seed="?" size={28} />
+          )
         ) : (
           <span className="w-7 shrink-0" />
         )

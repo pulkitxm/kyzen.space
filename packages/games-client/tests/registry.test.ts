@@ -15,7 +15,7 @@ describe("games-client registry", () => {
       test(`getGameClient("${type}") returns a component`, () => {
         const client = getGameClient(type);
         expect(client).not.toBeNull();
-        expect(typeof client).toBe("object");
+        expect(["function", "object"]).toContain(typeof client);
       });
     }
   });

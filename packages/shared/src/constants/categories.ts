@@ -1,6 +1,6 @@
 import type GameCategoryDef from "../types/games/GameCategoryDef";
 
-export const GAME_CATEGORIES = [
-  { id: "board-classics", label: "Board classics" },
-  { id: "party", label: "Party" },
-] satisfies GameCategoryDef[];
+export const GAME_CATEGORIES = {
+  BOARD_CLASSICS: { id: "board-classics", label: "Board classics" },
+  PARTY: { id: "party", label: "Party" },
+} as const satisfies Record<string, GameCategoryDef>;

@@ -134,10 +134,9 @@ export function ChatFloatingIcon({
         type="button"
         onClick={() => {
           if (justDraggedRef.current) return;
-          onStashChange(null);
-          onCommit();
+          onRestore();
         }}
-        aria-label="Show chat icon"
+        aria-label="Restore chat"
         style={style}
         className={cn(
           "fixed z-50 flex items-center justify-center bg-primary text-primary-foreground shadow-lg outline-none transition hover:bg-primary-hover",

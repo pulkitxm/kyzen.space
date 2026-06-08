@@ -8,6 +8,9 @@ node_modules/
 # testing
 /coverage
 
+# brainstorming visual companion
+.superpowers/
+
 # next.js (any workspace)
 .next/
 /out/

@@ -11,6 +11,7 @@
     "cloc:diff": "cloc --git --diff main HEAD --quiet --not-match-f='(bun\\.lock|package-lock\\.json|\\.snap$|_snapshot\\.json$|_journal\\.json$)'",
     "cloc:md": "bun run cloc -- --md",
     "cloc:file": "bun run cloc -- --by-file",
+    "cloc:authors": "bun scripts/cloc-authors.mjs",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "serve": "bun run build --force && bun start",

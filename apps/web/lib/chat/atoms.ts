@@ -47,6 +47,14 @@ export const typingAtomFamily = atomFamily((_conversationId: string) =>
 export const totalUnreadAtom = atom((get) =>
   get(conversationsAtom).reduce((sum, c) => sum + (c.unreadCount ?? 0), 0),
 );
+export const conversationUnreadAtomFamily = atomFamily(
+  (conversationId: string) =>
+    atom(
+      (get) =>
+        get(conversationsAtom).find((c) => c.id === conversationId)
+          ?.unreadCount ?? 0,
+    ),
+);
 export const pendingRequestCountAtom = atom(
   (get) => get(incomingRequestsAtom).length,
 );

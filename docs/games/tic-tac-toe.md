@@ -86,8 +86,60 @@ Socket.IO connection the chat lane uses, passed down as a prop.
   `initialMoves` (sorted by `moveNumber`) up to the chosen step to reconstruct the
   board. Arrow keys step prev/next and Space toggles autoplay (`REPLAY_MS` = 850ms
   per step).
-- **Icons** come from `react-icons/fa6` (`FaBackwardStep`, `FaChevronLeft`,
-  `FaPlay`/`FaPause`, `FaChevronRight`, `FaForwardStep`) — no hand-written SVG.
+- **Marks** render as themed, hand-authored SVG (`TttMark`, `marks.tsx`) rather
+  than plain text — a chunky outlined ✕ and ◯ recoloured from theme tokens (✕ =
+  `--primary`, ◯ = `--muted-foreground`, each outlined with a darker shade of its
+  own colour, so it reads in light and dark). An empty cell shows a faint ghost of
+  *your* mark on hover while it is your turn. A shared sheen gradient
+  (`TttMarkDefs`) is rendered once per board.
+- **Winning line** — when the game ends with a winner, a strike-through line
+  (`WinStrike`, an absolute SVG overlay on the grid) is drawn through the three
+  winning cells in the winner's colour. The draw is a `motion.line` spring
+  (`pathLength` 0 → 1, from `motion/react`) that plays **once**, and only on a
+  *transition* into the won state — a live win, or a replay reaching the deciding
+  move. A game opened already-finished renders the line **statically**
+  (`initial={false}`, no animation), so revisiting a result doesn't re-animate.
+  The state machine lives in `client.tsx` (a render-phase comparison of the
+  current vs. previous winning-line key).
+- **No snap on load** — the board is server-rendered: the registry imports the
+  board component eagerly (not via `React.lazy`), so opening a finished game shows
+  its final position (marks + the static winning line) in the first paint, with no
+  board-skeleton flash.
+- **Player bar** (`player-bar.tsx`) sits above the grid: each player's **avatar**
+  + username + their mark, with the active player's chip highlighted (whose turn
+  it is). Avatars render through a games-client `Character`
+  (`packages/games-client/src/ui/character.tsx`, DiceBear avataaars) from the
+  `avatar` now carried on each player — the player payload was extended end-to-end
+  (`getPlayers` left-joins `user_profile`; `avatar?: AvatarConfig | null` added to
+  the shared `GamePlayer` type, `gamePlayerSchema`, and `GameClientProps`).
+- **Replay controls** use `react-icons/fa6` (`FaBackwardStep`, `FaChevronLeft`,
+  `FaPlay`/`FaPause`, `FaChevronRight`, `FaForwardStep`); the ✕/◯ glyphs are the
+  one hand-authored decorative SVG, the same raw-SVG exception the playing-cards
+  use.
+- **Sound** — the board uses the shared `useGameAudio()` hook
+  (`@gamelobby/games-client`, see [audio.md](../architecture/audio.md)). All sounds
+  are audio files (no synthesis). A **hover** sound (`onMouseEnter`) and a
+  **touch** sound (`onClick`) fire only on a **playable** cell — empty, your turn,
+  in a live game — guarded by the same `playable` flag that drives the cell's
+  `disabled` state, so a finished game (and replay) has no playable cells and
+  hovering/clicking its boxes is **silent**. The **opponent's** move plays the
+  touch sound too — it arrives over the socket (not a local click), so the board
+  fires the sound when the live board gains a mark that isn't the move you just
+  made (de-duped via the post-move `currentTurn` flip; spectators hear every
+  move). Replay *playback* is audible, though:
+  each move replayed forward — autoplay or stepping next (`→`) — plays the
+  **touch** sound (going back or jumping to first/last is silent). The
+  **win**/**draw** sound plays **exactly once, live only**: a `useEffect` keyed on
+  `game.status`/`game.winner`
+  fires on a `waiting|active → completed` transition seen within the session
+  (guarded by a once-only ref), so a finished game opened fresh (no transition) and
+  replay scrubbing (which changes `replayStep`, not `game.status`) both stay
+  silent. All of these honour the game-sound volume/mute channel. **Background
+  music** is a separate channel: a looping, **crossfaded** jazz track
+  (`apps/web/public/sounds/tic-tac-toe-bg.ogg`, registered in `gameMusicSource`)
+  streamed through the audio engine; it starts after the first interaction
+  (browser autoplay policy) and is controlled by the gear's *Background music*
+  slider/mute.
 
 A loading placeholder, `TicTacToeSkeleton`
 (`packages/games-client/src/games/tic-tac-toe/skeleton.tsx`), is registered in

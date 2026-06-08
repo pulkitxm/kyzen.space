@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   DEFAULT_PATTERN,
   getPatternDef,
@@ -27,6 +29,18 @@ describe("pattern catalog", () => {
 
   it("default pattern resolves to a catalog entry", () => {
     expect(getPatternDef(DEFAULT_PATTERN)).toBeDefined();
+  });
+
+  it("every catalog tile SVG exists and matches its declared tile size", () => {
+    for (const p of PATTERNS) {
+      if (!p.src) continue;
+      const file = join(import.meta.dir, "..", "public", p.src);
+      expect(existsSync(file)).toBe(true);
+      const svg = readFileSync(file, "utf8");
+      expect(svg).toContain(`width="${p.tile}"`);
+      expect(svg).toContain(`viewBox="0 0 ${p.tile} ${p.tile}"`);
+      expect(svg).toContain("<use ");
+    }
   });
 });
 
