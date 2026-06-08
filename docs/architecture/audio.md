@@ -119,10 +119,11 @@ once-only ref.
 - **Live finish**: the winning `game_state` flips `active → completed` — plays
   once.
 
-Hover and touch tones, by contrast, fire on the cell `onMouseEnter` / `onClick`.
-To make them work during replay too (cells are non-interactive then), the cell
-uses `aria-disabled` + a `playable` guard instead of the native `disabled`
-attribute (which suppresses pointer events); `makeMove` only runs when `playable`.
+Hover and touch tones, by contrast, fire on the cell `onMouseEnter` / `onClick`
+but only when the cell is **playable** (empty, your turn, live) — both handlers
+are guarded by the same `playable` flag that sets the cell's `disabled` state. A
+finished game (and replay) has no playable cells, so hovering or clicking its
+boxes is silent; sound only ever accompanies a cell you can actually act on.
 
 ## Gotchas & conventions
 

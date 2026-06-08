@@ -453,13 +453,16 @@ export function TicTacToeGameClient({
             <button
               key={idx}
               type="button"
-              aria-disabled={!playable}
-              onMouseEnter={() => audio.playHover()}
-              onClick={() => {
-                audio.playTouch();
-                if (playable) makeMove(row, col);
+              disabled={!playable}
+              onMouseEnter={() => {
+                if (playable) audio.playHover();
               }}
-              className={`group flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised outline-none transition focus-visible:ring-2 focus-visible:ring-ring sm:size-28 ${playable ? "cursor-pointer hover:bg-surface-overlay" : "cursor-default"}`}
+              onClick={() => {
+                if (!playable) return;
+                audio.playTouch();
+                makeMove(row, col);
+              }}
+              className="group flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised outline-none transition focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-surface-overlay disabled:cursor-default sm:size-28"
             >
               {mark ? (
                 <TttMark mark={mark} className="size-16 sm:size-20" />

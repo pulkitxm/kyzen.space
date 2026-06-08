@@ -117,16 +117,17 @@ Socket.IO connection the chat lane uses, passed down as a prop.
   one hand-authored decorative SVG, the same raw-SVG exception the playing-cards
   use.
 - **Sound** — the board uses the shared `useGameAudio()` hook
-  (`@gamelobby/games-client`, see [audio.md](../architecture/audio.md)). Each cell
-  plays a hover tone on `onMouseEnter` and a touch tone on `onClick`; these fire
-  in **replay** too, which is why cells use `aria-disabled` + a `playable` guard
-  rather than the native `disabled` attribute (a native-disabled button suppresses
-  pointer events). The win/draw fanfare plays **exactly once, live only**: a
-  `useEffect` keyed on `game.status`/`game.winner` fires on a `waiting|active →
-  completed` transition seen within the session (guarded by a once-only ref), so a
-  finished game opened fresh (no transition) and replay scrubbing (which changes
-  `replayStep`, not `game.status`) both stay silent. All of these honour the
-  game-sound volume/mute channel; background music is a separate channel.
+  (`@gamelobby/games-client`, see [audio.md](../architecture/audio.md)). A **hover
+  tone** (`onMouseEnter`) and a **touch tone** (`onClick`) fire only on a
+  **playable** cell — empty, your turn, in a live game — guarded by the same
+  `playable` flag that drives the cell's `disabled` state. A finished game (and
+  replay) has no playable cells, so hovering or clicking its boxes is **silent**.
+  The win/draw fanfare plays **exactly once, live only**: a `useEffect` keyed on
+  `game.status`/`game.winner` fires on a `waiting|active → completed` transition
+  seen within the session (guarded by a once-only ref), so a finished game opened
+  fresh (no transition) and replay scrubbing (which changes `replayStep`, not
+  `game.status`) both stay silent. All of these honour the game-sound volume/mute
+  channel; background music is a separate channel.
 
 A loading placeholder, `TicTacToeSkeleton`
 (`packages/games-client/src/games/tic-tac-toe/skeleton.tsx`), is registered in
