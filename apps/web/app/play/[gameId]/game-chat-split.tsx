@@ -18,16 +18,14 @@ import {
   type IconPos,
   type PopoutGeometry,
   persistChatLayout,
+  RESIZE_HANDLE_W,
   readChatLayout,
   type StashEdge,
 } from "@/lib/chat-layout";
-import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import { ChatFloatingIcon } from "./chat-floating-icon";
 import { ChatPopoutWindow } from "./chat-popout-window";
 import { GameSettingsGear } from "./game-settings-gear";
-
-const RESIZE_HANDLE_W = 6;
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -60,7 +58,6 @@ export function GameChatSplit({
   );
   const [icon, setIcon] = useState<IconPos>(initialLayout.icon);
   const [tab, setTab] = useState<"game" | "chat">("game");
-  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   const modeRef = useRef(mode);
   const widthRef = useRef(chatWidth);
@@ -224,7 +221,7 @@ export function GameChatSplit({
   }, []);
 
   const isPopout = mode === "popout";
-  const docked = isDesktop && mode === "mounted" && !minimized;
+  const gearShifted = mode === "mounted" && !minimized;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -298,7 +295,7 @@ export function GameChatSplit({
         )}
 
         <GameSettingsGear
-          docked={docked}
+          shifted={gearShifted}
           offset={chatWidth + RESIZE_HANDLE_W}
         />
       </div>

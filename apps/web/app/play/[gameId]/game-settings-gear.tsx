@@ -1,17 +1,15 @@
 "use client";
 
-import { motion } from "motion/react";
+import type { CSSProperties } from "react";
 import { FaGear } from "react-icons/fa6";
 import { useLayeredPopup } from "@/lib/popups/use-layered-popup";
 import { GameSettingsPanel } from "./game-settings-panel";
 
-const EASE_OUT = [0.16, 1, 0.3, 1] as const;
-
 export function GameSettingsGear({
-  docked,
+  shifted,
   offset,
 }: {
-  docked: boolean;
+  shifted: boolean;
   offset: number;
 }) {
   const { openLayer } = useLayeredPopup();
@@ -24,11 +22,11 @@ export function GameSettingsGear({
     });
 
   return (
-    <motion.div
-      className="absolute top-3 right-3 z-20"
-      initial={false}
-      animate={{ x: docked ? -offset : 0 }}
-      transition={{ duration: 0.28, ease: EASE_OUT }}
+    <div
+      style={
+        { "--gear-shift": shifted ? `-${offset}px` : "0px" } as CSSProperties
+      }
+      className="md:gear-shift absolute top-3 right-3 z-20 transition-transform duration-300 ease-out"
     >
       <button
         type="button"
@@ -38,6 +36,6 @@ export function GameSettingsGear({
       >
         <FaGear size={16} aria-hidden="true" />
       </button>
-    </motion.div>
+    </div>
   );
 }

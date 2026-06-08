@@ -71,7 +71,7 @@ export function PlayClient({
     return (
       <div className="relative h-full min-h-0">
         {gameNode}
-        <GameSettingsGear docked={false} offset={0} />
+        <GameSettingsGear shifted={false} offset={0} />
       </div>
     );
   }

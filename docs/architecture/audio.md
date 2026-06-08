@@ -97,19 +97,30 @@ toggling mute updates the running sound immediately.
 
 ## The gear (slide + modal)
 
-`GameSettingsGear` is an `absolute top-3 right-3` `motion.div` that animates
-`x` between `0` and `-offset` using the house `EASE_OUT` cubic-bezier. It opens
+`GameSettingsGear` is an `absolute top-3 right-3` button that opens
 `GameSettingsPanel` through `useLayeredPopup().openLayer(...)` (the global
-layered-popup host, mounted in `app-shell.tsx`).
+layered-popup host, mounted in `app-shell.tsx`). Its slide is **CSS-driven and
+SSR-correct**: the element carries a `--gear-shift` inline CSS variable and the
+`md:gear-shift` utility (a custom `@utility` in `globals.css` →
+`transform: translateX(var(--gear-shift, 0px))`) plus `transition-transform` for
+the smooth slide. Living behind the `md:` breakpoint variant (pure CSS, not a JS
+media query) means it renders correctly from the first server paint — no flash,
+no `isDesktop` hook.
 
 `GameChatSplit` (`app/play/[gameId]/game-chat-split.tsx`) owns the chat docking
-state, so it renders the gear and computes when it should slide:
-`docked = isDesktop && mode === "mounted" && !minimized`, with
-`offset = chatWidth + RESIZE_HANDLE_W`. When the chat docks it occupies width on
-the right, so the gear slides left to stay over the game area; popping out,
-minimizing, or stashing the chat returns it to `x: 0`. The no-conversation play
-branch (`play-client.tsx`) renders a static, non-sliding gear so settings are
-reachable even when there is no chat.
+state and sets `--gear-shift`: when the chat is docked
+(`mode === "mounted" && !minimized`) the shift is `-(chatWidth + RESIZE_HANDLE_W)`
+so the gear sits over the game area; popping out, minimizing, or stashing resets
+it to `0`. On mobile the `md:` rule doesn't apply, so the gear stays at the corner
+(the chat is a tab there). The no-conversation play branch (`play-client.tsx`)
+renders a non-shifting gear.
+
+The **loading skeleton** (`play-skeleton.tsx`) renders the gear with the *same*
+`md:gear-shift` + `--gear-shift`, derived from the chat-layout **cookie** (the
+same cookie that positions the skeleton's chat — see [web.md](./web.md)). So the
+gear is pre-positioned during SSR and doesn't jump when the live page swaps in;
+no gear-specific cookie is needed since its position is a function of the chat
+layout.
 
 ## Win sound: exactly once, live only
 

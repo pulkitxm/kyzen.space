@@ -7,6 +7,7 @@ import {
   ICON_MARGIN,
   ICON_SIZE,
   POPOUT_MARGIN,
+  RESIZE_HANDLE_W,
 } from "@/lib/chat-layout";
 import { cn } from "@/lib/utils";
 
@@ -170,6 +171,20 @@ export function PlaySkeleton({ layout }: { layout: ChatLayout }) {
         ) : null}
 
         {layout.minimized ? <MinimizedSkeleton layout={layout} /> : null}
+
+        <div
+          aria-hidden
+          style={
+            {
+              "--gear-shift": docked
+                ? `-${layout.chatWidth + RESIZE_HANDLE_W}px`
+                : "0px",
+            } as CSSProperties
+          }
+          className="md:gear-shift absolute top-3 right-3 z-20"
+        >
+          <Skeleton className="size-9 rounded-full" />
+        </div>
       </div>
     </div>
   );

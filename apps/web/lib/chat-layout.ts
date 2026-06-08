@@ -41,6 +41,8 @@ export const DEFAULT_STASH_EDGE: StashEdge = "right";
 
 export const POPOUT_MARGIN = 16;
 
+export const RESIZE_HANDLE_W = 6;
+
 export const ICON_SIZE = 56;
 export const ICON_MARGIN = 16;
 export const EDGE_TAB_THICKNESS = 22;

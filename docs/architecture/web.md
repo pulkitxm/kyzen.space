@@ -30,7 +30,7 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/lib/sidebar-atoms.ts` | `atomWithStorage` atoms for sidebar collapsed/width, with SSR-safe and width-clamping storage adapters. |
 | `apps/web/lib/audio/atoms.ts` | `gameSfxAtom` / `gameMusicAtom` (`atomWithStorage`): the two client-only audio preference channels (volume + mute), seeded from `@gamelobby/shared` defaults. |
 | `apps/web/lib/audio/use-audio-bridge.ts` | `useGameAudioBridge()`: pushes the audio atoms into the `games-client` `GameAudioEngine`, marks music active for the play screen, and registers the gesture unlock. |
-| `apps/web/lib/use-media-query.ts` | `useMediaQuery(query)`: SSR-safe `matchMedia` subscription via `useSyncExternalStore` (returns `false` on the server). Used for the gear's desktop-dock check; reusable for any breakpoint. |
+| `apps/web/lib/use-media-query.ts` | `useMediaQuery(query)`: SSR-safe `matchMedia` subscription via `useSyncExternalStore` (returns `false` on the server). A reusable client hook for breakpoint-driven UI. |
 | `apps/web/app/play/[gameId]/game-settings-gear.tsx` | The sliding `FaGear` button (`motion/react`) that opens the settings modal via the layered-popup host. |
 | `apps/web/app/play/[gameId]/game-settings-panel.tsx` | Settings modal body: per-channel mute toggle + −/+ + range slider for game sound and background music. |
 | `apps/web/lib/sidebar-atoms-shared.ts` | Storage keys + `clampWidth` helpers shared by the atoms and the server-side cookie boot script. |
@@ -42,7 +42,7 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/play/[gameId]/page.tsx` | SSR-fetches game + moves (+ conversation + messages), gates on auth + game **code** (`isGameCode`, then normalizes and redirects to the canonical uppercase code), resolves the chat layout, renders `PlayClient`. |
 | `apps/web/app/play/[gameId]/play-client.tsx` | Resolves `getGameClient` / `getGameSkeleton`, renders the board in `<Suspense>` over the shared socket, optionally side-by-side with chat via `GameChatSplit`. |
 | `apps/web/app/play/[gameId]/loading.tsx` | Route `loading.tsx`: reads the chat-layout cookie and renders `<PlaySkeleton layout={…} />` during the SSR fetch. |
-| `apps/web/app/play/[gameId]/play-skeleton.tsx` | Layout-aware skeleton mirroring `GameChatSplit` (docked / popout / minimized). |
+| `apps/web/app/play/[gameId]/play-skeleton.tsx` | Layout-aware skeleton mirroring `GameChatSplit` (docked / popout / minimized) and the settings gear, all positioned from the chat-layout cookie. |
 | `apps/web/lib/chat-layout.ts` | `ChatLayout` type + `parseChatLayoutCookie` / `normalizeChatLayout` + layout geometry constants; the layout cookie/localStorage contract shared by page, loading, and `GameChatSplit`. |
 | `apps/web/app/chat/[handle]/page.tsx` | SSR conversation page; resolves handle (UUID or username) → conversation + messages. |
 | `apps/web/app/chat/[handle]/conversation-view.tsx` | Client conversation UI: hydrates messages atom, marks read, renders list/composer/typing. |
