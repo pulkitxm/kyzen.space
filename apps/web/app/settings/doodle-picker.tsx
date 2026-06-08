@@ -66,7 +66,7 @@ export function DoodlePicker({ signedIn: _signedIn }: { signedIn: boolean }) {
             )}
           >
             <div
-              className="relative aspect-[3/2] w-full overflow-hidden rounded-xl border border-border shadow-inner"
+              className="relative aspect-3/2 w-full overflow-hidden rounded-xl border border-border shadow-inner"
               style={{ backgroundColor: "var(--background)" }}
             >
               {def.src ? (
