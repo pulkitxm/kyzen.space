@@ -24,7 +24,7 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 | `apps/server/src/api/auth-context.ts` | `readJson(c)` (safe body parse). |
 | `apps/server/src/api/serialize.ts` | Pure row -> DTO mappers (`serializeGame`, `serializeMove`, `serializeMessage`, `serializeConversation`, `serializeSeries`, …). The `Date -> ISO string` boundary. |
 | `apps/server/src/api/routes/account.ts` | Session management built on Better Auth: list/sign-out/revoke sessions. |
-| `apps/server/src/api/routes/conversations.ts` | The largest router: list/create DMs & groups, messages, read receipts, members, rename, and `POST /:id/games`. |
+| `apps/server/src/api/routes/conversations.ts` | The largest router: list/create DMs & groups, messages, read receipts, members, rename, and `POST /:id/games`. Resolution for friendly URLs: `GET /with/:username` (→ DM) and `GET /group/:name` (→ group, member-gated). Group names are unique (enforced on create + rename in `conversations-service.ts`), so a name resolves to one group; `GET /:id` remains for internal id fetches. |
 | `apps/server/src/api/routes/friends.ts` | Friends list, pending requests, user search with friend-state, send/accept/decline/remove. |
 | `apps/server/src/api/routes/games.ts` | The two game REST reads: `GET /:gameId` (serialized game + its moves) and `GET /:gameId/series` (the rematch series via `serializeSeries` + `computeSeriesScore`). |
 | `apps/server/src/api/routes/gifs.ts` | Proxy to the Klipy GIF provider: trending + search, with limit/offset clamping. |
