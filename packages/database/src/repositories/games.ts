@@ -147,14 +147,19 @@ export async function seatPlayer(
   gameId: string,
   player: GamePlayer,
   seatOrder: number,
-): Promise<void> {
-  await db.insert(gamePlayer).values({
-    gameId,
-    userId: player.userId,
-    username: player.username,
-    role: player.role,
-    seatOrder,
-  });
+): Promise<boolean> {
+  const rows = await db
+    .insert(gamePlayer)
+    .values({
+      gameId,
+      userId: player.userId,
+      username: player.username,
+      role: player.role,
+      seatOrder,
+    })
+    .onConflictDoNothing({ target: [gamePlayer.gameId, gamePlayer.userId] })
+    .returning({ id: gamePlayer.id });
+  return rows.length > 0;
 }
 
 export async function updateGame(

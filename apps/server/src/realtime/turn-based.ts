@@ -60,7 +60,11 @@ async function ensureSeated(
   const nextPlayers = [...players, newPlayer];
   const becomesActive = nextPlayers.length >= engine.minPlayers;
 
-  await games.seatPlayer(gameRow.id, newPlayer, players.length);
+  const seated = await games.seatPlayer(gameRow.id, newPlayer, players.length);
+  if (!seated) {
+    const refreshed = await games.getGameById(gameRow.id);
+    return { game: refreshed ?? gameRow, changed: false };
+  }
   const game = await games.updateGame(gameRow.id, {
     status: becomesActive ? "active" : "waiting",
     startedAt: becomesActive ? new Date() : gameRow.startedAt,

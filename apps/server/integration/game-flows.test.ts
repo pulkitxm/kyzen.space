@@ -127,6 +127,31 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
     expect(bGames.some((g) => g.id === gameId)).toBe(true);
   });
 
+  it("seats idempotently so a duplicate join never violates game_player_uq", async () => {
+    const a = await makeUser("dup_a");
+    const b = await makeUser("dup_b");
+    const convId = await dmBetween(a, b);
+    const { game } = unwrap(
+      await createGameInConversation({
+        userId: a.id,
+        conversationId: convId,
+        gameType: TIC_TAC_TOE,
+      }),
+    );
+
+    const gameId = await gameUuid(game.id);
+    const seat = { userId: b.id, username: b.username, role: "O" };
+
+    const first = await games.seatPlayer(gameId, seat, 1);
+    const second = await games.seatPlayer(gameId, seat, 1);
+
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+
+    const loaded = await games.getGameById(gameId);
+    expect(loaded?.players.filter((p) => p.userId === b.id)).toHaveLength(1);
+  });
+
   it("persists moves and completes a game with a winner", async () => {
     const a = await makeUser("e");
     const b = await makeUser("f");
