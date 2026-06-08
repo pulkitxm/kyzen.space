@@ -101,4 +101,65 @@ describe.skipIf(!DB_UP)("rematch end-to-end", () => {
     expect(dup.ok).toBe(true);
     if (dup.ok) expect(dup.value.game.id).toBe(newCode);
   });
+
+  it("returns the existing live game when a second same-type game is created", async () => {
+    const a = await h.makeUser("oneLiveA");
+    const b = await h.makeUser("oneLiveB");
+    const convId = await h.makeDm(a, b);
+
+    const first = await createGameInConversation({
+      userId: a.id,
+      conversationId: convId,
+      gameType: TIC_TAC_TOE,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const code = first.value.game.id;
+    h.trackGame(code);
+
+    const second = await createGameInConversation({
+      userId: b.id,
+      conversationId: convId,
+      gameType: TIC_TAC_TOE,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.value.game.id).toBe(code);
+    expect(second.value.message).toBeUndefined();
+
+    const live = await games.findLiveGameInConversation(convId, TIC_TAC_TOE);
+    expect(live?.code).toBe(code);
+  });
+
+  it("re-creates a fresh game once the live game is abandoned", async () => {
+    const a = await h.makeUser("oneLiveC");
+    const b = await h.makeUser("oneLiveD");
+    const convId = await h.makeDm(a, b);
+
+    const first = await createGameInConversation({
+      userId: a.id,
+      conversationId: convId,
+      gameType: TIC_TAC_TOE,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const firstCode = first.value.game.id;
+    h.trackGame(firstCode);
+
+    const loaded = await games.getGameByCode(firstCode);
+    expect(loaded).toBeTruthy();
+    if (!loaded) return;
+    await games.updateGame(loaded.id, { status: "abandoned" });
+
+    const second = await createGameInConversation({
+      userId: a.id,
+      conversationId: convId,
+      gameType: TIC_TAC_TOE,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    h.trackGame(second.value.game.id);
+    expect(second.value.game.id).not.toBe(firstCode);
+    expect(second.value.message?.kind).toBe("game_card");
+  });
 });

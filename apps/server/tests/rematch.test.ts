@@ -28,6 +28,7 @@ let createInput: {
   status?: string;
   seriesId?: string | null;
 } | null;
+let createdConfig: unknown = null;
 const notifyCalls: { userId: string; type: string }[] = [];
 const sentCards: { gameId: string }[] = [];
 
@@ -47,6 +48,7 @@ mock.module("@gamelobby/database", () => ({
         status: input.status,
         seriesId: input.seriesId,
       };
+      createdConfig = input.config;
       return {
         ...input,
         id: "new-id",
@@ -113,6 +115,7 @@ describe("rematchGame", () => {
     prev = freshPrev();
     liveGame = null;
     createInput = null;
+    createdConfig = null;
     notifyCalls.length = 0;
     sentCards.length = 0;
   });
@@ -145,5 +148,48 @@ describe("rematchGame", () => {
     prev = freshPrev({ status: "active" });
     const res = await rematchGame({ userId: "u1", gameId: "OLDGM1" });
     expect(res.ok).toBe(false);
+  });
+
+  test("rejects a rematch of an abandoned game", async () => {
+    prev = freshPrev({ status: "abandoned" });
+    const res = await rematchGame({ userId: "u1", gameId: "OLDGM1" });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.status).toBe(400);
+    expect(createInput).toBeNull();
+  });
+
+  test("404s when the game code resolves to nothing", async () => {
+    prev = null as unknown as AnyGame;
+    const res = await rematchGame({ userId: "u1", gameId: "MISSIN" });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.status).toBe(404);
+    expect(createInput).toBeNull();
+  });
+
+  test("rejects a rematch of a game with no conversation", async () => {
+    prev = freshPrev({ conversationId: null });
+    const res = await rematchGame({ userId: "u1", gameId: "OLDGM1" });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.status).toBe(400);
+    expect(createInput).toBeNull();
+  });
+
+  test("seats the loser of a decisive O win as the first role", async () => {
+    prev = freshPrev({ winner: "u2" });
+    const res = await rematchGame({ userId: "u2", gameId: "OLDGM1" });
+    expect(res.ok).toBe(true);
+    expect(createInput?.players[0]?.userId).toBe("u1");
+    expect(createInput?.players[0]?.role).toBe("X");
+    expect(createInput?.players[1]?.userId).toBe("u2");
+    expect(createInput?.players[1]?.role).toBe("O");
+  });
+
+  test("copies the parent config and seats both players active", async () => {
+    prev = freshPrev({ config: { firstPlayer: "O" } });
+    const res = await rematchGame({ userId: "u1", gameId: "OLDGM1" });
+    expect(res.ok).toBe(true);
+    expect(createInput?.status).toBe("active");
+    expect(createInput?.players).toHaveLength(2);
+    expect(createdConfig).toEqual({ firstPlayer: "O" });
   });
 });

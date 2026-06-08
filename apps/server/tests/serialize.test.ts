@@ -9,7 +9,11 @@ import type {
   PublicUserRow,
 } from "@gamelobby/database";
 import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import { gameJsonSchema, moveJsonSchema } from "@gamelobby/shared/types";
+import {
+  gameJsonSchema,
+  moveJsonSchema,
+  seriesDetailSchema,
+} from "@gamelobby/shared/types";
 import {
   serializeConversation,
   serializeFriendship,
@@ -19,6 +23,7 @@ import {
   serializeMove,
   serializeNotification,
   serializePublicUser,
+  serializeSeries,
 } from "../src/api/serialize";
 
 const baseRow: GameRecord = {
@@ -375,6 +380,118 @@ describe("serializeNotification", () => {
       bob,
     );
     expect(out.payload).toEqual({});
+  });
+});
+
+describe("serializeSeries", () => {
+  const ZERO_SCORE = {
+    entries: [],
+    draws: 0,
+    completedGames: 0,
+    totalGames: 0,
+  };
+
+  const players2 = [
+    { userId: "u1", username: "alice", role: "X" },
+    { userId: "u2", username: "bob", role: "O" },
+  ];
+
+  function seriesGame(over: Partial<GameRecord>): GameRecord {
+    return { ...baseRow, players: players2, ...over } as GameRecord;
+  }
+
+  test("assigns a 1-based gameNumber in input order", () => {
+    const detail = serializeSeries(
+      "series-1",
+      TIC_TAC_TOE,
+      [
+        seriesGame({ code: "AAAAAA", status: "completed", winner: "u1" }),
+        seriesGame({ code: "BBBBBB", status: "completed", winner: "u2" }),
+        seriesGame({ code: "CCCCCC", status: "active", winner: null }),
+      ],
+      ZERO_SCORE,
+    );
+    expect(detail.seriesId).toBe("series-1");
+    expect(detail.gameType).toBe(TIC_TAC_TOE);
+    expect(detail.games.map((g) => g.gameNumber)).toEqual([1, 2, 3]);
+    expect(detail.games.map((g) => g.gameId)).toEqual([
+      "AAAAAA",
+      "BBBBBB",
+      "CCCCCC",
+    ]);
+  });
+
+  test("resolves a decisive winner to its username", () => {
+    const detail = serializeSeries(
+      "series-1",
+      TIC_TAC_TOE,
+      [seriesGame({ status: "completed", winner: "u2" })],
+      ZERO_SCORE,
+    );
+    expect(detail.games[0]?.winner).toBe("u2");
+    expect(detail.games[0]?.winnerUsername).toBe("bob");
+  });
+
+  test("a draw carries a null winner username", () => {
+    const detail = serializeSeries(
+      "series-1",
+      TIC_TAC_TOE,
+      [seriesGame({ status: "completed", winner: "draw" })],
+      ZERO_SCORE,
+    );
+    expect(detail.games[0]?.winner).toBe("draw");
+    expect(detail.games[0]?.winnerUsername).toBeNull();
+  });
+
+  test("an unseated winner resolves to a null username (defensive)", () => {
+    const detail = serializeSeries(
+      "series-1",
+      TIC_TAC_TOE,
+      [seriesGame({ status: "completed", winner: "ghost" })],
+      ZERO_SCORE,
+    );
+    expect(detail.games[0]?.winner).toBe("ghost");
+    expect(detail.games[0]?.winnerUsername).toBeNull();
+  });
+
+  test("an in-progress game has a null winner and ISO/null completedAt", () => {
+    const detail = serializeSeries(
+      "series-1",
+      TIC_TAC_TOE,
+      [
+        seriesGame({ status: "active", winner: null, completedAt: null }),
+        seriesGame({
+          status: "completed",
+          winner: "u1",
+          completedAt: new Date("2026-01-03T00:00:00.000Z"),
+        }),
+      ],
+      ZERO_SCORE,
+    );
+    expect(detail.games[0]?.winner).toBeNull();
+    expect(detail.games[0]?.winnerUsername).toBeNull();
+    expect(detail.games[0]?.completedAt).toBeNull();
+    expect(detail.games[1]?.completedAt).toBe("2026-01-03T00:00:00.000Z");
+  });
+
+  test("output parses against seriesDetailSchema", () => {
+    const detail = serializeSeries(
+      "series-1",
+      TIC_TAC_TOE,
+      [
+        seriesGame({ status: "completed", winner: "u1" }),
+        seriesGame({ status: "completed", winner: "draw" }),
+        seriesGame({ status: "active", winner: null }),
+      ],
+      { entries: [], draws: 1, completedGames: 2, totalGames: 3 },
+    );
+    expect(seriesDetailSchema.safeParse(detail).success).toBe(true);
+  });
+
+  test("an empty series serializes to no games", () => {
+    const detail = serializeSeries("series-1", TIC_TAC_TOE, [], ZERO_SCORE);
+    expect(detail.games).toEqual([]);
+    expect(seriesDetailSchema.safeParse(detail).success).toBe(true);
   });
 });
 
