@@ -11,11 +11,11 @@ import type {
   GameType,
   MessageJson,
 } from "@gamelobby/shared/types";
-import { cn } from "@/lib/utils";
 import { Suspense } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import type { ChatLayout } from "@/lib/chat-layout";
 import { useSocket } from "@/lib/socket/socket-context";
+import { cn } from "@/lib/utils";
 import { GameChatSplit } from "./game-chat-split";
 
 export function PlayClient({

@@ -354,8 +354,7 @@ export const oldMaidEngine: GameEngine<OldMaidState, OldMaidMove> = {
       [fromRole]: fromHand,
     };
     const activeRoles = activeRolesFor(hands);
-    const handOrderPending =
-      matchedRank === null ? actorRole : null;
+    const handOrderPending = matchedRank === null ? actorRole : null;
     const currentTurn = handOrderPending
       ? actorRole
       : activeRoles.includes(actorRole)

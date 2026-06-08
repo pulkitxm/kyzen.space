@@ -222,9 +222,14 @@ function fanCardElements(fan: HTMLElement): HTMLElement[] {
   ];
 }
 
-function handSlotElements(fan: HTMLElement, hand: OldMaidCard[]): HTMLElement[] {
+function handSlotElements(
+  fan: HTMLElement,
+  hand: OldMaidCard[],
+): HTMLElement[] {
   const byId = hand
-    .map((card) => fan.querySelector<HTMLElement>(`[data-card-id="${card.id}"]`))
+    .map((card) =>
+      fan.querySelector<HTMLElement>(`[data-card-id="${card.id}"]`),
+    )
     .filter((el): el is HTMLElement => el !== null);
   if (byId.length === hand.length) return byId;
   const backs = [
@@ -319,10 +324,7 @@ const FanHand = forwardRef(function FanHand(
       const cardW = sample.offsetWidth;
       const available = Math.max(el.clientWidth - 32, cardW);
       const step = (available - cardW) / (cardCount - 1);
-      const clampedStep = Math.max(
-        cardW * 0.16,
-        Math.min(cardW * 0.72, step),
-      );
+      const clampedStep = Math.max(cardW * 0.16, Math.min(cardW * 0.72, step));
       el.style.setProperty(
         "--card-overlap",
         `${Math.round(cardW - clampedStep)}px`,
@@ -379,17 +381,15 @@ function FlyingCardOverlay({
   );
 
   useLayoutEffect(() => {
-    playedRef.current = false;
-  }, [flight.cardIndex, flight.from.cx, flight.from.cy]);
-
-  useLayoutEffect(() => {
     const el = shellRef.current;
-    if (!el || !flight.to || flight.phase !== "fly" || playedRef.current) {
+    if (!el || !flight.to) return;
+    if (flight.phase !== "fly") {
+      playedRef.current = false;
       return;
     }
+    if (playedRef.current) return;
     playedRef.current = true;
-    const run =
-      flightKind === "discard" ? runDiscardFlight : runArcFlight;
+    const run = flightKind === "discard" ? runDiscardFlight : runArcFlight;
     const animation = run(el, flight.from, flight.to, durationMs, onComplete);
     return () => animation.cancel();
   }, [durationMs, flight, flightKind, onComplete]);
@@ -505,10 +505,7 @@ function DiscardPile({ pairs }: { pairs: OldMaidDiscardedPair[] }) {
   return (
     <div className="old-maid-discard-pile flex min-h-0 flex-1 flex-col items-center justify-center px-3 py-4">
       {visible.length > 0 ? (
-        <div
-          className="old-maid-discard-stack"
-          aria-label={`${pairs.length} matched pairs discarded`}
-        >
+        <div className="old-maid-discard-stack">
           {visible.map((card, index) => {
             const stackIndex = baseIndex + index;
             const { x, y, rotation } = discardStackOffset(stackIndex);
@@ -669,11 +666,13 @@ export function OldMaidGameClient({
   const playerFanRef = useRef<HTMLDivElement | null>(null);
   const opponentFanRef = useRef<HTMLDivElement | null>(null);
   const discardPileRef = useRef<HTMLDivElement | null>(null);
-  const discardedCountRef = useRef(0);
+  const initialOldMaidState =
+    (initialGame.gameState as OldMaidState | undefined) ?? emptyState();
+  const discardedCountRef = useRef(initialOldMaidState.discardedPairs.length);
   const preDrawHandRef = useRef<OldMaidCard[]>([]);
   const pickShellRef = useRef<HTMLDivElement | null>(null);
   const landedPickPointRef = useRef<FlightPoint | null>(null);
-  const prevGameStateRef = useRef<OldMaidState>(emptyState());
+  const prevGameStateRef = useRef<OldMaidState>(initialOldMaidState);
   const shuffleBusyRef = useRef(false);
   const localShufflePrimedRef = useRef(false);
   const pendingShuffleStateRef = useRef<OldMaidState | null>(null);
@@ -758,20 +757,12 @@ export function OldMaidGameClient({
     localShufflePrimedRef.current = false;
   }, []);
 
-  const runCollapseRiffle = useCallback(
-    async (fan: HTMLElement) => {
-      const elements = fanCardElements(fan);
-      if (elements.length === 0) return;
-      const stack = fanStackCenter(fan);
-      await runHandCollapse(elements, stack.x, stack.y, 420);
-      await runHandRiffle(elements, 360);
-    },
-    [],
-  );
-
-  useEffect(() => {
-    discardedCountRef.current = state.discardedPairs.length;
-    prevGameStateRef.current = state;
+  const runCollapseRiffle = useCallback(async (fan: HTMLElement) => {
+    const elements = fanCardElements(fan);
+    if (elements.length === 0) return;
+    const stack = fanStackCenter(fan);
+    await runHandCollapse(elements, stack.x, stack.y, 420);
+    await runHandRiffle(elements, 360);
   }, []);
 
   const playersRef = useRef(game.players);
@@ -802,8 +793,7 @@ export function OldMaidGameClient({
       clearPick();
       clearDiscardFlight();
       commitPendingState();
-      prevGameStateRef.current =
-        payload.game.gameState ?? emptyState();
+      prevGameStateRef.current = payload.game.gameState ?? emptyState();
       discardedCountRef.current =
         payload.game.gameState?.discardedPairs.length ?? 0;
       if (payload.game.status === "completed") {
@@ -881,8 +871,7 @@ export function OldMaidGameClient({
         pendingShuffleStateRef.current = nextState;
         setShufflingRole(shuffledRole);
         const finalHand = nextState.hands[shuffledRole];
-        const primed =
-          shuffledRole === myRole && localShufflePrimedRef.current;
+        const primed = shuffledRole === myRole && localShufflePrimedRef.current;
         void (async () => {
           const fan =
             shuffledRole === myRole
@@ -1006,12 +995,7 @@ export function OldMaidGameClient({
       cancelled = true;
       window.clearTimeout(safetyId);
     };
-  }, [
-    shuffleSpread,
-    commitPendingState,
-    myRole,
-    prefersReducedMotion,
-  ]);
+  }, [shuffleSpread, commitPendingState, myRole, prefersReducedMotion]);
 
   useLayoutEffect(() => {
     if (!pairStaging || !myRole || discardFlight) return;
@@ -1138,13 +1122,11 @@ export function OldMaidGameClient({
   ]);
 
   useLayoutEffect(() => {
-    if (!discardFlight || discardFlight.phase !== "prep") return;
+    if (discardFlight?.phase !== "prep") return;
     const frame = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (pairStaging) {
-          setHiddenCardIds(
-            new Set(pairStaging.cards.map((card) => card.id)),
-          );
+          setHiddenCardIds(new Set(pairStaging.cards.map((card) => card.id)));
           clearPick();
         }
         setDiscardFlight((current) =>
@@ -1170,7 +1152,13 @@ export function OldMaidGameClient({
       cancelAnimationFrame(frame);
       window.clearTimeout(fallbackId);
     };
-  }, [discardFlight, clearDiscardFlight, commitPendingState, pairStaging, clearPick]);
+  }, [
+    discardFlight,
+    clearDiscardFlight,
+    commitPendingState,
+    pairStaging,
+    clearPick,
+  ]);
 
   const myHandRef = useRef(myHand);
   myHandRef.current = myHand;
@@ -1189,7 +1177,7 @@ export function OldMaidGameClient({
   );
 
   useLayoutEffect(() => {
-    if (!pickFlight || pickFlight.phase !== "prep") return;
+    if (pickFlight?.phase !== "prep") return;
 
     if (!pickFlight.to) {
       const slot = landingSlotRef.current;
@@ -1211,7 +1199,7 @@ export function OldMaidGameClient({
     });
     const fallbackId = window.setTimeout(() => {
       const flight = pickFlightRef.current;
-      if (!flight || flight.phase !== "fly") return;
+      if (flight?.phase !== "fly") return;
       setPickFlight((current) =>
         current ? { ...current, phase: "landed" } : null,
       );
@@ -1227,7 +1215,7 @@ export function OldMaidGameClient({
 
   const handlePickFlightEnd = useCallback(() => {
     const flight = pickFlightRef.current;
-    if (!flight || flight.phase !== "fly") return;
+    if (flight?.phase !== "fly") return;
     if (pickShellRef.current) {
       landedPickPointRef.current = measurePoint(
         pickShellRef.current,
@@ -1243,7 +1231,7 @@ export function OldMaidGameClient({
 
   const handleDiscardFlightEnd = useCallback(() => {
     const flight = discardFlightRef.current;
-    if (!flight || flight.phase !== "fly") return;
+    if (flight?.phase !== "fly") return;
     setDiscardFlight((current) =>
       current ? { ...current, phase: "landed" } : null,
     );
@@ -1283,6 +1271,7 @@ export function OldMaidGameClient({
     });
   }, [
     canArrangeHand,
+    emitHandOrder,
     gameId,
     myRole,
     prefersReducedMotion,
@@ -1339,7 +1328,9 @@ export function OldMaidGameClient({
           <h2 className="font-semibold text-base">
             {roleName(game.players, otherRole)}
           </h2>
-          <span className="text-sm text-white/60">{otherHand.length} cards</span>
+          <span className="text-sm text-white/60">
+            {otherHand.length} cards
+          </span>
         </div>
         <div className="flex items-center gap-2 text-sm text-white/70">
           <FaLayerGroup size={16} aria-hidden="true" />
@@ -1495,7 +1486,7 @@ export function OldMaidGameClient({
       ) : null}
 
       {discardFlight
-        ? (["0", "1"] as const).map((slot, index) => {
+        ? (["0", "1"] as const).map((_slot, index) => {
             const card = discardFlight.cards[index];
             const flight = discardFlight.flights[index];
             if (!card || !flight) return null;

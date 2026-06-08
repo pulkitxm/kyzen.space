@@ -297,6 +297,11 @@ body {
   margin-left: calc(-1 * var(--card-overlap));
 }
 
+.old-maid-fan.old-maid-shuffle-active .old-maid-card-slot,
+.old-maid-animating .old-maid-fan .old-maid-card-slot {
+  transition: none;
+}
+
 .old-maid-player-fan {
   min-height: 15.5rem;
   padding-bottom: 1.75rem;
@@ -318,14 +323,9 @@ body {
   z-index: 9999;
 }
 
-.old-maid-shuffle-active .old-maid-card-enter,
-.old-maid-animating .old-maid-card-enter {
+.old-maid-fan.old-maid-shuffle-active .old-maid-card-enter,
+.old-maid-animating .old-maid-fan .old-maid-card-enter {
   animation: none;
-}
-
-.old-maid-shuffle-active .old-maid-card-slot,
-.old-maid-animating .old-maid-card-slot {
-  transition: none;
 }
 
 .old-maid-discard-pile {

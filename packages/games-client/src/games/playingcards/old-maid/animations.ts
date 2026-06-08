@@ -56,8 +56,10 @@ export function runArcFlight(
   const dx = to.cx - from.cx;
   const dy = to.cy - from.cy;
   const scale = to.width / from.width;
-  const arcLift =
-    -Math.min(180 * liftScale, Math.abs(dy) * 0.48 + 80 * liftScale);
+  const arcLift = -Math.min(
+    180 * liftScale,
+    Math.abs(dy) * 0.48 + 80 * liftScale,
+  );
   const midRot = (from.rotation + to.rotation) / 2;
 
   const animation = el.animate(
@@ -92,6 +94,12 @@ export function runDiscardFlight(
   onComplete?: () => void,
 ): Animation {
   return runArcFlight(el, from, to, durationMs, onComplete, 1.35);
+}
+
+function cancelElementAnimations(el: HTMLElement): void {
+  for (const anim of el.getAnimations()) {
+    anim.cancel();
+  }
 }
 
 function waitAnimations(anims: Animation[]): Promise<void> {
@@ -168,7 +176,7 @@ export function snapHandToStack(
   stackY: number,
 ): void {
   for (const el of elements) {
-    el.getAnimations().forEach((anim) => anim.cancel());
+    cancelElementAnimations(el);
     const rect = el.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
@@ -187,21 +195,20 @@ export function runHandSpreadToFan(
     const end = endTransforms[index];
     if (!end) return null;
     const base = getComputedStyle(el).transform;
-    return el.animate(
-      [{ transform: base }, { transform: end }],
-      {
-        duration: durationMs,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-        fill: "forwards",
-      },
-    );
+    return el.animate([{ transform: base }, { transform: end }], {
+      duration: durationMs,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      fill: "forwards",
+    });
   });
-  return waitAnimations(anims.filter((anim): anim is Animation => anim !== null));
+  return waitAnimations(
+    anims.filter((anim): anim is Animation => anim !== null),
+  );
 }
 
 export function clearHandTransforms(elements: HTMLElement[]): void {
   for (const el of elements) {
-    el.getAnimations().forEach((anim) => anim.cancel());
+    cancelElementAnimations(el);
     el.style.transform = "";
   }
 }
@@ -230,6 +237,7 @@ export function runHandSpread(
       },
     );
   });
-  return waitAnimations(anims.filter((anim): anim is Animation => anim !== null));
+  return waitAnimations(
+    anims.filter((anim): anim is Animation => anim !== null),
+  );
 }
-
