@@ -230,29 +230,31 @@ export function MessageComposer({
   }, [text, conversationId, me, socket, store, stopTyping]);
 
   return (
-    <div className="relative border-border border-t px-4 py-3">
-      {pickerOpen ? (
-        <button
-          type="button"
-          aria-label="Close picker"
-          className="fixed inset-0 z-10 cursor-default"
-          onClick={() => setPickerOpen(false)}
-        />
-      ) : null}
-      {pickerOpen ? (
-        <div className="absolute right-3 bottom-full z-20 mb-2">
-          <ComposerPicker onEmoji={insertEmoji} onGif={sendGif} />
-        </div>
-      ) : null}
+    <div className="border-border border-t px-4 py-3">
       <div className="flex items-end gap-2">
-        <button
-          type="button"
-          onClick={() => setPickerOpen((o) => !o)}
-          aria-label="Emoji & GIFs"
-          className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-surface-overlay hover:text-foreground"
-        >
-          <FaRegFaceSmile className="size-5" />
-        </button>
+        <div className="relative">
+          {pickerOpen ? (
+            <button
+              type="button"
+              aria-label="Close picker"
+              className="fixed inset-0 z-10 cursor-default"
+              onClick={() => setPickerOpen(false)}
+            />
+          ) : null}
+          {pickerOpen ? (
+            <div className="absolute bottom-full left-0 z-20 mb-2">
+              <ComposerPicker onEmoji={insertEmoji} onGif={sendGif} />
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setPickerOpen((o) => !o)}
+            aria-label="Emoji & GIFs"
+            className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-surface-overlay hover:text-foreground"
+          >
+            <FaRegFaceSmile className="size-5" />
+          </button>
+        </div>
         {me ? (
           <GameLauncher conversation={conversation} userId={me.id} />
         ) : null}
