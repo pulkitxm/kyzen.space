@@ -5,6 +5,7 @@ export { Card, CardBody } from "./card";
 export { Character } from "./character";
 export { EmptyState } from "./empty-state";
 export { LayeredPopupHost } from "./layered-popup";
+export { Logo, type LogoProps } from "./logo";
 export { BackLink, PageContainer, PageHeader } from "./page";
 export { Skeleton } from "./skeleton";
 export { Spinner } from "./spinner";
