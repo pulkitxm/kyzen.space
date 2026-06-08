@@ -118,9 +118,12 @@ error), implemented alongside the existing in-chat game handlers and reusing the
    - 2 players: the **loser** goes first; on a draw, swap from the previous game's
      first mover.
    - N > 2 (future default): rotate the starting seat by one each rematch.
-5. **Reserved seating:** each prior player is pre-assigned a seat/role from that
-   order. When a player rejoins they take **their** reserved slot, so first-mover
-   fairness holds regardless of who opens the game first.
+5. **Pre-seat both known players:** because the roster is known from the finished
+   game, the rematch seats every prior player up front with their arranged role
+   (loser → first-move role) and starts **`active`** immediately. Each player
+   opens the card to come play; opening calls `join_room`, which sees them already
+   seated and just subscribes. This guarantees first-mover fairness regardless of
+   who opens first, with no changes to `ensureSeated`.
 6. Re-broadcast the conversation's game card, notify the opponent(s) with a
    rematch-flavored notification, and emit `rematchCreated { newGameId }` to the
    **old** game's room so an open game-over modal can switch to **Go to rematch**.
@@ -133,9 +136,11 @@ error), implemented alongside the existing in-chat game handlers and reusing the
   `createdAt`, assign `gameNumber`, and compute the score: each `completed` game
   adds to the winner's `wins` (or `draws` when `winner === "draw"`); in-progress
   games are listed but not counted.
-- Backed by new `packages/database/src/repositories/games.ts` helpers
-  `getSeriesGames(seriesId)` and `computeSeriesScore(games)`.
-- The same computation feeds the card via `enrichGameCardMeta` in
+- Data access (`getSeriesGames(seriesId)`, `findLiveGameInConversation`) lives in
+  `packages/database/src/repositories/games.ts`; the pure tally
+  `computeSeriesScore(games)` lives in `apps/server/src/chat/series.ts` so it is
+  unit-testable without a database.
+- The same `computeSeriesScore` feeds the card via `enrichGameCardMeta` in
   `apps/server/src/chat/assemble.ts`, so the card and the modal agree.
 
 The endpoint lives under `/api/*` (the server's Hono app), so it adds no top-level
@@ -293,10 +298,10 @@ at `≥ minPlayers`?) and any custom per-game turn order.
   `GameCardMeta.seriesScore`; `CHAT_EVENTS` `rematch` / `rematchCreated` + socket
   types.
 - **database:** `schema.ts` column + self-FK; `repositories/games.ts`
-  (`getSeriesGames`, `computeSeriesScore`, set `seriesId` on create); generated
-  migration applied via `db:push`.
+  (`getSeriesGames`, `findLiveGameInConversation`, set `seriesId` on create);
+  generated migration applied via `db:push`.
 - **server:** rematch handler + service (reusing `games-in-chat-service`),
-  `computeRematchSeating`, reserved seating, the shared one-live check,
+  `computeRematchSeating`, `computeSeriesScore`, the shared one-live check,
   `assemble.ts` enrichment, `GET /api/games/:gameId/series`, `rematchCreated`
   emit.
 - **web:** `game-over-modal.tsx`, `series-detail-modal.tsx`,
