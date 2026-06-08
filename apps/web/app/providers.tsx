@@ -1,5 +1,6 @@
 "use client";
 
+import { MotionConfig } from "motion/react";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 
@@ -26,22 +27,24 @@ export function Providers({
   signedIn: boolean;
 }) {
   return (
-    <ThemeProvider
-      attribute="class"
-      themes={["light", "dark"]}
-      defaultTheme={initialMode ?? DEFAULT_COLOR_MODE}
-      enableSystem
-      disableTransitionOnChange
-      storageKey="gl-color-mode"
-    >
-      <AppearanceProvider
-        initialPalette={initialPalette ?? DEFAULT_THEME}
-        initialMode={initialMode ?? null}
-        initialPattern={initialPattern ?? DEFAULT_PATTERN}
-        signedIn={signedIn}
+    <MotionConfig reducedMotion="user">
+      <ThemeProvider
+        attribute="class"
+        themes={["light", "dark"]}
+        defaultTheme={initialMode ?? DEFAULT_COLOR_MODE}
+        enableSystem
+        disableTransitionOnChange
+        storageKey="gl-color-mode"
       >
-        {children}
-      </AppearanceProvider>
-    </ThemeProvider>
+        <AppearanceProvider
+          initialPalette={initialPalette ?? DEFAULT_THEME}
+          initialMode={initialMode ?? null}
+          initialPattern={initialPattern ?? DEFAULT_PATTERN}
+          signedIn={signedIn}
+        >
+          {children}
+        </AppearanceProvider>
+      </ThemeProvider>
+    </MotionConfig>
   );
 }

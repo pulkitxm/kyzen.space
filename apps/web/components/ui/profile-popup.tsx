@@ -46,15 +46,11 @@ export function useProfilePopup() {
 
 function ProfilePopupBody({ user }: { user: ProfilePopupUser }) {
   const [profile, setProfile] = useState<FetchedProfile | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failedFor, setFailedFor] = useState<string | null>(null);
 
   useEffect(() => {
-    if (profileCache.has(user.username)) {
-      setFailed(false);
-      return;
-    }
+    if (profileCache.has(user.username)) return;
     let active = true;
-    setFailed(false);
     clientFetchJson<ProfileResponse>(
       `/api/profiles/${encodeURIComponent(user.username)}`,
     )
@@ -63,7 +59,7 @@ function ProfilePopupBody({ user }: { user: ProfilePopupUser }) {
         if (active) setProfile(data.profile);
       })
       .catch(() => {
-        if (active) setFailed(true);
+        if (active) setFailedFor(user.username);
       });
     return () => {
       active = false;
@@ -74,6 +70,7 @@ function ProfilePopupBody({ user }: { user: ProfilePopupUser }) {
     (profile && profile.username === user.username ? profile : null) ??
     profileCache.get(user.username) ??
     null;
+  const failed = failedFor === user.username;
   const avatar = fresh?.avatar ?? user.avatar ?? null;
   const name = fresh?.displayName ?? user.displayName ?? user.username;
 

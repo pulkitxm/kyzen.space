@@ -32,7 +32,8 @@
     "db:studio": "docker compose --project-directory . -f scripts/docker-compose.yml up -d postgres && bun --env-file=.env drizzle-kit studio --config=drizzle.config.ts",
     "db:generate": "bun --env-file=.env drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "bun --env-file=.env packages/database/src/migrate.ts",
-    "db:push": "bun --env-file=.env drizzle-kit push --config=drizzle.config.ts"
+    "db:push": "bun --env-file=.env drizzle-kit push --config=drizzle.config.ts",
+    "doctor": "npx react-doctor@latest"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.16",

@@ -172,6 +172,83 @@ function jsoncComments(text) {
   return { remove, kept: 0 };
 }
 
+function keepYaml(t) {
+  if (/^yaml-language-server\b/.test(t)) return true;
+  if (/^yamllint\b/.test(t)) return true;
+  return false;
+}
+
+function yamlComments(text) {
+  const remove = [];
+  let kept = 0;
+  const lines = text.split("\n");
+  let pos = 0;
+  let blockIndent = null;
+  let str = null;
+  for (const line of lines) {
+    const lineStart = pos;
+    pos += line.length + 1;
+    const firstNonWs = line.search(/\S/);
+    const isBlank = firstNonWs === -1;
+    const indent = isBlank ? 0 : firstNonWs;
+    if (str === null && blockIndent !== null) {
+      if (isBlank || indent > blockIndent) continue;
+      blockIndent = null;
+    }
+    if (str === null && isBlank) continue;
+    let commentAt = -1;
+    let prevWs = true;
+    for (let k = 0; k < line.length; k++) {
+      const c = line[k];
+      if (str === '"') {
+        if (c === "\\") {
+          k++;
+          prevWs = false;
+          continue;
+        }
+        if (c === '"') str = null;
+        prevWs = false;
+        continue;
+      }
+      if (str === "'") {
+        if (c === "'" && line[k + 1] === "'") {
+          k++;
+          prevWs = false;
+          continue;
+        }
+        if (c === "'") str = null;
+        prevWs = false;
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        str = c;
+        prevWs = false;
+        continue;
+      }
+      if (c === "#" && prevWs) {
+        commentAt = k;
+        break;
+      }
+      prevWs = c === " " || c === "\t";
+    }
+    if (str === null) {
+      const code = (
+        commentAt === -1 ? line : line.slice(0, commentAt)
+      ).trimEnd();
+      if (/(?:^|\s)[|>](?:[1-9][+-]?|[+-][1-9]?)?$/.test(code))
+        blockIndent = indent;
+    }
+    if (commentAt === -1) continue;
+    const inner = line.slice(commentAt + 1).trim();
+    if (keepYaml(inner)) {
+      kept++;
+      continue;
+    }
+    remove.push({ pos: lineStart + commentAt, end: lineStart + line.length });
+  }
+  return { remove, kept };
+}
+
 function expand(text, pos, end) {
   let ls = pos;
   while (ls > 0 && text[ls - 1] !== "\n") ls--;
@@ -279,7 +356,7 @@ function reportGithub(findings, stats) {
 }
 
 const files = execSync(
-  "git ls-files '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.css' '*.json' '*.jsonc'",
+  "git ls-files '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.css' '*.json' '*.jsonc' '*.yml' '*.yaml'",
   {
     encoding: "utf8",
   },
@@ -302,7 +379,9 @@ for (const f of files) {
       ? cssComments(text)
       : ext === ".json" || ext === ".jsonc"
         ? jsoncComments(text)
-        : tsComments(f, text);
+        : ext === ".yml" || ext === ".yaml"
+          ? yamlComments(text)
+          : tsComments(f, text);
   totalKept += kept;
   if (remove.length === 0) continue;
   changedFiles++;

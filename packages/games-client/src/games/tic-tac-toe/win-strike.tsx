@@ -1,7 +1,7 @@
 "use client";
 
 import type { Mark } from "@gamelobby/shared/types";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 const CELL_OFFSET = 15.556;
 const CELL_SPAN = 34.444;
@@ -20,6 +20,7 @@ export function WinStrike({
   mark: Mark;
   animate: boolean;
 }) {
+  const shouldReduceMotion = useReducedMotion();
   const [start, , end] = line;
   const ax = axis(start % 3);
   const ay = axis(Math.floor(start / 3));
@@ -47,9 +48,13 @@ export function WinStrike({
         stroke="currentColor"
         strokeWidth={3}
         strokeLinecap="round"
-        initial={animate ? { pathLength: 0 } : false}
+        initial={animate && !shouldReduceMotion ? { pathLength: 0 } : false}
         animate={{ pathLength: 1 }}
-        transition={{ type: "spring", duration: 0.6, bounce: 0.3 }}
+        transition={
+          shouldReduceMotion
+            ? { duration: 0 }
+            : { type: "spring", duration: 0.6, bounce: 0.3 }
+        }
       />
     </svg>
   );

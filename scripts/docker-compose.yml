@@ -17,7 +17,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Enables the Socket.IO redis-adapter and the Redis-backed presence store.
   redis:
     image: redis:7
     container_name: gamelobby-redis
