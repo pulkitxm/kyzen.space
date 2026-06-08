@@ -28,7 +28,7 @@
     "strip-comments": "bun scripts/strip-comments.mjs",
     "db:start": "docker compose --project-directory . -f scripts/docker-compose.yml up -d postgres redis",
     "db:stop": "docker compose --project-directory . -f scripts/docker-compose.yml down",
-    "db:reset": "docker compose --project-directory . -f scripts/docker-compose.yml down -v && docker compose --project-directory . -f scripts/docker-compose.yml up -d && sleep 1 && bun run db:push",
+    "db:reset": "docker compose --project-directory . -f scripts/docker-compose.yml down -v && docker compose --project-directory . -f scripts/docker-compose.yml up -d && sleep 1 && bun --env-file=.env drizzle-kit push --config=drizzle.config.ts --force",
     "db:studio": "docker compose --project-directory . -f scripts/docker-compose.yml up -d postgres && bun --env-file=.env drizzle-kit studio --config=drizzle.config.ts",
     "db:generate": "bun --env-file=.env drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "bun --env-file=.env packages/database/src/migrate.ts",
