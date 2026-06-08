@@ -5,6 +5,7 @@ import {
   getGameClient,
   getGameSkeleton,
 } from "@gamelobby/games-client";
+import { OLD_MAID } from "@gamelobby/shared/constants";
 import type {
   ConversationJson,
   GameType,
@@ -14,6 +15,7 @@ import { Suspense } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import type { ChatLayout } from "@/lib/chat-layout";
 import { useSocket } from "@/lib/socket/socket-context";
+import { cn } from "@/lib/utils";
 import { GameChatSplit } from "./game-chat-split";
 
 export function PlayClient({
@@ -44,7 +46,12 @@ export function PlayClient({
   const { socket, status } = useSocket();
 
   const gameNode = GameClient ? (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
+    <div
+      className={cn(
+        "mx-auto flex h-full w-full flex-col p-3 sm:p-4",
+        gameType === OLD_MAID ? "max-w-none" : "max-w-2xl",
+      )}
+    >
       <Suspense fallback={<GameSkeleton />}>
         <GameClient
           gameId={gameId}
