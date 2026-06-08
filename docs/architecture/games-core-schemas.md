@@ -271,7 +271,7 @@ This is the core insight made concrete. Follow a single Tic-tac-toe move from th
 
 Summarized: `cell click → socket make_move → index.ts:100 (envelope) → turn-based.ts:143 (moveSchema) → turn-based.ts:145 (stateSchema) → turn-based.ts:148 (engine.reduce) → DB write → broadcast game_state`. The client may have *anticipated* this result by running the same engine locally, but the server's copy is the only one that counts.
 
-A parallel flow exists for game creation: the chat service validates the **config** with the same discipline — `definition.configSchema.safeParse(input.config ?? {})` at `apps/server/src/chat/games-in-chat-service.ts:35`, after a `hasEngine` gate (`:32`) — then seeds the first seat's state with `engine.createInitialState` (`:75`).
+A parallel flow exists for game creation: the chat service validates the **config** with the same discipline — `definition.configSchema.safeParse(input.config ?? {})` at `apps/server/src/chat/games-in-chat-service.ts:90`, after a `hasEngine` gate (`:79`) — then seeds the first seat's state with `engine.createInitialState` (`:130`).
 
 ## Gotchas, invariants & conventions
 

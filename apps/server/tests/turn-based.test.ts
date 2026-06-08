@@ -46,8 +46,10 @@ const games = {
     return row;
   },
   seatPlayer: async (_gameId: string, player: Player, seatOrder: number) => {
+    if (current.players.some((p) => p.userId === player.userId)) return false;
     seatCalls.push({ player, seatOrder });
     current.players = [...current.players, player];
+    return true;
   },
   // biome-ignore lint/suspicious/noExplicitAny: test stub
   updateGame: async (_id: string, patch: any) => {
@@ -191,6 +193,23 @@ describe("handleJoinRoom — seating", () => {
     await call(handleJoinRoom, io, challenged.socket, { gameId: CODE });
     expect(seatCalls).toHaveLength(1);
     expect(seatCalls[0]?.player.userId).toBe("u2");
+  });
+
+  test("a lost seating race surfaces no error and performs no stale write", async () => {
+    const original = games.seatPlayer;
+    games.seatPlayer = async () => false;
+    try {
+      const { io, emits } = fakeIo();
+      const { socket, emits: sockEmits } = fakeSocket("u2");
+      await call(handleJoinRoom, io, socket, { gameId: CODE });
+
+      expect(sockEmits.some((e) => e.event === "game_error")).toBe(false);
+      expect(emits.some((e) => e.event === "game_state")).toBe(true);
+      expect(current.status).toBe("waiting");
+      expect(current.players).toHaveLength(1);
+    } finally {
+      games.seatPlayer = original;
+    }
   });
 
   test("an already-seated player rejoins without re-seating", async () => {

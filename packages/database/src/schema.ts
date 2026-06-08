@@ -22,6 +22,7 @@ import type {
 } from "@gamelobby/shared/types";
 import { generateGameCode } from "@gamelobby/shared/types";
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -115,12 +116,18 @@ export const game = pgTable(
     challengedUserId: text("challenged_user_id").references(() => user.id, {
       onDelete: "set null",
     }),
+    seriesId: uuid("series_id").references((): AnyPgColumn => game.id, {
+      onDelete: "set null",
+    }),
     startedAt: timestamp("started_at"),
     completedAt: timestamp("completed_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (t) => [index("game_conversation_idx").on(t.conversationId)],
+  (t) => [
+    index("game_conversation_idx").on(t.conversationId),
+    index("game_series_idx").on(t.seriesId),
+  ],
 );
 
 export const move = pgTable(

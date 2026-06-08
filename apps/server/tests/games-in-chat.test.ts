@@ -21,6 +21,7 @@ mock.module("@gamelobby/database", () => ({
     getMemberIds: async () => members,
   },
   games: {
+    findLiveGameInConversation: async () => null,
     // biome-ignore lint/suspicious/noExplicitAny: test stub
     createGame: async (input: any) => {
       createGameInput = input;
@@ -46,6 +47,12 @@ mock.module("@gamelobby/database", () => ({
   profiles: {
     getProfileByUserId: async () => profile,
   },
+  messages: {},
+  friends: {},
+  notifications: {},
+  db: {},
+  schema: {},
+  createDb: () => ({ db: {}, client: {} }),
 }));
 
 mock.module("../src/realtime/notify", () => ({

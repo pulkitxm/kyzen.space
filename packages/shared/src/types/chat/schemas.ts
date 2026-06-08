@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { gameTypeSchema } from "../games/core";
+import { seriesScoreSchema } from "../games/series";
 
 const gameCardPlayerSchema = z
   .object({
@@ -20,6 +21,8 @@ export const gameCardMetaSchema = z
     winner: z.string().nullable().optional(),
     winnerUsername: z.string().nullable().optional(),
     players: z.array(gameCardPlayerSchema).optional(),
+    seriesScore: seriesScoreSchema.optional(),
+    seriesSuperseded: z.boolean().optional(),
   })
   .strict();
 
@@ -38,4 +41,8 @@ export const clientCreateGameInConversationSchema = z
     challengedUserId: z.string().nullable().optional(),
     config: z.unknown().optional(),
   })
+  .strict();
+
+export const clientRematchSchema = z
+  .object({ gameId: z.string().min(1) })
   .strict();

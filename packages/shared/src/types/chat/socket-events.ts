@@ -9,7 +9,10 @@ import type {
   PresenceStatus,
   TypingUser,
 } from "./dto";
-import type { clientCreateGameInConversationSchema } from "./schemas";
+import type {
+  clientCreateGameInConversationSchema,
+  clientRematchSchema,
+} from "./schemas";
 
 export type AckResult<T = Record<string, never>> =
   | ({ ok: true } & T)
@@ -53,6 +56,10 @@ export type ClientNotificationRead = { id: string };
 export type ClientCreateGameInConversation = z.infer<
   typeof clientCreateGameInConversationSchema
 >;
+
+export type ClientRematch = z.infer<typeof clientRematchSchema>;
+
+export type ServerRematchCreated = { newGameId: string };
 
 export type ServerMessageNew = { message: MessageJson; clientId?: string };
 

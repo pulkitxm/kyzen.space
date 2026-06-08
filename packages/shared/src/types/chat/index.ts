@@ -24,6 +24,7 @@ export type {
 } from "./dto";
 export {
   clientCreateGameInConversationSchema,
+  clientRematchSchema,
   gameCardMetaSchema,
   notificationPayloadSchema,
 } from "./schemas";
@@ -40,6 +41,7 @@ export type {
   ClientFriendRespond,
   ClientMarkRead,
   ClientNotificationRead,
+  ClientRematch,
   ClientRemoveMember,
   ClientRenameGroup,
   ClientSendMessage,
@@ -57,5 +59,6 @@ export type {
   ServerPresenceSnapshot,
   ServerPresenceUpdate,
   ServerReadReceipt,
+  ServerRematchCreated,
   ServerTypingUpdate,
 } from "./socket-events";

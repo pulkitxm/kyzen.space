@@ -26,6 +26,16 @@ export type {
   StepResult,
 } from "./engine";
 export {
+  type SeriesDetail,
+  type SeriesGameSummary,
+  type SeriesScore,
+  type SeriesScoreEntry,
+  seriesDetailSchema,
+  seriesGameSummarySchema,
+  seriesScoreEntrySchema,
+  seriesScoreSchema,
+} from "./series";
+export {
   type Cell,
   type Mark,
   type TicTacToeConfig,

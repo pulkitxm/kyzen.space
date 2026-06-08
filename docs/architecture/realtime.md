@@ -26,7 +26,7 @@ The reason this matters — and the single most important idea in the whole subs
 | `apps/server/src/realtime/presence-store.ts` | The `PresenceStore` interface plus its `InMemoryPresenceStore` and `RedisPresenceStore` implementations (pure; no env import). |
 | `apps/server/src/realtime/presence-store-instance.ts` | `createPresenceStore` + the `presenceStore` singleton, env-selected (Redis when `REDIS_URL` is set, else in-memory). |
 | `apps/server/src/realtime/presence-heartbeat.ts` | Per-node timers that refresh live presence entries and periodically persist last-seen to `user_profile.last_seen_at`. |
-| `apps/server/src/realtime/games-in-chat.ts` | `createGameInConversation` over the socket: validate payload, create the game, post a game-card message. |
+| `apps/server/src/realtime/games-in-chat.ts` | Two chat-lane game handlers: `CHAT_EVENTS.createGameInConversation` (validate payload, create-or-resume the game, post a game-card message) and `CHAT_EVENTS.rematch` (start a rematch in the same series, then emit `rematchCreated` to the old game's room). |
 | `apps/server/src/realtime/notify.ts` | `notify(userId, type, opts)`: persist a notification row and push it to the user's room via the `getIO()` singleton. |
 | `apps/server/src/realtime/redis.ts` | Optional `@socket.io/redis-adapter` wiring for multi-node scale-out; no-op without `REDIS_URL`. |
 | `apps/server/src/realtime/redis-client.ts` | Shared ioredis command client (`getRedis()`) used by the Redis-backed presence store, separate from the adapter's pub/sub connections. |
@@ -83,7 +83,7 @@ declare module "socket.io" {
 }
 ```
 
-The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:108`, `chat.ts:17`, `friends.ts:7`, `typing.ts:41`, `presence.ts:67`, `games-in-chat.ts:18`). A forged `userId` in a payload is simply ignored — the only `userId` that exists came from a verified session.
+The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:108`, `chat.ts:17`, `friends.ts:7`, `typing.ts:41`, `presence.ts:67`, `games-in-chat.ts:25`). A forged `userId` in a payload is simply ignored — the only `userId` that exists came from a verified session.
 
 ### Per-connection wiring
 
@@ -108,7 +108,7 @@ Both lanes are events on the same `socket`, but they are deliberately built and 
 
 ### Lane 1 — the chat lane
 
-The chat lane covers chat, friends, typing, presence, in-chat game *creation*, and notifications. Its event names are centralized in `@gamelobby/shared`'s `CHAT_EVENTS` constant (`packages/shared/src/constants/chat.ts:1`), so client and server never disagree on a string literal.
+The chat lane covers chat, friends, typing, presence, in-chat game *creation* and *rematch*, and notifications. Its event names are centralized in `@gamelobby/shared`'s `CHAT_EVENTS` constant (`packages/shared/src/constants/chat.ts:1`), so client and server never disagree on a string literal.
 
 Most chat-lane handlers go through the `register` helper, which is the lane's signature pattern:
 
@@ -178,6 +178,34 @@ export async function notify(
 ```
 
 `apps/server/src/realtime/notify.ts:11`. This is why `setIO` exists: `createGameInConversation` (a service, no socket) loops conversation members and calls `notify`, which reaches for `getIO()` rather than threading a socket through every call.
+
+### In-chat game creation, rematch & the one-live guard
+
+Both in-chat *game* events are wired in `attachGameChatHandlers` (`apps/server/src/realtime/games-in-chat.ts:13`) and delegate to `apps/server/src/chat/games-in-chat-service.ts`. They are chat-lane events (ack-shaped results), but they spawn / re-spawn games that the *game* lane then plays.
+
+**`CHAT_EVENTS.createGameInConversation`** (`games-in-chat.ts:15`) validates with `clientCreateGameInConversationSchema`, then calls `createGameInConversation` (`games-in-chat-service.ts:66`). That service now enforces the platform's **one-live-game-per-`(conversation, gameType)`** rule before creating anything: it calls `games.findLiveGameInConversation(conversationId, gameType)` and, if a `waiting | active` game of that type already exists in the conversation, returns *that* game instead of inserting a duplicate (`games-in-chat-service.ts:81`):
+
+```ts
+const existingLive = await games.findLiveGameInConversation(
+  input.conversationId,
+  input.gameType,
+);
+if (existingLive) {
+  return ok({ game: serializeGame(existingLive) });
+}
+```
+
+So the service result is `{ game: GameJson; message?: MessageJson }` — `message` is present only when a *new* card was posted; a short-circuit to an existing live game carries no new card. Completed/abandoned games never block — that is when **Rematch** takes over.
+
+**`CHAT_EVENTS.rematch`** (`game:rematch`, handled at `games-in-chat.ts:42`) validates `clientRematchSchema` (`{ gameId }`) and calls `rematchGame` (`games-in-chat-service.ts:150`):
+
+1. Load the finished game by code; require `status === "completed"`, that the requester was one of its players, and that it has a conversation (`games-in-chat-service.ts:156`–`:160`) — rematch is conversation-scoped.
+2. Run the **same one-live guard** (`findLiveGameInConversation`, `:163`): if a rematch is already live, return it — so two players both clicking Rematch converge on one game.
+3. Compute fair turn order via the single seam `computeRematchSeating(prev) → orderedUserIds` (`apps/server/src/chat/rematch-seating.ts:4`): for 2 players the **loser goes first** (on a draw, the first mover swaps from the previous game's first mover); for N > 2 it rotates the starting seat by one. Index 0 maps to `engine.roles[0]`.
+4. Create the new game in the same conversation with `seriesId = prev.seriesId` (linking it into the series), `config` copied from the parent, a fresh `engine.createInitialState`, and **both prior players pre-seated** in the arranged order — so it starts `active` immediately (`becomesActive = players.length >= engine.minPlayers`, `games-in-chat-service.ts:177`).
+5. `announceGame` posts the rematch's own `game_card` and notifies the other member(s).
+
+Back in the handler, on success it emits `CHAT_EVENTS.rematchCreated` (`game:rematch_created`, payload `{ newGameId }`) to the **old** game's room (`emitToGame(io, parsed.data.gameId, …)`, `games-in-chat.ts:58`) so an open game-over modal there can flip its button to **Go to rematch**, and acks `{ ok: true, gameId }` — the new game's public code — to the caller, who navigates to `/play/<code>`. The card-side series score is enriched at assembly time (see [chat-core](./chat-core.md) and [server-api](./server-api.md)).
 
 ### Lane 2 — the game lane
 
@@ -274,6 +302,8 @@ if (intent === "spectate" || !seatFree || challengeReserved) {
 ```
 
 `apps/server/src/realtime/turn-based.ts:43`. A user is seated only if: they are not already a player, the game is still `waiting` with room under `engine.maxPlayers`, they did not ask to merely `spectate`, and — for a `challenge` game — they are the challenged user. The seat's role comes straight from the engine: `engine.roles[players.length]` (`turn-based.ts:58`, with a `biome-ignore` at `turn-based.ts:57` justifying the non-null assertion). When the new seat count reaches `engine.minPlayers` the game flips to `active` and gets a `startedAt`, and the initial state is lazily created from the engine if absent (`turn-based.ts:61`). The seat is persisted via `games.seatPlayer` into its own indexed `game_player` row (`turn-based.ts:63`).
+
+**Seating is idempotent, because `join_room` is not.** A board emits `join_room` on effect setup *and* on every socket `connect` (and the shared socket can reconnect, dev Strict-Mode double-mounts, a second tab can join), so the same user's join can arrive twice and interleave around the `await`s in `ensureSeated` — both reads would see the user as unseated and both would try to insert the same `(game_id, user_id)`. To make that safe the membership check is *not* trusted as the only guard: `games.seatPlayer` inserts with `ON CONFLICT (game_id, user_id) DO NOTHING` and returns whether a row was actually written (`games.ts:146`). When it returns `false` the user was seated by a concurrent join, so `ensureSeated` re-loads the game and returns `changed: false` instead of issuing a stale `updateGame` (`turn-based.ts:63`) — the loser of the race never surfaces the old `duplicate key value violates unique constraint "game_player_uq"` error and never double-writes.
 
 Whether or not seating changed, the socket joins `game:<code>` (keyed by `game.code`, the public room code) and receives the full state. `emitFullState` always sends *everything* — the serialized game plus the full move list — so a late joiner or reconnecting client gets a complete, authoritative snapshot rather than a diff:
 
@@ -398,7 +428,7 @@ Player clicks a cell in the React board (apps/web, @gamelobby/games-client)
      every chat window in conv:<convId> updates the game card to "completed".
 ```
 
-Contrast with how a game even comes to exist: that is a **chat-lane** action. `CHAT_EVENTS.createGameInConversation` (`apps/server/src/realtime/games-in-chat.ts:8`) validates with `clientCreateGameInConversationSchema`, then `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:19`) validates the game's `configSchema`, seats the creator into role `engine.roles[0]`, creates the game with `engine.createInitialState`, posts a `game_card` message, and `notify`s the other members. So creation flows over chat; play flows over the game lane; and they meet again at the game card.
+Contrast with how a game even comes to exist: that is a **chat-lane** action. `CHAT_EVENTS.createGameInConversation` (`apps/server/src/realtime/games-in-chat.ts:15`) validates with `clientCreateGameInConversationSchema`, then `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:66`) runs the one-live guard, validates the game's `configSchema`, seats the creator into role `engine.roles[0]`, creates the game with `engine.createInitialState`, posts a `game_card` message, and `notify`s the other members. A finished game's **rematch** is the same lane (`CHAT_EVENTS.rematch` → `rematchGame`) — see ["In-chat game creation, rematch & the one-live guard"](#in-chat-game-creation-rematch--the-one-live-guard) above. So creation/rematch flow over chat; play flows over the game lane; and they meet again at the game card.
 
 ## Rooms
 
@@ -443,6 +473,7 @@ export function attachRedisAdapter(io: IOServer): void {
 - **Presence is Redis-backed; typing is still an in-process map.** Presence reads/writes go through a `PresenceStore` (`presence-store.ts`): a Redis sorted set per user (`presence:<userId>`, scored by heartbeat time) when `REDIS_URL` is set, or an in-process map for single-node dev. A per-node timer refreshes the live entries every `PRESENCE_HEARTBEAT_MS`, so a crashed node's users age out of reads within `PRESENCE_STALE_MS`. Durable last-seen lives in `user_profile.last_seen_at`, written on graceful disconnect and on a slower `PRESENCE_LASTSEEN_PERSIST_MS` timer while online. The live "went offline" push on a hard crash is not yet implemented (online reads still self-correct within the stale window). Typing (`typing.ts:9`) is still a per-node in-process map — treat it as best-effort, single-node-accurate.
 - **`notify` self-suppresses** (`notify.ts:16`) and depends on `getIO()` being set — which `attachRealtime` guarantees at boot via `setIO(io)` (`apps/server/src/realtime/index.ts:32`). Calling `notify` before `attachRealtime` would persist the row but skip the live push (`if (!io) return`).
 - **`getDriver` ignores its argument today.** All games use the turn-based driver. Add realtime games by implementing `RealtimeDriver` and branching in `getDriver` on the engine's `mode`; the listeners in `index.ts` need no change.
+- **One live game per `(conversation, gameType)`; rematch is a chat-lane event.** Both `createGameInConversation` and `rematchGame` call `games.findLiveGameInConversation` first and return the existing live game rather than creating a duplicate, so concurrent "new game" / double-Rematch clicks converge. `game:rematch` only acts on a `completed` game with a conversation, pre-seats both prior players (loser-first via `computeRematchSeating`), links the new game with `seriesId = prev.seriesId`, and emits `rematchCreated { newGameId }` to the *old* game's room.
 - **Stored state is treated as untrusted too.** `stateSchema.safeParse(gameRow.gameState)` returning failure yields `"Corrupt game state"` rather than a crash (`turn-based.ts:146`) — a deliberate guard against bad data in JSONB.
 - **No comments in code.** This repo enforces a strict no-comments rule; the lone comment in this subsystem is a justified `biome-ignore` at `turn-based.ts:57`.
 

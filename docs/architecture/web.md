@@ -45,11 +45,17 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/games/components/conversation-picker.tsx` | "Play with…" modal: picks a conversation/friend, emits `createGameInConversation`, routes to `/play/:id`. |
 | `apps/web/app/games/[gameType]/[gameId]/page.tsx` | Legacy redirect: `/games/<type>/<id>` → `/play/<id>` (the `[gameId]` segment is now a room code, passed straight through). |
 | `apps/web/app/play/[gameId]/page.tsx` | SSR-fetches game + moves (+ conversation + messages), gates on auth + game **code** (`isGameCode`, then normalizes and redirects to the canonical uppercase code), resolves the chat layout, renders `PlayClient`. |
-| `apps/web/app/play/[gameId]/play-client.tsx` | Resolves `getGameClient` / `getGameSkeleton`, renders the board in `<Suspense>` over the shared socket, optionally side-by-side with chat via `GameChatSplit`. |
+| `apps/web/app/play/[gameId]/play-client.tsx` | Resolves `getGameClient` / `getGameSkeleton`, renders the board in `<Suspense>` over the shared socket, optionally side-by-side with chat via `GameChatSplit`, and mounts the `GameOverOverlay` above it. |
+| `apps/web/app/play/[gameId]/game-over-overlay.tsx` | The game-over popup (chess.com-style): auto-opens on completion / abandon (and on revisit of a finished game), shows the outcome + both players' avatars with the winner highlighted (or the `SeriesScoreboard` for a series of ≥ 2), and offers Rematch / Go to rematch / Chat (back to the conversation via its friendly URL) / View series / Close. It is **non-blocking** — no backdrop, zero shadow, the container is `pointer-events-none` so the sidebar/chat/settings stay clickable, and a document `mousedown` listener closes it on any outside click (suppressed while a layered popup is open). |
+| `apps/web/components/games/series-scoreboard.tsx` | `SeriesScoreboard`: avatars-over-score (wins + a draw tally) for the series, shared by the game-over modal, the series modal, and the chat game card. |
+| `apps/web/components/games/series-detail-modal.tsx` | `SeriesDetailModal`: fetches `GET /api/games/:gameId/series` and renders the scoreboard + a linked list of every game in the series. |
+| `apps/web/app/chat/[handle]/game-card-message.tsx` | The chat game card: status pill + Open/Join/Spectate/View link, plus (once the series has ≥ 2 games) the scoreboard, "View series", and a "Rematch" button. |
 | `apps/web/app/play/[gameId]/loading.tsx` | Route `loading.tsx`: reads the chat-layout cookie and renders `<PlaySkeleton layout={…} />` during the SSR fetch. |
 | `apps/web/app/play/[gameId]/play-skeleton.tsx` | Layout-aware skeleton mirroring `GameChatSplit` (docked / popout / minimized) and the settings gear, all positioned from the chat-layout cookie. |
 | `apps/web/lib/chat-layout.ts` | `ChatLayout` type + `parseChatLayoutCookie` / `normalizeChatLayout` + layout geometry constants; the layout cookie/localStorage contract shared by page, loading, and `GameChatSplit`. |
-| `apps/web/app/chat/[handle]/page.tsx` | SSR conversation page; resolves handle (UUID or username) → conversation + messages. |
+| `apps/web/app/chat/[handle]/page.tsx` | SSR conversation page; resolves the handle as a **username** → DM (`/api/conversations/with/:username`). Raw `/chat/:id` URLs are no longer supported. |
+| `apps/web/app/chat/group/[name]/page.tsx` | SSR group page; resolves a group by **name** → conversation (`/api/conversations/group/:name`, member-gated). |
+| `apps/web/lib/chat/conversation-href.ts` | `conversationHref(conversation, userId)` → `/chat/<username>` for a DM, `/chat/group/<name>` for a group. The single source of friendly conversation URLs (sidebar, new-group redirect, game-over Chat button). |
 | `apps/web/app/chat/[handle]/conversation-view.tsx` | Client conversation UI: hydrates messages atom, marks read, renders list/composer/typing. |
 | `apps/web/app/settings/layout.tsx` | Settings shell: header + `SettingsTabs` nav (Account \| Appearance) wrapping the sub-route pages. |
 | `apps/web/app/settings/page.tsx` | Redirects `/settings` → `/settings/account` (the default tab). |
@@ -387,7 +393,37 @@ See `apps/web/app/play/[gameId]/play-client.tsx:46`. If the game belongs to a co
 
 `PlayClient` also calls `useGameAudioBridge(gameMusicSource(gameType))` once (`apps/web/app/play/[gameId]/play-client.tsx:51`), which pipes the two audio preference atoms (`gameSfxAtom` / `gameMusicAtom`) into the `games-client` `GameAudioEngine`, sets the per-game background-music source, and wires the browser-autoplay gesture unlock. The settings **gear** lives in `GameChatSplit` (it owns the chat docking state): an `absolute top-3 right-3` button that slides horizontally via a CSS transform — the `--gear-shift` custom property + `transition-transform duration-300 ease-out` applied at the `md` breakpoint (`apps/web/app/play/[gameId]/game-settings-gear.tsx:29`), no framer-motion. `GameChatSplit` drives it with `shifted={gearShifted}` and `offset={chatWidth + RESIZE_HANDLE_W}` (`apps/web/app/play/[gameId]/game-chat-split.tsx:297`), where `gearShifted = mode === "mounted" && !minimized` (`apps/web/app/play/[gameId]/game-chat-split.tsx:224`) — so the gear sits left of the docked chat and snaps back to `--gear-shift: 0px` when the chat pops out / minimizes / stashes. The button opens the audio settings modal through `useLayeredPopup`. The no-conversation branch renders a static, non-sliding gear (`shifted={false} offset={0}`). See [audio.md](./audio.md).
 
-`getGameClient` (`packages/games-client/src/registry.ts:17`) is just a lookup table of board components (currently the eagerly-imported, SSR'd `TicTacToeGameClient`; the registry type leaves room for a `React.lazy` board to code-split a heavy future game), and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`, and the optional `onViewProfile` callback). `play-client.tsx` pulls `socket`/`status` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx:48`) and passes them down so the board rides the app's single connection. `getGameSkeleton(type)` (`packages/games-client/src/registry.ts:24`) returns the board's `<Suspense>` fallback, falling back to `DefaultGameSkeleton` when a game registers no skeleton (it never returns `null`). Adding a game means adding one row each to `REGISTRY` / `SKELETON_REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, socket event, or driver.**
+`getGameClient` (`packages/games-client/src/registry.ts:17`) is just a lookup table of board components (currently the eagerly-imported, SSR'd `TicTacToeGameClient`; the registry type leaves room for a `React.lazy` board to code-split a heavy future game), and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`, and the optional `onViewProfile` callback). `play-client.tsx` pulls `socket`/`status` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx:50`) and passes them down so the board rides the app's single connection. `getGameSkeleton(type)` (`packages/games-client/src/registry.ts:24`) returns the board's `<Suspense>` fallback, falling back to `DefaultGameSkeleton` when a game registers no skeleton (it never returns `null`). Adding a game means adding one row each to `REGISTRY` / `SKELETON_REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, socket event, or driver.**
+
+### Game-over modal & the rematch series UI
+
+`PlayClient` also mounts a `GameOverOverlay` (`apps/web/app/play/[gameId]/game-over-overlay.tsx`) *above* `GameChatSplit` (so it floats over the board and replay toolbar) in both the with-chat and no-conversation branches (`apps/web/app/play/[gameId]/play-client.tsx:75`). The overlay is a `motion`/`AnimatePresence` modal seeded with the SSR `initialGame` that opens automatically when the game is over:
+
+```tsx
+const [open, setOpen] = useState(isOver(initialGame.status));
+
+useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
+  setGame(payload.game);
+  if (isOver(payload.game.status)) setOpen(true);
+});
+useSocketEvent<{ newGameId: string }>(
+  CHAT_EVENTS.rematchCreated,
+  (payload) => {
+    setRematchCode(payload.newGameId);
+  },
+);
+```
+
+See `apps/web/app/play/[gameId]/game-over-overlay.tsx:43`. Two open triggers: it starts open when the SSR game is already finished (`isOver(initialGame.status)` — the revisit case), and it flips open when a live `game_state` broadcast transitions the game to `completed` / `abandoned`. It is closable and clicking the backdrop dismisses it. The banner (`outcomeLabel`, `:23`) is derived from `game.winner` vs the viewer's `userId` (You won 🎉 / You lost / It's a draw / Game abandoned).
+
+When the modal is open and the game is over it fetches `GET /api/games/:gameId/series` into a `SeriesDetail` (`game-over-overlay.tsx:62`). The scoreboard and **View series** only appear for a series of ≥ 2 games (`showSeries = (detail?.score.totalGames ?? 0) >= 2`, `:75`) — finishing the very first game shows just the banner + Rematch + Close. **Rematch** (shown only to a player of a `completed` game that has a conversation, `canRematch`, `:73`) `emitAck`s `CHAT_EVENTS.rematch` and routes to `/play/<newCode>`; if a `rematchCreated` event already arrived (the opponent started it), the button reads **Go to rematch** and just navigates to the captured `rematchCode` (`:77`). **View series** opens the `SeriesDetailModal` through `useLayeredPopup`'s `openLayer`. Spectators see the outcome (and scoreboard, if a series) but no action.
+
+Two shared components back the series UI, both in `apps/web/components/games/`:
+
+- **`SeriesScoreboard`** (`series-scoreboard.tsx`) lays out each player's `Character` avatar over their win count (wrapping past two players) plus a `draws: N` line when there are draws. It is reused by the game-over modal, the series modal, and the chat game card.
+- **`SeriesDetailModal`** (`series-detail-modal.tsx`) fetches the same `/api/games/:gameId/series` endpoint and renders the scoreboard above a list of every game in the series — each row a `next/link` to `/play/<code>` (replay for finished games, resume/spectate for the live one).
+
+The **chat game card** (`apps/web/app/chat/[handle]/game-card-message.tsx`) reads the `seriesScore` already merged into its `GameCardMeta` (no fetch needed) and, once `seriesScore.totalGames >= 2`, renders the `SeriesScoreboard` plus a **View series** button (opening `SeriesDetailModal` via `openLayer`) and — when the card's game is `completed` and you're a player — a **Rematch** button that `emitAck`s `CHAT_EVENTS.rematch` and routes to the new game (`game-card-message.tsx:40`/`:69`). The server enforces one live game per `(conversation, gameType)`, so a duplicate "new game" / double-Rematch just converges on the existing live game (see [server-api.md](./server-api.md)).
 
 ### Two skeletons: the board fallback vs. the route loading
 
@@ -461,7 +497,8 @@ Two small but easy-to-trip-over config facts let the shared packages work in the
 - **The socket bridge hydrates atoms exactly once.** `useHydrateAtoms` runs on first render only; subsequent updates must come through socket events / `store.set`, not by re-hydrating.
 - **`useSocketEvent` keeps the handler in a ref.** Pass any closure you like; it always calls the latest one without re-subscribing. Do not memoize the handler to "fix" subscriptions — it's already handled.
 - **`emitAck` rejects on `{ ok: false }`.** Wrap socket actions in `try/catch`; a thrown error means the server refused (validation, permission, etc.).
-- **Games are created over the socket, read over REST.** The only game REST endpoint is `GET /api/games/:gameId` (used by SSR in `play/page.tsx`). Creation goes through `emitAck(..., CHAT_EVENTS.createGameInConversation, ...)`.
+- **Games are created/rematched over the socket, read over REST.** The game REST endpoints are reads only — `GET /api/games/:gameId` (the game + moves, used by SSR in `play/page.tsx`) and `GET /api/games/:gameId/series` (the rematch series, fetched by the game-over modal and `SeriesDetailModal`). Creation goes through `emitAck(..., CHAT_EVENTS.createGameInConversation, ...)` and rematch through `emitAck(..., CHAT_EVENTS.rematch, { gameId })`.
+- **The game-over modal mounts above the board, not inside it.** `GameOverOverlay` lives in `play-client.tsx` (not in a game's board), so every game gets the same outcome/rematch/series experience for free. It auto-opens on a `completed`/`abandoned` transition and on revisit of an already-finished game; the series scoreboard + View series appear only when the series has ≥ 2 games.
 - **Per-game UI lives in `games-client`, not in `apps/web`.** The play route renders whatever `getGameClient(type)` returns inside `<Suspense>`. To add a game, register it in `packages/games-client/src/registry.ts` and define it in `games-core` — do **not** add a web route.
 - **If a new game's classes vanish in production CSS,** check the `@source` in `globals.css` covers where those classes are authored.
 - **`params` and `cookies()` are awaited.** This Next.js version treats route `params` as a `Promise` and `cookies()` as async (`apps/web/app/play/[gameId]/page.tsx:28`, `apps/web/lib/api-server.ts:13`). Per AGENTS.md, consult `node_modules/next/dist/docs/` before writing Next-specific code rather than assuming older-version behavior.

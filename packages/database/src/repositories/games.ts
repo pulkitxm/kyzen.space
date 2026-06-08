@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   addMoveInputSchema,
   type CreateGameInput,
@@ -10,7 +11,7 @@ import {
   type MoveRow,
   normalizeGameCode,
 } from "@gamelobby/shared/types";
-import { desc, eq, getTableColumns, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
 import { db } from "../client";
 import { game, gamePlayer, move, userProfile } from "../schema";
 
@@ -30,14 +31,17 @@ export async function createGame(input: CreateGameInput): Promise<GameRecord> {
   for (let attempt = 1; attempt <= GAME_CODE_MAX_ATTEMPTS; attempt++) {
     try {
       return await db.transaction(async (tx) => {
+        const id = randomUUID();
         const [row] = await tx
           .insert(game)
           .values({
+            id,
             gameType: input.gameType,
             status: input.status ?? "waiting",
             gameState: input.gameState,
             config: input.config ?? null,
             winner: null,
+            seriesId: input.seriesId ?? id,
             conversationId: input.conversationId ?? null,
             creatorUserId: input.creatorUserId ?? null,
             seatingMode: input.seatingMode ?? null,
@@ -104,18 +108,58 @@ export async function getGameByCode(code: string): Promise<GameRecord | null> {
   return toGameRecord(row, players);
 }
 
+export async function getSeriesGames(seriesId: string): Promise<GameRecord[]> {
+  const rows = await db
+    .select()
+    .from(game)
+    .where(eq(game.seriesId, seriesId))
+    .orderBy(game.createdAt);
+  const records: GameRecord[] = [];
+  for (const row of rows) {
+    const players = await getPlayers(row.id);
+    records.push(toGameRecord(row, players));
+  }
+  return records;
+}
+
+export async function findLiveGameInConversation(
+  conversationId: string,
+  gameType: GameType,
+): Promise<GameRecord | null> {
+  const [row] = await db
+    .select()
+    .from(game)
+    .where(
+      and(
+        eq(game.conversationId, conversationId),
+        eq(game.gameType, gameType),
+        inArray(game.status, ["waiting", "active"]),
+      ),
+    )
+    .orderBy(desc(game.createdAt))
+    .limit(1);
+  if (!row) return null;
+  const players = await getPlayers(row.id);
+  return toGameRecord(row, players);
+}
+
 export async function seatPlayer(
   gameId: string,
   player: GamePlayer,
   seatOrder: number,
-): Promise<void> {
-  await db.insert(gamePlayer).values({
-    gameId,
-    userId: player.userId,
-    username: player.username,
-    role: player.role,
-    seatOrder,
-  });
+): Promise<boolean> {
+  const rows = await db
+    .insert(gamePlayer)
+    .values({
+      gameId,
+      userId: player.userId,
+      username: player.username,
+      role: player.role,
+      seatOrder,
+    })
+    .onConflictDoNothing({ target: [gamePlayer.gameId, gamePlayer.userId] })
+    .returning({ id: gamePlayer.id });
+  return rows.length > 0;
 }
 
 export async function updateGame(

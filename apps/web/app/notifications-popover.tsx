@@ -40,7 +40,6 @@ function notifHref(n: NotificationJson): string {
     return "/friends";
   }
   if (n.payload.gameId) return `/play/${n.payload.gameId}`;
-  if (n.payload.conversationId) return `/chat/${n.payload.conversationId}`;
   return "/chat";
 }
 

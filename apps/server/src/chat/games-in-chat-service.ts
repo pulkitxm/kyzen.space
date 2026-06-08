@@ -1,5 +1,6 @@
 import {
   conversations,
+  type GameRecord,
   games,
   profiles,
   type SeatingMode,
@@ -14,7 +15,53 @@ import type {
 import { serializeGame } from "../api/serialize";
 import { notify } from "../realtime/notify";
 import { sendMessage } from "./messages-service";
+import { computeRematchSeating } from "./rematch-seating";
 import { fail, ok, type ServiceResult } from "./result";
+
+async function announceGame(opts: {
+  game: GameRecord;
+  actorUserId: string;
+  creatorUsername: string;
+  seatingMode: SeatingMode;
+  challengedUserId: string | null;
+}): Promise<ServiceResult<MessageJson>> {
+  const conversationId = opts.game.conversationId;
+  if (!conversationId) return fail("Game is not in a conversation", 400);
+
+  const metadata: GameCardMeta = {
+    gameId: opts.game.code,
+    gameType: opts.game.gameType,
+    seatingMode: opts.seatingMode,
+    challengedUserId: opts.challengedUserId,
+    creatorUsername: opts.creatorUsername,
+  };
+  const sent = await sendMessage({
+    conversationId,
+    senderId: opts.actorUserId,
+    kind: "game_card",
+    metadata,
+    gameId: opts.game.id,
+  });
+  if (!sent.ok) return fail(sent.error, sent.status);
+
+  const memberIds = await conversations.getMemberIds(conversationId);
+  for (const uid of memberIds) {
+    if (uid === opts.actorUserId) continue;
+    await notify(
+      uid,
+      opts.challengedUserId === uid ? "game_challenge" : "game_started",
+      {
+        actorId: opts.actorUserId,
+        payload: {
+          conversationId,
+          gameId: opts.game.code,
+          gameType: opts.game.gameType,
+        },
+      },
+    );
+  }
+  return ok(sent.value);
+}
 
 export async function createGameInConversation(input: {
   userId: string;
@@ -23,13 +70,21 @@ export async function createGameInConversation(input: {
   seatingMode?: SeatingMode;
   challengedUserId?: string | null;
   config?: unknown;
-}): Promise<ServiceResult<{ game: GameJson; message: MessageJson }>> {
+}): Promise<ServiceResult<{ game: GameJson; message?: MessageJson }>> {
   const conv = await conversations.getById(input.conversationId);
   if (!conv) return fail("Conversation not found", 404);
   if (!(await conversations.isMember(input.conversationId, input.userId))) {
     return fail("Not a member of this conversation", 403);
   }
   if (!hasEngine(input.gameType)) return fail("Unsupported game type", 400);
+
+  const existingLive = await games.findLiveGameInConversation(
+    input.conversationId,
+    input.gameType,
+  );
+  if (existingLive) {
+    return ok({ game: serializeGame(existingLive) });
+  }
 
   const definition = getDefinition(input.gameType);
   const parsedConfig = definition.configSchema.safeParse(input.config ?? {});
@@ -80,38 +135,76 @@ export async function createGameInConversation(input: {
     challengedUserId,
   });
 
-  const metadata: GameCardMeta = {
-    gameId: created.code,
-    gameType: input.gameType,
+  const announced = await announceGame({
+    game: created,
+    actorUserId: input.userId,
+    creatorUsername: profile.username,
     seatingMode,
     challengedUserId,
-    creatorUsername: profile.username,
-  };
-  const sent = await sendMessage({
-    conversationId: input.conversationId,
-    senderId: input.userId,
-    kind: "game_card",
-    metadata,
-    gameId: created.id,
   });
-  if (!sent.ok) return fail(sent.error, sent.status);
+  if (!announced.ok) return fail(announced.error, announced.status);
 
-  const memberIds = await conversations.getMemberIds(input.conversationId);
-  for (const uid of memberIds) {
-    if (uid === input.userId) continue;
-    await notify(
-      uid,
-      challengedUserId === uid ? "game_challenge" : "game_started",
-      {
-        actorId: input.userId,
-        payload: {
-          conversationId: input.conversationId,
-          gameId: created.code,
-          gameType: input.gameType,
-        },
-      },
-    );
+  return ok({ game: serializeGame(created), message: announced.value });
+}
+
+export async function rematchGame(input: {
+  userId: string;
+  gameId: string;
+}): Promise<ServiceResult<{ game: GameJson }>> {
+  const prev = await games.getGameByCode(input.gameId);
+  if (!prev) return fail("Game not found", 404);
+  if (prev.status !== "completed") return fail("Game is not finished", 400);
+  if (!prev.players.some((p) => p.userId === input.userId)) {
+    return fail("Not a player in this game", 403);
   }
+  if (!prev.conversationId) return fail("Game is not in a conversation", 400);
+  if (!hasEngine(prev.gameType)) return fail("Unsupported game type", 400);
 
-  return ok({ game: serializeGame(created), message: sent.value });
+  const existingLive = await games.findLiveGameInConversation(
+    prev.conversationId,
+    prev.gameType,
+  );
+  if (existingLive) return ok({ game: serializeGame(existingLive) });
+
+  const { engine } = getDefinition(prev.gameType);
+  const orderedUserIds = computeRematchSeating(prev);
+  const players: { userId: string; username: string; role: string }[] = [];
+  for (let i = 0; i < orderedUserIds.length; i++) {
+    const uid = orderedUserIds[i];
+    const seat = prev.players.find((p) => p.userId === uid);
+    const role = engine.roles[i];
+    if (!uid || !seat || !role) {
+      return fail("Cannot rematch: invalid game seating", 409);
+    }
+    players.push({ userId: uid, username: seat.username, role });
+  }
+  const becomesActive = players.length >= engine.minPlayers;
+
+  const created = await games.createGame({
+    gameType: prev.gameType,
+    status: becomesActive ? "active" : "waiting",
+    players,
+    gameState: engine.createInitialState(
+      players.map((p) => ({ role: p.role })),
+    ),
+    config: prev.config,
+    conversationId: prev.conversationId,
+    creatorUserId: input.userId,
+    seriesId: prev.seriesId,
+    seatingMode: prev.seatingMode ?? undefined,
+    challengedUserId: prev.challengedUserId,
+  });
+
+  const creatorUsername =
+    prev.players.find((p) => p.userId === input.userId)?.username ?? "player";
+  const announced = await announceGame({
+    game: created,
+    actorUserId: input.userId,
+    creatorUsername,
+    seatingMode: created.seatingMode ?? "open",
+    challengedUserId: created.challengedUserId,
+  });
+  if (!announced.ok) return fail(announced.error, announced.status);
+
+  return ok({ game: serializeGame(created) });
 }

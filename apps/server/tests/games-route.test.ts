@@ -8,7 +8,10 @@ const CODE = "K7P2QX";
 let found: any = null;
 // biome-ignore lint/suspicious/noExplicitAny: test move store
 let moves: any[] = [];
+// biome-ignore lint/suspicious/noExplicitAny: test series store
+let seriesGames: any[] = [];
 const lookupArgs: string[] = [];
+const seriesLookupArgs: string[] = [];
 
 mock.module("@gamelobby/database", () => ({
   games: {
@@ -18,6 +21,10 @@ mock.module("@gamelobby/database", () => ({
     },
     getGameById: async () => found,
     listMoves: async () => moves,
+    getSeriesGames: async (seriesId: string) => {
+      seriesLookupArgs.push(seriesId);
+      return seriesGames;
+    },
   },
   profiles: {},
   conversations: {},
@@ -44,11 +51,15 @@ function record(over: Record<string, unknown> = {}) {
     creatorUserId: "u1",
     seatingMode: "open",
     challengedUserId: null,
+    seriesId: UUID,
     startedAt: null,
     completedAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-    players: [{ userId: "u1", username: "alice", role: "X" }],
+    players: [
+      { userId: "u1", username: "alice", role: "X" },
+      { userId: "u2", username: "bob", role: "O" },
+    ],
     ...over,
   };
 }
@@ -56,7 +67,9 @@ function record(over: Record<string, unknown> = {}) {
 beforeEach(() => {
   found = null;
   moves = [];
+  seriesGames = [];
   lookupArgs.length = 0;
+  seriesLookupArgs.length = 0;
 });
 
 describe("GET /api/games/:gameId", () => {
@@ -107,5 +120,81 @@ describe("GET /api/games/:gameId", () => {
     expect(lookupArgs).toEqual(["k7p2qx"]);
     const body = (await res.json()) as { game: { id: string } };
     expect(body.game.id).toBe(CODE);
+  });
+});
+
+describe("GET /api/games/:gameId/series", () => {
+  test("404s an invalid code without a DB lookup", async () => {
+    for (const bad of [UUID, "ABCDE", "ABCDEFG", "K7P2QU"]) {
+      const res = await gamesRouter.request(`/${bad}/series`);
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Not found" });
+    }
+    expect(lookupArgs).toHaveLength(0);
+    expect(seriesLookupArgs).toHaveLength(0);
+  });
+
+  test("404s when no game matches the code", async () => {
+    found = null;
+    const res = await gamesRouter.request(`/${CODE}/series`);
+    expect(res.status).toBe(404);
+    expect(lookupArgs).toEqual([CODE]);
+    expect(seriesLookupArgs).toHaveLength(0);
+  });
+
+  test("404s when the game has no seriesId", async () => {
+    found = record({ seriesId: null });
+    const res = await gamesRouter.request(`/${CODE}/series`);
+    expect(res.status).toBe(404);
+    expect(seriesLookupArgs).toHaveLength(0);
+  });
+
+  test("returns the series detail with the score and per-game summaries", async () => {
+    found = record({ seriesId: UUID });
+    seriesGames = [
+      record({
+        code: "AAAAAA",
+        status: "completed",
+        winner: "u1",
+        completedAt: new Date("2026-01-02T00:00:00.000Z"),
+      }),
+      record({ code: "BBBBBB", status: "completed", winner: "draw" }),
+      record({ code: CODE, status: "active", winner: null }),
+    ];
+    const res = await gamesRouter.request(`/${CODE}/series`);
+    expect(res.status).toBe(200);
+    expect(seriesLookupArgs).toEqual([UUID]);
+
+    const body = (await res.json()) as {
+      seriesId: string;
+      gameType: string;
+      score: {
+        draws: number;
+        completedGames: number;
+        totalGames: number;
+        entries: { userId: string; wins: number }[];
+      };
+      games: {
+        gameId: string;
+        gameNumber: number;
+        status: string;
+        winner: string | null;
+        winnerUsername: string | null;
+      }[];
+    };
+
+    expect(body.seriesId).toBe(UUID);
+    expect(body.gameType).toBe(TIC_TAC_TOE);
+    expect(body.score.draws).toBe(1);
+    expect(body.score.completedGames).toBe(2);
+    expect(body.score.totalGames).toBe(3);
+    expect(body.score.entries.find((e) => e.userId === "u1")?.wins).toBe(1);
+
+    expect(body.games.map((g) => g.gameId)).toEqual(["AAAAAA", "BBBBBB", CODE]);
+    expect(body.games.map((g) => g.gameNumber)).toEqual([1, 2, 3]);
+    expect(body.games[0]?.winnerUsername).toBe("alice");
+    expect(body.games[1]?.winner).toBe("draw");
+    expect(body.games[1]?.winnerUsername).toBeNull();
+    expect(body.games[2]?.winner).toBeNull();
   });
 });

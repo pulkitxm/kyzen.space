@@ -145,6 +145,23 @@ A loading placeholder, `TicTacToeSkeleton`
 (`packages/games-client/src/games/tic-tac-toe/skeleton.tsx`), is registered in
 `SKELETON_REGISTRY` and renders as the board's `<Suspense>` fallback.
 
+## Game-over & rematch
+
+The result/rematch experience is **platform-provided**, not part of the board:
+the play page mounts a `GameOverOverlay`
+(`apps/web/app/play/[gameId]/game-over-overlay.tsx`) over the board that
+auto-opens when the game completes (and on revisit of a finished game), shows the
+outcome banner, and — once a rematch series exists — the series scoreboard and a
+**View series** modal. **Rematch** re-invites the same two players into a new
+game in the same conversation, linked by a shared `seriesId`, with the **loser
+moving first** (`X`) and a draw swapping the previous game's first mover. Each
+game (the first and every rematch) posts its own chat game card; once the series
+has ≥ 2 games the card shows the wins/draws scoreboard. At most one
+`waiting | active` tic-tac-toe game exists per conversation at a time. The flow
+and data model are in [realtime.md](../architecture/realtime.md),
+[server-api.md](../architecture/server-api.md), and
+[web.md](../architecture/web.md).
+
 ## Source
 
 - Engine and meta: `packages/games-core/src/games/tic-tac-toe/`

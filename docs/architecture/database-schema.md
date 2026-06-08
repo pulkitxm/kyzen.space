@@ -70,16 +70,24 @@ export const game = pgTable(
     challengedUserId: text("challenged_user_id").references(() => user.id, {
       onDelete: "set null",
     }),
+    seriesId: uuid("series_id").references((): AnyPgColumn => game.id, {
+      onDelete: "set null",
+    }),
     startedAt: timestamp("started_at"),
     completedAt: timestamp("completed_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (t) => [index("game_conversation_idx").on(t.conversationId)],
+  (t) => [
+    index("game_conversation_idx").on(t.conversationId),
+    index("game_series_idx").on(t.seriesId),
+  ],
 );
 ```
 
 **Two identifiers, one public.** `id` is the internal `uuid` primary key — it is the FK target for `move.game_id` / `game_player.game_id` and is used for every DB write, but it is **never** serialized to clients. `code` is the **public** identifier: a short, shareable, human-friendly room code (e.g. `K7P2QX`) generated app-side by `$defaultFn(() => generateGameCode())` (from `@gamelobby/shared/types`, imported at `schema.ts:23`) and pinned unique by the `game_code_uq` constraint. `serializeGame` sets `GameJson.id = row.code`, so URLs (`/play/<code>`) and socket payloads (`join_room` / `make_move`) carry the code, never the UUID. Because the code is randomly allocated it can collide, so `createGame` wraps its insert in a retry loop that catches a `game_code_uq` unique violation and re-rolls (see [`database.md`](./database.md)); `getGameByCode` resolves a game by code (normalizing first). See [`generic-game-schema.md`](./generic-game-schema.md) for the full public-code/internal-id story.
+
+**`seriesId` links a rematch series.** `seriesId` (`schema.ts:119`) is a nullable `uuid` **self-FK** to `game.id` (`onDelete: "set null"`), backed by the `game_series_idx` index (`schema.ts:129`). Its meaning is *the id of the first game in the series*: a brand-new game's series is itself (`createGame` generates the row id app-side with `randomUUID()` and defaults `seriesId` to that same id, `games.ts:34`/`:44`), and a rematch copies its parent's `seriesId`. So every game in a rematch series — root included — shares one `seriesId`, and the whole series is a single flat query (`WHERE series_id = X`, `getSeriesGames`) rather than a predecessor-pointer chain to walk. The `series_id` column stays nullable for FK-set-null safety, but in practice every game has one. See [`database.md`](./database.md) for `getSeriesGames` / `findLiveGameInConversation` and [`realtime.md`](./realtime.md) for the rematch flow.
 
 `move` and `game_player` add the constraints that make the generic model safe:
 
@@ -111,6 +119,7 @@ The remaining tables are conventional relational shapes — one line each:
 - **`game_state` / `config` / `move_data` are `unknown` by design.** The DB neither knows nor checks their shape; validity is owned by the game's Zod schemas and enforced at the realtime boundary (`apps/server/src/realtime/turn-based.ts:145`). Treat any `gameState` you read as untrusted until `safeParse`'d.
 - **`$type<…>()` is compile-time only.** `status`, `seatingMode`, `kind`, `role`, etc. are plain `text`; Postgres will not reject an out-of-union value — the repository must only write legal ones.
 - **`game` has two ids: a private UUID and a public `code`.** `id` (uuid PK) is internal — the FK target for `move` / `game_player` and used for all writes — and is never serialized. `code` (`game_code_uq`, `$defaultFn(generateGameCode)`) is the public, shareable room id that appears in URLs and socket payloads (`serializeGame` sets `GameJson.id = row.code`). Resolve by code with `getGameByCode`; `createGame` retries on a `game_code_uq` collision.
+- **`game.seriesId` is a self-FK that defaults to the row's own id.** A fresh game's `seriesId` is set app-side to its own `randomUUID()` id; a rematch copies its parent's `seriesId` (`games.ts:44`). It is the id of the *first* game in the series, so a rematch series is `WHERE series_id = X` — never a chain walk. Don't reintroduce a predecessor pointer.
 - **Move numbers are dense, unique, and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` is the double-submit backstop.
 - **`game_player` replaced an old `players` JSONB array.** One indexed row per seat is the convention (it powers `game_player_uq` and the `userId` index); don't reintroduce per-game arrays.
 - **DMs and friendships key on a *sorted* pair.** `dmKey(a, b)` and `pairKey(a, b)` both `[a, b].sort().join(":")`, so the relationship is direction-independent and the unique constraint actually prevents duplicates.

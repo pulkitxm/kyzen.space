@@ -4,13 +4,13 @@
 
 `apps/server` is a single Bun process that has to do three jobs at once:
 
-1. Speak HTTP for REST-style data fetching (conversations, friends, profiles, notifications, GIFs, one game-read endpoint) and for the Better Auth session/OAuth surface.
+1. Speak HTTP for REST-style data fetching (conversations, friends, profiles, notifications, GIFs, and the two game *read* endpoints — the game itself and its rematch series) and for the Better Auth session/OAuth surface.
 2. Speak WebSocket for everything live: chat messages, presence, typing, friend events, and — critically — the **game lane** where moves are made and validated in real time.
 3. Share the exact same game/chat logic the browser uses, so that the *client is never the authority*. The browser imports `@gamelobby/games-core` to render a board and predict legality; the server imports the **same** `GameEngine` + Zod schemas to authoritatively validate and apply each move. A tampered client cannot smuggle an illegal move past the server because the server re-validates against the identical schema.
 
 The wiring that makes this work is deliberately layered. Express owns the raw HTTP socket and CORS; it hands `/api/*` to a **Hono** app (router-per-feature); Hono routes are thin and delegate to a **service layer** (`src/chat/*`, `src/services/*`) that returns a typed `ServiceResult`; services call **repositories** (`@gamelobby/database`) and never touch raw SQL. Socket.IO is attached to the *same* underlying Node HTTP server so realtime shares the process, the auth cookie, and the in-memory `io` reference.
 
-This doc explains how that process is assembled (`index.ts`), how the REST surface is shaped (the Hono app + every route), how rows become DTOs (`serialize.ts`), and how the `routes -> services -> repositories` + `ServiceResult` pattern keeps HTTP plumbing out of business logic. It also explains the single most surprising design decision: **`GET /api/games/:gameId` is the only game REST endpoint** — games are created and played over the socket lane, not over HTTP.
+This doc explains how that process is assembled (`index.ts`), how the REST surface is shaped (the Hono app + every route), how rows become DTOs (`serialize.ts`), and how the `routes -> services -> repositories` + `ServiceResult` pattern keeps HTTP plumbing out of business logic. It also explains the single most surprising design decision: **the only game REST endpoints are reads** (`GET /api/games/:gameId` for the game + moves, and `GET /api/games/:gameId/series` for its rematch series) — games are created, played, and rematched over the socket lane, not over HTTP.
 
 ## Files at a glance
 
@@ -22,11 +22,11 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 | `apps/server/src/api/middleware/logger.ts` | Per-request pino child logger with a request id; logs method/path/status/duration at the right level. |
 | `apps/server/src/api/middleware/auth.ts` | `requireAuth` middleware + `AuthEnv`: reads the Better Auth session from request headers, `401`s when absent, and stashes `userId`/`user`/`session` on the context. |
 | `apps/server/src/api/auth-context.ts` | `readJson(c)` (safe body parse). |
-| `apps/server/src/api/serialize.ts` | Pure row -> DTO mappers (`serializeGame`, `serializeMove`, `serializeMessage`, `serializeConversation`, …). The `Date -> ISO string` boundary. |
+| `apps/server/src/api/serialize.ts` | Pure row -> DTO mappers (`serializeGame`, `serializeMove`, `serializeMessage`, `serializeConversation`, `serializeSeries`, …). The `Date -> ISO string` boundary. |
 | `apps/server/src/api/routes/account.ts` | Session management built on Better Auth: list/sign-out/revoke sessions. |
-| `apps/server/src/api/routes/conversations.ts` | The largest router: list/create DMs & groups, messages, read receipts, members, rename, and `POST /:id/games`. |
+| `apps/server/src/api/routes/conversations.ts` | The largest router: list/create DMs & groups, messages, read receipts, members, rename, and `POST /:id/games`. Resolution for friendly URLs: `GET /with/:username` (→ DM) and `GET /group/:name` (→ group, member-gated). Group names are unique (enforced on create + rename in `conversations-service.ts`), so a name resolves to one group; `GET /:id` remains for internal id fetches. |
 | `apps/server/src/api/routes/friends.ts` | Friends list, pending requests, user search with friend-state, send/accept/decline/remove. |
-| `apps/server/src/api/routes/games.ts` | The *only* game REST endpoint: `GET /:gameId` returns the serialized game + its moves. |
+| `apps/server/src/api/routes/games.ts` | The two game REST reads: `GET /:gameId` (serialized game + its moves) and `GET /:gameId/series` (the rematch series via `serializeSeries` + `computeSeriesScore`). |
 | `apps/server/src/api/routes/gifs.ts` | Proxy to the Klipy GIF provider: trending + search, with limit/offset clamping. |
 | `apps/server/src/api/routes/messages.ts` | `DELETE /:id` (soft-delete a message). |
 | `apps/server/src/api/routes/notifications.ts` | List / unread-count / mark-read / read-all. |
@@ -36,8 +36,10 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 | `apps/server/src/chat/conversations-service.ts` | DM/group lifecycle, membership rules, socket fan-out of conversation changes. |
 | `apps/server/src/chat/friends-service.ts` | Friend-request state machine, realtime emits + persistent notifications. |
 | `apps/server/src/chat/messages-service.ts` | Send/system/delete/mark-read message logic + room broadcasts. |
-| `apps/server/src/chat/games-in-chat-service.ts` | `createGameInConversation`: validates config via the game's Zod schema, seats the creator, persists the game, posts a game-card message. Shared by REST and socket. |
-| `apps/server/src/chat/game-card.ts` | `enrichGameCardMeta`: merges live game status/winner into a game-card's metadata. |
+| `apps/server/src/chat/games-in-chat-service.ts` | `createGameInConversation` (validates config via the game's Zod schema, runs the one-live guard, seats the creator, persists, posts a game-card message — shared by REST and socket) and `rematchGame` (the socket-only rematch flow). |
+| `apps/server/src/chat/game-card.ts` | `enrichGameCardMeta`: merges live game status/winner (and the `seriesScore`) into a game-card's metadata. |
+| `apps/server/src/chat/series.ts` | `computeSeriesScore(games)`: the pure wins-per-player + draw tally over a series, used by both the series endpoint and the card enrichment. |
+| `apps/server/src/chat/rematch-seating.ts` | `computeRematchSeating(prev)`: the single seam that orders the rematch roster (loser-first for 2 players; rotate for N > 2). |
 | `apps/server/src/chat/game-card-broadcast.ts` | `broadcastGameCard`: re-emits an updated game-card message to its conversation room. |
 | `apps/server/src/services/gif-provider.ts` | Klipy HTTP client: normalizes provider items to `GifJson`, paginates, times out. |
 | `@gamelobby/shared` (`constants/theme.ts` + `types/theme.ts`) | Theme id + color-mode catalogs (`THEME_IDS`/`COLOR_MODES`) and `isValidTheme`/`isValidColorMode` guards. |
@@ -233,7 +235,7 @@ The division of labor:
 
 - **Repositories (imported as namespaces like `conversations`, `friends`, `games` from `@gamelobby/database`)** are the only code that touches Drizzle/SQL. Services call `conversations.getOrCreateDm(...)`, `friends.areFriends(...)`, etc. The repository layer is re-exported from `packages/database/src/index.ts` (`export * as games from "./repositories/games"` and friends, `packages/database/src/index.ts:27`).
 
-Why a hand-rolled `Result` type instead of throwing? Three reasons. (1) **The HTTP status is part of the domain answer** — "not your request" is a 403, "already friends" is a 409 — and encoding it in the return value keeps that decision next to the rule that produced it. (2) **The same service is called from two transports**: `createGameInConversation` is invoked from the REST route (`apps/server/src/api/routes/conversations.ts:129`) *and* from a socket handler (`apps/server/src/realtime/games-in-chat.ts:8`); a thrown exception would have to be caught and re-mapped in two places, whereas a `ServiceResult` is just inspected with `if (!res.ok)`. (3) **Expected failures stay off the exception path**, so the global `onError` boundary is reserved for genuinely unexpected bugs.
+Why a hand-rolled `Result` type instead of throwing? Three reasons. (1) **The HTTP status is part of the domain answer** — "not your request" is a 403, "already friends" is a 409 — and encoding it in the return value keeps that decision next to the rule that produced it. (2) **The same service is called from two transports**: `createGameInConversation` is invoked from the REST route (`apps/server/src/api/routes/conversations.ts:129`) *and* from a socket handler (`apps/server/src/realtime/games-in-chat.ts:15`); a thrown exception would have to be caught and re-mapped in two places, whereas a `ServiceResult` is just inspected with `if (!res.ok)`. (3) **Expected failures stay off the exception path**, so the global `onError` boundary is reserved for genuinely unexpected bugs.
 
 ### Assemblers: the read-side hydration layer (`assemble.ts`)
 
@@ -241,29 +243,46 @@ There's a fourth layer that sits *beside* services on the read path. Repository 
 
 For example `assembleConversation` (`apps/server/src/chat/assemble.ts:71`) fetches member rows, resolves each member's public user, finds the last message, computes the viewer's unread count, and only then calls `serializeConversation`. The batch variant `assembleMessages` (`apps/server/src/chat/assemble.ts:53`) avoids N+1 queries by collecting all distinct `senderId`s and fetching them in one `profiles.getPublicUsers(ids)` call.
 
-The most subtle assembler is `withGameCardStatus` (`apps/server/src/chat/assemble.ts:28`): when a message is a `game_card`, it loads the referenced game (by the FK `row.gameId`, which is the internal UUID) and merges live `status`/`winner`/`players` into the card's metadata via `enrichGameCardMeta`. It also rewrites the wire `gameId` to the game's public `code` (`apps/server/src/chat/assemble.ts:37`) so the client links to `/play/<code>`, even though the message's `game_id` FK column stays the UUID. This is why a game card in chat always shows the *current* game state even though the message row was written once at creation time — the live status is computed at read time, not stored on the message.
+The most subtle assembler is `withGameCardStatus` (`apps/server/src/chat/assemble.ts:29`): when a message is a `game_card`, it loads the referenced game (by the FK `row.gameId`, which is the internal UUID) and merges live `status`/`winner`/`players` into the card's metadata via `enrichGameCardMeta`. It also computes the game's **series score** — `computeSeriesScore` over `getSeriesGames(game.seriesId)` (or just `[game]` when there is somehow no series) — and folds it in as `seriesScore`, so the card can render the scoreboard once a rematch exists (`apps/server/src/chat/assemble.ts:36`). It also rewrites the wire `gameId` to the game's public `code` (`apps/server/src/chat/assemble.ts:41`) so the client links to `/play/<code>`, even though the message's `game_id` FK column stays the UUID. This is why a game card in chat always shows the *current* game state (and series standing) even though the message row was written once at creation time — the live status is computed at read time, not stored on the message.
 
-## Why `GET /api/games/:gameId` is the only game REST endpoint
+## Why the only game REST endpoints are reads
 
-`gamesRouter` is tiny on purpose (`apps/server/src/api/routes/games.ts:7`):
+`gamesRouter` is tiny on purpose — two `GET`s, both read-only (`apps/server/src/api/routes/games.ts:8`):
 
 ```ts
-export const gamesRouter = new Hono<LoggerEnv>().get("/:gameId", async (c) => {
-  const code = c.req.param("gameId");
-  if (!isGameCode(code)) return c.json({ error: "Not found" }, 404);
-  const found = await games.getGameByCode(code);
-  if (!found) return c.json({ error: "Not found" }, 404);
-  const moves = await games.listMoves(found.id);
-  return c.json({
-    game: serializeGame(found),
-    moves: moves.map((m) => serializeMove(m, found.code)),
+export const gamesRouter = new Hono<LoggerEnv>()
+  .get("/:gameId/series", async (c) => {
+    const code = c.req.param("gameId");
+    if (!isGameCode(code)) return c.json({ error: "Not found" }, 404);
+    const found = await games.getGameByCode(code);
+    if (!found?.seriesId) return c.json({ error: "Not found" }, 404);
+    const seriesGames = await games.getSeriesGames(found.seriesId);
+    const score = computeSeriesScore(seriesGames);
+    return c.json(
+      serializeSeries(found.seriesId, found.gameType, seriesGames, score),
+    );
+  })
+  .get("/:gameId", async (c) => {
+    const code = c.req.param("gameId");
+    if (!isGameCode(code)) return c.json({ error: "Not found" }, 404);
+    const found = await games.getGameByCode(code);
+    if (!found) return c.json({ error: "Not found" }, 404);
+    const moves = await games.listMoves(found.id);
+    return c.json({
+      game: serializeGame(found),
+      moves: moves.map((m) => serializeMove(m, found.code)),
+    });
   });
-});
 ```
 
-There is **no** `POST /api/games`, no `PATCH`, no move endpoint. The reason is the core architectural insight stated at the top: **games are created and played over the socket lane, not over HTTP.**
+There is **no** `POST /api/games`, no `PATCH`, no move endpoint, and even rematch is *not* REST. The reason is the core architectural insight stated at the top: **games are created, played, and rematched over the socket lane, not over HTTP.**
 
-- **Creation** goes through `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:19`). That service is reachable two ways — `POST /api/conversations/:id/games` (`apps/server/src/api/routes/conversations.ts:120`) for the "create a game in this chat" REST action, and the `CHAT_EVENTS.createGameInConversation` socket event (`apps/server/src/realtime/games-in-chat.ts:8`). Both transports first narrow the client-supplied `gameType` to a registered game: the REST route does `gameTypeSchema.safeParse(body?.gameType)` (`apps/server/src/api/routes/conversations.ts:125`, the registry-backed `z.enum` exported from `@gamelobby/shared/types`) and returns `400 Unsupported game type` on a miss, so the service's `gameType` parameter is a typed `GameType`, not a free-form string. Either way it then validates the config with the game's own Zod schema, seeds the initial state from the engine, persists, and posts a game-card message. It is *not* a generic game-resource POST; it's a chat action that happens to spawn a game.
+### The series read: `GET /api/games/:gameId/series`
+
+The one game read the web added for the rematch feature resolves the `:gameId` **code**, follows its `seriesId`, and returns a `SeriesDetail`. The route guards with `isGameCode`, loads the game with `getGameByCode`, and `404`s when the game has no `seriesId` (`apps/server/src/api/routes/games.ts:13`). It then fetches every game in the series with `games.getSeriesGames(found.seriesId)` (ordered by `createdAt`), computes the running score with the **pure** `computeSeriesScore` helper (`apps/server/src/chat/series.ts:4` — each `completed` game adds to the winner's `wins`, or to `draws` when `winner === "draw"`; in-progress games are listed but not counted), and projects it with `serializeSeries` (`apps/server/src/api/serialize.ts:29`), which assigns each game a 1-based `gameNumber`, maps `id → code`, and resolves `winnerUsername` from the seats. The web's game-over modal and the "View series" modal both fetch this endpoint; the chat game card instead reads a `seriesScore` already merged into its metadata at assembly time (so the card and the modal agree). The endpoint lives under `/api/*`, so it adds no top-level web route and needs no `RESERVED_USERNAMES` entry.
+
+- **Creation** goes through `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:66`). That service is reachable two ways — `POST /api/conversations/:id/games` (`apps/server/src/api/routes/conversations.ts:120`) for the "create a game in this chat" REST action, and the `CHAT_EVENTS.createGameInConversation` socket event (`apps/server/src/realtime/games-in-chat.ts:15`). Both transports first narrow the client-supplied `gameType` to a registered game: the REST route does `gameTypeSchema.safeParse(body?.gameType)` (`apps/server/src/api/routes/conversations.ts:125`, the registry-backed `z.enum` exported from `@gamelobby/shared/types`) and returns `400 Unsupported game type` on a miss, so the service's `gameType` parameter is a typed `GameType`, not a free-form string. The service then enforces the **one-live-game-per-`(conversation, gameType)`** rule — `findLiveGameInConversation` short-circuits to an existing `waiting | active` game rather than creating a duplicate — before validating the config with the game's own Zod schema, seeding the initial state from the engine, persisting, and posting a game-card message. Its result is `{ game; message? }` (no new `message` on a short-circuit). It is *not* a generic game-resource POST; it's a chat action that happens to spawn (or resume) a game.
+- **Rematch** also goes over the socket, not REST: `CHAT_EVENTS.rematch` → `rematchGame` (`apps/server/src/chat/games-in-chat-service.ts:150`) re-spawns a finished game into the same series (shared `seriesId`) with both players pre-seated in loser-first order, applies the same one-live guard, and emits `rematchCreated` to the old game's room. See [realtime.md](./realtime.md).
 - **Playing** (making moves) happens exclusively over the socket `make_move` event (`apps/server/src/realtime/index.ts:98`), routed through a driver that re-validates the move and stored state against the game's Zod schemas before applying `reduce`. A move is inherently a low-latency, broadcast-to-the-room operation; modeling it as an idempotent HTTP resource would be the wrong shape and would also bypass the realtime fan-out every other player needs.
 - **Reading** is the one thing that genuinely benefits from a plain request/response: the web app's `/play/[gameId]` page does an SSR/RSC fetch of the current game + move history to render the board before the socket connects. That's exactly what this endpoint serves. The `:gameId` path param is the game's public room **code**, so the route guards with `isGameCode` (cheap rejection of garbage) and resolves via `getGameByCode`, returning `404` for unknown codes so it never leaks whether an id format is valid-but-missing vs. malformed.
 
@@ -276,12 +295,20 @@ In short: HTTP is for fetching durable, cacheable read state; the socket is for 
 ```ts
 if (!hasEngine(input.gameType)) return fail("Unsupported game type", 400);
 
+const existingLive = await games.findLiveGameInConversation(
+  input.conversationId,
+  input.gameType,
+);
+if (existingLive) {
+  return ok({ game: serializeGame(existingLive) });
+}
+
 const definition = getDefinition(input.gameType);
 const parsedConfig = definition.configSchema.safeParse(input.config ?? {});
 if (!parsedConfig.success) return fail("Invalid game config", 400);
 ```
 
-(`apps/server/src/chat/games-in-chat-service.ts:32`). Its `input.gameType` is already a typed `GameType` (the caller narrowed it via `gameTypeSchema`), so `hasEngine(input.gameType)` looks the game up in the shared games-core registry and validates the client-supplied config against that game's **`configSchema`** (the same schema the web lobby form is built from), after first enforcing conversation membership (`apps/server/src/chat/games-in-chat-service.ts:29`) and, for group chats, seating rules (`apps/server/src/chat/games-in-chat-service.ts:46`). It then seeds initial state via `engine.createInitialState` (`apps/server/src/chat/games-in-chat-service.ts:75`), persists through the `games` repository, posts a `game_card` message via `sendMessage`, and fans out `game_started`/`game_challenge` notifications to the other members via `notify`. On success it returns `ok({ game: serializeGame(created), message: sent.value })` — already serialized for either transport.
+(`apps/server/src/chat/games-in-chat-service.ts:79`). Its `input.gameType` is already a typed `GameType` (the caller narrowed it via `gameTypeSchema`), so `hasEngine(input.gameType)` looks the game up in the shared games-core registry; if a live game of that type already exists in the conversation it returns *that* one (the one-live guard) instead of creating a duplicate, otherwise it validates the client-supplied config against that game's **`configSchema`** (the same schema the web lobby form is built from), after first enforcing conversation membership (`apps/server/src/chat/games-in-chat-service.ts:76`) and, for group chats, seating rules (`apps/server/src/chat/games-in-chat-service.ts:101`). It then seeds initial state via `engine.createInitialState` (`apps/server/src/chat/games-in-chat-service.ts:130`), persists through the `games` repository, posts a `game_card` message via `announceGame`/`sendMessage`, and fans out `game_started`/`game_challenge` notifications to the other members via `notify`. On success it returns `ok({ game: serializeGame(created), message: announced.value })` — already serialized for either transport (`message` is omitted when it short-circuited to an existing live game).
 
 ## Other notable services
 

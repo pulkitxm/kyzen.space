@@ -1,32 +1,32 @@
 import type { ConversationJson, MessageJson } from "@gamelobby/shared/types";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import { serverFetchJson } from "@/lib/api-server";
 import { getServerSession } from "@/lib/get-server-session";
-import { ConversationView } from "./conversation-view";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ handle: string }>;
+  params: Promise<{ name: string }>;
 }): Promise<Metadata> {
-  const { handle } = await params;
-  return { title: handle };
+  const { name } = await params;
+  return { title: decodeURIComponent(name) };
 }
 
-export default async function ConversationPage({
+export default async function GroupConversationPage({
   params,
 }: {
-  params: Promise<{ handle: string }>;
+  params: Promise<{ name: string }>;
 }) {
   const session = await getServerSession();
   if (!session?.user) redirect("/auth");
-  const { handle } = await params;
+  const { name } = await params;
 
   const conv = await serverFetchJson<{ conversation: ConversationJson }>(
-    `/api/conversations/with/${encodeURIComponent(handle)}`,
+    `/api/conversations/group/${encodeURIComponent(name)}`,
   );
   if (!conv) notFound();
 
