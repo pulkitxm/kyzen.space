@@ -16,9 +16,11 @@ export const CHAT_EVENTS = {
   typingStart: "typing_start",
   typingStop: "typing_stop",
   createGameInConversation: "game:create_in_conversation",
+  rematch: "game:rematch",
 
   messageNew: "message_new",
   messageUpdated: "message_updated",
+  rematchCreated: "game:rematch_created",
   messageDeleted: "message_deleted",
   conversationNew: "conversation_new",
   conversationUpdated: "conversation_updated",
