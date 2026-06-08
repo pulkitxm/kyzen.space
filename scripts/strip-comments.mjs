@@ -232,7 +232,9 @@ function yamlComments(text) {
       prevWs = c === " " || c === "\t";
     }
     if (str === null) {
-      const code = (commentAt === -1 ? line : line.slice(0, commentAt)).trimEnd();
+      const code = (
+        commentAt === -1 ? line : line.slice(0, commentAt)
+      ).trimEnd();
       if (/(?:^|\s)[|>](?:[1-9][+-]?|[+-][1-9]?)?$/.test(code))
         blockIndent = indent;
     }
