@@ -6,7 +6,7 @@ import type {
   GameJson,
   SeriesDetail,
 } from "@gamelobby/shared/types";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FaTrophy } from "react-icons/fa6";
@@ -89,8 +89,10 @@ export function GameOverOverlay({
   const [open, setOpen] = useState(() => isOver(initialGame.status));
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
   const [rematchCode, setRematchCode] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [rematch, setRematch] = useState<{
+    busy: boolean;
+    error: string | null;
+  }>({ busy: false, error: null });
 
   useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
     setGame(payload.game);
@@ -138,8 +140,7 @@ export function GameOverOverlay({
       router.push(`/play/${rematchCode}`);
       return;
     }
-    setBusy(true);
-    setError(null);
+    setRematch({ busy: true, error: null });
     try {
       const res = await emitAck<{ gameId: string }>(
         socket,
@@ -148,73 +149,79 @@ export function GameOverOverlay({
       );
       router.push(`/play/${res.gameId}`);
     } catch (e) {
-      setBusy(false);
-      setError(e instanceof Error ? e.message : "Couldn't start the rematch");
+      setRematch({
+        busy: false,
+        error: e instanceof Error ? e.message : "Couldn't start the rematch",
+      });
     }
   }, [socket, gameId, rematchCode, router]);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
-      <AnimatePresence>
-        {open && isOver(game.status) ? (
-          <motion.div
-            ref={cardRef}
-            className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"
-            initial={{ opacity: 0, y: 8, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.97 }}
-            transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.18 }}
-          >
-            <h2 className="mb-4 text-center font-bold text-xl">
-              {outcomeLabel(game, userId)}
-            </h2>
-            <div className="mb-4">
-              {showSeries && detail ? (
-                <SeriesScoreboard score={detail.score} />
-              ) : (
-                <PlayersRow game={game} />
-              )}
-            </div>
-            {error ? (
-              <p className="mb-2 text-center text-danger text-sm">{error}</p>
-            ) : null}
-            <div className="flex flex-col gap-2">
-              {canRematch ? (
-                <Button onClick={onRematch} disabled={busy}>
-                  {rematchCode ? "Go to rematch" : "Rematch"}
-                </Button>
+      <LazyMotion features={domAnimation}>
+        <AnimatePresence>
+          {open && isOver(game.status) ? (
+            <m.div
+              ref={cardRef}
+              className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"
+              initial={{ opacity: 0, y: 8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.97 }}
+              transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.18 }}
+            >
+              <h2 className="mb-4 text-center font-bold text-xl">
+                {outcomeLabel(game, userId)}
+              </h2>
+              <div className="mb-4">
+                {showSeries && detail ? (
+                  <SeriesScoreboard score={detail.score} />
+                ) : (
+                  <PlayersRow game={game} />
+                )}
+              </div>
+              {rematch.error ? (
+                <p className="mb-2 text-center text-danger text-sm">
+                  {rematch.error}
+                </p>
               ) : null}
-              {conversation ? (
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    router.push(conversationHref(conversation, userId))
-                  }
-                >
-                  Chat
+              <div className="flex flex-col gap-2">
+                {canRematch ? (
+                  <Button onClick={onRematch} disabled={rematch.busy}>
+                    {rematchCode ? "Go to rematch" : "Rematch"}
+                  </Button>
+                ) : null}
+                {conversation ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      router.push(conversationHref(conversation, userId))
+                    }
+                  >
+                    Chat
+                  </Button>
+                ) : null}
+                {showSeries ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      openLayer({
+                        title: "Series",
+                        content: <SeriesDetailModal gameId={gameId} />,
+                        size: "md",
+                      })
+                    }
+                  >
+                    View series
+                  </Button>
+                ) : null}
+                <Button variant="ghost" onClick={() => setOpen(false)}>
+                  Close
                 </Button>
-              ) : null}
-              {showSeries ? (
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    openLayer({
-                      title: "Series",
-                      content: <SeriesDetailModal gameId={gameId} />,
-                      size: "md",
-                    })
-                  }
-                >
-                  View series
-                </Button>
-              ) : null}
-              <Button variant="ghost" onClick={() => setOpen(false)}>
-                Close
-              </Button>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+              </div>
+            </m.div>
+          ) : null}
+        </AnimatePresence>
+      </LazyMotion>
     </div>
   );
 }

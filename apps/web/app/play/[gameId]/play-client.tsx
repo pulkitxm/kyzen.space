@@ -11,7 +11,7 @@ import type {
   GameType,
   MessageJson,
 } from "@gamelobby/shared/types";
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import { useProfilePopup } from "@/components/ui";
 import { gameMusicSource } from "@/lib/audio/music-sources";
@@ -52,24 +52,39 @@ export function PlayClient({
 
   useGameAudioBridge(gameMusicSource(gameType));
 
-  const gameNode = GameClient ? (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
-      <Suspense fallback={<GameSkeleton />}>
-        <GameClient
-          gameId={gameId}
-          userId={userId}
-          socket={socket}
-          connected={status === "connected"}
-          initialGame={initialGame}
-          initialMoves={initialMoves}
-          onViewProfile={openProfile}
-        />
-      </Suspense>
-    </div>
-  ) : (
-    <div className="p-6 text-center text-muted-foreground text-sm">
-      This game type isn't supported here.
-    </div>
+  const connected = status === "connected";
+  const gameNode = useMemo(
+    () =>
+      GameClient ? (
+        <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
+          <Suspense fallback={<GameSkeleton />}>
+            <GameClient
+              gameId={gameId}
+              userId={userId}
+              socket={socket}
+              connected={connected}
+              initialGame={initialGame}
+              initialMoves={initialMoves}
+              onViewProfile={openProfile}
+            />
+          </Suspense>
+        </div>
+      ) : (
+        <div className="p-6 text-center text-muted-foreground text-sm">
+          This game type isn't supported here.
+        </div>
+      ),
+    [
+      GameClient,
+      GameSkeleton,
+      gameId,
+      userId,
+      socket,
+      connected,
+      initialGame,
+      initialMoves,
+      openProfile,
+    ],
   );
 
   const overlay = (
