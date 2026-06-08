@@ -1,20 +1,27 @@
 "use client";
 
 import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { GameJson, SeriesDetail } from "@gamelobby/shared/types";
+import type {
+  ConversationJson,
+  GameJson,
+  SeriesDetail,
+} from "@gamelobby/shared/types";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FaTrophy } from "react-icons/fa6";
 import { SeriesDetailModal } from "@/components/games/series-detail-modal";
 import { SeriesScoreboard } from "@/components/games/series-scoreboard";
-import { Button } from "@/components/ui";
+import { Button, Character } from "@/components/ui";
 import { clientFetchJson } from "@/lib/api-client";
+import { conversationHref } from "@/lib/chat/conversation-href";
 import { useLayeredPopup } from "@/lib/popups/use-layered-popup";
 import {
   emitAck,
   useSocket,
   useSocketEvent,
 } from "@/lib/socket/socket-context";
+import { cn } from "@/lib/utils";
 
 function isOver(status: string): boolean {
   return status === "completed" || status === "abandoned";
@@ -27,18 +34,57 @@ function outcomeLabel(game: GameJson, userId: string): string {
   return game.winner === userId ? "You won! 🎉" : "You lost";
 }
 
+function PlayersRow({ game }: { game: GameJson }) {
+  return (
+    <div className="flex items-start justify-center gap-8">
+      {game.players.map((p) => {
+        const won = game.winner === p.userId;
+        return (
+          <div key={p.userId} className="flex flex-col items-center gap-1">
+            <div
+              className={cn(
+                "rounded-full",
+                won &&
+                  "ring-2 ring-amber-500 ring-offset-2 ring-offset-surface-raised",
+              )}
+            >
+              <Character
+                config={p.avatar ?? null}
+                fallbackSeed={p.username}
+                size={56}
+                className="rounded-full border-2 border-card bg-surface-overlay"
+              />
+            </div>
+            <span className="max-w-24 truncate text-sm">{p.username}</span>
+            {won ? (
+              <FaTrophy
+                className="text-amber-500"
+                size={14}
+                aria-hidden="true"
+              />
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function GameOverOverlay({
   gameId,
   userId,
   initialGame,
+  conversation,
 }: {
   gameId: string;
   userId: string;
   initialGame: GameJson;
+  conversation: ConversationJson | null;
 }) {
   const router = useRouter();
   const { socket } = useSocket();
-  const { openLayer } = useLayeredPopup();
+  const { openLayer, layers } = useLayeredPopup();
+  const cardRef = useRef<HTMLDivElement>(null);
   const [game, setGame] = useState<GameJson>(initialGame);
   const [open, setOpen] = useState(isOver(initialGame.status));
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
@@ -70,6 +116,18 @@ export function GameOverOverlay({
     };
   }, [open, gameId, game.status]);
 
+  const layerCount = layers.length;
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: MouseEvent) {
+      if (layerCount > 0) return;
+      const card = cardRef.current;
+      if (card && !card.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open, layerCount]);
+
   const isPlayer = game.players.some((p) => p.userId === userId);
   const canRematch =
     isPlayer && game.status === "completed" && !!game.conversationId;
@@ -95,62 +153,68 @@ export function GameOverOverlay({
     }
   }, [socket, gameId, rematchCode, router]);
 
-  if (!open || !isOver(game.status)) return null;
-
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={() => setOpen(false)}
-      >
-        <motion.div
-          className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl"
-          initial={{ opacity: 0, y: 8, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.97 }}
-          transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.18 }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <h2 className="mb-4 text-center font-bold text-xl">
-            {outcomeLabel(game, userId)}
-          </h2>
-          {showSeries && detail ? (
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
+      <AnimatePresence>
+        {open && isOver(game.status) ? (
+          <motion.div
+            ref={cardRef}
+            className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"
+            initial={{ opacity: 0, y: 8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.97 }}
+            transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.18 }}
+          >
+            <h2 className="mb-4 text-center font-bold text-xl">
+              {outcomeLabel(game, userId)}
+            </h2>
             <div className="mb-4">
-              <SeriesScoreboard score={detail.score} />
+              {showSeries && detail ? (
+                <SeriesScoreboard score={detail.score} />
+              ) : (
+                <PlayersRow game={game} />
+              )}
             </div>
-          ) : null}
-          {error ? (
-            <p className="mb-2 text-center text-danger text-sm">{error}</p>
-          ) : null}
-          <div className="flex flex-col gap-2">
-            {canRematch ? (
-              <Button onClick={onRematch} disabled={busy}>
-                {rematchCode ? "Go to rematch" : "Rematch"}
-              </Button>
+            {error ? (
+              <p className="mb-2 text-center text-danger text-sm">{error}</p>
             ) : null}
-            {showSeries ? (
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  openLayer({
-                    title: "Series",
-                    content: <SeriesDetailModal gameId={gameId} />,
-                    size: "md",
-                  })
-                }
-              >
-                View series
+            <div className="flex flex-col gap-2">
+              {canRematch ? (
+                <Button onClick={onRematch} disabled={busy}>
+                  {rematchCode ? "Go to rematch" : "Rematch"}
+                </Button>
+              ) : null}
+              {conversation ? (
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    router.push(conversationHref(conversation, userId))
+                  }
+                >
+                  Chat
+                </Button>
+              ) : null}
+              {showSeries ? (
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    openLayer({
+                      title: "Series",
+                      content: <SeriesDetailModal gameId={gameId} />,
+                      size: "md",
+                    })
+                  }
+                >
+                  View series
+                </Button>
+              ) : null}
+              <Button variant="ghost" onClick={() => setOpen(false)}>
+                Close
               </Button>
-            ) : null}
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Close
-            </Button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
   );
 }

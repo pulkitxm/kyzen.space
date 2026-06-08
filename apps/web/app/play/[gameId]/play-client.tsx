@@ -77,6 +77,7 @@ export function PlayClient({
       gameId={gameId}
       userId={userId}
       initialGame={initialGame}
+      conversation={conversation}
     />
   );
 
