@@ -95,9 +95,6 @@ export function GameCardMessage({
           <div className="truncate font-medium text-sm">
             {gameName(meta.gameType)}
           </div>
-          <div className="truncate text-muted-foreground text-xs">
-            Started by {meta.creatorUsername}
-          </div>
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-2">
