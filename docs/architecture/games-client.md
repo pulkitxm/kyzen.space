@@ -15,7 +15,8 @@ A second key idea is **resolution by `type` string**. The web app has a single d
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/games-client/src/index.ts` | Public package surface: re-exports `getGameClient`, `getGameSkeleton`, `DefaultGameSkeleton`, `SkeletonBox`, and the `GameClientProps` type. |
+| `packages/games-client/src/index.ts` | Public package surface: re-exports `getGameClient`, `getGameSkeleton`, `DefaultGameSkeleton`, `SkeletonBox`, the `GameClientProps` type, the playing-card primitives, and the game-audio API (`getGameAudioEngine`, `useGameAudio`, `clampVolume`/`stepVolume`/`shouldPlayMusic` — see [audio.md](./audio.md)). |
+| `packages/games-client/src/audio/` | The jotai-free `GameAudioEngine` (Web Audio SFX + procedural background music) and the `useGameAudio()` hook. Consumed by the boards (SFX) and by `apps/web`'s audio bridge (volume/mute/active). |
 | `packages/games-client/src/types.ts` | `GameClientProps` — the contract every board component receives (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`). |
 | `packages/games-client/src/registry.ts` | Two registries keyed by the typed `GameType` from `@gamelobby/shared`: `REGISTRY` (board components — `ComponentType<GameClientProps>`, currently the statically-imported `TicTacToeGameClient`) and `SKELETON_REGISTRY` (eager skeleton components). `getGameClient(type)` returns the board (`null` for unknown types); `getGameSkeleton(type)` returns the skeleton, falling back to `DefaultGameSkeleton`. |
 | `packages/games-client/src/skeletons.tsx` | `SkeletonBox` (a pulse-animated placeholder primitive) and `DefaultGameSkeleton` (the generic board placeholder). No `"use client"` — pure markup, so it renders in both server and client trees. |
@@ -43,6 +44,15 @@ Authoritative counterpart on the server:
 The package's public surface is small:
 
 ```ts
+export {
+  clampVolume,
+  GameAudioEngine,
+  getGameAudioEngine,
+  type MusicState,
+  shouldPlayMusic,
+  stepVolume,
+} from "./audio/engine";
+export { useGameAudio } from "./audio/use-game-audio";
 export { getGameClient, getGameSkeleton } from "./registry";
 export { DefaultGameSkeleton, SkeletonBox } from "./skeletons";
 export type { GameClientProps } from "./types";

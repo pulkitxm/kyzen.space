@@ -24,6 +24,9 @@ import {
 import { cn } from "@/lib/utils";
 import { ChatFloatingIcon } from "./chat-floating-icon";
 import { ChatPopoutWindow } from "./chat-popout-window";
+import { GameSettingsGear } from "./game-settings-gear";
+
+const RESIZE_HANDLE_W = 6;
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -56,6 +59,7 @@ export function GameChatSplit({
   );
   const [icon, setIcon] = useState<IconPos>(initialLayout.icon);
   const [tab, setTab] = useState<"game" | "chat">("game");
+  const [isDesktop, setIsDesktop] = useState(false);
 
   const modeRef = useRef(mode);
   const widthRef = useRef(chatWidth);
@@ -158,6 +162,14 @@ export function GameChatSplit({
     return () => mq.removeEventListener("change", onChange);
   }, [persist]);
 
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const onChange = () => setIsDesktop(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -219,6 +231,7 @@ export function GameChatSplit({
   }, []);
 
   const isPopout = mode === "popout";
+  const docked = isDesktop && mode === "mounted" && !minimized;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -290,6 +303,11 @@ export function GameChatSplit({
             onCommit={persist}
           />
         )}
+
+        <GameSettingsGear
+          docked={docked}
+          offset={chatWidth + RESIZE_HANDLE_W}
+        />
       </div>
     </div>
   );

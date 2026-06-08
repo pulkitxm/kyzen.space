@@ -1,3 +1,4 @@
+export * from "./audio";
 export * from "./avatar";
 export * from "./chat";
 export * from "./chat-layout";

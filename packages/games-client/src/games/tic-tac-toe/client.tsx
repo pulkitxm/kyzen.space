@@ -14,6 +14,7 @@ import {
   FaPause,
   FaPlay,
 } from "react-icons/fa6";
+import { useGameAudio } from "../../audio/use-game-audio";
 import type { GameClientProps } from "../../types";
 import { TttMark, TttMarkDefs } from "./marks";
 import { PlayerBar } from "./player-bar";
@@ -193,6 +194,8 @@ export function TicTacToeGameClient({
   const [moves, setMoves] = useState<MoveJson[]>(initialMoves);
   const [error, setError] = useState<string | null>(null);
 
+  const audio = useGameAudio();
+
   const pastInitially =
     initialGame.status === "completed" || initialGame.status === "abandoned";
   const [replayStep, setReplayStep] = useState(() =>
@@ -328,6 +331,20 @@ export function TicTacToeGameClient({
     setWinState({ key: winLineKey, animate: winLineKey !== null });
   }
 
+  const prevStatusRef = useRef(initialGame.status);
+  const endSoundPlayedRef = useRef(false);
+  useEffect(() => {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = game.status;
+    if (endSoundPlayedRef.current) return;
+    const wasLive = prevStatus === "waiting" || prevStatus === "active";
+    if (wasLive && game.status === "completed" && game.winner) {
+      endSoundPlayedRef.current = true;
+      if (game.winner === "draw") audio.playDraw();
+      else audio.playWin();
+    }
+  }, [game.status, game.winner, audio]);
+
   const goFirst = useCallback(() => {
     setReplayPlaying(false);
     setReplayStep(0);
@@ -429,16 +446,20 @@ export function TicTacToeGameClient({
           const row = Math.floor(idx / 3);
           const col = idx % 3;
           const mark = state.board[idx];
-          const ghostMark = !isPast && canMove && mark === null ? myRole : null;
+          const playable =
+            !isPast && canMove && mark === null && game.status === "active";
+          const ghostMark = playable ? myRole : null;
           return (
             <button
               key={idx}
               type="button"
-              disabled={
-                isPast || !canMove || mark !== null || game.status !== "active"
-              }
-              onClick={() => makeMove(row, col)}
-              className="group flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised outline-none transition focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-surface-overlay disabled:cursor-default sm:size-28"
+              aria-disabled={!playable}
+              onMouseEnter={() => audio.playHover()}
+              onClick={() => {
+                audio.playTouch();
+                if (playable) makeMove(row, col);
+              }}
+              className={`group flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised outline-none transition focus-visible:ring-2 focus-visible:ring-ring sm:size-28 ${playable ? "cursor-pointer hover:bg-surface-overlay" : "cursor-default"}`}
             >
               {mark ? (
                 <TttMark mark={mark} className="size-16 sm:size-20" />

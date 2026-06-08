@@ -1,4 +1,13 @@
 export {
+  clampVolume,
+  GameAudioEngine,
+  getGameAudioEngine,
+  type MusicState,
+  shouldPlayMusic,
+  stepVolume,
+} from "./audio/engine";
+export { useGameAudio } from "./audio/use-game-audio";
+export {
   CardBack,
   Joker,
   type JokerProps,
