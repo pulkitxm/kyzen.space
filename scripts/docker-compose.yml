@@ -17,26 +17,12 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Optional: enables the Socket.IO redis-adapter for multi-instance scale-out.
+  # Enables the Socket.IO redis-adapter and the Redis-backed presence store.
   redis:
     image: redis:7
     container_name: gamelobby-redis
-    profiles:
-      - redis
     ports:
       - "${REDIS_HOST_PORT:-6379}:6379"
-    restart: unless-stopped
-
-  # Lightweight DB UI: `bun run db:studio`
-  adminer:
-    image: adminer:latest
-    container_name: gamelobby-adminer
-    profiles:
-      - studio
-    depends_on:
-      - postgres
-    ports:
-      - "127.0.0.1:${ADMINER_HOST_PORT:-18081}:8080"
     restart: unless-stopped
 
 volumes:
