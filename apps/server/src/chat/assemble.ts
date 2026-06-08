@@ -41,6 +41,12 @@ async function withGameCardStatus(
       seriesGames = [game];
     }
   }
+  const latest = seriesGames[seriesGames.length - 1];
+  const isLatestInSeries = !latest || latest.id === game.id;
+  const inSeries = seriesGames.length >= 2;
+  const seriesScore =
+    isLatestInSeries && inSeries ? computeSeriesScore(seriesGames) : undefined;
+  const seriesSuperseded = inSeries && !isLatestInSeries ? true : undefined;
   return {
     ...msg,
     gameId: game.code,
@@ -48,7 +54,8 @@ async function withGameCardStatus(
       status: game.status,
       winner: game.winner,
       players: (game.players ?? []) as GamePlayer[],
-      seriesScore: computeSeriesScore(seriesGames),
+      seriesScore,
+      seriesSuperseded,
     }),
   };
 }

@@ -22,6 +22,7 @@ export const gameCardMetaSchema = z
     winnerUsername: z.string().nullable().optional(),
     players: z.array(gameCardPlayerSchema).optional(),
     seriesScore: seriesScoreSchema.optional(),
+    seriesSuperseded: z.boolean().optional(),
   })
   .strict();
 

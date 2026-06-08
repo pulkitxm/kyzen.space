@@ -5,6 +5,7 @@ export type GameCardSnapshot = {
   winner: string | null;
   players: { userId: string; username: string; role: string }[];
   seriesScore?: SeriesScore;
+  seriesSuperseded?: boolean;
 };
 
 export function enrichGameCardMeta(
@@ -23,5 +24,6 @@ export function enrichGameCardMeta(
     winnerUsername,
     players: game.players,
     seriesScore: game.seriesScore,
+    seriesSuperseded: game.seriesSuperseded,
   };
 }
