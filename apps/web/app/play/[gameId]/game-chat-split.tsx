@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { clientFetch } from "@/lib/api-client";
-import { messagesAtomFamily } from "@/lib/chat/atoms";
+import { conversationUnreadAtomFamily } from "@/lib/chat/atoms";
 import {
   type ChatLayout,
   type ChatMode,
@@ -36,7 +36,7 @@ export function GameChatSplit({
 }: {
   conversationId: string;
   game: ReactNode;
-  chat: ReactNode;
+  chat: (visible: boolean) => ReactNode;
   initialLayout: ChatLayout;
   layoutTrusted: boolean;
 }) {
@@ -185,25 +185,16 @@ export function GameChatSplit({
     persist({ mode: "mounted" });
   }, [persist]);
 
-  const messages = useAtomValue(messagesAtomFamily(conversationId));
-  const unreadBaseRef = useRef(messages.length);
-  const [unread, setUnread] = useState(0);
-  useEffect(() => {
-    if (!minimized) return;
-    setUnread(Math.max(0, messages.length - unreadBaseRef.current));
-  }, [messages.length, minimized]);
+  const unread = useAtomValue(conversationUnreadAtomFamily(conversationId));
 
   const minimize = useCallback(() => {
-    unreadBaseRef.current = messages.length;
-    setUnread(0);
     setMinimized(true);
     persist({ minimized: true });
-  }, [persist, messages.length]);
+  }, [persist]);
 
   const restore = useCallback(() => {
     setMinimized(false);
     setStashEdge(null);
-    setUnread(0);
     persist({ minimized: false, stashEdge: null });
   }, [persist]);
 
@@ -252,7 +243,7 @@ export function GameChatSplit({
           onMouseDown={startDrag}
           className={cn(
             "w-1.5 shrink-0 cursor-col-resize bg-border/40 outline-none transition hover:bg-primary",
-            isPopout ? "hidden" : "hidden md:block",
+            isPopout || minimized ? "hidden" : "hidden md:block",
           )}
         />
 
@@ -268,7 +259,7 @@ export function GameChatSplit({
           onGeometryChange={setGeometry}
           onCommit={persist}
         >
-          <div className="min-h-0 w-full">{chat}</div>
+          <div className="min-h-0 w-full">{chat(!minimized)}</div>
         </ChatPopoutWindow>
 
         {minimized && (

@@ -72,15 +72,16 @@ export function PlayClient({
       initialLayout={initialLayout}
       layoutTrusted={layoutTrusted}
       game={gameNode}
-      chat={
+      chat={(visible) => (
         <ConversationView
           key={conversation.id}
           userId={userId}
+          visible={visible}
           initialConversation={conversation}
           initialMessages={initialMessages}
           initialNextCursor={initialNextCursor}
         />
-      }
+      )}
     />
   );
 }

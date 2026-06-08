@@ -24,11 +24,13 @@ import { TypingIndicator } from "./typing-indicator";
 
 export function ConversationView({
   userId,
+  visible = true,
   initialConversation,
   initialMessages,
   initialNextCursor,
 }: {
   userId: string;
+  visible?: boolean;
   initialConversation: ConversationJson;
   initialMessages: MessageJson[];
   initialNextCursor: string | null;
@@ -62,14 +64,15 @@ export function ConversationView({
   }, [conversationId, initialConversation, store]);
 
   useEffect(() => {
+    if (!visible) return;
     setActive(conversationId);
     return () => setActive(null);
-  }, [conversationId, setActive]);
+  }, [conversationId, setActive, visible]);
 
   const last = messages[messages.length - 1];
   const lastId = last && !last.pending ? last.id : null;
   useEffect(() => {
-    if (!lastId) return;
+    if (!visible || !lastId) return;
     void emitAck(socket, CHAT_EVENTS.markRead, {
       conversationId,
       messageId: lastId,
@@ -77,7 +80,7 @@ export function ConversationView({
     store.set(conversationsAtom, (prev) =>
       prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c)),
     );
-  }, [lastId, conversationId, socket, store]);
+  }, [lastId, conversationId, socket, store, visible]);
 
   const presence = useAtomValue(presenceAtom);
   const me = conversation.members.find((m) => m.id === userId);
