@@ -312,7 +312,7 @@ This is the payoff of the whole design — the same engine that informs the clie
 
 So the path is: **client `make_move` -> `turn-based.ts:125` -> `getDefinition` `turn-based.ts:140` -> `moveSchema`/`stateSchema` parse `turn-based.ts:143`/`:145` -> `engine.reduce` `turn-based.ts:148` (which itself re-runs `tic-tac-toe/engine.ts:70`) -> persist + broadcast.** The client supplied data; the engine decided truth.
 
-The seating side mirrors this: `ensureSeated` reads `engine.maxPlayers` to know if a seat is free, `engine.roles[players.length]` to assign the next role, and `engine.minPlayers` to flip the game to `active` (`apps/server/src/realtime/turn-based.ts:43`–`:72`). Its `gameState ?? engine.createInitialState(...)` line is a fallback only — the creator's seat already minted the starting state at creation (`apps/server/src/chat/games-in-chat-service.ts:75`).
+The seating side mirrors this: `ensureSeated` reads `engine.maxPlayers` to know if a seat is free, `engine.roles[players.length]` to assign the next role, and `engine.minPlayers` to flip the game to `active` (`apps/server/src/realtime/turn-based.ts:43`–`:72`). Its `gameState ?? engine.createInitialState(...)` line is a fallback only — the creator's seat already minted the starting state at creation (`apps/server/src/chat/games-in-chat-service.ts:130`). (A **rematch** also pre-seats all prior players via `computeRematchSeating` before the first `join_room`, so `ensureSeated` only ever resubscribes them — see [`realtime.md`](./realtime.md).)
 
 ## The conformance suite: invariants every game must satisfy
 

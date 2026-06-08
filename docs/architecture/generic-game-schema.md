@@ -130,7 +130,7 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
 
 ### Phase 1 — Alice creates the game (status: `"waiting"`)
 
-Alice creates the game from a conversation. `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:19`) seats the **creator** as the first player — `firstRole` = `engine.roles[0]` → `"X"` (`const [firstRole] = engine.roles`, `:63`) — and initializes `game_state` in the *same* insert via `engine.createInitialState([{ role: firstRole }])` (`:75`). `createGame` writes the `game` row and the creator's `game_player` row in one transaction (`packages/database/src/repositories/games.ts:28`). So after creation **two** rows already exist:
+Alice creates the game from a conversation. `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:66`) seats the **creator** as the first player — `firstRole` = `engine.roles[0]` → `"X"` (`const [firstRole] = engine.roles`, `:118`) — and initializes `game_state` in the *same* insert via `engine.createInitialState([{ role: firstRole }])` (`:130`). `createGame` writes the `game` row and the creator's `game_player` row in one transaction (`packages/database/src/repositories/games.ts:29`) and defaults `series_id` to the row's own id (a brand-new game is its own one-game series). So after creation **two** rows already exist:
 
 ```
 game row
@@ -141,6 +141,7 @@ game row
   game_state   : { "board": [null,null,null,null,null,null,null,null,null],
                    "currentTurn": "X" }
   config       : {}
+  series_id    : "g-001"          ← defaults to its own id; a rematch copies it
 
 game_player row
   id         : "gp-001"
@@ -151,7 +152,7 @@ game_player row
   seat_order : 0
 ```
 
-`game_state` is **not** `null` at creation — `createInitialState` runs immediately, so the board exists before the second player arrives. `status` stays `"waiting"` only because the game still needs a second seat to become `"active"`. `config` is `{}` — the result of `definition.configSchema.safeParse(input.config ?? {})`, validated at `games-in-chat-service.ts:35`. An empty object is still a legal value; it occupies the column so future games that **do** use config (e.g. a board-size setting) write their validated config here.
+`game_state` is **not** `null` at creation — `createInitialState` runs immediately, so the board exists before the second player arrives. `status` stays `"waiting"` only because the game still needs a second seat to become `"active"`. `config` is `{}` — the result of `definition.configSchema.safeParse(input.config ?? {})`, validated at `games-in-chat-service.ts:90`. An empty object is still a legal value; it occupies the column so future games that **do** use config (e.g. a board-size setting) write their validated config here.
 
 ### Phase 2 — Bob joins, the last seat fills (status: `"active"`)
 
@@ -297,9 +298,9 @@ After `step` resolves the tick, a new `game_state` is written with the outcome a
 
 ```
 creator creates game (seated as the first player)
-  → role = engine.roles[0]                            (games-in-chat-service.ts:63)
-  → game_state = engine.createInitialState([{ role }]) (games-in-chat-service.ts:75)
-  → insert game row + creator's game_player row        (games.ts:28)
+  → role = engine.roles[0]                            (games-in-chat-service.ts:118)
+  → game_state = engine.createInitialState([{ role }]) (games-in-chat-service.ts:130)
+  → insert game row + creator's game_player row        (games.ts:29)
       status "waiting", game_state already set
 
 each additional player joins
@@ -325,8 +326,8 @@ server broadcasts move_made + game_state to room      (turn-based.ts:166)
 
 - **`game_state` is `unknown` until `safeParse`'d.** Read the raw row and you have bytes. The repository hands you an `unknown`; the caller is responsible for parsing it through the game's Zod schema before passing it to the engine.
 - **`move_number` is dense and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` rejects a double-submit at the constraint level — the server does not need an advisory lock.
-- **Role assignment is seat-order-dependent.** The creator takes `engine.roles[0]` at creation (`games-in-chat-service.ts:63`); each later joiner takes `engine.roles[players.length]`, evaluated *before* their `game_player` row is inserted (`turn-based.ts:58`). Seat `i` always gets `roles[i]` — you cannot choose your role.
-- **`createInitialState` fires once, at creation.** `createGameInConversation` mints the initial `game_state` in the creating insert (`games-in-chat-service.ts:75`), not when the last seat fills. The `gameRow.gameState ?? engine.createInitialState(...)` guard on join (`turn-based.ts:67`) is a fallback the normal flow never triggers, because the state already exists. Reaching `"active"` only flips `status`; it does not re-mint state.
+- **Role assignment is seat-order-dependent.** The creator takes `engine.roles[0]` at creation (`games-in-chat-service.ts:118`); each later joiner takes `engine.roles[players.length]`, evaluated *before* their `game_player` row is inserted (`turn-based.ts:58`). Seat `i` always gets `roles[i]` — you cannot choose your role. (A **rematch** instead pre-seats every prior player up front in `computeRematchSeating` order — loser-first for 2 players — so seat 0 / `roles[0]` goes to the loser; see [`realtime.md`](./realtime.md).)
+- **`createInitialState` fires once, at creation.** `createGameInConversation` mints the initial `game_state` in the creating insert (`games-in-chat-service.ts:130`), not when the last seat fills. The `gameRow.gameState ?? engine.createInitialState(...)` guard on join (`turn-based.ts:67`) is a fallback the normal flow never triggers, because the state already exists. Reaching `"active"` only flips `status`; it does not re-mint state.
 - **`move.player_id` is plain `text`, not a foreign key.** It stores the mover's `user.id` but declares no `references()` constraint — same for `game_player.user_id`. (`user.id` is Better Auth `text`; the game tables hold it without an FK.)
 - **The public id is `code`; the FK/PK id is `uuid`.** Clients only ever see and send the short `code` (`/play/<code>`, socket `gameId`); the server resolves it with `getGameByCode` and uses the internal `uuid` for FK joins and writes. `serializeGame` maps `row.code → GameJson.id`, so the UUID never leaves the server. Only **games** moved to codes — conversations/messages/friendships/users/profiles keep their UUIDs.
 - **No per-game tables, ever.** If you find yourself thinking "I need a `connect_four_state` column," the answer is: add it to the state schema and let it live in `game_state`.

@@ -8,7 +8,7 @@ GameLobby is a [Bun](https://bun.sh) + [Turborepo](https://turbo.build) monorepo
 
 - **Live games** over Socket.IO — a generic, schema-driven engine; adding a game needs no new routes, tables, or socket events.
 - **Chat & social** — DMs and group conversations, friends, presence, typing indicators, and notifications, all realtime.
-- **Games in chat** — start a match from a conversation; it appears as a live game card that updates as the game progresses.
+- **Games in chat** — start a match from a conversation; it appears as a live game card that updates as the game progresses. When a game ends, a result modal offers a **rematch** that re-invites the same players (loser goes first) into a linked **series**, and the card shows the running series score.
 - **Auth** — Google sign-in via [Better Auth](https://better-auth.com), with a profile (username, avatar, stats, theme) provisioned on first sign-in.
 
 ## Tech stack
