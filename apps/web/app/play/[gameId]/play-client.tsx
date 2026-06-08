@@ -7,6 +7,7 @@ import {
 } from "@gamelobby/games-client";
 import type {
   ConversationJson,
+  GameJson,
   GameType,
   MessageJson,
 } from "@gamelobby/shared/types";
@@ -18,6 +19,7 @@ import { useGameAudioBridge } from "@/lib/audio/use-audio-bridge";
 import type { ChatLayout } from "@/lib/chat-layout";
 import { useSocket } from "@/lib/socket/socket-context";
 import { GameChatSplit } from "./game-chat-split";
+import { GameOverOverlay } from "./game-over-overlay";
 import { GameSettingsGear } from "./game-settings-gear";
 
 export function PlayClient({
@@ -35,7 +37,7 @@ export function PlayClient({
   gameId: string;
   userId: string;
   gameType: GameType;
-  initialGame: GameClientProps["initialGame"];
+  initialGame: GameJson;
   initialMoves: GameClientProps["initialMoves"];
   conversation: ConversationJson | null;
   initialMessages: MessageJson[];
@@ -70,31 +72,43 @@ export function PlayClient({
     </div>
   );
 
+  const overlay = (
+    <GameOverOverlay
+      gameId={gameId}
+      userId={userId}
+      initialGame={initialGame}
+    />
+  );
+
   if (!conversation) {
     return (
       <div className="relative h-full min-h-0">
         {gameNode}
         <GameSettingsGear shifted={false} offset={0} />
+        {overlay}
       </div>
     );
   }
 
   return (
-    <GameChatSplit
-      conversationId={conversation.id}
-      initialLayout={initialLayout}
-      layoutTrusted={layoutTrusted}
-      game={gameNode}
-      chat={(visible) => (
-        <ConversationView
-          key={conversation.id}
-          userId={userId}
-          visible={visible}
-          initialConversation={conversation}
-          initialMessages={initialMessages}
-          initialNextCursor={initialNextCursor}
-        />
-      )}
-    />
+    <>
+      <GameChatSplit
+        conversationId={conversation.id}
+        initialLayout={initialLayout}
+        layoutTrusted={layoutTrusted}
+        game={gameNode}
+        chat={(visible) => (
+          <ConversationView
+            key={conversation.id}
+            userId={userId}
+            visible={visible}
+            initialConversation={conversation}
+            initialMessages={initialMessages}
+            initialNextCursor={initialNextCursor}
+          />
+        )}
+      />
+      {overlay}
+    </>
   );
 }

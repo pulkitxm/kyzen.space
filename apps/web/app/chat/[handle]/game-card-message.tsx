@@ -1,9 +1,16 @@
 "use client";
 
 import { listGameMeta } from "@gamelobby/games-core";
+import { CHAT_EVENTS } from "@gamelobby/shared/constants";
 import type { GameCardMeta, GameType } from "@gamelobby/shared/types";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { FaGamepad } from "react-icons/fa6";
+import { SeriesDetailModal } from "@/components/games/series-detail-modal";
+import { SeriesScoreboard } from "@/components/games/series-scoreboard";
+import { useLayeredPopup } from "@/lib/popups/use-layered-popup";
+import { emitAck, useSocket } from "@/lib/socket/socket-context";
 import { cn } from "@/lib/utils";
 
 function gameName(gameType: GameType): string {
@@ -19,10 +26,19 @@ export function GameCardMessage({
   meta: GameCardMeta;
   userId: string;
 }) {
+  const { socket } = useSocket();
+  const { openLayer } = useLayeredPopup();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
   const status = meta.status ?? "waiting";
   const players = meta.players ?? [];
   const isPlayer = players.some((p) => p.userId === userId);
   const isChallenged = meta.challengedUserId === userId;
+
+  const seriesScore = meta.seriesScore;
+  const showSeries = (seriesScore?.totalGames ?? 0) >= 2;
+  const canRematch = status === "completed" && isPlayer;
 
   let action = "Open";
   if (status === "completed") action = "View";
@@ -50,6 +66,20 @@ export function GameCardMessage({
   const href =
     action === "Spectate" ? `/play/${gameId}?spectate=1` : `/play/${gameId}`;
 
+  async function onRematch() {
+    setBusy(true);
+    try {
+      const res = await emitAck<{ gameId: string }>(
+        socket,
+        CHAT_EVENTS.rematch,
+        { gameId },
+      );
+      router.push(`/play/${res.gameId}`);
+    } catch {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="w-80 max-w-full rounded-2xl border border-border bg-surface-raised p-3">
       <div className="flex items-center gap-2.5">
@@ -76,6 +106,36 @@ export function GameCardMessage({
           {action}
         </Link>
       </div>
+      {showSeries && seriesScore ? (
+        <div className="mt-3 flex flex-col gap-3 border-border border-t pt-3">
+          <SeriesScoreboard score={seriesScore} />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                openLayer({
+                  title: "Series",
+                  content: <SeriesDetailModal gameId={gameId} />,
+                  size: "md",
+                })
+              }
+              className="flex-1 rounded-lg border border-border px-3 py-1.5 text-xs transition hover:bg-surface-overlay"
+            >
+              View series
+            </button>
+            {canRematch ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onRematch}
+                className="flex-1 rounded-lg bg-primary px-3 py-1.5 font-medium text-primary-foreground text-xs transition hover:bg-primary-hover disabled:opacity-50"
+              >
+                Rematch
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
