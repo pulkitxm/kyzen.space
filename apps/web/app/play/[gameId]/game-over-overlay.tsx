@@ -86,7 +86,7 @@ export function GameOverOverlay({
   const { openLayer, layers } = useLayeredPopup();
   const cardRef = useRef<HTMLDivElement>(null);
   const [game, setGame] = useState<GameJson>(initialGame);
-  const [open, setOpen] = useState(isOver(initialGame.status));
+  const [open, setOpen] = useState(() => isOver(initialGame.status));
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
   const [rematchCode, setRematchCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
