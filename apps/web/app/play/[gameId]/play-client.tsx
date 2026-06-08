@@ -12,6 +12,7 @@ import type {
 } from "@gamelobby/shared/types";
 import { Suspense } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
+import { gameMusicSource } from "@/lib/audio/music-sources";
 import { useGameAudioBridge } from "@/lib/audio/use-audio-bridge";
 import type { ChatLayout } from "@/lib/chat-layout";
 import { useSocket } from "@/lib/socket/socket-context";
@@ -45,7 +46,7 @@ export function PlayClient({
   const GameSkeleton = getGameSkeleton(gameType);
   const { socket, status } = useSocket();
 
-  useGameAudioBridge();
+  useGameAudioBridge(gameMusicSource(gameType));
 
   const gameNode = GameClient ? (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">

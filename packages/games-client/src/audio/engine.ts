@@ -27,58 +27,43 @@ export function shouldPlayMusic(state: MusicState): boolean {
   return state.active && !state.muted && state.volume > 0 && state.running;
 }
 
-type Tone = {
-  type: OscillatorType;
-  freq: number;
-  duration: number;
-};
+export type SfxKey = "hover" | "touch" | "win" | "draw";
+export type SfxSources = Partial<Record<SfxKey, string>>;
 
-const HOVER_TONE: Tone = { type: "triangle", freq: 600, duration: 0.05 };
-const TOUCH_TONE: Tone = { type: "square", freq: 800, duration: 0.1 };
-const DRAW_TONE: Tone = { type: "sawtooth", freq: 300, duration: 0.5 };
+const SFX_KEYS: SfxKey[] = ["hover", "touch", "win", "draw"];
 
-const WIN_SEQUENCE: { freq: number; offset: number; duration: number }[] = [
-  { freq: 523.25, offset: 0, duration: 0.2 },
-  { freq: 659.25, offset: 0.1, duration: 0.2 },
-  { freq: 783.99, offset: 0.2, duration: 0.2 },
-  { freq: 1046.5, offset: 0.3, duration: 0.4 },
-];
-
-const SFX_PEAK_GAIN = 0.3;
-const SFX_FLOOR_GAIN = 0.01;
-
-const MUSIC_STEP_S = 0.5;
-const MUSIC_LOOKAHEAD_S = 0.15;
-const MUSIC_TIMER_MS = 40;
-const MUSIC_NOTE_GAIN = 0.12;
-const MUSIC_NOTES_PER_CHORD = 4;
-
-const MUSIC_PROGRESSION: number[][] = [
-  [261.63, 329.63, 392.0, 329.63],
-  [392.0, 493.88, 587.33, 493.88],
-  [220.0, 277.18, 329.63, 277.18],
-  [349.23, 440.0, 523.25, 440.0],
-];
+const MUSIC_FADE_S = 2.5;
 
 export class GameAudioEngine {
   private ctx: AudioContext | null = null;
   private musicGain: GainNode | null = null;
+  private sfxGain: GainNode | null = null;
   private sfxVolume = DEFAULT_SFX_VOLUME;
   private sfxMuted = false;
   private musicVolume = DEFAULT_MUSIC_VOLUME;
   private musicMuted = false;
   private musicActive = false;
-  private musicTimer: number | null = null;
-  private musicStep = 0;
-  private nextNoteTime = 0;
+  private musicUrl: string | null = null;
+  private musicElement: HTMLAudioElement | null = null;
+  private musicElementNode: MediaElementAudioSourceNode | null = null;
+  private musicFileGain: GainNode | null = null;
+  private musicLastTime = 0;
+  private musicFadingOut = false;
+  private sfxUrls: SfxSources = {};
+  private sfxBuffers: Partial<Record<SfxKey, AudioBuffer>> = {};
+  private sfxLoading = new Set<SfxKey>();
 
   private ensureContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
     if (!this.ctx) {
       this.ctx = new AudioContext();
+      this.ctx.onstatechange = () => this.reconcileMusic();
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.value = this.musicMuted ? 0 : this.musicVolume;
       this.musicGain.connect(this.ctx.destination);
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = this.sfxMuted ? 0 : this.sfxVolume;
+      this.sfxGain.connect(this.ctx.destination);
     }
     return this.ctx;
   }
@@ -88,14 +73,23 @@ export class GameAudioEngine {
     if (!ctx) return;
     if (ctx.state === "suspended") void ctx.resume();
     this.reconcileMusic();
+    this.preloadSfx();
   }
 
   setSfxVolume(volume: number): void {
     this.sfxVolume = clampVolume(volume);
+    this.applySfxGain();
   }
 
   setSfxMuted(muted: boolean): void {
     this.sfxMuted = muted;
+    this.applySfxGain();
+  }
+
+  setSfxSources(sources: SfxSources): void {
+    this.sfxUrls = { ...sources };
+    this.sfxBuffers = {};
+    this.preloadSfx();
   }
 
   setMusicVolume(volume: number): void {
@@ -113,59 +107,89 @@ export class GameAudioEngine {
     this.reconcileMusic();
   }
 
+  setMusicSource(url: string | null): void {
+    if (this.musicUrl === url) return;
+    this.musicUrl = url;
+    this.teardownFileMusic();
+    this.reconcileMusic();
+  }
+
   playHover(): void {
-    this.playTone(HOVER_TONE);
+    this.playSfx("hover");
   }
 
   playTouch(): void {
-    this.playTone(TOUCH_TONE);
-  }
-
-  playDraw(): void {
-    this.playTone(DRAW_TONE);
+    this.playSfx("touch");
   }
 
   playWin(): void {
+    this.playSfx("win");
+  }
+
+  playDraw(): void {
+    this.playSfx("draw");
+  }
+
+  private applySfxGain(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxGain) return;
+    this.sfxGain.gain.setTargetAtTime(
+      this.sfxMuted ? 0 : this.sfxVolume,
+      ctx.currentTime,
+      0.02,
+    );
+  }
+
+  private playSfx(key: SfxKey): void {
     const ctx = this.ensureContext();
     if (!ctx || this.sfxMuted || this.sfxVolume <= 0) return;
     if (ctx.state === "suspended") void ctx.resume();
-    for (const note of WIN_SEQUENCE) {
-      this.scheduleTone(
-        "sine",
-        note.freq,
-        ctx.currentTime + note.offset,
-        note.duration,
-      );
+    const buffer = this.sfxBuffers[key];
+    if (buffer) {
+      this.fireSfx(ctx, buffer);
+      return;
+    }
+    const url = this.sfxUrls[key];
+    if (url) void this.loadSfx(ctx, key, url, true);
+  }
+
+  private fireSfx(ctx: AudioContext, buffer: AudioBuffer): void {
+    if (!this.sfxGain) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(this.sfxGain);
+    src.start();
+  }
+
+  private async loadSfx(
+    ctx: AudioContext,
+    key: SfxKey,
+    url: string,
+    playAfter: boolean,
+  ): Promise<void> {
+    if (this.sfxBuffers[key] || this.sfxLoading.has(key)) return;
+    this.sfxLoading.add(key);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+      this.sfxBuffers[key] = buffer;
+      if (playAfter && !this.sfxMuted && this.sfxVolume > 0) {
+        this.fireSfx(ctx, buffer);
+      }
+    } catch {
+    } finally {
+      this.sfxLoading.delete(key);
     }
   }
 
-  private playTone(tone: Tone): void {
-    const ctx = this.ensureContext();
-    if (!ctx || this.sfxMuted || this.sfxVolume <= 0) return;
-    if (ctx.state === "suspended") void ctx.resume();
-    this.scheduleTone(tone.type, tone.freq, ctx.currentTime, tone.duration);
-  }
-
-  private scheduleTone(
-    type: OscillatorType,
-    freq: number,
-    startTime: number,
-    duration: number,
-  ): void {
+  private preloadSfx(): void {
     const ctx = this.ctx;
     if (!ctx) return;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, startTime);
-    const peak = Math.max(0.0001, SFX_PEAK_GAIN * this.sfxVolume);
-    const floor = Math.max(0.00001, SFX_FLOOR_GAIN * this.sfxVolume);
-    gain.gain.setValueAtTime(peak, startTime);
-    gain.gain.exponentialRampToValueAtTime(floor, startTime + duration);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(startTime);
-    osc.stop(startTime + duration + 0.03);
+    for (const key of SFX_KEYS) {
+      const url = this.sfxUrls[key];
+      if (url) void this.loadSfx(ctx, key, url, false);
+    }
   }
 
   private reconcileMusic(): void {
@@ -184,52 +208,102 @@ export class GameAudioEngine {
       volume: this.musicVolume,
       running,
     });
-    if (shouldPlay && this.musicTimer === null) this.startMusicLoop();
-    else if (!shouldPlay && this.musicTimer !== null) this.stopMusicLoop();
+    if (shouldPlay) this.startMusic();
+    else this.stopMusic();
   }
 
-  private startMusicLoop(): void {
+  private startMusic(): void {
     const ctx = this.ctx;
-    if (!ctx) return;
-    this.nextNoteTime = ctx.currentTime + 0.1;
-    this.musicTimer = window.setInterval(() => {
-      const now = this.ctx?.currentTime ?? 0;
-      while (this.nextNoteTime < now + MUSIC_LOOKAHEAD_S) {
-        this.scheduleMusicNote(this.musicStep, this.nextNoteTime);
-        this.musicStep += 1;
-        this.nextNoteTime += MUSIC_STEP_S;
-      }
-    }, MUSIC_TIMER_MS);
+    if (!ctx || !this.musicUrl) return;
+    this.startFileMusic(ctx);
   }
 
-  private stopMusicLoop(): void {
-    if (this.musicTimer !== null) {
-      window.clearInterval(this.musicTimer);
-      this.musicTimer = null;
+  private stopMusic(): void {
+    this.stopFileMusic();
+  }
+
+  private startFileMusic(ctx: AudioContext): void {
+    const url = this.musicUrl;
+    if (!url || !this.musicGain) return;
+    if (!this.musicElement) {
+      const el = new Audio(url);
+      el.loop = true;
+      el.preload = "auto";
+      el.addEventListener("error", () => {
+        this.musicUrl = null;
+        this.teardownFileMusic();
+      });
+      el.addEventListener("timeupdate", () => this.handleMusicTimeUpdate());
+      const fileGain = ctx.createGain();
+      fileGain.gain.value = 0.0001;
+      const node = ctx.createMediaElementSource(el);
+      node.connect(fileGain);
+      fileGain.connect(this.musicGain);
+      this.musicElement = el;
+      this.musicElementNode = node;
+      this.musicFileGain = fileGain;
+      this.musicLastTime = 0;
+      this.musicFadingOut = false;
+    }
+    void this.musicElement.play().catch(() => {});
+    this.fadeMusicIn();
+  }
+
+  private fadeMusicIn(): void {
+    const ctx = this.ctx;
+    const gain = this.musicFileGain;
+    if (!ctx || !gain) return;
+    this.musicFadingOut = false;
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(
+      Math.max(0.0001, gain.gain.value),
+      ctx.currentTime,
+    );
+    gain.gain.linearRampToValueAtTime(1, ctx.currentTime + MUSIC_FADE_S);
+  }
+
+  private handleMusicTimeUpdate(): void {
+    const ctx = this.ctx;
+    const el = this.musicElement;
+    const gain = this.musicFileGain;
+    if (!ctx || !el || !gain) return;
+    const duration = el.duration;
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    const time = el.currentTime;
+    if (time < this.musicLastTime - 0.5) this.fadeMusicIn();
+    this.musicLastTime = time;
+    const remaining = duration - time;
+    if (!this.musicFadingOut && remaining <= MUSIC_FADE_S) {
+      this.musicFadingOut = true;
+      gain.gain.cancelScheduledValues(ctx.currentTime);
+      gain.gain.setValueAtTime(
+        Math.max(0.0001, gain.gain.value),
+        ctx.currentTime,
+      );
+      gain.gain.linearRampToValueAtTime(
+        0.0001,
+        ctx.currentTime + Math.max(0.05, remaining),
+      );
     }
   }
 
-  private scheduleMusicNote(step: number, time: number): void {
-    const ctx = this.ctx;
-    if (!ctx || !this.musicGain) return;
-    const chord =
-      MUSIC_PROGRESSION[
-        Math.floor(step / MUSIC_NOTES_PER_CHORD) % MUSIC_PROGRESSION.length
-      ];
-    if (!chord) return;
-    const freq = chord[step % chord.length];
-    if (freq === undefined) return;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(freq, time);
-    gain.gain.setValueAtTime(0.00001, time);
-    gain.gain.exponentialRampToValueAtTime(MUSIC_NOTE_GAIN, time + 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.00001, time + MUSIC_STEP_S * 0.95);
-    osc.connect(gain);
-    gain.connect(this.musicGain);
-    osc.start(time);
-    osc.stop(time + MUSIC_STEP_S);
+  private stopFileMusic(): void {
+    this.musicElement?.pause();
+  }
+
+  private teardownFileMusic(): void {
+    if (this.musicElement) {
+      this.musicElement.pause();
+      this.musicElement.removeAttribute("src");
+      this.musicElement.load();
+      this.musicElementNode?.disconnect();
+      this.musicFileGain?.disconnect();
+      this.musicElement = null;
+      this.musicElementNode = null;
+      this.musicFileGain = null;
+      this.musicFadingOut = false;
+      this.musicLastTime = 0;
+    }
   }
 }
 

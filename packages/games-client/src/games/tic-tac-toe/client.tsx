@@ -202,6 +202,8 @@ export function TicTacToeGameClient({
     pastInitially ? initialMoves.length : 0,
   );
   const [replayPlaying, setReplayPlaying] = useState(false);
+  const replayStepRef = useRef(replayStep);
+  replayStepRef.current = replayStep;
 
   const isLive = game.status === "waiting" || game.status === "active";
 
@@ -220,17 +222,16 @@ export function TicTacToeGameClient({
   useEffect(() => {
     if (!isPast || !replayPlaying) return;
     const id = window.setInterval(() => {
-      setReplayStep((s) => {
-        const cur = Math.min(s, sortedLen);
-        if (cur >= sortedLen) {
-          queueMicrotask(() => setReplayPlaying(false));
-          return sortedLen;
-        }
-        return cur + 1;
-      });
+      const cur = Math.min(replayStepRef.current, sortedLen);
+      if (cur >= sortedLen) {
+        setReplayPlaying(false);
+        return;
+      }
+      audio.playTouch();
+      setReplayStep(cur + 1);
     }, REPLAY_MS);
     return () => window.clearInterval(id);
-  }, [isPast, replayPlaying, sortedLen]);
+  }, [isPast, replayPlaying, sortedLen, audio]);
 
   const prevIsLiveRef = useRef(
     initialGame.status === "waiting" || initialGame.status === "active",
@@ -345,6 +346,19 @@ export function TicTacToeGameClient({
     }
   }, [game.status, game.winner, audio]);
 
+  const liveFilled = useMemo(
+    () => liveState.board.reduce((n, cell) => (cell ? n + 1 : n), 0),
+    [liveState.board],
+  );
+  const prevLiveFilledRef = useRef(liveFilled);
+  useEffect(() => {
+    const prev = prevLiveFilledRef.current;
+    prevLiveFilledRef.current = liveFilled;
+    if (isPast || liveFilled <= prev) return;
+    if (myRole && liveState.currentTurn !== myRole) return;
+    audio.playTouch();
+  }, [liveFilled, isPast, myRole, liveState.currentTurn, audio]);
+
   const goFirst = useCallback(() => {
     setReplayPlaying(false);
     setReplayStep(0);
@@ -360,11 +374,11 @@ export function TicTacToeGameClient({
 
   const goNext = useCallback(() => {
     setReplayPlaying(false);
-    setReplayStep((s) => {
-      const cur = Math.min(s, sortedLen);
-      return Math.min(sortedLen, cur + 1);
-    });
-  }, [sortedLen]);
+    const cur = Math.min(replayStepRef.current, sortedLen);
+    if (cur >= sortedLen) return;
+    audio.playTouch();
+    setReplayStep(cur + 1);
+  }, [sortedLen, audio]);
 
   const goLast = useCallback(() => {
     setReplayPlaying(false);

@@ -3,6 +3,8 @@ export {
   GameAudioEngine,
   getGameAudioEngine,
   type MusicState,
+  type SfxKey,
+  type SfxSources,
   shouldPlayMusic,
   stepVolume,
 } from "./audio/engine";

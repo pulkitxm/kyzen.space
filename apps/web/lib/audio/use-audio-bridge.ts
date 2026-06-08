@@ -1,13 +1,32 @@
 "use client";
 
-import { getGameAudioEngine } from "@gamelobby/games-client";
+import { getGameAudioEngine, type SfxSources } from "@gamelobby/games-client";
 import { useAtomValue } from "jotai";
 import { useEffect } from "react";
 import { gameMusicAtom, gameSfxAtom } from "./atoms";
 
-export function useGameAudioBridge() {
+const SFX_SOURCES: SfxSources = {
+  hover: "/sounds/hover.mp3",
+  touch: "/sounds/click.mp3",
+  win: "/sounds/win.mp3",
+  draw: "/sounds/draw.mp3",
+};
+
+export function useGameAudioBridge(musicUrl?: string | null) {
   const sfx = useAtomValue(gameSfxAtom);
   const music = useAtomValue(gameMusicAtom);
+
+  useEffect(() => {
+    const engine = getGameAudioEngine();
+    if (!engine) return;
+    engine.setSfxSources(SFX_SOURCES);
+  }, []);
+
+  useEffect(() => {
+    const engine = getGameAudioEngine();
+    if (!engine) return;
+    engine.setMusicSource(musicUrl ?? null);
+  }, [musicUrl]);
 
   useEffect(() => {
     const engine = getGameAudioEngine();
