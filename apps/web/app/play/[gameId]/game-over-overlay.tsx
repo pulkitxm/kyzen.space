@@ -88,11 +88,11 @@ export function GameOverOverlay({
   const [game, setGame] = useState<GameJson>(initialGame);
   const [open, setOpen] = useState(() => isOver(initialGame.status));
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
-  const [rematchCode, setRematchCode] = useState<string | null>(null);
   const [rematch, setRematch] = useState<{
     busy: boolean;
     error: string | null;
-  }>({ busy: false, error: null });
+    code: string | null;
+  }>({ busy: false, error: null, code: null });
 
   useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
     setGame(payload.game);
@@ -101,7 +101,7 @@ export function GameOverOverlay({
   useSocketEvent<{ newGameId: string }>(
     CHAT_EVENTS.rematchCreated,
     (payload) => {
-      setRematchCode(payload.newGameId);
+      setRematch((r) => ({ ...r, code: payload.newGameId }));
     },
   );
 
@@ -136,11 +136,11 @@ export function GameOverOverlay({
   const showSeries = (detail?.score.totalGames ?? 0) >= 2;
 
   const onRematch = useCallback(async () => {
-    if (rematchCode) {
-      router.push(`/play/${rematchCode}`);
+    if (rematch.code) {
+      router.push(`/play/${rematch.code}`);
       return;
     }
-    setRematch({ busy: true, error: null });
+    setRematch((r) => ({ ...r, busy: true, error: null }));
     try {
       const res = await emitAck<{ gameId: string }>(
         socket,
@@ -149,12 +149,13 @@ export function GameOverOverlay({
       );
       router.push(`/play/${res.gameId}`);
     } catch (e) {
-      setRematch({
+      setRematch((r) => ({
+        ...r,
         busy: false,
         error: e instanceof Error ? e.message : "Couldn't start the rematch",
-      });
+      }));
     }
-  }, [socket, gameId, rematchCode, router]);
+  }, [socket, gameId, rematch.code, router]);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -187,7 +188,7 @@ export function GameOverOverlay({
               <div className="flex flex-col gap-2">
                 {canRematch ? (
                   <Button onClick={onRematch} disabled={rematch.busy}>
-                    {rematchCode ? "Go to rematch" : "Rematch"}
+                    {rematch.code ? "Go to rematch" : "Rematch"}
                   </Button>
                 ) : null}
                 {conversation ? (
