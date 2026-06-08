@@ -27,6 +27,7 @@ export const createGameInputSchema = z.object({
   creatorUserId: z.string().nullable().optional(),
   seatingMode: seatingModeSchema.nullable().optional(),
   challengedUserId: z.string().nullable().optional(),
+  seriesId: z.string().nullable().optional(),
 });
 
 export const addMoveInputSchema = z.object({

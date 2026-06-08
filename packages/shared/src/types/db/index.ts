@@ -94,6 +94,7 @@ export type GameRow = {
   creatorUserId: string | null;
   seatingMode: SeatingMode | null;
   challengedUserId: string | null;
+  seriesId: string | null;
   startedAt: Date | null;
   completedAt: Date | null;
   createdAt: Date;
@@ -210,6 +211,7 @@ export type CreateGameInput = {
   creatorUserId?: string | null;
   seatingMode?: SeatingMode | null;
   challengedUserId?: string | null;
+  seriesId?: string | null;
 };
 
 export type GameUpdate = Partial<
