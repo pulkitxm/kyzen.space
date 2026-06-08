@@ -282,7 +282,6 @@ is **skipped, not verified** — `_preflight` throwing is the signal it actually
 
 ```bash
 bun run db:start
-bun run redis:start
 cd apps/server && bun run test:integration
 ```
 

@@ -26,7 +26,7 @@ Integration tests **self-skip without a DB**: each file probes `select 1` and ga
 
 `harness.ts` factors out the boilerplate: `createHarness(prefix)` returns `makeUser`/`befriend`/`makeDm`/`makeGroup`/`trackGame`/`cleanup` over UUID-namespaced fixtures (so parallel files never collide), plus `unwrap`/`expectErr`/`TestUser`. Each edge/driver file does `const h = createHarness("…")` and `afterAll(h.cleanup)`, which deletes its tracked games/conversations/users. The two original files still carry their own copy of this harness inline.
 
-The presence Redis integration tests (`apps/server/integration/presence-redis.test.ts`) exercise `RedisPresenceStore` against a real Redis rather than a DB, so they need a reachable `REDIS_URL`. The `redis` service in `scripts/docker-compose.yml` sits behind a `redis` Compose profile, so `bun run db:start` (postgres only) does **not** bring it up — start it explicitly with `bun run redis:start` (`redis:7` on `localhost:6379`). In CI it's the `redis` service on the `integration` job.
+The presence Redis integration tests (`apps/server/integration/presence-redis.test.ts`) exercise `RedisPresenceStore` against a real Redis rather than a DB, so they need a reachable `REDIS_URL`. The `redis` service in `scripts/docker-compose.yml` (`redis:7` on `localhost:6379`) is a standard service brought up alongside Postgres by `bun run db:start` (and `bun run db:reset`). In CI it's the `redis` service on the `integration` job.
 
 ## Files at a glance
 

@@ -50,17 +50,16 @@ cd apps/server && bun run test:integration               # integration/ suite (n
 bun test --filter "<pattern>"                            # filter by test name within a file
 ```
 
-Database (Postgres via Docker, Drizzle ORM). The compose file lives at `scripts/docker-compose.yml` (all db scripts run `docker compose --project-directory . -f scripts/docker-compose.yml …`); host ports are env-configurable (`POSTGRES_HOST_PORT`/`REDIS_HOST_PORT`/`ADMINER_HOST_PORT`).
+Database (Postgres via Docker, Drizzle ORM). The compose file lives at `scripts/docker-compose.yml` (all db scripts run `docker compose --project-directory . -f scripts/docker-compose.yml …`); host ports are env-configurable (`POSTGRES_HOST_PORT`/`REDIS_HOST_PORT`).
 
 ```bash
-bun run db:start            # docker compose up postgres
+bun run db:start            # docker compose up postgres + redis (redis enables the Socket.IO redis-adapter / presence store)
 bun run db:stop             # docker compose down
-bun run db:studio           # postgres + Adminer (studio profile) at http://127.0.0.1:18081
+bun run db:studio           # postgres + Drizzle Studio at https://local.drizzle.studio
 bun run db:generate         # drizzle-kit generate migrations from schema.ts
 bun run db:migrate          # apply migrations (runs packages/database/src/migrate.ts)
 bun run db:push             # push schema directly (dev)
-bun run db:reset            # drop volumes and recreate
-bun run redis:start         # docker compose up redis (redis profile) — enables the Socket.IO redis-adapter
+bun run db:reset            # drop volumes and recreate postgres + redis, then db:push
 ```
 
 Lint note: Biome is the only linter (ESLint was removed). `bun run check` runs format + import-organize + lint (strict: recommended plus curated rules as errors, with `useSortedClasses` enforcing Tailwind class order); `bun run fix` autofixes everything safe **and** sorts Tailwind classes. Every workspace's `type-check` script is `tsc --noEmit` (type-only). Biome covers all code files including CSS — Tailwind v4 at-rules (`@theme`, `@apply`, `@source`, …) parse via the `tailwindDirectives` CSS parser option in `biome.json`.
