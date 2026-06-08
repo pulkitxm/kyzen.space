@@ -189,6 +189,7 @@ export function TicTacToeGameClient({
   connected,
   initialGame,
   initialMoves,
+  onViewProfile,
 }: GameClientProps) {
   const [game, setGame] = useState<GameJson>(initialGame as GameJson);
   const [moves, setMoves] = useState<MoveJson[]>(initialMoves);
@@ -437,6 +438,7 @@ export function TicTacToeGameClient({
         currentTurn={state.currentTurn}
         myUserId={userId}
         active={game.status === "active"}
+        onViewProfile={onViewProfile}
       />
       {isPast ? null : !userId ? (
         <p className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">

@@ -13,6 +13,7 @@ import {
   PopoverTrigger,
 } from "@/app/ui/popover";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
+import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import { notificationsAtom, unreadNotificationsAtom } from "@/lib/chat/atoms";
 import { relativeTime } from "@/lib/chat/format";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
@@ -137,11 +138,17 @@ export function NotificationsPopover({
                   onClick={onNavigate}
                   className="flex items-center gap-3 border-border/60 border-b px-4 py-3 transition last:border-b-0 hover:bg-surface-overlay"
                 >
-                  <PresenceAvatar
-                    config={n.actor?.avatar ?? null}
-                    seed={n.actor?.username ?? "?"}
-                    size={32}
-                  />
+                  {n.actor ? (
+                    <ProfilePopupTrigger user={n.actor} className="shrink-0">
+                      <PresenceAvatar
+                        config={n.actor.avatar}
+                        seed={n.actor.username}
+                        size={32}
+                      />
+                    </ProfilePopupTrigger>
+                  ) : (
+                    <PresenceAvatar config={null} seed="?" size={32} />
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="text-sm">{notifText(n)}</div>
                     <div className="text-muted-foreground text-xs">

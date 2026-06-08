@@ -12,6 +12,7 @@ import type {
 } from "@gamelobby/shared/types";
 import { Suspense } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
+import { useProfilePopup } from "@/components/ui";
 import { gameMusicSource } from "@/lib/audio/music-sources";
 import { useGameAudioBridge } from "@/lib/audio/use-audio-bridge";
 import type { ChatLayout } from "@/lib/chat-layout";
@@ -45,6 +46,7 @@ export function PlayClient({
   const GameClient = getGameClient(gameType);
   const GameSkeleton = getGameSkeleton(gameType);
   const { socket, status } = useSocket();
+  const openProfile = useProfilePopup();
 
   useGameAudioBridge(gameMusicSource(gameType));
 
@@ -58,6 +60,7 @@ export function PlayClient({
           connected={status === "connected"}
           initialGame={initialGame}
           initialMoves={initialMoves}
+          onViewProfile={openProfile}
         />
       </Suspense>
     </div>

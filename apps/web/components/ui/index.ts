@@ -7,5 +7,11 @@ export { EmptyState } from "./empty-state";
 export { LayeredPopupHost } from "./layered-popup";
 export { Logo, type LogoProps } from "./logo";
 export { BackLink, PageContainer, PageHeader } from "./page";
+export {
+  ProfilePopupHost,
+  ProfilePopupTrigger,
+  type ProfilePopupUser,
+  useProfilePopup,
+} from "./profile-popup";
 export { Skeleton } from "./skeleton";
 export { Spinner } from "./spinner";

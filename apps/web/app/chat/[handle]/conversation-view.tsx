@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FaArrowLeft } from "react-icons/fa6";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
+import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import {
   activeConversationIdAtom,
   conversationsAtom,
@@ -131,12 +132,18 @@ export function ConversationView({
           </button>
         ) : (
           <>
-            <PresenceAvatar
-              config={others[0]?.avatar ?? null}
-              seed={others[0]?.username ?? "?"}
-              size={36}
-              online={otherPresence?.online ? true : undefined}
-            />
+            {others[0] ? (
+              <ProfilePopupTrigger user={others[0]} className="shrink-0">
+                <PresenceAvatar
+                  config={others[0].avatar}
+                  seed={others[0].username}
+                  size={36}
+                  online={otherPresence?.online ? true : undefined}
+                />
+              </ProfilePopupTrigger>
+            ) : (
+              <PresenceAvatar config={null} seed="?" size={36} />
+            )}
             <div className="min-w-0">
               <div className="truncate font-medium text-sm">{title}</div>
               <div

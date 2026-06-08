@@ -20,11 +20,16 @@ export function PlayerBar({
   currentTurn,
   myUserId,
   active,
+  onViewProfile,
 }: {
   players: BarPlayer[];
   currentTurn: Mark;
   myUserId: string | null;
   active: boolean;
+  onViewProfile?: (user: {
+    username: string;
+    avatar?: AvatarConfig | null;
+  }) => void;
 }) {
   return (
     <div className="mb-5 flex items-stretch gap-3">
@@ -42,13 +47,32 @@ export function PlayerBar({
                 : "border-border bg-surface-raised",
             ].join(" ")}
           >
-            <Character
-              config={p.avatar ?? null}
-              fallbackSeed={p.username}
-              alt={p.username}
-              size={36}
-              className="size-9 shrink-0 rounded-full"
-            />
+            {!isMe && onViewProfile ? (
+              <button
+                type="button"
+                aria-label={`View ${p.username}'s profile`}
+                onClick={() =>
+                  onViewProfile({ username: p.username, avatar: p.avatar })
+                }
+                className="shrink-0 rounded-full outline-none transition hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Character
+                  config={p.avatar ?? null}
+                  fallbackSeed={p.username}
+                  alt={p.username}
+                  size={36}
+                  className="size-9 rounded-full"
+                />
+              </button>
+            ) : (
+              <Character
+                config={p.avatar ?? null}
+                fallbackSeed={p.username}
+                alt={p.username}
+                size={36}
+                className="size-9 shrink-0 rounded-full"
+              />
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 {mark ? (

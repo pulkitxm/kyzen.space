@@ -13,7 +13,7 @@ import { FaChevronRight } from "react-icons/fa6";
 import { ChatSocketBridge } from "@/app/chat-socket-bridge";
 import { Sidebar } from "@/app/sidebar";
 import { TooltipProvider } from "@/app/ui/tooltip";
-import { LayeredPopupHost } from "@/components/ui";
+import { LayeredPopupHost, ProfilePopupHost } from "@/components/ui";
 import type { SidebarPrefs } from "@/lib/sidebar-prefs";
 import { SocketProvider } from "@/lib/socket/socket-context";
 import { useScrollRestoration } from "@/lib/use-scroll-restoration";
@@ -109,6 +109,7 @@ export function AppShellClient({
             </main>
           </div>
           <LayeredPopupHost />
+          <ProfilePopupHost />
         </SocketProvider>
       </Provider>
     </TooltipProvider>

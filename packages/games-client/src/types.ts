@@ -19,4 +19,9 @@ export type GameClientProps = {
     gameState?: unknown;
   };
   initialMoves: Record<string, unknown>[];
+  onViewProfile?: (user: {
+    username: string;
+    displayName?: string | null;
+    avatar?: AvatarConfig | null;
+  }) => void;
 };
