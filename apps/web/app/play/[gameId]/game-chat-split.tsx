@@ -21,6 +21,7 @@ import {
   readChatLayout,
   type StashEdge,
 } from "@/lib/chat-layout";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 import { ChatFloatingIcon } from "./chat-floating-icon";
 import { ChatPopoutWindow } from "./chat-popout-window";
@@ -59,7 +60,7 @@ export function GameChatSplit({
   );
   const [icon, setIcon] = useState<IconPos>(initialLayout.icon);
   const [tab, setTab] = useState<"game" | "chat">("game");
-  const [isDesktop, setIsDesktop] = useState(false);
+  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   const modeRef = useRef(mode);
   const widthRef = useRef(chatWidth);
@@ -161,14 +162,6 @@ export function GameChatSplit({
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, [persist]);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const onChange = () => setIsDesktop(mq.matches);
-    onChange();
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
 
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
