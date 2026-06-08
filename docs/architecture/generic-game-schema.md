@@ -33,6 +33,8 @@ If you want to know how the Drizzle declarations look, see [`database-schema.md`
 │  game_state  → JSONB  ← stateSchema owns its shape            │
 │  config      → JSONB  ← configSchema owns its shape           │
 │  conversation_id (nullable FK)                                 │
+│  … winner, creator_user_id, seating_mode, challenged_user_id,  │
+│    started_at, completed_at, created_at, updated_at            │
 └──────────────────────────────┬─────────────────────────────────┘
                                │ 1:N
          ┌─────────────────────┴─────────────────────┐
@@ -58,7 +60,7 @@ A `game` row has **two** identifiers and they serve opposite audiences:
 - **`id` (uuid PK)** — the *internal* key. It is the FK target for `move.game_id` and `game_player.game_id`, and every repository write (`addMove`, `updateGame`, `listMoves`, `seatPlayer`) is keyed on it. It is **never serialized to clients**.
 - **`code` (text, `unique("game_code_uq")`)** — the *public* key. A short, shareable, human-friendly room code (`GAME_CODE_LENGTH = 6` over the Crockford-base32 `GAME_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"`, which drops I/L/O/U — ~1.07B combinations). It is generated app-side by the column's `$defaultFn(() => generateGameCode())` and is the only game id that crosses the wire.
 
-The seam is `serializeGame` (`apps/server/src/api/serialize.ts:26`), which sets `GameJson.id = row.code`. From there on the **code is the game's identity to clients**: the web builds `/play/<code>`, and the socket `join_room` / `make_move` payloads carry the code as `gameId` (validated by `gameCodeSchema` / `isGameCode`, which `normalizeGameCode` first — uppercasing and mapping I/L→1, O→0 so a typed code is forgiving). The server resolves it back to a row with `games.getGameByCode(code)` (`packages/database/src/repositories/games.ts:89`), then uses `row.id` for all DB work. Because the code is random, `createGame` wraps its insert in a `game_code_uq` collision-retry loop. (Conversations, messages, friendships, users, and profiles are **unchanged** — they keep their UUIDs as the public id; only games moved to codes.)
+The seam is `serializeGame` (`apps/server/src/api/serialize.ts:26`), which sets `GameJson.id = row.code`. From there on the **code is the game's identity to clients**: the web builds `/play/<code>`, and the socket `join_room` / `make_move` payloads carry the code as `gameId` (validated by `gameCodeSchema` / `isGameCode`, which `normalizeGameCode` first — uppercasing and mapping I/L→1, O→0 so a typed code is forgiving). The server resolves it back to a row with `games.getGameByCode(code)` (`packages/database/src/repositories/games.ts:96`), then uses `row.id` for all DB work. Because the code is random, `createGame` wraps its insert in a `game_code_uq` collision-retry loop. (Conversations, messages, friendships, users, and profiles are **unchanged** — they keep their UUIDs as the public id; only games moved to codes.)
 
 ## How a `GameDefinition` maps to the columns
 
@@ -149,7 +151,7 @@ game_player row
   seat_order : 0
 ```
 
-`game_state` is **not** `null` at creation — `createInitialState` runs immediately, so the board exists before the second player arrives. `status` stays `"waiting"` only because the game still needs a second seat to become `"active"`. `config` is `{}` — the result of `definition.configSchema.safeParse({})`, validated at `games-in-chat-service.ts:35`. An empty object is still a legal value; it occupies the column so future games that **do** use config (e.g. a board-size setting) write their validated config here.
+`game_state` is **not** `null` at creation — `createInitialState` runs immediately, so the board exists before the second player arrives. `status` stays `"waiting"` only because the game still needs a second seat to become `"active"`. `config` is `{}` — the result of `definition.configSchema.safeParse(input.config ?? {})`, validated at `games-in-chat-service.ts:35`. An empty object is still a legal value; it occupies the column so future games that **do** use config (e.g. a board-size setting) write their validated config here.
 
 ### Phase 2 — Bob joins, the last seat fills (status: `"active"`)
 

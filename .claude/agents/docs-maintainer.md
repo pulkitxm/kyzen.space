@@ -27,7 +27,7 @@ docs** for an undocumented subsystem. Both follow the rules below.
 
 | Area | Files |
 | --- | --- |
-| Architecture guide | `docs/architecture/README.md` (index + overview) and one page per subsystem: `shared.md` (the `@gamelobby/shared` types/schemas/constants package), `database.md` (the `@gamelobby/database` package), `database-schema.md`, `generic-game-schema.md`, `auth.md`, `games-core-engine.md`, `games-client.md`, `chat-core.md` (chat contracts, now living in `@gamelobby/shared/types/chat`), `realtime.md`, `server-api.md`, `web.md`, `testing.md` |
+| Architecture guide | `docs/architecture/README.md` (index + overview) and one page per subsystem: `shared.md` (the `@gamelobby/shared` types/schemas/constants package), `database.md` (the `@gamelobby/database` package), `database-schema.md`, `generic-game-schema.md`, `games-core-schemas.md` (the `@gamelobby/shared/types/games` contract layer: `GameDefinition` / `GameEngine` / wire + socket Zod schemas), `auth.md`, `games-core-engine.md`, `games-client.md`, `audio.md` (game SFX engine + background music + settings gear), `playing-cards.md` (the themed playing-card primitive), `chat-core.md` (chat contracts, now living in `@gamelobby/shared/types/chat`), `realtime.md`, `server-api.md`, `web.md`, `testing.md` |
 | Game-authoring guide | `docs/adding-a-game.md` |
 | Per-game docs | `docs/games/README.md` + `docs/games/<type>.md` (one per registered game; enforced by `packages/games-core/tests/game-docs.test.ts`) |
 | Project README | `README.md` (root) |

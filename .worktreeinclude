@@ -1,0 +1,12 @@
+# Files copied into each new Claude Code worktree (.claude/worktrees/<name>/).
+# A worktree checks out only git-tracked files; the gitignored paths below are
+# required for the monorepo to install-free build and run. Syntax matches .gitignore.
+
+# Single root env consumed by every app (apps/web/.env is a tracked symlink → ../../.env).
+.env
+.env.local
+
+# Installed deps: root + every workspace node_modules (the bare pattern matches all levels).
+# Bun's symlinks (.bun/* and the @gamelobby/* workspace links) are relative, so they
+# resolve correctly inside the copied worktree — no `bun install` needed.
+node_modules/

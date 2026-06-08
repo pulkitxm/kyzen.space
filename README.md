@@ -53,7 +53,7 @@ bun run type-check          # tsc --noEmit across all workspaces (fast, Turbo-ca
 bun run check               # Biome: format + import-organize + lint (the CI gate, read-only)
 bun run fix                 # Biome autofix + Tailwind class sorting
 bun run test                # run every workspace's tests
-bun run db:studio           # Postgres + Adminer at http://127.0.0.1:18081
+bun run db:studio           # Postgres + Drizzle Studio at https://local.drizzle.studio
 ```
 
 ## Documentation
