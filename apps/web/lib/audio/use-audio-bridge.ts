@@ -6,10 +6,10 @@ import { useEffect } from "react";
 import { gameMusicAtom, gameSfxAtom } from "./atoms";
 
 const SFX_SOURCES: SfxSources = {
-  hover: "/sounds/hover.mp3",
-  touch: "/sounds/click.mp3",
-  win: "/sounds/win.mp3",
-  draw: "/sounds/draw.mp3",
+  hover: "/sounds/hover.ogg",
+  touch: "/sounds/click.ogg",
+  win: "/sounds/win.ogg",
+  draw: "/sounds/draw.ogg",
 };
 
 export function useGameAudioBridge(musicUrl?: string | null) {

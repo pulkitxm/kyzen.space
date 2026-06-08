@@ -4,9 +4,10 @@
 
 Games on the play screen have sound: short **effect** sounds (hover, touch, win,
 draw) and **background music**. Everything is an audio **file** played through the
-Web Audio API — there is no runtime tone synthesis. SFX are tiny `.mp3` clips
+Web Audio API — there is no runtime tone synthesis. All assets are **Opus** in
+`.ogg` (the best-compressing widely-supported web codec). SFX are tiny clips
 decoded into buffers; the background music is a per-game streamed track
-(tic-tac-toe ships a jazz `.mp3`). Two user preferences (a *game-sound* channel
+(tic-tac-toe ships a jazz `.ogg`). Two user preferences (a *game-sound* channel
 and a *background-music* channel, each with a volume and a mute) drive everything;
 they are **client-only** and persist in `localStorage`. Nothing here touches the
 game DB, the game Zod schemas, or the wire/socket contract — audio is a pure
@@ -36,8 +37,8 @@ Because jotai is a singleton across the workspace (`transpilePackages`, see
 | `packages/games-client/src/audio/use-game-audio.ts` | `useGameAudio()` → stable `{ playHover, playTouch, playWin, playDraw, unlock }` bound to the singleton. |
 | `apps/web/lib/audio/atoms.ts` | `gameSfxAtom` / `gameMusicAtom` (`atomWithStorage`, SSR-safe noop storage), seeded from the shared defaults. |
 | `apps/web/lib/audio/use-audio-bridge.ts` | `useGameAudioBridge(musicUrl?)` — registers the SFX file URLs, sets the per-game music source, syncs both atoms into the engine, marks music active for the play screen's lifetime, and registers a one-time gesture `unlock`. |
-| `apps/web/lib/audio/music-sources.ts` | `gameMusicSource(gameType)` — maps a game type to its background-music asset URL (tic-tac-toe → `/sounds/tic-tac-toe-bg.mp3`); `null` (no music) for the rest. |
-| `apps/web/public/sounds/` | The audio assets: `tic-tac-toe-bg.mp3` (background music) and `hover.mp3` / `click.mp3` / `win.mp3` / `draw.mp3` (SFX), each served at `/sounds/<name>`. |
+| `apps/web/lib/audio/music-sources.ts` | `gameMusicSource(gameType)` — maps a game type to its background-music asset URL (tic-tac-toe → `/sounds/tic-tac-toe-bg.ogg`); `null` (no music) for the rest. |
+| `apps/web/public/sounds/` | The Opus `.ogg` audio assets: `tic-tac-toe-bg.ogg` (background music) and `hover.ogg` / `click.ogg` / `win.ogg` / `draw.ogg` (SFX), each served at `/sounds/<name>`. |
 | `apps/web/app/play/[gameId]/game-settings-gear.tsx` | The `FaGear` button; slides via `motion/react` and opens the settings popup. |
 | `apps/web/app/play/[gameId]/game-settings-panel.tsx` | Modal body: per-channel mute toggle, −/+ buttons, range slider, % readout. |
 
@@ -55,7 +56,7 @@ module is safe to import during SSR; `getGameAudioEngine()` returns `null` when
   play nothing. There is **no oscillator synthesis** anywhere in the engine.
 - **Background music** is a streamed file routed through a persistent `musicGain`
   node. When a per-game track URL is registered (`setMusicSource`, e.g.
-  tic-tac-toe's `/sounds/tic-tac-toe-bg.mp3`) it plays via an `HTMLAudioElement`
+  tic-tac-toe's `/sounds/tic-tac-toe-bg.ogg`) it plays via an `HTMLAudioElement`
   → a per-track fade gain → `musicGain`. Streaming (rather than decoding the whole
   file) keeps memory low for multi-minute tracks (the jazz clip is ~5 min). The
   loop is **crossfaded**: a `timeupdate` handler ramps the fade gain down over the
@@ -143,14 +144,15 @@ never plays in replay (it's gated to the live status transition).
 
 ## Gotchas & conventions
 
-- **Everything is a file; no synthesis.** SFX and music are all assets under
-  `apps/web/public/sounds/`. SFX URLs are registered via `setSfxSources` (the
-  bridge's `SFX_SOURCES` map → `/sounds/hover.mp3`, `/sounds/click.mp3`,
-  `/sounds/win.mp3`, `/sounds/draw.mp3`); per-game music via `gameMusicSource`.
-  Swap a sound by replacing the file; add a game's music by dropping a file in
-  `public/sounds/` and adding one line to `gameMusicSource`. Keep the engine the
-  single playback authority — route new audio through `sfxGain`/`musicGain`, not a
-  stray `new Audio()` elsewhere.
+- **Everything is a file; no synthesis.** SFX and music are all **Opus `.ogg`**
+  assets under `apps/web/public/sounds/` (Opus is the best-compressing codec with
+  broad 2026 browser + `decodeAudioData` support). SFX URLs are registered via
+  `setSfxSources` (the bridge's `SFX_SOURCES` map → `/sounds/hover.ogg`,
+  `/sounds/click.ogg`, `/sounds/win.ogg`, `/sounds/draw.ogg`); per-game music via
+  `gameMusicSource`. Swap a sound by replacing the file; add a game's music by
+  dropping a file in `public/sounds/` and adding one line to `gameMusicSource`.
+  Keep the engine the single playback authority — route new audio through
+  `sfxGain`/`musicGain`, not a stray `new Audio()` elsewhere.
 - **The engine is jotai-free.** Preferences live in `apps/web` atoms and are
   pushed in via the bridge. Don't add jotai to `games-client` to read prefs.
 - **Audio is client-only.** No DB, no game schema, no socket event. The win

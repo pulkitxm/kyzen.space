@@ -136,7 +136,7 @@ Socket.IO connection the chat lane uses, passed down as a prop.
   replay scrubbing (which changes `replayStep`, not `game.status`) both stay
   silent. All of these honour the game-sound volume/mute channel. **Background
   music** is a separate channel: a looping, **crossfaded** jazz track
-  (`apps/web/public/sounds/tic-tac-toe-bg.mp3`, registered in `gameMusicSource`)
+  (`apps/web/public/sounds/tic-tac-toe-bg.ogg`, registered in `gameMusicSource`)
   streamed through the audio engine; it starts after the first interaction
   (browser autoplay policy) and is controlled by the gear's *Background music*
   slider/mute.
