@@ -22,7 +22,7 @@ See `docs/architecture/shared.md` and the "Shared packages — strict rules" sec
 
 # Reserved usernames vs. top-level routes
 
-The profile page is a catch-all `/[username]` route, so every top-level segment under `apps/web/app/` is a potential username collision. When you add a new top-level route, add its segment to `RESERVED_USERNAMES` in `@gamelobby/shared/constants` (`packages/shared/src/constants/username.ts`) if a user claiming that name would shadow the route. Per-user blocklisting is separate — that's the `NOT_ALLOWED_USERNAMES` env var (parsed in `apps/server/src/env.ts`).
+The profile page is a dynamic `/[username]` route, so every top-level segment under `apps/web/app/` is a potential username collision. When you add a new top-level route, add its segment to `RESERVED_USERNAMES` in `@gamelobby/shared/constants` (`packages/shared/src/constants/username.ts`) if a user claiming that name would shadow the route. Per-user blocklisting is separate — that's the `NOT_ALLOWED_USERNAMES` env var (parsed in `apps/server/src/env.ts`).
 
 # Keep docs and agents in sync
 

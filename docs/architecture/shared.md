@@ -21,7 +21,7 @@ This is also why the chat contract no longer has its own package: the former `@g
 | --- | --- |
 | `packages/shared/package.json` | Declares the two subpath exports (`./constants`, `./types`) and the lone `zod` dependency (`:6`–`:18`). |
 | `packages/shared/src/index.ts` | Root barrel: `export * from "./constants"` + `export * from "./types"`. |
-| `packages/shared/src/constants/index.ts` | Barrel for all constant **values** (audio, theme, pattern, chat-layout, username, games, categories, chat). |
+| `packages/shared/src/constants/index.ts` | Barrel for all constant **values** (audio, theme, pattern, chat-layout, username, games, categories, chat, playing-cards). |
 | `packages/shared/src/constants/audio.ts` | `GAME_SFX_STORAGE_KEY` / `GAME_MUSIC_STORAGE_KEY`, `DEFAULT_SFX_VOLUME` / `DEFAULT_MUSIC_VOLUME`, `VOLUME_MIN` / `VOLUME_MAX` / `VOLUME_STEP` — the client-only game-audio preference keys + bounds (see [audio.md](./audio.md)). |
 | `packages/shared/src/constants/theme.ts` | `THEME_IDS`, `DEFAULT_THEME`, `COLOR_MODES`, `DEFAULT_COLOR_MODE`. |
 | `packages/shared/src/constants/pattern.ts` | `PATTERN_IDS`, `DEFAULT_PATTERN`. |
@@ -31,7 +31,7 @@ This is also why the chat contract no longer has its own package: the former `@g
 | `packages/shared/src/constants/categories.ts` | `GAME_CATEGORIES`. |
 | `packages/shared/src/constants/chat.ts` | `CHAT_EVENTS` — the socket event-name registry. |
 | `packages/shared/src/constants/playing-cards.ts` | `CARD_SUITS` and `CARD_RANKS` — the 4 suits + 13 ranks for the playing-card renderer (see [playing-cards.md](./playing-cards.md)). |
-| `packages/shared/src/types/index.ts` | Barrel for all types + schemas (audio, avatar, chat, chat-layout, db, games, pattern, theme, username) and the re-exported `z`. |
+| `packages/shared/src/types/index.ts` | Barrel for all types + schemas (audio, avatar, chat, chat-layout, db, games, pattern, playing-cards, theme, username) and the re-exported `z`. |
 | `packages/shared/src/types/audio.ts` | `AudioChannelPrefs` (`{ volume, muted }`) — a plain type (no Zod) for the two client-only audio preference channels. |
 | `packages/shared/src/types/z.ts` | `export { z } from "zod"` (+ `ZodType` / `ZodTypeAny`) — the single import point for Zod. |
 | `packages/shared/src/types/theme.ts` / `pattern.ts` / `chat-layout.ts` / `username.ts` | Per-area schemas + inferred types + small guards/helpers (`isValidTheme`, `validateChatModePref`, `normalizeUsername`, …). |
@@ -85,16 +85,16 @@ The game contract that the engine (`@gamelobby/games-core`) and the boards (`@ga
 
 - `core.ts:4` — `gameTypeSchema = z.enum(GAME_TYPES)` and `type GameType = z.infer<…>` (`:5`). The literal union derives from the `GAME_TYPES` constant (`constants/games.ts:3`), so `GameType` is the registry of valid game-type strings.
 - `code.ts` — the **public game room code**: `GAME_CODE_ALPHABET` (`:3`, Crockford base32 minus I/L/O/U) + `GAME_CODE_LENGTH` (`:4`, 6), `generateGameCode()` (`:8`, unbiased `crypto.getRandomValues`), `normalizeGameCode()` (`:16`, uppercases and maps I/L→1, O→0 so typed codes are forgiving), `isGameCode()` (`:20`), and `gameCodeSchema` (`:24`, normalizes then validates `^[0-9A-HJKMNP-TV-Z]{6}$`). The code is the game id clients see in URLs and socket payloads; the UUID `game.id` stays internal — see [`generic-game-schema.md`](./generic-game-schema.md).
-- `definition.ts:25` — `GameDefinition<S, I, C>` (`meta`, `engine`, `stateSchema`, `moveSchema`, `configSchema`, optional `configFields`), plus `GameMeta` (`:5`) and `ConfigField` (`:15`).
+- `definition.ts:26` — `GameDefinition<S, I, C>` (`meta`, `engine`, `stateSchema`, `moveSchema`, `configSchema`, optional `configFields`), plus `GameMeta` (`:6`) and `ConfigField` (`:16`).
 - `engine.ts:15` — `GameEngine<State, Input>` (`createInitialState` + optional `reduce` / `step`), with `Outcome` (`:1`), `Seat` (`:5`), `ReduceResult` (`:7`), and `MoveContext` (`:13`).
-- `wire.ts` — the socket/wire DTOs and their schemas: `gamePlayerSchema` (`:16`, each seat is `{ userId, username, role, avatar? }` where `avatar` is an optional/nullable `avatarConfigSchema`), `clientJoinRoomSchema` (`:25`), `clientMakeMoveSchema` (`:33`), `gameJsonSchema`/`GameJson` (`:41`/`:57`), `moveJsonSchema`/`MoveJson` (`:59`/`:67`), and the server payload types. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`), not a UUID schema.
+- `wire.ts` — the socket/wire DTOs and their schemas: `gamePlayerSchema` (`:17`, each seat is `{ userId, username, role, avatar? }` where `avatar` is an optional/nullable `avatarConfigSchema`), `clientJoinRoomSchema` (`:27`), `clientMakeMoveSchema` (`:35`), `gameJsonSchema`/`GameJson` (`:43`/`:59`), `moveJsonSchema`/`MoveJson` (`:61`/`:69`), and the server payload types. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`), not a UUID schema.
 - `games/<type>/schemas.ts` — one folder per registered game holds its strict Zod `stateSchema` / `moveSchema` / `configSchema` and the `z.infer` types (e.g. `games/tic-tac-toe/schemas.ts`).
 
 `@gamelobby/games-core` then imports these to assemble each `GameDefinition` and to derive its registry; it holds the engines and the `GAMES` array, but no schemas. See [`games-core-schemas.md`](./games-core-schemas.md) and [`games-core-engine.md`](./games-core-engine.md).
 
 ## What lives under `types/db/`
 
-`@gamelobby/database` is server-only (it pulls in `drizzle-orm` + `postgres`), so the **row and domain types it returns are declared here** instead, where `apps/web` can read them without importing the database package. `types/db/index.ts` hand-writes `GameRow` (`:80`), `MoveRow`, `GamePlayerRow`, `UserProfileRow`, the auth rows, plus domain aggregates like `GameRecord` (`:193`), `CreateGameInput` (`:198`), and `GameUpdate` (`:210`). `types/db/io.ts` holds the **repository-input Zod schemas** — `createGameInputSchema` (`:20`), `addMoveInputSchema` (`:32`), `createMessageInputSchema`, `appearancePatchSchema` (`:61`) — which the repositories `parse()` before writing. The schema-vs-type agreement is enforced by `drift-guard.ts` in `@gamelobby/database` (see [`database-schema.md`](./database-schema.md)).
+`@gamelobby/database` is server-only (it pulls in `drizzle-orm` + `postgres`), so the **row and domain types it returns are declared here** instead, where `apps/web` can read them without importing the database package. `types/db/index.ts` hand-writes `GameRow` (`:85`), `MoveRow`, `GamePlayerRow`, `UserProfileRow`, the auth rows, plus domain aggregates like `GameRecord` (`:198`), `CreateGameInput` (`:203`), and `GameUpdate` (`:215`). `types/db/io.ts` holds the **repository-input Zod schemas** — `createGameInputSchema` (`:20`), `addMoveInputSchema` (`:32`), `createMessageInputSchema`, `appearancePatchSchema` (`:61`) — which the repositories `parse()` before writing. The schema-vs-type agreement is enforced by `drift-guard.ts` in `@gamelobby/database` (see [`database-schema.md`](./database-schema.md)).
 
 ## What lives under `types/chat/`
 

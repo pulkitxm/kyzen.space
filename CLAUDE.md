@@ -33,35 +33,41 @@ bun run test                # turbo: run every workspace's tests
 bun run type-check          # tsc --noEmit across all workspaces (no build step; Turbo-cached)
 bun run check               # biome: format + import-organize + lint (the CI gate; read-only)
 bun run fix                 # biome --write: autofix format/imports/lint AND sort Tailwind classes
+bun run clean               # remove all node_modules/.next/.turbo/cache (skips .git/.claude)
+bun run ins:clean           # clean, then bun install
 ```
+
+`dev`/`build`/`serve` each have a `:clean` variant (`dev:clean`, `build:clean`, `serve:clean`) that runs `ins:clean` first; `serve` builds (`--force`) then `start`.
 
 **Always run `bun run type-check` after making code changes and before declaring work done, committing, or opening a PR.** It's fast (no build step, Turbo-cached) and catches type errors that tests may miss. Fix any errors it reports before finishing.
 
 Per-workspace / single test (cd into the workspace, or use `--filter`):
 
 ```bash
-cd apps/server && bun test tests/theme.test.ts          # one server test file
+cd apps/server && bun test tests/games-route.test.ts    # one server test file
 cd packages/games-core && bun test                       # one package's suite
 cd apps/server && bun run test:integration               # integration/ suite (needs DB + .env)
 bun test --filter "<pattern>"                            # filter by test name within a file
 ```
 
-Database (Postgres via Docker, Drizzle ORM):
+Database (Postgres via Docker, Drizzle ORM). The compose file lives at `scripts/docker-compose.yml` (all db scripts run `docker compose --project-directory . -f scripts/docker-compose.yml …`); host ports are env-configurable (`POSTGRES_HOST_PORT`/`REDIS_HOST_PORT`/`ADMINER_HOST_PORT`).
 
 ```bash
 bun run db:start            # docker compose up postgres
-bun run db:studio           # postgres + Adminer at http://127.0.0.1:18081
+bun run db:stop             # docker compose down
+bun run db:studio           # postgres + Adminer (studio profile) at http://127.0.0.1:18081
 bun run db:generate         # drizzle-kit generate migrations from schema.ts
 bun run db:migrate          # apply migrations (runs packages/database/src/migrate.ts)
 bun run db:push             # push schema directly (dev)
 bun run db:reset            # drop volumes and recreate
+bun run redis:start         # docker compose up redis (redis profile) — enables the Socket.IO redis-adapter
 ```
 
 Lint note: Biome is the only linter (ESLint was removed). `bun run check` runs format + import-organize + lint (strict: recommended plus curated rules as errors, with `useSortedClasses` enforcing Tailwind class order); `bun run fix` autofixes everything safe **and** sorts Tailwind classes. Every workspace's `type-check` script is `tsc --noEmit` (type-only). Biome covers all code files including CSS — Tailwind v4 at-rules (`@theme`, `@apply`, `@source`, …) parse via the `tailwindDirectives` CSS parser option in `biome.json`.
 
 ## Environment
 
-A **single root `.env`** is consumed by every app (`bun --env-file=.env`). `apps/web/.env` is a committed symlink to it. Copy `.env.example` to `.env`. Turbo declares all env vars in `globalEnv` (turbo.json) — add new vars there or builds won't see them. Set `DB_LATENCY_MS` to artificially delay every DB query (for testing loading states).
+A **single root `.env`** is consumed by every app (`bun --env-file=.env`). `apps/web/.env` is a committed symlink to it. Copy `.env.example` to `.env`. Turbo declares all env vars in `globalEnv` (turbo.json) — add new vars there or builds won't see them. Set `DB_LATENCY_MS` to artificially delay every DB query (for testing loading states). `.worktreeinclude` (gitignore-syntax) lists files copied into each new git worktree — `.env`, `.env.local`, and `node_modules/` — so a copied `node_modules` resolves install-free via Bun's relative symlinks.
 
 ## Architecture
 
@@ -110,7 +116,7 @@ Realtime client lives in `lib/socket/`. **State management is Jotai-first**: sta
 
 ### Reserved usernames vs. top-level routes
 
-The profile page is a **catch-all `/[username]` route**, so every top-level segment under `apps/web/app/` is a potential username collision. When you add a new top-level route, add its segment to `RESERVED_USERNAMES` in `@gamelobby/shared/constants` (`packages/shared/src/constants/username.ts`) if a user claiming that name would shadow the route — otherwise that route becomes unreachable for whoever owns the username. (Server-only username helpers — suggestion/slug/cooldown logic — stay in `apps/server/src/username-rules.ts`.) (Per-user/personal blocklisting is separate: the `NOT_ALLOWED_USERNAMES` env var, a comma-separated list parsed into the same block set.)
+The profile page is a **dynamic `/[username]` route**, so every top-level segment under `apps/web/app/` is a potential username collision. When you add a new top-level route, add its segment to `RESERVED_USERNAMES` in `@gamelobby/shared/constants` (`packages/shared/src/constants/username.ts`) if a user claiming that name would shadow the route — otherwise that route becomes unreachable for whoever owns the username. (Server-only username helpers — suggestion/slug/cooldown logic — stay in `apps/server/src/username-rules.ts`.) (Per-user/personal blocklisting is separate: the `NOT_ALLOWED_USERNAMES` env var, a comma-separated list parsed into the same block set.)
 
 ### Adding a game
 

@@ -17,8 +17,8 @@ A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `
 | Path | Responsibility |
 | --- | --- |
 | `apps/server/src/auth.ts` | The Better Auth instance: secret, base URL, trusted origins, Drizzle adapter, Google provider, first-sign-in profile hook, prod cookie attributes. |
-| `apps/server/src/username.ts` | `ensureUsernameForUser` (provisioning) + `isUsernameBlocked` / `suggestUsernames`, wiring the pure `username-rules.ts` helpers to env + DB. |
-| `apps/server/src/username-rules.ts` | Pure, dependency-free username rules: normalize, format check, `RESERVED_USERNAMES`, CSV blocklist parse, candidate/suggestion builders, cooldown math. |
+| `apps/server/src/username.ts` | `ensureUsernameForUser` (provisioning) + `isUsernameBlocked` / `suggestUsernames`, wiring the `username-rules.ts` helpers to env + DB. |
+| `apps/server/src/username-rules.ts` | Username rule helpers: CSV blocklist parse (`parseUsernameCsv`), `slugifyBase`, candidate/suggestion builders (`buildUsernameCandidates` / `selectSuggestions`), and cooldown math (`usernameEditableAt`). Imports `USERNAME_MAX_LENGTH` and `normalizeUsername` from `@gamelobby/shared` — normalize / format-check / `RESERVED_USERNAMES` themselves now live in `@gamelobby/shared` (`packages/shared/src/types/username.ts`, `packages/shared/src/constants/username.ts`). |
 | `apps/server/src/api/index.ts` | Mounts Better Auth's request handler at `/api/auth/*` inside the Hono app. |
 | `apps/server/src/api/middleware/auth.ts` | `requireAuth` middleware — how REST routers read the session from request headers and gate on it. |
 | `apps/server/src/api/routes/account.ts` | Session-management REST: list sessions, sign out, revoke a session, revoke all others. |
@@ -244,7 +244,7 @@ A full trace from clicking the button to being authenticated on all three lanes:
 5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:26`) → `ensureUsernameForUser(id, name)` (`apps/server/src/username.ts:43`) → slugify + batched candidate scan → `createProfile` inserts the `user_profile` row with a seeded avatar (`packages/database/src/repositories/profiles.ts:74`).
 6. **Cookie set + redirect.** Better Auth sets the session cookie (in prod: `secure`, `SameSite=Lax`, cross-subdomain per `apps/server/src/auth.ts:48`) and redirects the browser to the `callbackURL` (`/profile`).
 7. **RSC reads the session.** The `/profile` (and root layout) server component calls `getServerSession()` → `serverFetchJson("/api/auth/get-session")` (`apps/web/lib/get-server-session.ts:17`). `serverFetch` forwards the browser's cookies from `next/headers` `cookies()` with `cache: "no-store"` (`apps/web/lib/api-server.ts:13`), so the server resolves the session and returns `{ user, session }`. `getServerSession` is wrapped in `react.cache` so multiple components in one render share a single fetch.
-8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:44`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:46`).
+8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:46`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:46`).
 9. **Browser fetches.** Any subsequent client-side mutation (`SignOutForm`, friend actions, settings) uses `clientFetch(..., { credentials: "include" })` (`apps/web/lib/api-client.ts:12`), and the `requireAuth` middleware re-derives identity into `c.get("userId")` (`apps/server/src/api/middleware/auth.ts:16`).
 
 Arrow summary:

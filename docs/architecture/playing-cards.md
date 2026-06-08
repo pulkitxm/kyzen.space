@@ -40,7 +40,7 @@ import { PlayingCard, Joker, CardBack } from "@gamelobby/games-client";
 - `Joker` props: optional `variant?: JokerVariant` (default `"red"`), plus `className` / `style`.
 - `CardBack` props: just `className` / `style`.
 
-All three render an `<svg viewBox="0 0 360 504">` and inject the art with `dangerouslySetInnerHTML` (`playing-card.tsx:41`, `:60`, `:75`). They are `"use client"` components and already namespace their SVG ids per instance — see [Multiple cards on one page](#multiple-cards-on-one-page-id-prefixing) below.
+All three render an `<svg viewBox="0 0 360 504">` and inject the art with `dangerouslySetInnerHTML` (`playing-card.tsx:41`, `:60`, `:75`). They are `"use client"` components and already namespace their SVG ids per instance — see [Multiple cards on one page](#multiple-cards-on-one-page-id-prefixing-gotcha-2) below.
 
 ### String builders — for non-React / tests / standalone files
 
@@ -70,17 +70,27 @@ import { CARD_SUITS, CARD_RANKS } from "@gamelobby/shared/constants";
 
 ## Recipes: generating each kind of card
 
+A face / number / ace card (rank is any `Rank` — `"A"`, `"2"`…`"10"`, `"J"`, `"Q"`, `"K"`):
+
 ```tsx
-// A face / number / ace card — rank is any Rank ("A","2"…"10","J","Q","K")
 <PlayingCard suit="spades" rank="K" className="h-auto w-full" />;
+```
 
-// The card back
+The card back:
+
+```tsx
 <CardBack className="h-auto w-full" />;
+```
 
-// A joker (red or black)
+A joker (red or black):
+
+```tsx
 <Joker variant="black" className="h-auto w-full" />;
+```
 
-// The whole deck
+The whole deck:
+
+```tsx
 {CARD_SUITS.map((suit) => (
   <div className="grid grid-cols-13 gap-2" key={suit}>
     {CARD_RANKS.map((rank) => (
@@ -134,7 +144,7 @@ The `<svg>` has a `viewBox` but **no `width`/`height`**, so it has no intrinsic 
 
 ## Multiple cards on one page: id prefixing (gotcha #2)
 
-SVG element ids (`goldFoil`, `robe`, `cardClip`, …) are **document-global**, and `url(#id)` references resolve to the *first* matching id in the document. With several inline cards that would make every card reuse the first card's gradients/clips. The builder prevents this: `prefixIds()` (`svg.ts:407`) rewrites every `id="…"` and `url(#…)` with a per-instance prefix. The React components derive a stable prefix from React's `useId()` (`playing-card.tsx:14`), which is consistent across SSR and hydration — so there is no hydration mismatch and no need to pass anything.
+SVG element ids (`goldFoil`, `robe`, `cardClip`, …) are **document-global**, and `url(#id)` references resolve to the *first* matching id in the document. With several inline cards that would make every card reuse the first card's gradients/clips. The builder prevents this: `prefixIds()` (`svg.ts:407`) rewrites every `id="…"` and `url(#…)` with a per-instance prefix. The React components derive a stable prefix from React's `useId()` (`playing-card.tsx:15`, inside `useIdPrefix()` at `:14`), which is consistent across SSR and hydration — so there is no hydration mismatch and no need to pass anything.
 
 If you call the **builder** directly and render more than one inline on a page, pass a unique `idPrefix` yourself (e.g. `cardInner("hearts", "Q", "a-")`, `cardInner("spades", "K", "b-")`).
 
@@ -154,7 +164,7 @@ Card markup is assembled as `defs()` + `frame()` + (per card) body, then id-pref
 | `indices(rank, suit)` (via `indexContent`) | The two diagonal corner labels (rank glyph + small pip). |
 | `numberPips(rank, suit)` (`:196`) + `LAYOUTS` (`:122`) / `COL` (`:121`) | The pip grid for `2`–`10`; `LAYOUTS` maps each rank to `[column, y]` pairs, `COL` is the L/C/R x-positions. |
 | `aceContent(suit)` | The single large center pip + flourish for the Ace. |
-| `queenFigure` / `kingFigure` / `jackFigure` (+ shared `FACE`, `faceFeatures`, `ROBE`, `bodicePanel`) | The court portraits; each is clipped to `topClip` and mirrored to fill the panel (`cardContent`, `:343`). |
+| `queenFigure` / `kingFigure` / `jackFigure` (+ shared `FACE`, `faceFeatures`, `ROBE`, `bodicePanel`) | The court portraits; each is clipped to `topClip` and mirrored to fill the panel (`courtCard`, `:327`), which `cardContent` (`:343`) dispatches to by rank. |
 | `backMarkup()` (`:389`) | The card back (felt + lattice + medallion). |
 | `jesterMarkup(variant)` (`:350`) | The joker (hat lobes, face, motley, marotte, "JOKER" lettering). |
 | `pip(suit, cx, cy, scale, rot?, color?, flat?)` (`:40`) | The reusable suit symbol — places a heart/diamond/spade/club path, scaled/rotated, optionally embossed. |
@@ -170,3 +180,10 @@ Card markup is assembled as `defs()` + `frame()` + (per card) body, then id-pref
 ## Tests
 
 `packages/games-core/tests/playing-cards.test.ts` asserts: every `CARD_SUITS` × `CARD_RANKS` combination renders a labeled `<svg>`; jokers and the back render; themeable parts reference `var(--pc-…)`; suit pips keep `#C8102E` / `#16161D`; no `url(#shadow)` is baked in; and `idPrefix` namespaces both `id="…"` and `url(#…)` so instances don't collide. Run it with `cd packages/games-core && bun test tests/playing-cards.test.ts`.
+
+## Where to go next
+
+- [Architecture index](./README.md) — start here for the full doc map.
+- [games-client](./games-client.md) — the React UI package these `"use client"` components ship from.
+- [games-core engine](./games-core-engine.md) — the framework-agnostic logic package that holds the pure SVG builder (`svg.ts`).
+- [shared](./shared.md) — where `Suit` / `Rank` / `JokerVariant` and the `CARD_SUITS` / `CARD_RANKS` constants live.

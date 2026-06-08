@@ -68,9 +68,11 @@ pass a fake (no module mocking). The server unit suite runs with a preload
 `DATABASE_URL`/`BETTER_AUTH_SECRET`/`LOG_LEVEL` via `||=` so the real
 `env`/`db`/`logger` import without a `.env`. The integration suite runs with
 `bun --env-file=../../.env`, probes the DB in `harness.ts:8-14` (exporting
-`DB_UP`), and wraps every suite in `describe.skipIf(!DB_UP)` so it self-skips when
-Postgres is down — except `_preflight.test.ts`, which **throws** when `DB_UP` is
-false so a misconfigured run fails loudly instead of passing silently empty. Read
+`DB_UP`), and wraps every DB-backed suite in `describe.skipIf(!DB_UP)` so it
+self-skips when Postgres is down — except `_preflight.test.ts`, which **throws**
+when `DB_UP` is false so a misconfigured run fails loudly instead of passing
+silently empty, and `presence-redis.test.ts`, which is Redis-gated and **throws**
+in `beforeAll` when `REDIS_URL` is unset/unreachable rather than using `DB_UP`. Read
 `docs/architecture/testing.md` for the per-suite table before doing anything.
 
 ## Cardinal rules
@@ -135,9 +137,9 @@ of the source to a test that must exist.
    existing per-suite responsibilities before reading a line of test code.
 
 2. **Inventory existing coverage.** For the target module, list every `export`ed
-   symbol, then grep the test dirs for each name. Any export with zero references
-   is wholly untested — the highest-yield finding (e.g. only 2 of 8 serializers in
-   `apps/server/src/api/serialize.ts` are referenced by `serialize.test.ts`).
+   symbol, then grep the test dirs for each name. Any export with zero test
+   references is wholly untested — the highest-yield finding (e.g. a serializer in
+   `apps/server/src/api/serialize.ts` that no `serialize.test.ts` case names).
    ```bash
    grep -rnoE 'export (async )?(function|const) [A-Za-z0-9_]+' apps/server/src/api/serialize.ts
    grep -rn 'serializePublicUser\|serializeConversation\|serializeMessage' apps/server/tests apps/server/integration
@@ -145,17 +147,20 @@ of the source to a test that must exist.
 
 3. **Enumerate every branch and confirm an assertion for each.** For the source
    under test, walk every:
-   - **early-return / throw / `return err(...)`** — each guard has a distinct
+   - **early-return / throw / failure result** — each guard has a distinct
      error string or outcome; grep the tests for that exact literal. A guard with
-     no matching assertion is an untested branch.
+     no matching assertion is an untested branch. (Chat/REST services return
+     `fail(...)` / `ok(...)` from `apps/server/src/chat/result.ts`; the realtime
+     game lane uses a local `err(socket, message)` helper at
+     `apps/server/src/realtime/turn-based.ts:20`.)
      ```bash
-     grep -nE 'return err\(|throw new|return null|status: [0-9]{3}' apps/server/src/chat/conversations-service.ts
+     grep -nE 'return fail\(|throw new|return null|status: [0-9]{3}' apps/server/src/chat/conversations-service.ts
      ```
    - **Zod refinement** — `.int()`, `.min()/.max()`, `.length(n)`, enums,
      `.nullable()`, and especially `.strict()`. Each needs an input that violates
      **only** that constraint and asserts rejection. `.strict()` (reject unknown
-     keys) is the most-forgotten one — e.g. nothing asserts `ticTacToeMoveSchema`
-     rejects `{ row, col, mark }`.
+     keys) is the most-forgotten one — for each `.strict()` object schema, confirm
+     a case feeds a valid payload plus one extra key and asserts the parse fails.
    - **boundary value** — for a range `min..max` test `min-1, min, max, max+1`,
      non-integer, and the exact threshold; for arrays test empty and `len±1`; for
      time comparisons using strict `>`/`<` test the **equality** point (off-by-one
