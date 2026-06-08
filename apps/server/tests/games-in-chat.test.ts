@@ -21,6 +21,7 @@ mock.module("@gamelobby/database", () => ({
     getMemberIds: async () => members,
   },
   games: {
+    findLiveGameInConversation: async () => null,
     // biome-ignore lint/suspicious/noExplicitAny: test stub
     createGame: async (input: any) => {
       createGameInput = input;

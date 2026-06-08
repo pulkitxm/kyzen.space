@@ -33,6 +33,7 @@ const baseRow: GameRecord = {
   creatorUserId: "u1",
   seatingMode: "open",
   challengedUserId: null,
+  seriesId: "g1",
   startedAt: new Date("2026-01-01T00:00:00.000Z"),
   completedAt: null,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),

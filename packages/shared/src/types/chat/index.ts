@@ -58,7 +58,7 @@ export type {
   ServerNotificationRead,
   ServerPresenceSnapshot,
   ServerPresenceUpdate,
-  ServerRematchCreated,
   ServerReadReceipt,
+  ServerRematchCreated,
   ServerTypingUpdate,
 } from "./socket-events";

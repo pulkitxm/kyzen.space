@@ -90,7 +90,7 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
     expect(game.players).toEqual([
       { userId: a.id, username: a.username, role: "X" },
     ]);
-    expect(message.kind).toBe("game_card");
+    expect(message?.kind).toBe("game_card");
 
     const gameId = await gameUuid(game.id);
     const loaded = await games.getGameById(gameId);

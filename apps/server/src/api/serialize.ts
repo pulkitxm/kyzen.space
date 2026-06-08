@@ -12,15 +12,42 @@ import type {
   ConversationJson,
   FriendshipJson,
   GameJson,
+  GameType,
   MemberJson,
   MessageJson,
   MoveJson,
   NotificationJson,
   PublicUser,
+  SeriesDetail,
+  SeriesScore,
 } from "@gamelobby/shared/types";
 
 function iso(d: Date | null | undefined): string | null {
   return d ? new Date(d).toISOString() : null;
+}
+
+export function serializeSeries(
+  seriesId: string,
+  gameType: GameType,
+  seriesGames: GameRecord[],
+  score: SeriesScore,
+): SeriesDetail {
+  return {
+    seriesId,
+    gameType,
+    score,
+    games: seriesGames.map((g, i) => ({
+      gameId: g.code,
+      gameNumber: i + 1,
+      status: g.status,
+      winner: g.winner,
+      winnerUsername:
+        g.winner && g.winner !== "draw"
+          ? (g.players.find((p) => p.userId === g.winner)?.username ?? null)
+          : null,
+      completedAt: iso(g.completedAt),
+    })),
+  };
 }
 
 export function serializeGame(row: GameRecord): GameJson {

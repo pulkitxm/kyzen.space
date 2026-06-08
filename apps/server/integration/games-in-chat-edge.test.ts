@@ -162,8 +162,8 @@ describe.skipIf(!DB_UP)(
       expect(game.players).toEqual([
         { userId: owner.id, username: owner.username, role: "X" },
       ]);
-      expect(message.kind).toBe("game_card");
-      expect(message.gameId).toBe(game.id);
+      expect(message?.kind).toBe("game_card");
+      expect(message?.gameId).toBe(game.id);
 
       const loaded = await games.getGameByCode(game.id);
       expect(loaded?.seatingMode).toBe("challenge");
@@ -194,7 +194,7 @@ describe.skipIf(!DB_UP)(
       expect(game.players).toEqual([
         { userId: owner.id, username: owner.username, role: "X" },
       ]);
-      expect(message.kind).toBe("game_card");
+      expect(message?.kind).toBe("game_card");
 
       const loaded = await games.getGameByCode(game.id);
       expect(loaded?.seatingMode).toBe("open");

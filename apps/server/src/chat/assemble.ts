@@ -24,6 +24,7 @@ import {
   serializeNotification,
 } from "../api/serialize";
 import { enrichGameCardMeta } from "./game-card";
+import { computeSeriesScore } from "./series";
 
 async function withGameCardStatus(
   msg: MessageJson,
@@ -32,6 +33,9 @@ async function withGameCardStatus(
   if (msg.kind !== "game_card" || !row.gameId || !msg.metadata) return msg;
   const game = await games.getGameById(row.gameId);
   if (!game) return msg;
+  const seriesGames = game.seriesId
+    ? await games.getSeriesGames(game.seriesId)
+    : [game];
   return {
     ...msg,
     gameId: game.code,
@@ -39,6 +43,7 @@ async function withGameCardStatus(
       status: game.status,
       winner: game.winner,
       players: (game.players ?? []) as GamePlayer[],
+      seriesScore: computeSeriesScore(seriesGames),
     }),
   };
 }

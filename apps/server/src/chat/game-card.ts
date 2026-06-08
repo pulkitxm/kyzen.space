@@ -1,9 +1,10 @@
-import type { GameCardMeta } from "@gamelobby/shared/types";
+import type { GameCardMeta, SeriesScore } from "@gamelobby/shared/types";
 
 export type GameCardSnapshot = {
   status: string;
   winner: string | null;
   players: { userId: string; username: string; role: string }[];
+  seriesScore?: SeriesScore;
 };
 
 export function enrichGameCardMeta(
@@ -21,5 +22,6 @@ export function enrichGameCardMeta(
     winner: game.winner,
     winnerUsername,
     players: game.players,
+    seriesScore: game.seriesScore,
   };
 }
