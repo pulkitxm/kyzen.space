@@ -30,7 +30,8 @@
     "db:studio": "docker compose --project-directory . -f scripts/docker-compose.yml --profile studio up -d postgres adminer && echo Adminer → http://127.0.0.1:18081",
     "db:generate": "bun --env-file=.env drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "bun --env-file=.env packages/database/src/migrate.ts",
-    "db:push": "bun --env-file=.env drizzle-kit push --config=drizzle.config.ts"
+    "db:push": "bun --env-file=.env drizzle-kit push --config=drizzle.config.ts",
+    "doctor": "npx react-doctor@latest"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.16",
