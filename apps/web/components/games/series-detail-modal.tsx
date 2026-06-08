@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { FaArrowRight } from "react-icons/fa6";
 import { SeriesScoreboard } from "@/components/games/series-scoreboard";
 import { clientFetchJson } from "@/lib/api-client";
+import { useLayeredPopup } from "@/lib/popups/use-layered-popup";
 
 function rowLabel(
   status: string,
@@ -18,6 +19,7 @@ function rowLabel(
 }
 
 export function SeriesDetailModal({ gameId }: { gameId: string }) {
+  const { closeAll } = useLayeredPopup();
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
   const [error, setError] = useState(false);
 
@@ -57,6 +59,7 @@ export function SeriesDetailModal({ gameId }: { gameId: string }) {
           <Link
             key={g.gameId}
             href={`/play/${g.gameId}`}
+            onClick={() => closeAll()}
             className="flex items-center justify-between rounded-lg border border-border px-3 py-2 hover:bg-surface-overlay"
           >
             <span className="text-sm">
