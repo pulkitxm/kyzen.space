@@ -87,13 +87,15 @@ function GifMessage({
 const URL_RE = /(https?:\/\/[^\s]+)/g;
 
 function linkify(text: string, own: boolean): ReactNode {
+  const seen = new Map<string, number>();
   return text.split(URL_RE).map((part, i) => {
     if (i % 2 === 0) return part;
     const trailing = part.match(/[.,!?)]+$/)?.[0] ?? "";
     const href = trailing ? part.slice(0, -trailing.length) : part;
+    const occurrence = seen.get(part) ?? 0;
+    seen.set(part, occurrence + 1);
     return (
-      // biome-ignore lint/suspicious/noArrayIndexKey: split output is positional and stable
-      <span key={i}>
+      <span key={`${part}#${occurrence}`}>
         <a
           href={href}
           target="_blank"

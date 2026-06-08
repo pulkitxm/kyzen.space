@@ -106,9 +106,9 @@ export function ConversationPicker({
               >
                 Open game · anyone can join
               </button>
-              {group.members
-                .filter((m) => m.id !== userId)
-                .map((m) => (
+              {group.members.reduce<React.ReactElement[]>((acc, m) => {
+                if (m.id === userId) return acc;
+                acc.push(
                   <button
                     key={m.id}
                     type="button"
@@ -124,8 +124,10 @@ export function ConversationPicker({
                     <span className="truncate">
                       Challenge {m.displayName ?? m.username}
                     </span>
-                  </button>
-                ))}
+                  </button>,
+                );
+                return acc;
+              }, [])}
             </div>
           </>
         ) : (

@@ -6,7 +6,7 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://localhost:4000";
 
-export async function serverFetch(
+async function serverFetch(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {

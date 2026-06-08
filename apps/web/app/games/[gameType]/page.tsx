@@ -1,9 +1,15 @@
 import { getDefinition, hasEngine } from "@gamelobby/games-core";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GameLobby } from "@/app/games/_shared/game-lobby";
 import { BackLink, PageContainer, PageHeader } from "@/components/ui/page";
 import { getServerSession } from "@/lib/get-server-session";
+
+export const metadata: Metadata = {
+  title: "Game lobby",
+  description: "Pick a friend or group chat to start a multiplayer game with.",
+};
 
 export const dynamic = "force-dynamic";
 

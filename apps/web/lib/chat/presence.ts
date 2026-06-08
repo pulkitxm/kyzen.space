@@ -1,7 +1,7 @@
 import type { PresenceInfo } from "./atoms";
 import { relativeTime } from "./format";
 
-export function lastSeenLabel(lastSeen: string | null | undefined): string {
+function lastSeenLabel(lastSeen: string | null | undefined): string {
   if (!lastSeen) return "Offline";
   const rt = relativeTime(lastSeen);
   if (rt === "now") return "last seen just now";

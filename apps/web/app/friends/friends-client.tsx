@@ -299,6 +299,7 @@ function AddFriend() {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search by username…"
+        aria-label="Search by username"
         className="w-full rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       {loading ? (

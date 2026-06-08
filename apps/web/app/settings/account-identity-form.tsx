@@ -32,12 +32,14 @@ type CheckState =
   | { kind: "available" }
   | { kind: "unavailable"; reason: string; suggestions: string[] };
 
+const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
+
 function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(iso));
+  return DATE_FORMATTER.format(new Date(iso));
 }
 
 function pluralizeDays(days: number): string {

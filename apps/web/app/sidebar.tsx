@@ -10,6 +10,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   useSyncExternalStore,
@@ -153,41 +154,41 @@ export function Sidebar({
     [collapsed],
   );
 
+  const onResizeMove = useEffectEvent((e: MouseEvent) => {
+    const deltaX = Math.abs(e.clientX - resizeStartXRef.current);
+    if (deltaX > 5) hasResizedThisGestureRef.current = true;
+    if (resizeStartedFromCollapsedRef.current) {
+      if (e.clientX >= MIN_SIDEBAR_WIDTH) {
+        const newWidth = Math.min(
+          MAX_SIDEBAR_WIDTH,
+          Math.max(MIN_SIDEBAR_WIDTH, e.clientX),
+        );
+        setWidth(newWidth);
+        setCollapsed(false);
+        resizeStartedFromCollapsedRef.current = false;
+      }
+      return;
+    }
+    if (e.clientX < MIN_SIDEBAR_WIDTH) return;
+    const newWidth = Math.min(
+      MAX_SIDEBAR_WIDTH,
+      Math.max(MIN_SIDEBAR_WIDTH, e.clientX),
+    );
+    setWidth(newWidth);
+  });
+
+  const onResizeUp = useEffectEvent((e: MouseEvent) => {
+    if (!resizeStartedFromCollapsedRef.current && e.clientX < MIN_SIDEBAR_WIDTH)
+      toggleCollapsed();
+    resizeStartedFromCollapsedRef.current = false;
+    setIsResizing(false);
+  });
+
   useEffect(() => {
     if (!isResizing) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = Math.abs(e.clientX - resizeStartXRef.current);
-      if (deltaX > 5) hasResizedThisGestureRef.current = true;
-      if (resizeStartedFromCollapsedRef.current) {
-        if (e.clientX >= MIN_SIDEBAR_WIDTH) {
-          const newWidth = Math.min(
-            MAX_SIDEBAR_WIDTH,
-            Math.max(MIN_SIDEBAR_WIDTH, e.clientX),
-          );
-          setWidth(newWidth);
-          setCollapsed(false);
-          resizeStartedFromCollapsedRef.current = false;
-        }
-        return;
-      }
-      if (e.clientX < MIN_SIDEBAR_WIDTH) return;
-      const newWidth = Math.min(
-        MAX_SIDEBAR_WIDTH,
-        Math.max(MIN_SIDEBAR_WIDTH, e.clientX),
-      );
-      setWidth(newWidth);
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      if (
-        !resizeStartedFromCollapsedRef.current &&
-        e.clientX < MIN_SIDEBAR_WIDTH
-      )
-        toggleCollapsed();
-      resizeStartedFromCollapsedRef.current = false;
-      setIsResizing(false);
-    };
+    const handleMouseMove = (e: MouseEvent) => onResizeMove(e);
+    const handleMouseUp = (e: MouseEvent) => onResizeUp(e);
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
@@ -199,7 +200,7 @@ export function Sidebar({
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isResizing, setCollapsed, setWidth, toggleCollapsed]);
+  }, [isResizing]);
 
   const collapsedWidth = 68;
   const navPx = 8;

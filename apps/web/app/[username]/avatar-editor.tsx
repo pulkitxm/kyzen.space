@@ -14,7 +14,7 @@ import {
   randomAvatarConfig,
 } from "@gamelobby/avatar";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   FaChevronDown,
@@ -103,11 +103,14 @@ function AvatarEditorModal({
     setDraft((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  const onEscape = useEffectEvent(() => {
+    if (confirmOpen) setConfirmOpen(false);
+    else attemptClose();
+  });
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (confirmOpen) setConfirmOpen(false);
-      else attemptClose();
+      if (e.key === "Escape") onEscape();
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
@@ -115,7 +118,7 @@ function AvatarEditorModal({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [attemptClose, confirmOpen]);
+  }, []);
 
   useEffect(() => {
     if (!dirty) return;

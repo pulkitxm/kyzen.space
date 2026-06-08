@@ -102,6 +102,7 @@ export function GroupSettingsDialog({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
+              aria-label="Group name"
               className="flex-1 rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <Button

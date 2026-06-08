@@ -16,7 +16,7 @@ export type SidebarPrefs = {
   width: number;
 };
 
-export const DEFAULT_SIDEBAR_PREFS = {
+const DEFAULT_SIDEBAR_PREFS = {
   collapsed: false,
   width: DEFAULT_SIDEBAR_WIDTH,
 } satisfies SidebarPrefs;
@@ -49,7 +49,7 @@ export function parseSidebarPrefsCookieValue(
   return parsePrefsFromEncoded(value) ?? DEFAULT_SIDEBAR_PREFS;
 }
 
-export function encodeSidebarPrefsCookieValue(prefs: SidebarPrefs): string {
+function encodeSidebarPrefsCookieValue(prefs: SidebarPrefs): string {
   return encodeURIComponent(
     JSON.stringify({
       collapsed: prefs.collapsed,
