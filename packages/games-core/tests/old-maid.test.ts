@@ -34,6 +34,7 @@ function state(
     currentTurn,
     deckSeed: "test-seed",
     discardedPairs: [],
+    handOrderPending: null,
     hands,
     lastDraw: null,
     loserRole: null,
@@ -44,9 +45,9 @@ function state(
 function play(
   inputState: OldMaidState,
   role: OldMaidRole,
-  cardIndex: number,
+  move: OldMaidMove,
 ): OldMaidState {
-  const res = reduce(inputState, { role }, { cardIndex });
+  const res = reduce(inputState, { role }, move);
   expect(res.ok).toBe(true);
   if (!res.ok) throw new Error(res.error);
   return res.state;
@@ -167,23 +168,50 @@ describe("old-maid — drawing and outcomes", () => {
     });
   });
 
-  test("a non-matching draw passes the turn to the other active player", () => {
-    const next = play(
+  test("a non-matching draw waits for hand order before passing the turn", () => {
+    const afterDraw = play(
       state({
         P1: [card("A", "H"), card("JOKER", "JOKER")],
         P2: [card("Q", "H"), card("K", "D")],
       }),
       "P1",
-      0,
+      { cardIndex: 0 },
     );
-    expect(next.currentTurn).toBe("P2");
-    expect(next.lastDraw).toEqual({
+    expect(afterDraw.currentTurn).toBe("P1");
+    expect(afterDraw.handOrderPending).toBe("P1");
+    expect(afterDraw.lastDraw).toEqual({
       actorRole: "P1",
       fromRole: "P2",
       matchedRank: null,
     });
-    expect(next.hands.P1.map((c) => c.rank)).toEqual(["A", "JOKER", "Q"]);
-    expect(next.hands.P2.map((c) => c.rank)).toEqual(["K"]);
+    expect(afterDraw.hands.P1.map((c) => c.rank)).toEqual(["A", "JOKER", "Q"]);
+    expect(afterDraw.hands.P2.map((c) => c.rank)).toEqual(["K"]);
+
+    const kept = play(afterDraw, "P1", { action: "keepOrder" });
+    expect(kept.currentTurn).toBe("P2");
+    expect(kept.handOrderPending).toBeNull();
+    expect(kept.hands.P1.map((c) => c.rank)).toEqual(["A", "JOKER", "Q"]);
+  });
+
+  test("shuffle reorders only the actor hand and is deterministic", () => {
+    const afterDraw = play(
+      state({
+        P1: [card("A", "H"), card("JOKER", "JOKER")],
+        P2: [card("Q", "H"), card("K", "D")],
+      }),
+      "P1",
+      { cardIndex: 0 },
+    );
+    const shuffled = play(afterDraw, "P1", { action: "shuffle" });
+    expect(shuffled.currentTurn).toBe("P2");
+    expect(shuffled.handOrderPending).toBeNull();
+    expect(shuffled.hands.P1.map((c) => c.id).sort()).toEqual(
+      ["A-H", "JOKER-JOKER", "Q-H"].sort(),
+    );
+    const shuffledAgain = play(afterDraw, "P1", { action: "shuffle" });
+    expect(shuffledAgain.hands.P1.map((c) => c.id)).toEqual(
+      shuffled.hands.P1.map((c) => c.id),
+    );
   });
 
   test("no move is accepted after the Old Maid is determined", () => {

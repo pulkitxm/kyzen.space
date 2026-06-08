@@ -83,6 +83,7 @@ export const oldMaidStateSchema = z
     currentTurn: oldMaidRoleSchema,
     deckSeed: z.string().min(1),
     discardedPairs: z.array(oldMaidDiscardedPairSchema).max(26),
+    handOrderPending: oldMaidRoleSchema.nullable(),
     hands: oldMaidHandsSchema,
     lastDraw: oldMaidLastDrawSchema.nullable(),
     loserRole: oldMaidRoleSchema.nullable(),
@@ -91,11 +92,29 @@ export const oldMaidStateSchema = z
   .strict();
 export type OldMaidState = z.infer<typeof oldMaidStateSchema>;
 
-export const oldMaidMoveSchema = z
+export const oldMaidDrawMoveSchema = z
   .object({
     cardIndex: z.number().int().min(0).max(51),
   })
   .strict();
+export type OldMaidDrawMove = z.infer<typeof oldMaidDrawMoveSchema>;
+
+export const oldMaidHandOrderActionSchema = z.enum(["shuffle", "keepOrder"]);
+export type OldMaidHandOrderAction = z.infer<
+  typeof oldMaidHandOrderActionSchema
+>;
+
+export const oldMaidHandOrderMoveSchema = z
+  .object({
+    action: oldMaidHandOrderActionSchema,
+  })
+  .strict();
+export type OldMaidHandOrderMove = z.infer<typeof oldMaidHandOrderMoveSchema>;
+
+export const oldMaidMoveSchema = z.union([
+  oldMaidDrawMoveSchema,
+  oldMaidHandOrderMoveSchema,
+]);
 export type OldMaidMove = z.infer<typeof oldMaidMoveSchema>;
 
 export const oldMaidConfigSchema = z.object({}).strict();

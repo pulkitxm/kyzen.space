@@ -3,10 +3,13 @@ import {
   type GameEngine,
   type OldMaidCard,
   type OldMaidDiscardedPair,
+  type OldMaidHandOrderAction,
   type OldMaidMove,
   type OldMaidPairRank,
   type OldMaidRole,
   type OldMaidState,
+  oldMaidDrawMoveSchema,
+  oldMaidHandOrderMoveSchema,
   oldMaidMoveSchema,
   type ReduceResult,
   type Seat,
@@ -64,6 +67,24 @@ export function createOldMaidDeck(): OldMaidCard[] {
   }
   deck.push({ id: "JOKER", rank: "JOKER", suit: "JOKER" });
   return deck;
+}
+
+function shuffleHandOrder(
+  hand: OldMaidCard[],
+  deckSeed: string,
+  salt: string,
+): OldMaidCard[] {
+  const random = randomFromSeed(`${deckSeed}:hand-order:${salt}`);
+  const shuffled = [...hand];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    const nextI = shuffled[j];
+    const nextJ = shuffled[i];
+    if (nextI === undefined || nextJ === undefined) continue;
+    shuffled[i] = nextI;
+    shuffled[j] = nextJ;
+  }
+  return shuffled;
 }
 
 export function shuffleDeck(deck: OldMaidCard[], seed: string): OldMaidCard[] {
@@ -180,6 +201,7 @@ function createStateWithSeed(seed: string): OldMaidState {
     currentTurn: "P1",
     deckSeed: seed,
     discardedPairs: [...p1.pairs, ...p2.pairs],
+    handOrderPending: null,
     hands: { P1: p1.hand, P2: p2.hand },
     lastDraw: null,
     loserRole: null,
@@ -198,6 +220,52 @@ export function createInitialOldMaidState(_seats: Seat[]): OldMaidState {
 
 function isTerminal(state: OldMaidState): boolean {
   return state.loserRole !== null || state.activeRoles.length <= 1;
+}
+
+function reduceHandOrder(
+  state: OldMaidState,
+  role: OldMaidRole,
+  action: OldMaidHandOrderAction,
+): ReduceResult<OldMaidState> {
+  if (state.handOrderPending !== role) {
+    return { ok: false, error: "No hand order choice pending" };
+  }
+  if (state.currentTurn !== role) {
+    return { ok: false, error: "Not your turn" };
+  }
+
+  const actorHand = [...state.hands[role]];
+  const nextHand =
+    action === "shuffle"
+      ? shuffleHandOrder(
+          actorHand,
+          state.deckSeed,
+          `${state.discardedPairs.length}:${actorHand.map((card) => card.id).join("|")}`,
+        )
+      : actorHand;
+
+  const hands = { ...state.hands, [role]: nextHand };
+  const activeRoles = activeRolesFor(hands);
+  const currentTurn = nextRole(role, activeRoles);
+  const nextState = finalized({
+    ...state,
+    activeRoles,
+    currentTurn,
+    handOrderPending: null,
+    hands,
+  });
+
+  if (nextState.loserRole) {
+    const winnerRole =
+      nextState.winnerRoles.find((r) => r !== nextState.loserRole) ?? null;
+    return {
+      ok: true,
+      state: nextState,
+      outcome: { status: "completed", winnerRole, draw: false },
+    };
+  }
+
+  return { ok: true, state: nextState, outcome: { status: "active" } };
 }
 
 export const oldMaidEngine: GameEngine<OldMaidState, OldMaidMove> = {
@@ -225,6 +293,20 @@ export const oldMaidEngine: GameEngine<OldMaidState, OldMaidMove> = {
     const parsed = oldMaidMoveSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: "Invalid move" };
 
+    const orderMove = oldMaidHandOrderMoveSchema.safeParse(parsed.data);
+    if (orderMove.success) {
+      if (ctx.role !== "P1" && ctx.role !== "P2") {
+        return { ok: false, error: "Not a player in this game" };
+      }
+      return reduceHandOrder(state, ctx.role, orderMove.data.action);
+    }
+
+    const drawMove = oldMaidDrawMoveSchema.safeParse(parsed.data);
+    if (!drawMove.success) return { ok: false, error: "Invalid move" };
+    if (state.handOrderPending !== null) {
+      return { ok: false, error: "Finish arranging your hand first" };
+    }
+
     const actorRole = ctx.role;
     const fromRole = rightNeighbor(actorRole, state.activeRoles);
     if (fromRole === actorRole)
@@ -232,10 +314,10 @@ export const oldMaidEngine: GameEngine<OldMaidState, OldMaidMove> = {
 
     const actorHand = [...state.hands[actorRole]];
     const fromHand = [...state.hands[fromRole]];
-    const drawn = fromHand[parsed.data.cardIndex];
+    const drawn = fromHand[drawMove.data.cardIndex];
     if (!drawn) return { ok: false, error: "Card not available" };
 
-    fromHand.splice(parsed.data.cardIndex, 1);
+    fromHand.splice(drawMove.data.cardIndex, 1);
     const afterDraw = [...actorHand, drawn];
     const discard = isPairRank(drawn.rank)
       ? afterDraw.findIndex(
@@ -272,14 +354,19 @@ export const oldMaidEngine: GameEngine<OldMaidState, OldMaidMove> = {
       [fromRole]: fromHand,
     };
     const activeRoles = activeRolesFor(hands);
-    const currentTurn = activeRoles.includes(actorRole)
-      ? nextRole(actorRole, activeRoles)
-      : nextRole(fromRole, activeRoles);
-    const nextState = finalized({
+    const handOrderPending =
+      matchedRank === null ? actorRole : null;
+    const currentTurn = handOrderPending
+      ? actorRole
+      : activeRoles.includes(actorRole)
+        ? nextRole(actorRole, activeRoles)
+        : nextRole(fromRole, activeRoles);
+    let nextState = finalized({
       ...state,
       activeRoles,
       currentTurn,
       discardedPairs,
+      handOrderPending,
       hands,
       lastDraw: { actorRole, fromRole, matchedRank },
       loserRole: null,
@@ -287,6 +374,7 @@ export const oldMaidEngine: GameEngine<OldMaidState, OldMaidMove> = {
     });
 
     if (nextState.loserRole) {
+      nextState = { ...nextState, handOrderPending: null };
       const winnerRole =
         nextState.winnerRoles.find((role) => role !== nextState.loserRole) ??
         null;

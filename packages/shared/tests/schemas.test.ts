@@ -77,12 +77,21 @@ describe("tic-tac-toe state schema (strict)", () => {
 describe("old-maid schemas (strict)", () => {
   const card = { id: "A-H", rank: "A", suit: "H" };
 
-  test("move schema accepts only an integer card index in range", () => {
+  test("move schema accepts draw and hand-order actions", () => {
     expect(oldMaidMoveSchema.safeParse({ cardIndex: 0 }).success).toBe(true);
+    expect(oldMaidMoveSchema.safeParse({ action: "shuffle" }).success).toBe(
+      true,
+    );
+    expect(oldMaidMoveSchema.safeParse({ action: "keepOrder" }).success).toBe(
+      true,
+    );
     expect(oldMaidMoveSchema.safeParse({ cardIndex: 52 }).success).toBe(false);
     expect(oldMaidMoveSchema.safeParse({ cardIndex: 1.5 }).success).toBe(false);
     expect(
       oldMaidMoveSchema.safeParse({ cardIndex: 0, peek: true }).success,
+    ).toBe(false);
+    expect(
+      oldMaidMoveSchema.safeParse({ action: "shuffle", cardIndex: 0 }).success,
     ).toBe(false);
   });
 
@@ -93,6 +102,7 @@ describe("old-maid schemas (strict)", () => {
         currentTurn: "P1",
         deckSeed: "seed",
         discardedPairs: [],
+        handOrderPending: null,
         hands: {
           P1: [card],
           P2: [{ id: "JOKER", rank: "JOKER", suit: "JOKER" }],
@@ -108,6 +118,7 @@ describe("old-maid schemas (strict)", () => {
         currentTurn: "P3",
         deckSeed: "seed",
         discardedPairs: [],
+        handOrderPending: "P1",
         hands: { P1: [card], P2: [] },
         lastDraw: null,
         loserRole: null,

@@ -89,21 +89,32 @@ cleanly.
 - `discardedPairs` contains all mandatory pair discards from setup and draw
   turns.
 - `hands` stores each role's current cards.
+- `handOrderPending` is the role that must send `shuffle` or `keepOrder` before
+  the turn advances (set after a non-matching draw; `null` otherwise).
 - `lastDraw` records the latest draw and any rank that was immediately paired.
 - `loserRole` is set only once the Old Maid is determined.
 - `winnerRoles` contains roles whose hands are empty.
 
 ## Move shape
 
+Draw from the opponent:
+
 ```ts
-{
-  cardIndex: number;
-}
+{ cardIndex: number }
 ```
 
-- `cardIndex` is an integer in `0..51` (inclusive).
-- It indexes the opponent's current face-down fan.
-- The schema is **strict**: unknown keys are rejected.
+- `cardIndex` is an integer in `0..51` (inclusive) into the opponent's fan.
+
+After a non-matching draw, the actor must resolve hand order:
+
+```ts
+{ action: "shuffle" } | { action: "keepOrder" }
+```
+
+- **Shuffle** reorders only the actor's current hand (same cards, new order).
+- **Keep order** leaves the hand as dealt (drawn card stays last).
+
+All move objects are **strict**; unknown keys are rejected.
 
 ## Config
 
@@ -122,11 +133,21 @@ receives a `GameClientProps` (`packages/games-client/src/types.ts`) — includin
   Picking a card back emits `make_move` with `{ gameId, moveData: { cardIndex } }`
   only when it is your turn and the socket is connected. It emits `leave_room` on
   cleanup.
-- **Cards:** your own hand is shown face-up; the other hand is rendered as card
-  backs. The game state currently stores full hands in the shared game JSON, so
-  the UI preserves table etiquette but the generic platform does not yet provide
-  per-player redacted private state.
-- **Icons** come from `react-icons/fa6` (`FaRegCircleQuestion`, `FaShuffle`,
+- **Cards:** the board uses the full play-pane width (`play-client` drops
+  `max-w-2xl` for this game). Opponent and player hands are wide, overlapping
+  fans whose overlap is computed from container width so cards stay on-screen
+  without scrollbars. Card faces and backs use the shared inline-SVG components
+  (`PlayingCard`, `Joker`, `CardBack` from `@gamelobby/games-client`; see
+  `docs/architecture/playing-cards.md`). Each `OldMaidCard` in game state carries
+  `rank` and `suit` (`S`/`H`/`D`/`C`/`JOKER`), which the client maps to the
+  correct SVG. Matched pairs accumulate in a central discard pile (mini card
+  stacks); when a draw creates a pair, the two cards fly from your hand into the
+  pile.   Picking from the opponent flies a `CardBack` overlay to your hand, then
+  emits the socket move. After a non-matching draw, the actor must choose
+  **Shuffle** or **Keep order** (bottom-right controls; only their hand order
+  changes) before the turn passes. Fan layout and motion live in
+  `apps/web/app/globals.css`.
+- **Icons** come from `react-icons/fa6` (`FaLayerGroup`, `FaShuffle`,
   `FaUserCheck`) — no hand-written SVG.
 
 A loading placeholder, `OldMaidSkeleton`
