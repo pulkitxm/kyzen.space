@@ -94,12 +94,13 @@ Socket.IO connection the chat lane uses, passed down as a prop.
   (`TttMarkDefs`) is rendered once per board.
 - **Winning line** — when the game ends with a winner, a strike-through line
   (`WinStrike`, an absolute SVG overlay on the grid) is drawn through the three
-  winning cells in the winner's colour. The draw animation (`animate-ttt-strike`
-  in `globals.css`) plays **once**, and only on a *transition* into the won state
-  — a live win, or a replay reaching the deciding move. A game opened
-  already-finished renders the line **statically** (no animation), so revisiting a
-  result doesn't re-animate. The state machine lives in `client.tsx` (a
-  render-phase comparison of the current vs. previous winning-line key).
+  winning cells in the winner's colour. The draw is a `motion.line` spring
+  (`pathLength` 0 → 1, from `motion/react`) that plays **once**, and only on a
+  *transition* into the won state — a live win, or a replay reaching the deciding
+  move. A game opened already-finished renders the line **statically**
+  (`initial={false}`, no animation), so revisiting a result doesn't re-animate.
+  The state machine lives in `client.tsx` (a render-phase comparison of the
+  current vs. previous winning-line key).
 - **No snap on load** — the board is server-rendered: the registry imports the
   board component eagerly (not via `React.lazy`), so opening a finished game shows
   its final position (marks + the static winning line) in the first paint, with no

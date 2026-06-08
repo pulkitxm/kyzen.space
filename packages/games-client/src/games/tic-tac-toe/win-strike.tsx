@@ -1,6 +1,7 @@
 "use client";
 
 import type { Mark } from "@gamelobby/shared/types";
+import { motion } from "motion/react";
 
 const CELL_OFFSET = 15.556;
 const CELL_SPAN = 34.444;
@@ -38,7 +39,7 @@ export function WinStrike({
       aria-hidden="true"
       className={`pointer-events-none absolute inset-0 h-full w-full ${colorClass}`}
     >
-      <line
+      <motion.line
         x1={ax - ox}
         y1={ay - oy}
         x2={bx + ox}
@@ -46,10 +47,9 @@ export function WinStrike({
         stroke="currentColor"
         strokeWidth={3}
         strokeLinecap="round"
-        pathLength={1}
-        strokeDasharray={1}
-        className={animate ? "animate-ttt-strike" : undefined}
-        style={{ strokeDashoffset: animate ? 1 : 0 }}
+        initial={animate ? { pathLength: 0 } : false}
+        animate={{ pathLength: 1 }}
+        transition={{ type: "spring", duration: 0.6, bounce: 0.3 }}
       />
     </svg>
   );

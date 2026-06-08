@@ -1,3 +1,6 @@
+"use client";
+
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 export function BlurImage({
@@ -33,11 +36,14 @@ export function BlurImage({
         <span className="absolute inset-0 animate-pulse bg-surface-overlay" />
       )}
       {/* biome-ignore lint/performance/noImgElement: GIF with dynamic remote src and blur placeholder, not a next/image static asset */}
-      <img
+      <motion.img
         src={src}
         alt={alt}
         loading={loading}
-        className="relative block h-full w-full animate-gif-fade-in object-cover"
+        className="relative block h-full w-full object-cover"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
       />
     </span>
   );
