@@ -83,23 +83,19 @@ export function GameCardMessage({
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <FaGamepad className="size-5" />
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="truncate font-medium text-sm">
             {gameName(meta.gameType)}
           </div>
         </div>
-      </div>
-      <div className="mt-3 flex items-center justify-between gap-2">
-        {status === "completed" ? (
-          <span />
-        ) : (
+        {status === "completed" ? null : (
           <span className={cn("rounded-full px-2 py-0.5 text-[11px]", tone)}>
             {statusText}
           </span>
         )}
         <Link
           href={href}
-          className="rounded-lg bg-primary px-3.5 py-1.5 font-medium text-primary-foreground text-xs outline-none transition hover:bg-primary-hover"
+          className="shrink-0 rounded-lg bg-primary px-3.5 py-1.5 font-medium text-primary-foreground text-xs outline-none transition hover:bg-primary-hover"
         >
           {action}
         </Link>
