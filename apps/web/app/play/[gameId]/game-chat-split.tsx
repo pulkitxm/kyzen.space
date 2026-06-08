@@ -51,6 +51,9 @@ export function GameChatSplit({
   const [stashEdge, setStashEdge] = useState<StashEdge | null>(
     initialLayout.stashEdge,
   );
+  const [lastStashEdge, setLastStashEdge] = useState<StashEdge>(
+    initialLayout.lastStashEdge,
+  );
   const [icon, setIcon] = useState<IconPos>(initialLayout.icon);
   const [tab, setTab] = useState<"game" | "chat">("game");
 
@@ -59,12 +62,14 @@ export function GameChatSplit({
   const geomRef = useRef(geometry);
   const minimizedRef = useRef(minimized);
   const stashRef = useRef(stashEdge);
+  const lastStashRef = useRef(lastStashEdge);
   const iconRef = useRef(icon);
   modeRef.current = mode;
   widthRef.current = chatWidth;
   geomRef.current = geometry;
   minimizedRef.current = minimized;
   stashRef.current = stashEdge;
+  lastStashRef.current = lastStashEdge;
   iconRef.current = icon;
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,6 +81,7 @@ export function GameChatSplit({
         override?.stashEdge !== undefined
           ? override.stashEdge
           : stashRef.current,
+      lastStashEdge: override?.lastStashEdge ?? lastStashRef.current,
       chatWidth: override?.chatWidth ?? widthRef.current,
       popout: override?.popout ?? geomRef.current,
       icon: override?.icon ?? iconRef.current,
@@ -107,6 +113,7 @@ export function GameChatSplit({
         setGeometry(ls.popout);
         setMinimized(isDesktop ? ls.minimized : false);
         setStashEdge(ls.stashEdge);
+        setLastStashEdge(ls.lastStashEdge);
         setIcon(ls.icon);
         return;
       }
@@ -189,7 +196,15 @@ export function GameChatSplit({
 
   const minimize = useCallback(() => {
     setMinimized(true);
-    persist({ minimized: true });
+    setStashEdge(null);
+    persist({ minimized: true, stashEdge: null });
+  }, [persist]);
+
+  const closeToSide = useCallback(() => {
+    const edge = lastStashRef.current;
+    setMinimized(true);
+    setStashEdge(edge);
+    persist({ minimized: true, stashEdge: edge });
   }, [persist]);
 
   const restore = useCallback(() => {
@@ -200,6 +215,7 @@ export function GameChatSplit({
 
   const changeStash = useCallback((edge: StashEdge | null) => {
     setStashEdge(edge);
+    if (edge) setLastStashEdge(edge);
   }, []);
 
   const isPopout = mode === "popout";
@@ -256,6 +272,7 @@ export function GameChatSplit({
           onPopOut={popOut}
           onDock={dock}
           onMinimize={minimize}
+          onClose={closeToSide}
           onGeometryChange={setGeometry}
           onCommit={persist}
         >
