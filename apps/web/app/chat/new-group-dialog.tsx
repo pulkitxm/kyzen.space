@@ -66,6 +66,7 @@ export function NewGroupDialog({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Group name"
+          aria-label="Group name"
           className="mb-3 w-full rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <div className="mb-3 max-h-64 overflow-y-auto rounded-xl border border-border">

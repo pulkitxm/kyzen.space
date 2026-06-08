@@ -1,10 +1,20 @@
 import type { ConversationJson, MessageJson } from "@gamelobby/shared/types";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";
 import { getServerSession } from "@/lib/get-server-session";
 import { ConversationView } from "./conversation-view";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ handle: string }>;
+}): Promise<Metadata> {
+  const { handle } = await params;
+  return { title: handle };
+}
 
 export default async function ConversationPage({
   params,
