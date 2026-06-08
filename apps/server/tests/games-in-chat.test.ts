@@ -47,6 +47,12 @@ mock.module("@gamelobby/database", () => ({
   profiles: {
     getProfileByUserId: async () => profile,
   },
+  messages: {},
+  friends: {},
+  notifications: {},
+  db: {},
+  schema: {},
+  createDb: () => ({ db: {}, client: {} }),
 }));
 
 mock.module("../src/realtime/notify", () => ({

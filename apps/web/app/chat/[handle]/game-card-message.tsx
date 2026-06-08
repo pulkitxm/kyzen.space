@@ -30,6 +30,7 @@ export function GameCardMessage({
   const { openLayer } = useLayeredPopup();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [rematchError, setRematchError] = useState<string | null>(null);
 
   const status = meta.status ?? "waiting";
   const players = meta.players ?? [];
@@ -68,6 +69,7 @@ export function GameCardMessage({
 
   async function onRematch() {
     setBusy(true);
+    setRematchError(null);
     try {
       const res = await emitAck<{ gameId: string }>(
         socket,
@@ -75,8 +77,11 @@ export function GameCardMessage({
         { gameId },
       );
       router.push(`/play/${res.gameId}`);
-    } catch {
+    } catch (e) {
       setBusy(false);
+      setRematchError(
+        e instanceof Error ? e.message : "Couldn't start the rematch",
+      );
     }
   }
 
@@ -134,6 +139,9 @@ export function GameCardMessage({
               </button>
             ) : null}
           </div>
+          {rematchError ? (
+            <p className="text-danger text-xs">{rematchError}</p>
+          ) : null}
         </div>
       ) : null}
     </div>

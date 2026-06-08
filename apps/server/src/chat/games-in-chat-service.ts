@@ -168,12 +168,16 @@ export async function rematchGame(input: {
 
   const { engine } = getDefinition(prev.gameType);
   const orderedUserIds = computeRematchSeating(prev);
-  const players = orderedUserIds.map((uid, i) => {
+  const players: { userId: string; username: string; role: string }[] = [];
+  for (let i = 0; i < orderedUserIds.length; i++) {
+    const uid = orderedUserIds[i];
     const seat = prev.players.find((p) => p.userId === uid);
     const role = engine.roles[i];
-    if (!seat || !role) throw new Error("Rematch seating mismatch");
-    return { userId: uid, username: seat.username, role };
-  });
+    if (!uid || !seat || !role) {
+      return fail("Cannot rematch: invalid game seating", 409);
+    }
+    players.push({ userId: uid, username: seat.username, role });
+  }
   const becomesActive = players.length >= engine.minPlayers;
 
   const created = await games.createGame({

@@ -44,6 +44,7 @@ export function GameOverOverlay({
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
   const [rematchCode, setRematchCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
     setGame(payload.game);
@@ -80,6 +81,7 @@ export function GameOverOverlay({
       return;
     }
     setBusy(true);
+    setError(null);
     try {
       const res = await emitAck<{ gameId: string }>(
         socket,
@@ -87,8 +89,9 @@ export function GameOverOverlay({
         { gameId },
       );
       router.push(`/play/${res.gameId}`);
-    } catch {
+    } catch (e) {
       setBusy(false);
+      setError(e instanceof Error ? e.message : "Couldn't start the rematch");
     }
   }, [socket, gameId, rematchCode, router]);
 
@@ -118,6 +121,9 @@ export function GameOverOverlay({
             <div className="mb-4">
               <SeriesScoreboard score={detail.score} />
             </div>
+          ) : null}
+          {error ? (
+            <p className="mb-2 text-center text-danger text-sm">{error}</p>
           ) : null}
           <div className="flex flex-col gap-2">
             {canRematch ? (

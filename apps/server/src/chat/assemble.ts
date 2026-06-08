@@ -33,9 +33,14 @@ async function withGameCardStatus(
   if (msg.kind !== "game_card" || !row.gameId || !msg.metadata) return msg;
   const game = await games.getGameById(row.gameId);
   if (!game) return msg;
-  const seriesGames = game.seriesId
-    ? await games.getSeriesGames(game.seriesId)
-    : [game];
+  let seriesGames = [game];
+  if (game.seriesId) {
+    try {
+      seriesGames = await games.getSeriesGames(game.seriesId);
+    } catch {
+      seriesGames = [game];
+    }
+  }
   return {
     ...msg,
     gameId: game.code,
