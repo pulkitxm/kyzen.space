@@ -285,3 +285,7 @@ html[data-pattern="none"] .app-canvas::before {
     background: var(--sidebar-primary);
   }
 }
+
+@utility gear-shift {
+  transform: translateX(var(--gear-shift, 0px));
+}

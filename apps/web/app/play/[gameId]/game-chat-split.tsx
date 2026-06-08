@@ -18,12 +18,14 @@ import {
   type IconPos,
   type PopoutGeometry,
   persistChatLayout,
+  RESIZE_HANDLE_W,
   readChatLayout,
   type StashEdge,
 } from "@/lib/chat-layout";
 import { cn } from "@/lib/utils";
 import { ChatFloatingIcon } from "./chat-floating-icon";
 import { ChatPopoutWindow } from "./chat-popout-window";
+import { GameSettingsGear } from "./game-settings-gear";
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -219,6 +221,7 @@ export function GameChatSplit({
   }, []);
 
   const isPopout = mode === "popout";
+  const gearShifted = mode === "mounted" && !minimized;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -290,6 +293,11 @@ export function GameChatSplit({
             onCommit={persist}
           />
         )}
+
+        <GameSettingsGear
+          shifted={gearShifted}
+          offset={chatWidth + RESIZE_HANDLE_W}
+        />
       </div>
     </div>
   );

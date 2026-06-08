@@ -28,6 +28,11 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/chat-socket-bridge.tsx` | Hydrates chat atoms from SSR props, then maps every `CHAT_EVENTS.*` socket event onto a Jotai store mutation. |
 | `apps/web/lib/chat/atoms.ts` | Shared chat state: conversations, messages (atomFamily), friends, requests, notifications, presence, typing, derived totals, pure upsert helpers. |
 | `apps/web/lib/sidebar-atoms.ts` | `atomWithStorage` atoms for sidebar collapsed/width, with SSR-safe and width-clamping storage adapters. |
+| `apps/web/lib/audio/atoms.ts` | `gameSfxAtom` / `gameMusicAtom` (`atomWithStorage`): the two client-only audio preference channels (volume + mute), seeded from `@gamelobby/shared` defaults. |
+| `apps/web/lib/audio/use-audio-bridge.ts` | `useGameAudioBridge()`: pushes the audio atoms into the `games-client` `GameAudioEngine`, marks music active for the play screen, and registers the gesture unlock. |
+| `apps/web/lib/use-media-query.ts` | `useMediaQuery(query)`: SSR-safe `matchMedia` subscription via `useSyncExternalStore` (returns `false` on the server). A reusable client hook for breakpoint-driven UI. |
+| `apps/web/app/play/[gameId]/game-settings-gear.tsx` | The sliding `FaGear` button (`motion/react`) that opens the settings modal via the layered-popup host. |
+| `apps/web/app/play/[gameId]/game-settings-panel.tsx` | Settings modal body: per-channel mute toggle + −/+ + range slider for game sound and background music. |
 | `apps/web/lib/sidebar-atoms-shared.ts` | Storage keys + `clampWidth` helpers shared by the atoms and the server-side cookie boot script. |
 | `apps/web/lib/appearance.tsx` | `AppearanceProvider` + `usePalette`/`usePattern`/`useColorModeSetting`; persists appearance via `clientFetch` PUT. |
 | `apps/web/app/games/[gameType]/page.tsx` | The single dynamic game-lobby route; `hasEngine` gate + `getDefinition` drive `GameLobby`. |
@@ -37,7 +42,7 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/play/[gameId]/page.tsx` | SSR-fetches game + moves (+ conversation + messages), gates on auth + game **code** (`isGameCode`, then normalizes and redirects to the canonical uppercase code), resolves the chat layout, renders `PlayClient`. |
 | `apps/web/app/play/[gameId]/play-client.tsx` | Resolves `getGameClient` / `getGameSkeleton`, renders the board in `<Suspense>` over the shared socket, optionally side-by-side with chat via `GameChatSplit`. |
 | `apps/web/app/play/[gameId]/loading.tsx` | Route `loading.tsx`: reads the chat-layout cookie and renders `<PlaySkeleton layout={…} />` during the SSR fetch. |
-| `apps/web/app/play/[gameId]/play-skeleton.tsx` | Layout-aware skeleton mirroring `GameChatSplit` (docked / popout / minimized). |
+| `apps/web/app/play/[gameId]/play-skeleton.tsx` | Layout-aware skeleton mirroring `GameChatSplit` (docked / popout / minimized) and the settings gear, all positioned from the chat-layout cookie. |
 | `apps/web/lib/chat-layout.ts` | `ChatLayout` type + `parseChatLayoutCookie` / `normalizeChatLayout` + layout geometry constants; the layout cookie/localStorage contract shared by page, loading, and `GameChatSplit`. |
 | `apps/web/app/chat/[handle]/page.tsx` | SSR conversation page; resolves handle (UUID or username) → conversation + messages. |
 | `apps/web/app/chat/[handle]/conversation-view.tsx` | Client conversation UI: hydrates messages atom, marks read, renders list/composer/typing. |
@@ -373,6 +378,8 @@ const gameNode = GameClient ? (
 
 See `apps/web/app/play/[gameId]/play-client.tsx:42`. If the game belongs to a conversation it wraps the board and a `ConversationView` in a `GameChatSplit`; otherwise it renders the board alone (`apps/web/app/play/[gameId]/play-client.tsx:65`).
 
+`PlayClient` also calls `useGameAudioBridge()` once, which pipes the two audio preference atoms (`gameSfxAtom` / `gameMusicAtom`) into the `games-client` `GameAudioEngine` and wires the browser-autoplay gesture unlock. The settings **gear** lives in `GameChatSplit` (it owns the chat docking state): an `absolute top-3 right-3` `motion/react` button that slides left by `chatWidth` when the chat is docked (`mode === "mounted" && !minimized` on desktop) and back to `x: 0` when it pops out / minimizes / stashes, opening the audio settings modal through `useLayeredPopup`. The no-conversation branch renders a static, non-sliding gear. See [audio.md](./audio.md).
+
 `getGameClient` (`packages/games-client/src/registry.ts:20`) is just a lookup table of board components (currently the eagerly-imported, SSR'd `TicTacToeGameClient`; the registry type leaves room for a `React.lazy` board to code-split a heavy future game), and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`). `play-client.tsx` pulls `socket`/`status` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx:44`) and passes them down so the board rides the app's single connection. `getGameSkeleton(type)` (`packages/games-client/src/registry.ts:24`) returns the board's `<Suspense>` fallback, falling back to `DefaultGameSkeleton` when a game registers no skeleton (it never returns `null`). Adding a game means adding one row each to `REGISTRY` / `SKELETON_REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, socket event, or driver.**
 
 ### Two skeletons: the board fallback vs. the route loading
@@ -467,5 +474,6 @@ Two small but easy-to-trip-over config facts let the shared packages work in the
 - [games-core schemas](./games-core-schemas.md) — the strict Zod `configSchema`/`moveSchema` the lobby form and move emits are validated against.
 - [games-core engine](./games-core-engine.md) — the authoritative `reduce`/`step` that decides the move outcome the board renders.
 - [games-client](./games-client.md) — the board components, the `getGameClient` registry, and `GameClientProps`.
+- [audio](./audio.md) — the game-sound/background-music engine, the preference atoms + bridge, and the sliding settings gear over the layered-popup modal.
 - [chat-core](./chat-core.md) — the `CHAT_EVENTS` contract and DTOs (`ConversationJson`, `MessageJson`, …) this app consumes.
 - [Database](./database.md) — the generic `game` / `move` / `game_player` tables the SSR reads ultimately resolve to.

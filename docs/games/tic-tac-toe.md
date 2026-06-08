@@ -116,6 +116,30 @@ Socket.IO connection the chat lane uses, passed down as a prop.
   `FaPlay`/`FaPause`, `FaChevronRight`, `FaForwardStep`); the ✕/◯ glyphs are the
   one hand-authored decorative SVG, the same raw-SVG exception the playing-cards
   use.
+- **Sound** — the board uses the shared `useGameAudio()` hook
+  (`@gamelobby/games-client`, see [audio.md](../architecture/audio.md)). All sounds
+  are audio files (no synthesis). A **hover** sound (`onMouseEnter`) and a
+  **touch** sound (`onClick`) fire only on a **playable** cell — empty, your turn,
+  in a live game — guarded by the same `playable` flag that drives the cell's
+  `disabled` state, so a finished game (and replay) has no playable cells and
+  hovering/clicking its boxes is **silent**. The **opponent's** move plays the
+  touch sound too — it arrives over the socket (not a local click), so the board
+  fires the sound when the live board gains a mark that isn't the move you just
+  made (de-duped via the post-move `currentTurn` flip; spectators hear every
+  move). Replay *playback* is audible, though:
+  each move replayed forward — autoplay or stepping next (`→`) — plays the
+  **touch** sound (going back or jumping to first/last is silent). The
+  **win**/**draw** sound plays **exactly once, live only**: a `useEffect` keyed on
+  `game.status`/`game.winner`
+  fires on a `waiting|active → completed` transition seen within the session
+  (guarded by a once-only ref), so a finished game opened fresh (no transition) and
+  replay scrubbing (which changes `replayStep`, not `game.status`) both stay
+  silent. All of these honour the game-sound volume/mute channel. **Background
+  music** is a separate channel: a looping, **crossfaded** jazz track
+  (`apps/web/public/sounds/tic-tac-toe-bg.ogg`, registered in `gameMusicSource`)
+  streamed through the audio engine; it starts after the first interaction
+  (browser autoplay policy) and is controlled by the gear's *Background music*
+  slider/mute.
 
 A loading placeholder, `TicTacToeSkeleton`
 (`packages/games-client/src/games/tic-tac-toe/skeleton.tsx`), is registered in

@@ -21,7 +21,8 @@ This is also why the chat contract no longer has its own package: the former `@g
 | --- | --- |
 | `packages/shared/package.json` | Declares the two subpath exports (`./constants`, `./types`) and the lone `zod` dependency (`:6`–`:18`). |
 | `packages/shared/src/index.ts` | Root barrel: `export * from "./constants"` + `export * from "./types"`. |
-| `packages/shared/src/constants/index.ts` | Barrel for all constant **values** (theme, pattern, chat-layout, username, games, categories, chat). |
+| `packages/shared/src/constants/index.ts` | Barrel for all constant **values** (audio, theme, pattern, chat-layout, username, games, categories, chat). |
+| `packages/shared/src/constants/audio.ts` | `GAME_SFX_STORAGE_KEY` / `GAME_MUSIC_STORAGE_KEY`, `DEFAULT_SFX_VOLUME` / `DEFAULT_MUSIC_VOLUME`, `VOLUME_MIN` / `VOLUME_MAX` / `VOLUME_STEP` — the client-only game-audio preference keys + bounds (see [audio.md](./audio.md)). |
 | `packages/shared/src/constants/theme.ts` | `THEME_IDS`, `DEFAULT_THEME`, `COLOR_MODES`, `DEFAULT_COLOR_MODE`. |
 | `packages/shared/src/constants/pattern.ts` | `PATTERN_IDS`, `DEFAULT_PATTERN`. |
 | `packages/shared/src/constants/chat-layout.ts` | The chat-layout numeric bounds (`MIN_GAME`, `MIN_CHAT`/`MAX_CHAT`/`DEFAULT_CHAT_W`, the `*_CHAT_POPOUT_*` bounds, `DEFAULT_POPOUT`). |
@@ -30,7 +31,8 @@ This is also why the chat contract no longer has its own package: the former `@g
 | `packages/shared/src/constants/categories.ts` | `GAME_CATEGORIES`. |
 | `packages/shared/src/constants/chat.ts` | `CHAT_EVENTS` — the socket event-name registry. |
 | `packages/shared/src/constants/playing-cards.ts` | `CARD_SUITS` and `CARD_RANKS` — the 4 suits + 13 ranks for the playing-card renderer (see [playing-cards.md](./playing-cards.md)). |
-| `packages/shared/src/types/index.ts` | Barrel for all types + schemas (avatar, chat, chat-layout, db, games, pattern, theme, username) and the re-exported `z`. |
+| `packages/shared/src/types/index.ts` | Barrel for all types + schemas (audio, avatar, chat, chat-layout, db, games, pattern, theme, username) and the re-exported `z`. |
+| `packages/shared/src/types/audio.ts` | `AudioChannelPrefs` (`{ volume, muted }`) — a plain type (no Zod) for the two client-only audio preference channels. |
 | `packages/shared/src/types/z.ts` | `export { z } from "zod"` (+ `ZodType` / `ZodTypeAny`) — the single import point for Zod. |
 | `packages/shared/src/types/theme.ts` / `pattern.ts` / `chat-layout.ts` / `username.ts` | Per-area schemas + inferred types + small guards/helpers (`isValidTheme`, `validateChatModePref`, `normalizeUsername`, …). |
 | `packages/shared/src/types/avatar.ts` | Re-exports `AvatarConfig` (and friends) from `@gamelobby/avatar`, and defines `avatarConfigSchema` (the Zod schema used to validate an avatar config on the wire). |
