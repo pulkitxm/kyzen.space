@@ -102,6 +102,9 @@
       "name": "@gamelobby/games-client",
       "version": "0.1.0",
       "dependencies": {
+        "@dicebear/collection": "^9.0.0",
+        "@dicebear/core": "^9.0.0",
+        "@gamelobby/avatar": "workspace:*",
         "@gamelobby/shared": "workspace:*",
       },
       "devDependencies": {

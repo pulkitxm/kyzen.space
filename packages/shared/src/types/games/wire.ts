@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avatarConfigSchema } from "../avatar";
 import { gameCodeSchema } from "./code";
 import { gameTypeSchema } from "./core";
 
@@ -18,6 +19,7 @@ export const gamePlayerSchema = z
     userId: z.string().min(1),
     username: z.string().min(1),
     role: z.string().min(1),
+    avatar: avatarConfigSchema.nullable().optional(),
   })
   .strict();
 export type GamePlayerDto = z.infer<typeof gamePlayerSchema>;

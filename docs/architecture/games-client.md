@@ -1,4 +1,4 @@
-# games-client: React Game UI & Lazy Registry
+# games-client: React Game UI & Registry
 
 ## What this is / why it matters
 
@@ -9,7 +9,7 @@
 
 This separation is the point. The same `TicTacToeState` type and `ticTacToeMoveSchema` that the board in `packages/games-client/src/games/tic-tac-toe/client.tsx` uses to render cells are the exact ones the server runs through `engine.reduce` in `apps/server/src/realtime/turn-based.ts:148`. The client **informs** the UI but **never decides** anything: it emits a `make_move` over the socket, the server re-validates against the shared schema + engine, and the board only updates when the server broadcasts the new state back. The client is never trusted — it is a thin, optimistic-free view that mirrors server-authoritative state.
 
-A second key idea is **lazy resolution by `type` string**. The web app has a single dynamic play route; it never imports a specific game component directly. Instead it asks `getGameClient(gameType)` for a `React.lazy` component, which code-splits each game's board into its own chunk. Adding a game means adding one registry entry, not touching the route.
+A second key idea is **resolution by `type` string**. The web app has a single dynamic play route; it never imports a specific game component directly. Instead it asks `getGameClient(gameType)` for the board component. Adding a game means adding one registry entry, not touching the route. The registry value is a `ComponentType<GameClientProps>`, so it *can* hold a `React.lazy`-wrapped board to code-split a heavy game into its own chunk — but the currently registered tic-tac-toe board is **statically imported** into the registry so it is server-rendered in the initial HTML. That matters for revisiting finished games: an eagerly-imported board lands in the SSR'd markup with its final position already drawn, with no skeleton-to-board "snap" on load. With a single registered game (whose board only loads on the `/play` route, already its own bundle) the code-splitting loss is negligible.
 
 ## Files at a glance
 
@@ -17,7 +17,7 @@ A second key idea is **lazy resolution by `type` string**. The web app has a sin
 | --- | --- |
 | `packages/games-client/src/index.ts` | Public package surface: re-exports `getGameClient`, `getGameSkeleton`, `DefaultGameSkeleton`, `SkeletonBox`, and the `GameClientProps` type. |
 | `packages/games-client/src/types.ts` | `GameClientProps` — the contract every board component receives (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`). |
-| `packages/games-client/src/registry.ts` | Two registries keyed by the typed `GameType` from `@gamelobby/shared`: `REGISTRY` (`React.lazy` board components) and `SKELETON_REGISTRY` (eager skeleton components). `getGameClient(type)` returns the board (`null` for unknown types); `getGameSkeleton(type)` returns the skeleton, falling back to `DefaultGameSkeleton`. |
+| `packages/games-client/src/registry.ts` | Two registries keyed by the typed `GameType` from `@gamelobby/shared`: `REGISTRY` (board components — `ComponentType<GameClientProps>`, currently the statically-imported `TicTacToeGameClient`) and `SKELETON_REGISTRY` (eager skeleton components). `getGameClient(type)` returns the board (`null` for unknown types); `getGameSkeleton(type)` returns the skeleton, falling back to `DefaultGameSkeleton`. |
 | `packages/games-client/src/skeletons.tsx` | `SkeletonBox` (a pulse-animated placeholder primitive) and `DefaultGameSkeleton` (the generic board placeholder). No `"use client"` — pure markup, so it renders in both server and client trees. |
 | `packages/games-client/src/games/tic-tac-toe/client.tsx` | A concrete board: reuses the shared socket from props, emits `join_room`/`make_move`/`leave_room`, listens for `game_state`/`move_made`/`game_error`, derives `canMove`, and renders a replay scrubber for finished games. |
 | `packages/games-client/src/games/tic-tac-toe/skeleton.tsx` | `TicTacToeSkeleton` — a prop-less placeholder that mirrors the board (status dot, 3×3 grid, footer line) so the loading state matches the eventual UI. |
@@ -28,7 +28,7 @@ Consumed on the web side by:
 | Path | Role |
 | --- | --- |
 | `apps/web/app/play/[gameId]/page.tsx` | RSC route: fetches the game + moves over REST, passes them as `initial*` props. |
-| `apps/web/app/play/[gameId]/play-client.tsx` | Calls `getGameClient(gameType)` and renders the board inside `<Suspense>`, with `getGameSkeleton(gameType)` as the fallback. |
+| `apps/web/app/play/[gameId]/play-client.tsx` | Calls `getGameClient(gameType)` and renders the board inside `<Suspense>`, with `getGameSkeleton(gameType)` as the fallback. The `<Suspense>` only ever suspends for a *lazily*-registered board; the current eagerly-imported board never triggers the fallback. |
 | `apps/web/app/play/[gameId]/loading.tsx` + `play-skeleton.tsx` | Route-level loading UI streamed while `page.tsx` fetches the game record. Reads the `gl_chat_layout` cookie and renders the matching chat shell — docked panel (`mounted`, sized to `chatWidth`), floating window (`popout`, positioned/sized from the saved `x/y/w/h`), or floating icon (minimized, positioned from the saved `x/y`). The board area is a **generic** placeholder: the game `type` isn't known yet at this stage (it *is* the data being fetched), so it can't pick a per-game skeleton. |
 
 Authoritative counterpart on the server:
@@ -54,7 +54,7 @@ That is the entire public API. Everything else — the per-game boards, the repl
 
 ### Per-game loading skeletons
 
-The board chunk is `React.lazy`, so something must render while it loads. `getGameSkeleton(type)` resolves the matching skeleton from a small `SKELETON_REGISTRY`, falling back to `DefaultGameSkeleton` when a game ships none:
+A board registered with `React.lazy` resolves as a chunk, so something must render while it loads. The currently registered tic-tac-toe board is *not* lazy (it is statically imported, so it SSRs and never suspends), but the skeleton system is still required: the structural test makes every game ship one, and it remains the `<Suspense>` fallback the moment any game is registered lazily. `getGameSkeleton(type)` resolves the matching skeleton from a small `SKELETON_REGISTRY`, falling back to `DefaultGameSkeleton` when a game ships none:
 
 ```ts
 export function getGameSkeleton(gameType: string): ComponentType {
@@ -69,7 +69,7 @@ export function getGameSkeleton(gameType: string): ComponentType {
 
 Two deliberate choices:
 
-- **Skeletons are registered eagerly, not lazily.** A skeleton must be available *before* the board chunk it stands in for has loaded — so it lives in its own tiny module (`games/<type>/skeleton.tsx`) and is statically imported into the registry, never `React.lazy`'d. Keeping it separate from `client.tsx` is also what stops the heavy board (and its `socket.io-client` import) from being pulled into the main bundle.
+- **Skeletons are registered eagerly, not lazily.** A skeleton must be available *before* the board it stands in for has rendered — so it lives in its own tiny module (`games/<type>/skeleton.tsx`) and is statically imported into the registry, never `React.lazy`'d. Keeping it in its own module (rather than `client.tsx`) also means it can serve as the fallback for a board that *is* lazily registered, without dragging that board's chunk in with it.
 - **Skeletons are prop-less and `"use client"`-free.** They are pure presentational markup built from `SkeletonBox`, so they render as a `<Suspense>` fallback in the client tree without needing game data or a client boundary. A good skeleton mirrors the board's layout (tic-tac-toe draws a 3×3 grid) so the swap to the live board doesn't shift the page.
 
 `play-client.tsx` uses it as the board's fallback:
@@ -105,6 +105,7 @@ React and `socket.io-client` are peers, not regular dependencies, so the host (t
 Every board component is a `ComponentType<GameClientProps>`. The shape is intentionally small:
 
 ```ts
+import type { AvatarConfig } from "@gamelobby/shared/types";
 import type { Socket } from "socket.io-client";
 
 export type GameClientProps = {
@@ -116,7 +117,12 @@ export type GameClientProps = {
     id: string;
     status: string;
     winner: string | null;
-    players: { userId: string; username: string; role: string }[];
+    players: {
+      userId: string;
+      username: string;
+      role: string;
+      avatar?: AvatarConfig | null;
+    }[];
     gameState?: unknown;
   };
   initialMoves: Record<string, unknown>[];
@@ -135,24 +141,21 @@ Notes that matter:
 
 These `initial*` props are SSR data: the RSC route fetches them once so the board renders fully on first paint, then the board takes over live updates via the shared socket. See the walkthrough below.
 
-## Lazy resolution by type
+## Resolution by type
 
-The registry is an object keyed by the **typed `GameType`** from `@gamelobby/shared` (not a bare string literal), with each value built by `React.lazy`. The key is the exported `TIC_TAC_TOE` constant, so a typo is a compile error rather than a silently missing board:
+The registry is an object keyed by the **typed `GameType`** from `@gamelobby/shared` (not a bare string literal), with each value a `ComponentType<GameClientProps>`. The key is the exported `TIC_TAC_TOE` constant, so a typo is a compile error rather than a silently missing board. The currently registered board is **statically imported** — the registry holds the `TicTacToeGameClient` component directly:
 
 ```ts
 import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 import type { GameType } from "@gamelobby/shared/types";
-import { type ComponentType, lazy } from "react";
+import type { ComponentType } from "react";
+import { TicTacToeGameClient } from "./games/tic-tac-toe/client";
 import { TicTacToeSkeleton } from "./games/tic-tac-toe/skeleton";
 import { DefaultGameSkeleton } from "./skeletons";
 import type { GameClientProps } from "./types";
 
 const REGISTRY: Record<GameType, ComponentType<GameClientProps>> = {
-  [TIC_TAC_TOE]: lazy(() =>
-    import("./games/tic-tac-toe/client").then((m) => ({
-      default: m.TicTacToeGameClient,
-    })),
-  ),
+  [TIC_TAC_TOE]: TicTacToeGameClient,
 };
 
 const SKELETON_REGISTRY: Record<GameType, ComponentType> = {
@@ -172,12 +175,12 @@ export function getGameClient(
 Why this design:
 
 - **Typed keys.** `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>`, so the compiler requires an entry for every game type the registry (`GAME_TYPES` in `@gamelobby/shared/constants`) knows about. The public getters still accept a plain `string` and widen through a local `Record<string, …>` alias, so an unknown type returns `null`/the default instead of failing to type-check.
-- **Code splitting.** Each board is a dynamic `import()`, so a game's UI (and its sometimes-heavy assets) only downloads when someone actually opens that game. The lobby and unrelated games stay light.
-- **The board export isn't a default.** `client.tsx` exports a *named* `TicTacToeGameClient`, so the `.then((m) => ({ default: m.TicTacToeGameClient }))` adapts it into the `{ default }` shape `React.lazy` requires.
+- **Eager import → server-rendered board.** The registry holds `TicTacToeGameClient` directly (a plain function component), so the board renders during SSR and ships in the initial HTML. Opening or reloading a finished game shows the final position immediately, with no skeleton-to-board snap. Because the only registered game's board is reached on the `/play` route — already its own route bundle — there is no meaningful code-splitting cost.
+- **Lazy is still permitted for a heavy game.** The registry value type is `ComponentType<GameClientProps>`, which a `React.lazy(() => import(…))`-wrapped board also satisfies. If a future game ships a heavy board (large assets, a big dependency), register it lazily to code-split it into its own chunk; its `<Suspense>` fallback (`getGameSkeleton`) will then actually render while the chunk loads. A `React.lazy` board needs the `.then((m) => ({ default: m.BoardComponent }))` adapter because `client.tsx` exports a *named* component, not a default.
 - **Unknown types return `null`, not a throw.** A game-type the web build doesn't know how to render degrades gracefully — the caller shows a "not supported here" message rather than crashing (`apps/web/app/play/[gameId]/play-client.tsx:60`).
 - **One source of truth on the web side.** The route never references a specific game component; it only knows the string. Adding a game = one line in `REGISTRY` (and, optionally, one in `SKELETON_REGISTRY`) plus the matching `GameDefinition` in games-core. No new route, no new endpoint.
 
-Because the registry hands back `React.lazy` components, callers must render them inside a `<Suspense>` boundary. That's exactly what the web app does:
+Callers still render the board inside a `<Suspense>` boundary so that a *lazily*-registered board has a fallback (for the eager board the boundary simply never suspends). That's what the web app does:
 
 ```tsx
 const GameClient = getGameClient(gameType);
@@ -327,8 +330,8 @@ Crucially, `makeMove` does **not** mutate the board. There is no optimistic upda
 1. User opens `/play/<gameId>` → `apps/web/app/play/[gameId]/page.tsx:23` runs as an RSC.
 2. It validates the `[gameId]` segment is a game **code** (`isGameCode`, then normalizes + redirects to the canonical code), resolves the session via `getServerSession()` (redirects to `/auth` if signed out), then `serverFetchJson` → `GET /api/games/:gameId` returns `{ game, moves }` (`apps/web/app/play/[gameId]/page.tsx:36`). The `:gameId` is the code, and `data.game.id` is that same code (`serializeGame` maps `row.code → GameJson.id`).
 3. It renders `<PlayClient ... initialGame initialMoves gameType={data.game.gameType} />` (`apps/web/app/play/[gameId]/page.tsx:72`); `gameType` is the typed `GameType` carried on the fetched `GameJson` (`page.tsx:75`).
-4. `play-client.tsx:42` calls `getGameClient(gameType)` (and `getGameSkeleton(gameType)`) → registry returns the `React.lazy` tic-tac-toe component.
-5. `<Suspense>` resolves the lazy chunk and mounts `TicTacToeGameClient` with the SSR `initial*` props plus the shared `socket`/`connected` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx`). The board paints immediately from `initialGame`/`initialMoves` — no join needed yet.
+4. `play-client.tsx:42` calls `getGameClient(gameType)` (and `getGameSkeleton(gameType)`) → registry returns the statically-imported `TicTacToeGameClient` component.
+5. `<Suspense>` wraps and mounts `TicTacToeGameClient` with the SSR `initial*` props plus the shared `socket`/`connected` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx`). Because the board is eagerly imported, it renders during SSR and paints immediately from `initialGame`/`initialMoves` — the `<Suspense>` never suspends and the skeleton fallback is never shown — no join needed yet.
 
 **Phase 2 — going live (shared socket):**
 
@@ -432,7 +435,7 @@ The rest of replay is UI sugar: a `<ReplayToolbar>` with first/prev/play/next/la
 - **Reuse the shared socket — never call `io()`.** The board receives the one shared connection via `props.socket` and rides it for the game lane alongside chat. Opening your own `io()` would create a second redundant connection (double handshake/auth, doubled presence). On cleanup, remove your listeners with `socket.off(...)` and emit `leave_room`; **never** call `socket.disconnect()` — the connection is owned by the host's `SocketProvider`.
 - **Identity is never in the payload.** Boards send `{ gameId, moveData }` only. The server reads the user from the authenticated socket (`socket.data.userId`), set from the Better Auth session cookie that rode on the shared connection's handshake (`withCredentials: true`). Sending a `userId` from the client would be ignored.
 - **`gameState` and `moveData` cross the boundary as `unknown`.** `GameClientProps.initialGame.gameState` is `unknown` and `initialMoves` is `Record<string, unknown>[]` because games-client is generic. Each board narrows these itself (tic-tac-toe casts to a local `GameJson`/`TicState`). The real schema lives in games-core; keep that the single source of truth and import its types rather than re-declaring shapes.
-- **Boards must be `"use client"` and Suspense-safe.** They are `React.lazy`-loaded, so a caller must wrap them in `<Suspense>` (the web route does at `apps/web/app/play/[gameId]/play-client.tsx:48`). The first line of `client.tsx` is `"use client"`.
+- **Boards must be `"use client"` and Suspense-safe.** The web route wraps every board in `<Suspense>` (`apps/web/app/play/[gameId]/play-client.tsx:48`), so a board registered with `React.lazy` has its fallback covered; the currently registered board is eagerly imported, so it SSRs and that boundary never suspends for it. Either way the first line of `client.tsx` is `"use client"`.
 - **Register by the typed `GameType` key.** Both `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>` keyed by the constant exported from `@gamelobby/shared/constants` (`TIC_TAC_TOE`), so a typo or a missing entry is a *compile error* — the registries can't fall out of sync with `GAME_TYPES` silently. The runtime getters still accept a plain `string` (the value comes off a fetched record), and an unrecognized one yields `null` (board) / `DefaultGameSkeleton` (skeleton).
 - **Tailwind must see the source.** Classes used in board components only survive the build because `apps/web/app/globals.css:3` has `@source "../../../packages/games-client/src/**/*.{ts,tsx}"` and `apps/web/next.config.ts:5` lists `@gamelobby/games-client` in `transpilePackages`. A new board file outside that glob would lose its Tailwind classes.
 - **React/socket.io are peers.** Don't add `react` or `socket.io-client` as regular dependencies of this package — they must come from the host app to avoid duplicate-instance bugs.

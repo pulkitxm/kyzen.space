@@ -1,16 +1,13 @@
 import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 import type { GameType } from "@gamelobby/shared/types";
-import { type ComponentType, lazy } from "react";
+import type { ComponentType } from "react";
+import { TicTacToeGameClient } from "./games/tic-tac-toe/client";
 import { TicTacToeSkeleton } from "./games/tic-tac-toe/skeleton";
 import { DefaultGameSkeleton } from "./skeletons";
 import type { GameClientProps } from "./types";
 
 const REGISTRY: Record<GameType, ComponentType<GameClientProps>> = {
-  [TIC_TAC_TOE]: lazy(() =>
-    import("./games/tic-tac-toe/client").then((m) => ({
-      default: m.TicTacToeGameClient,
-    })),
-  ),
+  [TIC_TAC_TOE]: TicTacToeGameClient,
 };
 
 const SKELETON_REGISTRY: Record<GameType, ComponentType> = {

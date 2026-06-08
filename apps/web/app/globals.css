@@ -281,6 +281,18 @@ html[data-pattern="none"] .app-canvas::before {
     animation: gif-fade-in 0.45s ease-out both;
   }
 
+  @keyframes ttt-strike-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  .animate-ttt-strike {
+    animation: ttt-strike-draw 0.45s ease-out forwards;
+  }
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { TIC_TAC_TOE } from "../src/constants";
 import {
+  avatarConfigSchema,
   clientJoinRoomSchema,
   clientMakeMoveSchema,
   gameJsonSchema,
@@ -10,6 +11,23 @@ import {
 } from "../src/types";
 
 const CODE = "K7P2QX";
+
+const SAMPLE_AVATAR = {
+  skinColor: "edb98a",
+  top: "shortFlat",
+  hairColor: "2c1b18",
+  hatColor: "3c4f5c",
+  accessories: "none",
+  accessoriesColor: "000000",
+  facialHair: "none",
+  facialHairColor: "2c1b18",
+  clothing: "shirtCrewNeck",
+  clothesColor: "3c4f5c",
+  eyes: "default",
+  eyebrows: "default",
+  mouth: "smile",
+  backgroundColor: "b6e3f4",
+};
 
 describe("tic-tac-toe move schema (strict)", () => {
   test("accepts in-range integer coordinates", () => {
@@ -115,6 +133,25 @@ describe("wire payload schemas", () => {
     ).toBe(true);
   });
 
+  test("gamePlayer accepts an optional or null avatar", () => {
+    expect(
+      gamePlayerSchema.safeParse({
+        userId: "u1",
+        username: "a",
+        role: "X",
+        avatar: null,
+      }).success,
+    ).toBe(true);
+    expect(
+      gamePlayerSchema.safeParse({
+        userId: "u1",
+        username: "a",
+        role: "O",
+        avatar: SAMPLE_AVATAR,
+      }).success,
+    ).toBe(true);
+  });
+
   test("gameJson accepts a serialized game", () => {
     expect(
       gameJsonSchema.safeParse({
@@ -150,5 +187,27 @@ describe("wire payload schemas", () => {
         players: [],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("avatar config schema", () => {
+  test("accepts a full avatar config", () => {
+    expect(avatarConfigSchema.safeParse(SAMPLE_AVATAR).success).toBe(true);
+  });
+
+  test("accepts an optional style", () => {
+    expect(
+      avatarConfigSchema.safeParse({ ...SAMPLE_AVATAR, style: "feminine" })
+        .success,
+    ).toBe(true);
+    expect(
+      avatarConfigSchema.safeParse({ ...SAMPLE_AVATAR, style: "wizard" })
+        .success,
+    ).toBe(false);
+  });
+
+  test("rejects a missing required field", () => {
+    const { backgroundColor: _omit, ...partial } = SAMPLE_AVATAR;
+    expect(avatarConfigSchema.safeParse(partial).success).toBe(false);
   });
 });
