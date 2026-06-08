@@ -234,17 +234,17 @@ export function TicTacToeGameClient({
     return () => window.clearInterval(id);
   }, [isPast, replayPlaying, sortedLen, audio]);
 
-  const prevIsLiveRef = useRef(
+  const [wasLive, setWasLive] = useState(
     initialGame.status === "waiting" || initialGame.status === "active",
   );
 
-  useEffect(() => {
-    if (prevIsLiveRef.current && !isLive && isPast) {
-      setReplayStep(sortMoves(moves).length);
+  if (wasLive !== isLive) {
+    setWasLive(isLive);
+    if (wasLive && !isLive && isPast) {
+      setReplayStep(sortedLen);
       setReplayPlaying(false);
     }
-    prevIsLiveRef.current = isLive;
-  }, [isLive, isPast, moves]);
+  }
 
   useEffect(() => {
     if (!socket || !liveSocketKey) return;

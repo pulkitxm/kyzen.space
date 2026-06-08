@@ -44,6 +44,25 @@ function pluralizeDays(days: number): string {
   return `${days} day${days === 1 ? "" : "s"}`;
 }
 
+function deriveCheck(
+  locked: boolean,
+  normalized: string,
+  isCurrent: boolean,
+  result: { for: string; data: AvailabilityResponse | null } | null,
+): CheckState {
+  if (locked) return { kind: "current" };
+  if (normalized.length === 0) return { kind: "idle" };
+  if (isCurrent) return { kind: "current" };
+  if (!result || result.for !== normalized) return { kind: "checking" };
+  if (result.data === null) return { kind: "idle" };
+  if (result.data.available) return { kind: "available" };
+  return {
+    kind: "unavailable",
+    reason: REASON_TEXT[result.data.reason ?? "taken"] ?? "Not available.",
+    suggestions: result.data.suggestions ?? [],
+  };
+}
+
 export function AccountIdentityForm({
   name,
   username,
@@ -158,7 +177,10 @@ function UsernameField({
   const router = useRouter();
   const [value, setValue] = useState(currentUsername);
   const [saved, setSaved] = useState(currentUsername);
-  const [check, setCheck] = useState<CheckState>({ kind: "current" });
+  const [result, setResult] = useState<{
+    for: string;
+    data: AvailabilityResponse | null;
+  } | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -169,16 +191,7 @@ function UsernameField({
   const isCurrent = normalized === saved.toLowerCase();
 
   useEffect(() => {
-    if (locked) return;
-    if (normalized.length === 0) {
-      setCheck({ kind: "idle" });
-      return;
-    }
-    if (isCurrent) {
-      setCheck({ kind: "current" });
-      return;
-    }
-    setCheck({ kind: "checking" });
+    if (locked || normalized.length === 0 || isCurrent) return;
     const id = ++requestId.current;
     const timer = setTimeout(async () => {
       try {
@@ -187,17 +200,10 @@ function UsernameField({
         );
         const data = (await res.json()) as AvailabilityResponse;
         if (id !== requestId.current) return;
-        if (data.available) {
-          setCheck({ kind: "available" });
-        } else {
-          setCheck({
-            kind: "unavailable",
-            reason: REASON_TEXT[data.reason ?? "taken"] ?? "Not available.",
-            suggestions: data.suggestions ?? [],
-          });
-        }
+        setResult({ for: normalized, data });
       } catch {
-        if (id === requestId.current) setCheck({ kind: "idle" });
+        if (id === requestId.current)
+          setResult({ for: normalized, data: null });
       }
     }, CHECK_DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -211,6 +217,8 @@ function UsernameField({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [confirmOpen]);
+
+  const check = deriveCheck(locked, normalized, isCurrent, result);
 
   const canSave =
     !pending &&
