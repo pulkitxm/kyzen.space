@@ -355,6 +355,64 @@ describe("handleMakeMove — applying moves", () => {
     expect(bumpCalls).toContainEqual({ userId: "u1", outcome: "won" });
     expect(bumpCalls).toContainEqual({ userId: "u2", outcome: "lost" });
   });
+
+  test("a drawing move completes the game with winner draw and bumps both as drawn", async () => {
+    current = activeGame({
+      gameState: {
+        board: ["X", "O", "X", "X", "O", "O", "O", "X", null],
+        currentTurn: "X",
+      },
+    });
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u1");
+    await call(handleMakeMove, io, socket, {
+      gameId: CODE,
+      moveData: { row: 2, col: 2 },
+    });
+
+    expect(current.status).toBe("completed");
+    expect(current.winner).toBe("draw");
+    expect(emits).toContainEqual({
+      room: `game:${CODE}`,
+      event: "game_over",
+      payload: { winner: "draw" },
+    });
+    expect(bumpCalls).toContainEqual({ userId: "u1", outcome: "drawn" });
+    expect(bumpCalls).toContainEqual({ userId: "u2", outcome: "drawn" });
+    expect(bumpCalls.filter((c) => c.outcome === "won")).toHaveLength(0);
+    expect(bumpCalls.filter((c) => c.outcome === "lost")).toHaveLength(0);
+  });
+
+  test("the game-over broadcast and stat bumps fire exactly once on a winning move", async () => {
+    current = activeGame({
+      gameState: {
+        board: ["X", "X", null, "O", "O", null, null, null, null],
+        currentTurn: "X",
+      },
+    });
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u1");
+    await call(handleMakeMove, io, socket, {
+      gameId: CODE,
+      moveData: { row: 0, col: 2 },
+    });
+
+    expect(emits.filter((e) => e.event === "game_over")).toHaveLength(1);
+    expect(bumpCalls).toHaveLength(2);
+  });
+
+  test("does not emit game_over or bump stats on a non-terminal move", async () => {
+    current = activeGame();
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u1");
+    await call(handleMakeMove, io, socket, {
+      gameId: CODE,
+      moveData: { row: 0, col: 0 },
+    });
+
+    expect(emits.some((e) => e.event === "game_over")).toBe(false);
+    expect(bumpCalls).toHaveLength(0);
+  });
 });
 
 const INVALID_IDS = [
