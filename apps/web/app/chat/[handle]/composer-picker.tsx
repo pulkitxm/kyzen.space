@@ -284,11 +284,16 @@ export function ComposerPicker({
   });
 
   useEffect(() => {
-    const value = q.trim();
-    const needGifs = value.length > 0 || tab === "gif";
+    const needGifs = q.trim().length > 0 || tab === "gif";
     if (!needGifs) return;
     if (gifScrollRef.current) gifScrollRef.current.scrollTop = 0;
     setError(false);
+  }, [q, tab]);
+
+  useEffect(() => {
+    const value = q.trim();
+    const needGifs = value.length > 0 || tab === "gif";
+    if (!needGifs) return;
     if (cache.has(value)) return;
     const t = setTimeout(() => requestGifs(value), value ? 300 : 0);
     return () => clearTimeout(t);
