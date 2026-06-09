@@ -5,11 +5,7 @@ import {
   PATTERN_STORAGE_KEY,
   PATTERNS,
 } from "@gamelobby/shared/constants";
-import {
-  isValidPattern,
-  type PatternDef,
-  type PatternId,
-} from "@gamelobby/shared/types";
+import { isValidPattern, type PatternId } from "@gamelobby/shared/types";
 
 export {
   DEFAULT_PATTERN,
@@ -18,7 +14,6 @@ export {
   PATTERN_IDS,
   PATTERN_STORAGE_KEY,
   PATTERNS,
-  type PatternDef,
   type PatternId,
 };
 

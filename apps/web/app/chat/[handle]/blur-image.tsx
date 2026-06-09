@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { cn } from "@/lib/utils";
 
 export function BlurImage({
@@ -36,7 +36,7 @@ export function BlurImage({
         <span className="absolute inset-0 animate-pulse bg-surface-overlay" />
       )}
       {/* biome-ignore lint/performance/noImgElement: GIF with dynamic remote src and blur placeholder, not a next/image static asset */}
-      <motion.img
+      <m.img
         src={src}
         alt={alt}
         loading={loading}

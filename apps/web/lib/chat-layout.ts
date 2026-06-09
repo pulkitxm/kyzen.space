@@ -12,17 +12,7 @@ import {
 import type { ChatMode, PopoutGeometry } from "@gamelobby/shared/types";
 
 export type { ChatMode, PopoutGeometry };
-export {
-  DEFAULT_CHAT_W,
-  DEFAULT_POPOUT,
-  MAX_CHAT,
-  MAX_CHAT_POPOUT_H,
-  MAX_CHAT_POPOUT_W,
-  MIN_CHAT,
-  MIN_CHAT_POPOUT_H,
-  MIN_CHAT_POPOUT_W,
-  MIN_GAME,
-};
+export { MAX_CHAT, MIN_CHAT, MIN_CHAT_POPOUT_H, MIN_CHAT_POPOUT_W };
 
 export type StashEdge = "left" | "right" | "top" | "bottom";
 export type IconPos = { x: number; y: number };
@@ -48,7 +38,7 @@ export const ICON_MARGIN = 16;
 export const EDGE_TAB_THICKNESS = 22;
 export const EDGE_TAB_LENGTH = 44;
 
-export const CHAT_LAYOUT_KEY = "gl_chat_layout";
+const CHAT_LAYOUT_KEY = "gl_chat_layout";
 
 export const DEFAULT_ICON = { x: 100000, y: 100000 } as const satisfies IconPos;
 

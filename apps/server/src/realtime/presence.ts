@@ -37,10 +37,6 @@ function defaultDeps(): PresenceDeps {
   };
 }
 
-export function isOnline(userId: string): Promise<boolean> {
-  return presenceStore.isOnline(userId);
-}
-
 async function audienceFor(
   userId: string,
   deps: PresenceDeps,

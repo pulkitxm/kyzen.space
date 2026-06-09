@@ -2,7 +2,14 @@
 
 import type { GifJson } from "@gamelobby/shared/types";
 import { useAtom } from "jotai";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { FaRegFaceSmile } from "react-icons/fa6";
 import { clientFetchJson } from "@/lib/api-client";
 import { gifCacheAtom, recentEmojisAtom } from "@/lib/chat/atoms";
@@ -178,6 +185,11 @@ export function ComposerPicker({
   const [error, setError] = useState(false);
   const reqIdRef = useRef(0);
   const gifScrollRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -194,20 +206,31 @@ export function ComposerPicker({
   const entry = cache.get(query) ?? null;
   const gifs = entry?.gifs ?? [];
 
+  const haystacks = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!groups) return map;
+    for (const g of groups) {
+      for (const e of g.emojis) {
+        map.set(e.id, e.keywords.join(" "));
+      }
+    }
+    return map;
+  }, [groups]);
+
   const emojiStrip = useMemo<EmojiCell[]>(() => {
     if (!searching || !groups) return [];
     const lower = query.toLowerCase();
     const out: EmojiCell[] = [];
     for (const g of groups) {
       for (const e of g.emojis) {
-        if (e.keywords.some((k) => k.includes(lower))) {
+        if (haystacks.get(e.id)?.toLowerCase().includes(lower)) {
           out.push({ id: e.id, native: e.native });
           if (out.length >= EMOJI_STRIP) return out;
         }
       }
     }
     return out;
-  }, [searching, query, groups]);
+  }, [searching, query, groups, haystacks]);
 
   const fetchGifs = useCallback(
     async (value: string, offset: number, append: boolean) => {
@@ -225,7 +248,8 @@ export function ComposerPicker({
           gifs: GifJson[];
           nextOffset: number | null;
         }>(url);
-        if (reqId !== reqIdRef.current) return;
+        const stale = reqId !== reqIdRef.current;
+        if (stale) return;
         setCache((prev) => {
           const next = new Map(prev);
           const base = append ? (prev.get(value)?.gifs ?? []) : [];
@@ -255,6 +279,10 @@ export function ComposerPicker({
     [setCache],
   );
 
+  const requestGifs = useEffectEvent((value: string) => {
+    void fetchGifs(value, 0, false);
+  });
+
   useEffect(() => {
     const value = q.trim();
     const needGifs = value.length > 0 || tab === "gif";
@@ -262,12 +290,9 @@ export function ComposerPicker({
     if (gifScrollRef.current) gifScrollRef.current.scrollTop = 0;
     setError(false);
     if (cache.has(value)) return;
-    const t = setTimeout(
-      () => void fetchGifs(value, 0, false),
-      value ? 300 : 0,
-    );
+    const t = setTimeout(() => requestGifs(value), value ? 300 : 0);
     return () => clearTimeout(t);
-  }, [q, tab, cache, fetchGifs]);
+  }, [q, tab, cache]);
 
   const onGifScroll = useCallback(() => {
     const el = gifScrollRef.current;
@@ -292,10 +317,10 @@ export function ComposerPicker({
   return (
     <div className="flex h-128 w-104 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
       <input
+        ref={searchRef}
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        // biome-ignore lint/a11y/noAutofocus: focus the search when the picker opens
-        autoFocus
+        aria-label="Search emoji & GIFs"
         placeholder="Search emoji & GIFs"
         className="m-2 rounded-lg border border-border bg-surface-raised px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />

@@ -19,7 +19,7 @@ export type ProfileActivityGameRow = {
   updatedAt: string;
 };
 
-export function mapApiRowToActivity(
+function mapApiRowToActivity(
   row: ProfileActivityApiRow,
 ): ProfileActivityGameRow {
   const entry = listGameMeta().find((m) => m.type === row.gameType);

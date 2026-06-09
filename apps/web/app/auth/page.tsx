@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { GoogleSignInButton } from "@/app/google-sign-in-button";
 import { getServerSession } from "@/lib/get-server-session";
+
+export const metadata: Metadata = {
+  title: "Sign in",
+  description:
+    "Sign in with your Google account to play and chat on GameLobby.",
+};
 
 export const dynamic = "force-dynamic";
 

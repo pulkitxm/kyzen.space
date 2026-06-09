@@ -109,6 +109,32 @@ export function ChatPopoutWindow({
     [mode, onGeometryChange, onCommit],
   );
 
+  const nudge = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (mode !== "popout") return;
+      const step = e.shiftKey ? 20 : 5;
+      const deltas: Record<string, { dx: number; dy: number }> = {
+        ArrowLeft: { dx: -step, dy: 0 },
+        ArrowRight: { dx: step, dy: 0 },
+        ArrowUp: { dx: 0, dy: -step },
+        ArrowDown: { dx: 0, dy: step },
+      };
+      const delta = deltas[e.key];
+      if (!delta) return;
+      e.preventDefault();
+      const orig = geomRef.current;
+      onGeometryChange(
+        clampGeometry(
+          { ...orig, x: orig.x + delta.dx, y: orig.y + delta.dy },
+          window.innerWidth,
+          window.innerHeight,
+        ),
+      );
+      onCommit();
+    },
+    [mode, onGeometryChange, onCommit],
+  );
+
   useEffect(() => {
     return () => {
       document.body.style.userSelect = "";
@@ -140,21 +166,28 @@ export function ChatPopoutWindow({
               ),
       )}
     >
-      {}
-      {/** biome-ignore lint/a11y/noStaticElementInteractions: drag surface */}
       <div
-        onMouseDown={startDrag}
         className={cn(
-          "relative shrink-0 cursor-move select-none items-center rounded-t-xl border-border border-b bg-muted/40 px-3 py-2",
+          "relative shrink-0 select-none items-center rounded-t-xl border-border border-b bg-muted/40 px-3 py-2",
           isPopout ? "flex" : "hidden",
         )}
       >
-        <ChatWindowControls
-          isPopout
-          onClose={onClose}
-          onMinimize={onMinimize}
-          onZoom={onDock}
+        <button
+          type="button"
+          tabIndex={isPopout ? 0 : -1}
+          aria-label="Move chat window"
+          onMouseDown={startDrag}
+          onKeyDown={nudge}
+          className="absolute inset-0 cursor-move rounded-t-xl"
         />
+        <div className="relative z-10 flex items-center">
+          <ChatWindowControls
+            isPopout
+            onClose={onClose}
+            onMinimize={onMinimize}
+            onZoom={onDock}
+          />
+        </div>
         <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 font-medium text-muted-foreground text-xs">
           Chat
         </span>

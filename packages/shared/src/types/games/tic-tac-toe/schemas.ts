@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-export const cellSchema = z.enum(["X", "O"]).nullable();
+const cellSchema = z.enum(["X", "O"]).nullable();
 export type Cell = z.infer<typeof cellSchema>;
 
-export const markSchema = z.enum(["X", "O"]);
+const markSchema = z.enum(["X", "O"]);
 export type Mark = z.infer<typeof markSchema>;
 
 export const ticTacToeStateSchema = z

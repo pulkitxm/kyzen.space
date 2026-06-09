@@ -2,7 +2,7 @@
 
 import type { AvatarConfig } from "@gamelobby/shared/types";
 import { atom, useAtomValue, useSetAtom } from "jotai";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { clientFetchJson } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
-export type ProfilePopupUser = {
+type ProfilePopupUser = {
   username: string;
   displayName?: string | null;
   avatar?: AvatarConfig | null;
@@ -152,7 +152,7 @@ export function ProfilePopupHost() {
       }}
       aria-hidden={!open}
     >
-      <motion.button
+      <m.button
         type="button"
         aria-label="Close"
         tabIndex={-1}
@@ -162,7 +162,7 @@ export function ProfilePopupHost() {
         animate={{ opacity: open ? 1 : 0 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
       />
-      <motion.div
+      <m.div
         role="dialog"
         aria-modal="true"
         className="relative w-full max-w-sm rounded-2xl border border-border bg-card p-4 shadow-xl"
@@ -196,7 +196,7 @@ export function ProfilePopupHost() {
             </Button>
           </div>
         ) : null}
-      </motion.div>
+      </m.div>
     </div>,
     document.body,
   );

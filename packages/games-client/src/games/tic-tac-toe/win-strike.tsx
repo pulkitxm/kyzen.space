@@ -1,7 +1,7 @@
 "use client";
 
 import type { Mark } from "@gamelobby/shared/types";
-import { motion, useReducedMotion } from "motion/react";
+import { m, useReducedMotion } from "motion/react";
 
 const CELL_OFFSET = 15.556;
 const CELL_SPAN = 34.444;
@@ -40,7 +40,7 @@ export function WinStrike({
       aria-hidden="true"
       className={`pointer-events-none absolute inset-0 h-full w-full ${colorClass}`}
     >
-      <motion.line
+      <m.line
         x1={ax - ox}
         y1={ay - oy}
         x2={bx + ox}

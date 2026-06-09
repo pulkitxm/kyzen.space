@@ -17,10 +17,6 @@ type KlipyResponse = {
 
 export type GifPage = { gifs: GifJson[]; hasNext: boolean };
 
-export function isGifConfigured(): boolean {
-  return Boolean(env.klipyApiKey);
-}
-
 function normalize(item: KlipyItem): GifJson | null {
   const file = item.file ?? {};
   const preview = file.sm?.webp ?? file.sm?.gif ?? file.md?.webp;

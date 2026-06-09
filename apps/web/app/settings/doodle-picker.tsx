@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import { FaCheck } from "react-icons/fa6";
 
 import { usePattern } from "@/lib/appearance";
@@ -24,6 +31,13 @@ function previewPattern(id: PatternId) {
   applyPattern(document.documentElement, id);
 }
 
+const PREVIEW_TILE_STYLE: CSSProperties = {
+  backgroundColor: "var(--pattern-ink)",
+  opacity: 0.72,
+  WebkitMaskRepeat: "repeat",
+  maskRepeat: "repeat",
+};
+
 export function DoodlePicker({ signedIn: _signedIn }: { signedIn: boolean }) {
   const mounted = useHydrated();
   const { pattern, setPattern } = usePattern();
@@ -33,8 +47,12 @@ export function DoodlePicker({ signedIn: _signedIn }: { signedIn: boolean }) {
     committedRef.current = pattern;
   }, [pattern]);
 
+  const restoreCommitted = useEffectEvent(() =>
+    previewPattern(committedRef.current),
+  );
+
   useEffect(() => {
-    return () => previewPattern(committedRef.current);
+    return () => restoreCommitted();
   }, []);
 
   const restore = useCallback(() => previewPattern(committedRef.current), []);
@@ -74,12 +92,9 @@ export function DoodlePicker({ signedIn: _signedIn }: { signedIn: boolean }) {
                   aria-hidden
                   className="absolute inset-0"
                   style={{
-                    backgroundColor: "var(--pattern-ink)",
-                    opacity: 0.72,
+                    ...PREVIEW_TILE_STYLE,
                     WebkitMaskImage: `url("${def.src}")`,
                     maskImage: `url("${def.src}")`,
-                    WebkitMaskRepeat: "repeat",
-                    maskRepeat: "repeat",
                     WebkitMaskSize: `${previewTile}px`,
                     maskSize: `${previewTile}px`,
                   }}

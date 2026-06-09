@@ -6,6 +6,7 @@ import {
   type MoveJson,
   normalizeGameCode,
 } from "@gamelobby/shared/types";
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";
@@ -17,6 +18,11 @@ import {
 } from "@/lib/chat-layout";
 import { getServerSession } from "@/lib/get-server-session";
 import { PlayClient } from "./play-client";
+
+export const metadata: Metadata = {
+  title: "Play",
+  description: "Play a live multiplayer game with chat, side-by-side.",
+};
 
 export const dynamic = "force-dynamic";
 

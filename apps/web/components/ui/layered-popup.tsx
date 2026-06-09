@@ -1,7 +1,7 @@
 "use client";
 
 import { useAtomValue, useSetAtom } from "jotai";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, m } from "motion/react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaXmark } from "react-icons/fa6";
@@ -73,12 +73,12 @@ export function LayeredPopupHost() {
         };
         const hasHeader = layer.title != null || layer.showClose;
         return (
-          <motion.div
+          <m.div
             key={layer.id}
             className="fixed inset-0 flex items-center justify-center p-4"
             style={{ zIndex: 100 + index }}
           >
-            <motion.button
+            <m.button
               type="button"
               aria-label="Close"
               tabIndex={-1}
@@ -90,7 +90,7 @@ export function LayeredPopupHost() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
             />
-            <motion.div
+            <m.div
               role="dialog"
               aria-modal="true"
               className={cn(
@@ -125,8 +125,8 @@ export function LayeredPopupHost() {
                   {renderNode(layer.footer, api)}
                 </div>
               )}
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         );
       })}
     </AnimatePresence>,

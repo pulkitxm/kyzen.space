@@ -12,8 +12,6 @@ export {
   DEFAULT_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
-  SIDEBAR_COLLAPSED_KEY,
-  SIDEBAR_WIDTH_KEY,
 } from "@/lib/sidebar-atoms-shared";
 
 const noopStringStorage = {

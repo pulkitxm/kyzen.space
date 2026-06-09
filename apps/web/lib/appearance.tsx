@@ -4,9 +4,10 @@ import { useTheme } from "next-themes";
 import {
   createContext,
   type ReactNode,
+  use,
   useCallback,
-  useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -131,9 +132,18 @@ export function AppearanceProvider({
     [signedIn],
   );
 
+  const paletteValue = useMemo(
+    () => ({ palette, setPalette }),
+    [palette, setPalette],
+  );
+  const patternValue = useMemo(
+    () => ({ pattern, setPattern }),
+    [pattern, setPattern],
+  );
+
   return (
-    <PaletteContext.Provider value={{ palette, setPalette }}>
-      <PatternContext.Provider value={{ pattern, setPattern }}>
+    <PaletteContext.Provider value={paletteValue}>
+      <PatternContext.Provider value={patternValue}>
         {children}
       </PatternContext.Provider>
     </PaletteContext.Provider>
@@ -141,11 +151,11 @@ export function AppearanceProvider({
 }
 
 export function usePalette(): PaletteContextValue {
-  return useContext(PaletteContext);
+  return use(PaletteContext);
 }
 
 export function usePattern(): PatternContextValue {
-  return useContext(PatternContext);
+  return use(PatternContext);
 }
 
 export function useColorModeSetting(signedIn: boolean) {

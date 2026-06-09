@@ -5,7 +5,14 @@ import type {
   Cell,
   TicTacToeState as TicState,
 } from "@gamelobby/shared/types";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   FaBackwardStep,
   FaChevronLeft,
@@ -36,7 +43,7 @@ type GameJson = {
 
 type MoveJson = Record<string, unknown>;
 
-const CELL_INDICES = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
+const CELL_KEYS = ["nw", "n", "ne", "w", "c", "e", "sw", "s", "se"] as const;
 
 const REPLAY_MS = 850;
 
@@ -168,9 +175,8 @@ function ReplayToolbar({
 function StatusDot({ online }: { online: boolean }) {
   const tone = online ? "bg-success" : "bg-danger";
   return (
-    <span
+    <output
       className="relative inline-flex size-3 items-center justify-center"
-      role="status"
       aria-label={online ? "Online" : "Offline"}
       title={online ? "Online" : "Offline"}
     >
@@ -178,7 +184,7 @@ function StatusDot({ online }: { online: boolean }) {
         className={`absolute inline-flex size-3 animate-ping rounded-full opacity-70 ${tone}`}
       />
       <span className={`relative inline-flex size-2.5 rounded-full ${tone}`} />
-    </span>
+    </output>
   );
 }
 
@@ -399,36 +405,36 @@ export function TicTacToeGameClient({
     });
   }, [sortedLen]);
 
+  const onReplayKey = useEffectEvent((e: KeyboardEvent) => {
+    const t = e.target;
+    if (
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement ||
+      (t instanceof HTMLElement && t.isContentEditable)
+    ) {
+      return;
+    }
+
+    if (e.code === "ArrowLeft") {
+      e.preventDefault();
+      goPrev();
+    } else if (e.code === "ArrowRight") {
+      e.preventDefault();
+      goNext();
+    } else if (e.code === "Space") {
+      if (sortedLen <= 0) return;
+      e.preventDefault();
+      toggleReplayPlay();
+    }
+  });
+
   useEffect(() => {
     if (!isPast) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      const t = e.target;
-      if (
-        t instanceof HTMLInputElement ||
-        t instanceof HTMLTextAreaElement ||
-        t instanceof HTMLSelectElement ||
-        (t instanceof HTMLElement && t.isContentEditable)
-      ) {
-        return;
-      }
-
-      if (e.code === "ArrowLeft") {
-        e.preventDefault();
-        goPrev();
-      } else if (e.code === "ArrowRight") {
-        e.preventDefault();
-        goNext();
-      } else if (e.code === "Space") {
-        if (sortedLen <= 0) return;
-        e.preventDefault();
-        toggleReplayPlay();
-      }
-    };
-
+    const onKeyDown = (e: KeyboardEvent) => onReplayKey(e);
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [isPast, sortedLen, goPrev, goNext, toggleReplayPlay]);
+  }, [isPast]);
 
   return (
     <div className="mt-8">
@@ -458,7 +464,7 @@ export function TicTacToeGameClient({
       ) : null}
 
       <div className="relative grid w-fit grid-cols-3 gap-3">
-        {CELL_INDICES.map((idx) => {
+        {CELL_KEYS.map((cellKey, idx) => {
           const row = Math.floor(idx / 3);
           const col = idx % 3;
           const mark = state.board[idx];
@@ -467,7 +473,7 @@ export function TicTacToeGameClient({
           const ghostMark = playable ? myRole : null;
           return (
             <button
-              key={idx}
+              key={cellKey}
               type="button"
               disabled={!playable}
               onMouseEnter={() => {

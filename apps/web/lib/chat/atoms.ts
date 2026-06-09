@@ -55,10 +55,6 @@ export const conversationUnreadAtomFamily = atomFamily(
           ?.unreadCount ?? 0,
     ),
 );
-export const pendingRequestCountAtom = atom(
-  (get) => get(incomingRequestsAtom).length,
-);
-
 export function upsertMessage(
   list: ChatMessage[],
   incoming: ChatMessage,
@@ -80,18 +76,6 @@ export function upsertMessage(
     return copy;
   }
   return [...list, incoming];
-}
-
-export function bumpConversation(
-  list: ConversationJson[],
-  conversationId: string,
-  patch: Partial<ConversationJson>,
-): ConversationJson[] {
-  const idx = list.findIndex((c) => c.id === conversationId);
-  const existing = idx < 0 ? undefined : list[idx];
-  if (!existing) return list;
-  const updated = { ...existing, ...patch };
-  return [updated, ...list.filter((_, i) => i !== idx)];
 }
 
 export function upsertFriend(

@@ -1,5 +1,9 @@
+const relativeTimeFormat = new Intl.RelativeTimeFormat("en", {
+  numeric: "auto",
+});
+
 export function formatRelativeTime(date: Date): string {
-  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+  const rtf = relativeTimeFormat;
   const diffMs = date.getTime() - Date.now();
   const minutes = Math.round(diffMs / 60000);
   if (Math.abs(minutes) < 60) return rtf.format(minutes, "minute");

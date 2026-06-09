@@ -3,14 +3,14 @@
 import {
   createContext,
   type ReactNode,
-  useContext,
+  use,
   useEffect,
   useRef,
   useState,
 } from "react";
 import { io, type Socket } from "socket.io-client";
 
-export type SocketStatus = "connecting" | "connected" | "disconnected";
+type SocketStatus = "connecting" | "connected" | "disconnected";
 
 type SocketContextValue = { socket: Socket | null; status: SocketStatus };
 
@@ -29,13 +29,14 @@ export function SocketProvider({
   enabled: boolean;
   children: ReactNode;
 }) {
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [status, setStatus] = useState<SocketStatus>("disconnected");
+  const [conn, setConn] = useState<SocketContextValue>({
+    socket: null,
+    status: "disconnected",
+  });
 
   useEffect(() => {
     if (!enabled) {
-      setSocket(null);
-      setStatus("disconnected");
+      setConn({ socket: null, status: "disconnected" });
       return;
     }
     const url =
@@ -49,28 +50,28 @@ export function SocketProvider({
       reconnectionDelay: 500,
       reconnectionDelayMax: 5000,
     });
-    setSocket(s);
-    setStatus("connecting");
-    s.on("connect", () => setStatus("connected"));
-    s.on("disconnect", () => setStatus("disconnected"));
-    s.io.on("reconnect_attempt", () => setStatus("connecting"));
+    setConn({ socket: s, status: "connecting" });
+    s.on("connect", () => setConn((c) => ({ ...c, status: "connected" })));
+    s.on("disconnect", () =>
+      setConn((c) => ({ ...c, status: "disconnected" })),
+    );
+    s.io.on("reconnect_attempt", () =>
+      setConn((c) => ({ ...c, status: "connecting" })),
+    );
 
     return () => {
       s.disconnect();
-      setSocket(null);
-      setStatus("disconnected");
+      setConn({ socket: null, status: "disconnected" });
     };
   }, [enabled]);
 
   return (
-    <SocketContext.Provider value={{ socket, status }}>
-      {children}
-    </SocketContext.Provider>
+    <SocketContext.Provider value={conn}>{children}</SocketContext.Provider>
   );
 }
 
 export function useSocket(): SocketContextValue {
-  return useContext(SocketContext);
+  return use(SocketContext);
 }
 
 export function useSocketEvent<T = unknown>(

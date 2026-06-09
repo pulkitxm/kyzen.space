@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 type LogoVariant = "full" | "icon" | "text";
 
-export type LogoProps = {
+type LogoProps = {
   variant?: LogoVariant;
   className?: string;
   iconClassName?: string;
