@@ -1,6 +1,10 @@
 import type { AvatarConfig } from "@gamelobby/avatar";
 import type { z } from "zod";
-import type { gameCardMetaSchema, notificationPayloadSchema } from "./schemas";
+import type {
+  gameCardMetaSchema,
+  gifMetaSchema,
+  notificationPayloadSchema,
+} from "./schemas";
 
 export type PublicUser = {
   id: string;
@@ -35,16 +39,7 @@ export type MemberJson = PublicUser & {
 
 export type MessageKind = "text" | "gif" | "game_card" | "system";
 
-export type GifMeta = {
-  provider: "klipy";
-  providerId: string;
-  previewUrl: string;
-  fullUrl: string;
-  width: number;
-  height: number;
-  title?: string;
-  blurPreview?: string;
-};
+export type GifMeta = z.infer<typeof gifMetaSchema>;
 
 export type GameCardMeta = z.infer<typeof gameCardMetaSchema>;
 

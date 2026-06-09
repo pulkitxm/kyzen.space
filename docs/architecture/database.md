@@ -158,23 +158,23 @@ Repositories occasionally need a SQL expression Drizzle's builder doesn't model 
 
 ### `profiles.bumpStats` — read-modify-write of JSONB
 
-`bumpStats` (`profiles.ts:153`) is a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime driver when a game completes (`apps/server/src/realtime/turn-based.ts:93`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice — but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
+`bumpStats` (`profiles.ts:153`) is a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime `finalize` helper when a game completes (`apps/server/src/realtime/turn-based.ts:99`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice — but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
 
 ## Data-flow walkthrough: persisting a move
 
-This is the database layer's busiest path, and where the "client is never trusted" insight becomes concrete. A player taps the board, the client emits `make_move`, and the server's turn-based driver runs `handleMakeMove` (`apps/server/src/realtime/turn-based.ts:125`):
+This is the database layer's busiest path, and where the "client is never trusted" insight becomes concrete. A player taps the board, the client emits `make_move`, and the server's turn-based handler `handleMakeMove` runs (`apps/server/src/realtime/turn-based.ts:129`):
 
 1. **Load the aggregate.** `games.getGameByCode(payload.gameId)` (`games.ts:100`) returns the `GameRecord` — game row + seats — resolved from the public room **code** the client sent (the wire never carries the UUID). The handler checks `status === "active"` and that the socket's `userId` is actually a seated player. The DB join is what makes the seat check possible.
-2. **Validate with the shared schemas.** `def.moveSchema.safeParse(payload.moveData)` validates the *client's* input (`turn-based.ts:143`), and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB (`turn-based.ts:145`). Both schemas come from the same `GameDefinition` the client imports. A bad move or corrupt state is rejected before any write.
-3. **Reduce — authoritatively.** `def.engine.reduce(...)` (`turn-based.ts:148`) computes the next state on the server. The client's opinion about legality is irrelevant.
+2. **Validate with the shared schemas.** `def.moveSchema.safeParse(payload.moveData)` validates the *client's* input (`turn-based.ts:147`), and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB (`turn-based.ts:149`). Both schemas come from the same `GameDefinition` the client imports. A bad move or corrupt state is rejected before any write.
+3. **Reduce — authoritatively.** `def.engine.reduce(...)` (`turn-based.ts:152`) computes the next state on the server. The client's opinion about legality is irrelevant.
 4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`games.ts:196`) returns `max(moveNumber) + 1` — keyed on the internal UUID `gameRow.id`, since `move.game_id` FKs the UUID. The `move_game_number_uq` constraint is the backstop if two moves race to the same number.
 5. **Append the move.** `games.addMove(...)` (`games.ts:204`) inserts the validated move into the append-only `move` table.
-6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:160`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
-7. **Finalize on game over.** If the engine's outcome is `completed`, `finalize` (`turn-based.ts:74`) calls `games.updateGame` again (status / `completedAt` / `winner`) and `profiles.bumpStats` (`profiles.ts:153`) once per seat.
+6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:167`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
+7. **Finalize on game over.** If the engine's outcome is `completed`, `finalize` (`turn-based.ts:78`) calls `games.updateGame` again (status / `completedAt` / `winner`) and `profiles.bumpStats` (`profiles.ts:153`) once per seat.
 
 In arrows:
 
-`make_move` → `handleMakeMove` → `games.getGameByCode` → `moveSchema/stateSchema.safeParse` → `engine.reduce` → `games.nextMoveNumber` → `games.addMove` → `games.updateGame` → `finalize` → `profiles.bumpStats` → broadcast `move_made` + `game_state`.
+`make_move` → `handleMakeMove` → `games.getGameByCode` → `moveSchema/stateSchema.safeParse` → `engine.reduce` → `games.nextMoveNumber` → `games.addMove` → `games.updateGame` → `finalize` → `profiles.bumpStats` → broadcast one `game_state` `{ game, move }`.
 
 Notice that no SQL appears anywhere in `turn-based.ts` — only `games.*` and `profiles.*` calls. That's the layering working as intended. The full realtime side of this story is in [`realtime.md`](./realtime.md).
 
@@ -192,7 +192,7 @@ Notice that no SQL appears anywhere in `turn-based.ts` — only `games.*` and `p
 - **Cursors are opaque and tolerant.** `decodeCursor` returns `null` (rather than throwing) on a malformed or non-base64 cursor (`cursor.ts:7`); callers then simply page from the start. Keyset pagination relies on the composite `createdAt`-leading indexes — keep them if you add new paginated lists.
 - **`bumpStats` is read-modify-write on JSONB** (`profiles.ts:153`), not an atomic increment. Fine for the current serialized call site in the move handler; be careful if you ever bump stats from concurrent paths.
 - **`DB_LATENCY_MS` is dev-only.** Forced to 0 in production by `resolveDbLatencyMs` (`latency.ts:63`), and resolved inside the package (`client.ts:8`).
-- **JSONB blobs are untrusted until parsed.** `game_state` / `config` / `move_data` are `unknown` by design; validity is owned by the games' Zod schemas (see [`database-schema.md`](./database-schema.md)) and enforced at the realtime boundary (`turn-based.ts:145`). Treat any `gameState` you read as untrusted until `stateSchema.safeParse`'d.
+- **JSONB blobs are untrusted until parsed.** `game_state` / `config` / `move_data` are `unknown` by design; validity is owned by the games' Zod schemas (see [`database-schema.md`](./database-schema.md)) and enforced at the realtime boundary (`turn-based.ts:149`). Treat any `gameState` you read as untrusted until `stateSchema.safeParse`'d.
 - **No comments in code.** Per the repo-wide rule, the only comments you'll find in this layer are the `biome-ignore` directives on the `or(...)!` non-null assertions in the two paginated repositories.
 
 ## Where to go next

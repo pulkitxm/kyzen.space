@@ -22,7 +22,7 @@ This doc covers the **schema/contract half** of games-core: the `GameDefinition`
 | `packages/shared/src/types/games/definition.ts` | `GameDefinition<S,I,C>`, `GameMeta` (`type: GameType`, not `string`), `ConfigField` — the self-describing manifest one game ships. Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>`, `Outcome`, `ReduceResult`, `StepResult`, `Seat`, `MoveContext` — the behavioral contract a `GameDefinition` references. Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/code.ts` | The **public game room code**: `GAME_CODE_ALPHABET`/`GAME_CODE_LENGTH`, `generateGameCode`, `normalizeGameCode`, `isGameCode`, and `gameCodeSchema` (normalizes then validates a 6-char Crockford-base32 code). The code is the public game id; the UUID `game.id` stays internal. Exported via `@gamelobby/shared/types`. |
-| `packages/shared/src/types/games/wire.ts` | Shared **wire/socket** Zod schemas: `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, and the server→client `Server*Payload` types. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`). Exported via `@gamelobby/shared/types`. |
+| `packages/shared/src/types/games/wire.ts` | Shared **wire/socket** Zod schemas: `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, the server→client `Server*Payload` types, and the pure status helpers `isGameOver`/`isGameLive`/`resolveWinnerUsername`. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`). Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/categories.ts` | `GameCategoryDef` type and the `GameCategoryId` union (`GAME_CATEGORIES` ids). Both re-exported via the `types/games` barrel (`index.ts:1-4`). |
 | `packages/shared/src/constants/categories.ts` | The static `GAME_CATEGORIES` list used to group games in the lobby. Exported via `@gamelobby/shared/constants`. |
 | `packages/shared/src/types/games/tic-tac-toe/schemas.ts` | Per-game `stateSchema` / `moveSchema` / `configSchema`, each `.strict()`, with TS types derived via `z.infer`. The slug constant lives in `constants/games.ts`, not here. Exported via `@gamelobby/shared/types`. |
@@ -162,7 +162,7 @@ export type ClientMakeMove = z.infer<typeof clientMakeMoveSchema>;
 Two things to internalize:
 
 1. **`moveData` is `z.unknown()` here, on purpose.** The *envelope* schema (`clientMakeMoveSchema`) only knows there's a `gameId` and some opaque payload. It cannot validate the move's shape, because the generic socket handler doesn't know which game it is yet. The actual move validation is a **second pass**, done by the *per-game* `moveSchema` (below), after the server has looked up the `gameType`. This two-stage validation — generic envelope first, game-specific payload second — is the central design pattern of the realtime lane.
-2. **`gameCodeSchema`** (`packages/shared/src/types/games/code.ts:24`) is the **public game room code** schema: it `transform`s the id through `normalizeGameCode` (uppercases, maps I/L→1 and O→0) then `refine`s it against `^[0-9A-HJKMNP-TV-Z]{6}$`. The same check is duplicated defensively on the server in `code.ts`'s `isGameCode`, which the driver calls as a belt-and-braces guard (`isGameCode(payload.gameId)`, `apps/server/src/realtime/turn-based.ts:131`) before resolving the game by code with `games.getGameByCode(...)`. (The internal UUID `game.id` is never serialized or accepted over the wire.)
+2. **`gameCodeSchema`** (`packages/shared/src/types/games/code.ts:24`) is the **public game room code** schema: it `transform`s the id through `normalizeGameCode` (uppercases, maps I/L→1 and O→0) then `refine`s it against `^[0-9A-HJKMNP-TV-Z]{6}$`. The same check is duplicated defensively on the server in `code.ts`'s `isGameCode`, which the turn-based handler calls as a belt-and-braces guard (`isGameCode(payload.gameId)`, `apps/server/src/realtime/turn-based.ts:135`) before resolving the game by code with `games.getGameByCode(...)`. (The internal UUID `game.id` is never serialized or accepted over the wire.)
 
 ### Outbound (server → client) wire DTOs
 
@@ -197,12 +197,8 @@ The server→client socket payload types are plain TS structural types (not Zod)
 ```ts
 export type ServerGameStatePayload = {
   game: GameJson;
-  moves: MoveJson[];
-};
-
-export type ServerMoveMadePayload = {
-  move: MoveJson;
-  gameState: unknown;
+  moves?: MoveJson[];
+  move?: MoveJson;
 };
 
 export type ServerGameOverPayload = {
@@ -214,7 +210,7 @@ export type ServerErrorPayload = {
 };
 ```
 
-These name the `game_state`, `move_made`, `game_over`, and `game_error` socket events. The driver builds a `ServerGameStatePayload` literally typed (`apps/server/src/realtime/turn-based.ts:26`) so the compiler verifies the broadcast matches the contract the client expects.
+These name the `game_state`, `game_over`, and `game_error` socket events. `ServerGameStatePayload` carries the full serialized `game` plus *either* `moves` (the entire history, sent on join via `emitFullState`) *or* a single `move` delta (the one new move, sent after each `make_move`); the client appends `move` when present, otherwise replaces its move list from `moves`. The handler builds a `ServerGameStatePayload` literally typed (`apps/server/src/realtime/turn-based.ts:26`, `:170`) so the compiler verifies the broadcast matches the contract the client expects. `wire.ts` also exports the pure helpers `isGameOver`/`isGameLive` (status predicates) and `resolveWinnerUsername` (maps a winner user id to a username against a players list), used by both ends to classify a game without re-deriving the rules.
 
 ## Per-game schemas and the `.strict()` discipline
 
@@ -254,22 +250,22 @@ Definitions are collected in one array (`packages/games-core/src/games/index.ts`
 export const GAMES = [ticTacToeDefinition] satisfies GameDefinition[];
 ```
 
-`registry.ts` builds a `Map` from `meta.type` → definition and derives every lookup helper from it (`packages/games-core/src/registry.ts`). `getDefinition(type)` throws on an unknown type; `hasEngine(type)` is the soft check the chat service uses before creating a game; `listGameTypes()` returns the narrowed `GameType[]` (used by the conformance suite to assert `GAME_TYPES` matches the registry); `listGameMeta()` powers the lobby grid; `getCategoryGroups()` joins `GAMES` against `GAME_CATEGORIES` (from `@gamelobby/shared/constants`) and drops empty categories. Adding a game is purely: declare its slug in `@gamelobby/shared/constants`, write its schemas in `packages/shared/src/types/games/<type>/schemas.ts`, write the engine/meta/index in `packages/games-core/src/games/<type>/`, append to `GAMES`, export from `index.ts`. No new route, table, socket event, or driver — see `docs/adding-a-game.md`.
+`registry.ts` builds a `Map` from `meta.type` → definition and derives every lookup helper from it (`packages/games-core/src/registry.ts`). `getDefinition(type)` throws on an unknown type; `hasEngine(type)` is the soft check the chat service uses before creating a game; `listGameTypes()` returns the narrowed `GameType[]` (used by the conformance suite to assert `GAME_TYPES` matches the registry); `listGameMeta()` powers the lobby grid; `getCategoryGroups()` joins `GAMES` against `GAME_CATEGORIES` (from `@gamelobby/shared/constants`) and drops empty categories. Adding a game is purely: declare its slug in `@gamelobby/shared/constants`, write its schemas in `packages/shared/src/types/games/<type>/schemas.ts`, write the engine/meta/index in `packages/games-core/src/games/<type>/`, append to `GAMES`, export from `index.ts`. No new route, table, or socket event — see `docs/adding-a-game.md`.
 
 ## Data-flow walkthrough: a move, validated twice, trusted once
 
 This is the core insight made concrete. Follow a single Tic-tac-toe move from the browser to a persisted, broadcast state. Note that the server validates **both** the inbound `moveData` *and* the state it loaded from the database, against the per-game Zod schemas, before trusting either.
 
 1. User clicks a cell. The web client emits a `make_move` socket event with `{ gameId, moveData: { row, col } }`.
-2. **Generic envelope validation.** The socket handler runs `clientMakeMoveSchema.safeParse(payload)` (`apps/server/src/realtime/index.ts:100`). If the envelope is malformed (bad `gameId`, extra keys), it emits `game_error` and stops. `moveData` is still `unknown` at this point.
-3. The handler looks up the game's `gameType` from the DB, picks a driver via `getDriver(...)` (`apps/server/src/realtime/index.ts:111`; currently always the turn-based driver, `apps/server/src/realtime/drivers.ts:25`), and calls `driver.makeMove(io, socket, data)`.
-4. **Authorization.** `handleMakeMove` (`apps/server/src/realtime/turn-based.ts:125`) confirms the game is `active` and that the authenticated `socket.data.userId` actually holds a seat (`gameRow.players.find(...)`). The user is mapped to a *role* here.
-5. **Per-game move validation.** `def.moveSchema.safeParse(payload.moveData)` (`apps/server/src/realtime/turn-based.ts:143`) — now the *real* Tic-tac-toe `moveSchema` validates the move's shape. Invalid → `game_error: "Invalid move"`.
-6. **Stored-state validation.** `def.stateSchema.safeParse(gameRow.gameState)` (`apps/server/src/realtime/turn-based.ts:145`). The state pulled from Postgres JSONB is validated *too* — if it's somehow corrupt, the server bails with `"Corrupt game state"` rather than feeding garbage into the engine.
-7. **Authoritative reduce.** `def.engine.reduce(parsedState.data, { role: player.role }, parsedMove.data)` (`apps/server/src/realtime/turn-based.ts:148`) runs the same engine the client could run, but on server-validated inputs. It returns `{ ok: false, error }` (relayed verbatim) or `{ ok: true, state, outcome }`.
-8. **Persist + broadcast.** On `ok`, the server records the move (`games.addMove`), writes `result.state` back (`games.updateGame`), runs `finalize` for completion/stats, then emits `move_made` (`apps/server/src/realtime/turn-based.ts:166`) and a fresh `game_state` (`ServerGameStatePayload`) via `emitFullState` (`apps/server/src/realtime/turn-based.ts:170`) to the room.
+2. **Generic envelope validation.** The game-lane registration runs `clientMakeMoveSchema.safeParse(payload)` inside `registerGameEvent` (`apps/server/src/realtime/socket-util.ts:55`). If the envelope is malformed (bad `gameId`, extra keys), it emits `game_error` and stops. `moveData` is still `unknown` at this point.
+3. On a valid envelope, `registerGameEvent` calls the registered runner, which invokes `handleMakeMove(io, socket, data)` from `./turn-based` directly (`apps/server/src/realtime/index.ts:69`) — there is no driver indirection.
+4. **Authorization.** `handleMakeMove` (`apps/server/src/realtime/turn-based.ts:129`) confirms the game is `active` and that the authenticated `socket.data.userId` actually holds a seat (`gameRow.players.find(...)`). The user is mapped to a *role* here.
+5. **Per-game move validation.** `def.moveSchema.safeParse(payload.moveData)` (`apps/server/src/realtime/turn-based.ts:147`) — now the *real* Tic-tac-toe `moveSchema` validates the move's shape. Invalid → `game_error: "Invalid move"`.
+6. **Stored-state validation.** `def.stateSchema.safeParse(gameRow.gameState)` (`apps/server/src/realtime/turn-based.ts:149`). The state pulled from Postgres JSONB is validated *too* — if it's somehow corrupt, the server bails with `"Corrupt game state"` rather than feeding garbage into the engine.
+7. **Authoritative reduce.** `def.engine.reduce(parsedState.data, { role: player.role }, parsedMove.data)` (`apps/server/src/realtime/turn-based.ts:152`) runs the same engine the client could run, but on server-validated inputs. It returns `{ ok: false, error }` (relayed verbatim) or `{ ok: true, state, outcome }`.
+8. **Persist + broadcast.** On `ok`, the server records the move (`games.addMove`), writes `result.state` back (`games.updateGame`), runs `finalize` for completion/stats, then emits a single `game_state` carrying `{ game, move }` — the full serialized game plus the one new move as a delta (`apps/server/src/realtime/turn-based.ts:170`–`:174`) — to the room.
 
-Summarized: `cell click → socket make_move → index.ts:100 (envelope) → turn-based.ts:143 (moveSchema) → turn-based.ts:145 (stateSchema) → turn-based.ts:148 (engine.reduce) → DB write → broadcast game_state`. The client may have *anticipated* this result by running the same engine locally, but the server's copy is the only one that counts.
+Summarized: `cell click → socket make_move → socket-util.ts:55 (envelope) → turn-based.ts:147 (moveSchema) → turn-based.ts:149 (stateSchema) → turn-based.ts:152 (engine.reduce) → DB write → broadcast game_state`. The client may have *anticipated* this result by running the same engine locally, but the server's copy is the only one that counts.
 
 A parallel flow exists for game creation: the chat service validates the **config** with the same discipline — `definition.configSchema.safeParse(input.config ?? {})` at `apps/server/src/chat/games-in-chat-service.ts:90`, after a `hasEngine` gate (`:79`) — then seeds the first seat's state with `engine.createInitialState` (`:130`).
 
@@ -281,9 +277,9 @@ A parallel flow exists for game creation: the chat service validates the **confi
 - **The server validates *stored state*, not just incoming moves.** `def.stateSchema.safeParse(gameRow.gameState)` guards against corrupt/migrated JSONB. Treat persisted state as untrusted, just like client input.
 - **`.strict()` on every per-game object schema.** Unknown keys must fail. A non-strict schema is a silent security hole here.
 - **Types are inferred from schemas (`z.infer`), never hand-written alongside them.** This keeps the validator and the static type provably in sync.
-- **`winnerRole` is a role, not a user id.** `Outcome.winnerRole` is `"X"`/`"O"`; the driver maps role → `userId` in `finalize` (`apps/server/src/realtime/turn-based.ts:84`). `GameJson.winner`, by contrast, is the resolved user id (or the literal `"draw"`).
+- **`winnerRole` is a role, not a user id.** `Outcome.winnerRole` is `"X"`/`"O"`; the turn-based handler maps role → `userId` in `finalize` (`apps/server/src/realtime/turn-based.ts:84`). `GameJson.winner`, by contrast, is the resolved user id (or the literal `"draw"`).
 - **`roles` ordering is load-bearing.** Seat *n* receives `roles[n]`. The join handler relies on `engine.roles[players.length]` (`apps/server/src/realtime/turn-based.ts:58`); reordering `roles` reassigns seats.
-- **`reduce` returns errors, it does not throw.** Use the `ReduceResult` `ok` tag; a thrown error would escape the driver's normal error-relay path.
+- **`reduce` returns errors, it does not throw.** Use the `ReduceResult` `ok` tag; a thrown error would escape the handler's normal error-relay path.
 - **`getDefinition` throws on unknown types; `hasEngine` does not.** Use `hasEngine` for soft "is this a real game?" checks (as the chat service does) and `getDefinition` once you know the type is valid.
 - **One `GAMES` array is the only registration point.** The conformance suite (`packages/games-core/tests/conformance.test.ts`) iterates it and asserts `meta.type === engine.type`, coherent player bounds, the correct handler for the mode, that `createInitialState` validates against `stateSchema`, that `moveSchema` rejects nonsense, and that `configSchema` accepts the declared `configFields` defaults — plus (added this round) that `meta.categoryId` joins to a real `GAME_CATEGORIES` id, `roles` has no duplicates, and `coverImage` (when set) is a `/games/` path. A new game gets these checks for free. (A companion `tests/registry.test.ts` covers the registry API itself.)
 - **No comments in source.** This repo enforces a strict no-comments rule; the schema files are intentionally self-documenting. Only tooling directives (e.g. the `biome-ignore` at `apps/server/src/realtime/turn-based.ts:57`) are permitted.
@@ -293,7 +289,7 @@ A parallel flow exists for game creation: the chat service validates the **confi
 - [./README.md](./README.md) — architecture index and the big picture.
 - [./games-core-engine.md](./games-core-engine.md) — the engine *behavior* (`reduce`/`step`, `Outcome`, the Tic-tac-toe implementation) that these schemas type.
 - [./games-client.md](./games-client.md) — how the React UI consumes `GameJson`/`MoveJson` and renders boards from the same definitions. Boards no longer open their own socket: the `GameClientProps` contract now passes the app's shared Socket.IO connection (`socket` + `connected`), over which the board emits `join_room` / `make_move` / `leave_room`.
-- [./realtime.md](./realtime.md) — the Socket.IO lanes, drivers, and the `join_room` / `make_move` handlers that perform the two-stage validation described above.
+- [./realtime.md](./realtime.md) — the Socket.IO lanes and the `join_room` / `make_move` handlers (`handleJoinRoom`/`handleMakeMove`) that perform the two-stage validation described above.
 - [./server-api.md](./server-api.md) — the Hono REST surface, including `GET /api/games/:gameId` and `serializeGame`/`serializeMove`.
 - [./chat-core.md](./chat-core.md) — the chat/social contracts (now part of `@gamelobby/shared`, under `types/chat/`) and the `gameCardMetaSchema` / create-game-in-conversation flow.
 - [./database-schema.md](./database-schema.md) — the generic `game` / `move` / `game_player` tables whose JSONB columns these per-game schemas validate.

@@ -77,7 +77,7 @@ client), `userId`, the **shared** `socket`, `connected`, `initialGame`, and
 Socket.IO connection the chat lane uses, passed down as a prop.
 
 - **Live play** (status `waiting`/`active`): the board emits `join_room` on the
-  shared socket, then listens for `game_state`, `move_made`, and `game_error`.
+  shared socket, then listens for `game_state` and `game_error`.
   Tapping an empty cell emits `make_move` with `{ gameId, moveData: { row, col } }`
   (only when it is your turn and the socket is connected). It emits `leave_room`
   on cleanup. A `StatusDot` reflects `connected`.

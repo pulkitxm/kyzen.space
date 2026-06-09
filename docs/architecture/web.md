@@ -348,11 +348,11 @@ onClose();
 router.push(`/play/${res.game.id}`);
 ```
 
-See `apps/web/app/games/components/conversation-picker.tsx:41`. Games are created **over the socket**, never via a REST POST — the only game REST endpoint is the read at `GET /api/games/:gameId`. Note `res.game.id` is the game's public room **code** — `serializeGame` sets `GameJson.id = row.code` — so `/play/<code>` is the canonical play URL and that same code is later sent as the socket `gameId`; the internal UUID never reaches the browser.
+See `apps/web/app/games/components/conversation-picker.tsx:41`. Games are created **over the socket**, never via a REST POST — the only game REST endpoints are reads (`GET /api/games/:gameId` and `GET /api/games/:gameId/series`). Note `res.game.id` is the game's public room **code** — `serializeGame` sets `GameJson.id = row.code` — so `/play/<code>` is the canonical play URL and that same code is later sent as the socket `gameId`; the internal UUID never reaches the browser.
 
 ### The play route
 
-`app/play/[gameId]/page.tsx` is a Server Component that does the SSR fetch for a single game. The `[gameId]` segment is the game's public room **code**: it validates it with `isGameCode` (`notFound()` otherwise), `normalizeGameCode`s it, and redirects to the canonical uppercase code if they differ (`apps/web/app/play/[gameId]/page.tsx:29`–`:31`). It then requires a session (`redirect("/auth")`), fetches game + moves by that code, and — if the game is attached to a conversation — also fetches the conversation and its first page of messages so the chat can render side-by-side:
+`app/play/[gameId]/page.tsx` is a Server Component that does the SSR fetch for a single game. The `[gameId]` segment is the game's public room **code**: it validates it with `isGameCode` (`notFound()` otherwise), `normalizeGameCode`s it, and redirects to the canonical uppercase code if they differ (`apps/web/app/play/[gameId]/page.tsx:35`–`:37`). It then requires a session (`redirect("/auth")`), fetches game + moves by that code, and — if the game is attached to a conversation — also fetches the conversation and its first page of messages so the chat can render side-by-side:
 
 ```tsx
 const data = await serverFetchJson<{ game: GameJson; moves: MoveJson[] }>(
@@ -361,7 +361,7 @@ const data = await serverFetchJson<{ game: GameJson; moves: MoveJson[] }>(
 if (!data) notFound();
 ```
 
-See `apps/web/app/play/[gameId]/page.tsx:36`. It also resolves the **chat layout**: it reads the `CHAT_LAYOUT_COOKIE` and, when the cookie is missing/untrusted, falls back to the profile's saved `chatLayout` — passing `initialLayout` + `layoutTrusted` down so `GameChatSplit` can render docked/popout without a flash (`apps/web/app/play/[gameId]/page.tsx:59`). All of that becomes props on `PlayClient`.
+See `apps/web/app/play/[gameId]/page.tsx:42`. It also resolves the **chat layout**: it reads the `CHAT_LAYOUT_COOKIE` and, when the cookie is missing/untrusted, falls back to the profile's saved `chatLayout` — passing `initialLayout` + `layoutTrusted` down so `GameChatSplit` can render docked/popout without a flash (`apps/web/app/play/[gameId]/page.tsx:65`). All of that becomes props on `PlayClient`.
 
 `PlayClient` (`apps/web/app/play/[gameId]/play-client.tsx`) is where the data-driven rendering happens. It resolves the board component **by string** and renders it inside `<Suspense>`. The currently registered board is statically imported, so it server-renders and the `<Suspense>` never suspends for it — the boundary is there so that a *lazily*-registered board (a heavy future game) would have its skeleton fallback:
 
@@ -370,53 +370,60 @@ const GameClient = getGameClient(gameType);
 const GameSkeleton = getGameSkeleton(gameType);
 const { socket, status } = useSocket();
 
-const gameNode = GameClient ? (
-  <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
-    <Suspense fallback={<GameSkeleton />}>
-      <GameClient
-        gameId={gameId}
-        userId={userId}
-        socket={socket}
-        connected={status === "connected"}
-        initialGame={initialGame}
-        initialMoves={initialMoves}
-        onViewProfile={openProfile}
-      />
-    </Suspense>
-  </div>
-) : (
-  <div className="p-6 ...">This game type isn't supported here.</div>
+const connected = status === "connected";
+const gameNode = useMemo(
+  () =>
+    GameClient ? (
+      <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
+        <Suspense fallback={<GameSkeleton />}>
+          <GameClient
+            gameId={gameId}
+            userId={userId}
+            socket={socket}
+            connected={connected}
+            initialGame={initialGame}
+            initialMoves={initialMoves}
+            onViewProfile={openProfile}
+          />
+        </Suspense>
+      </div>
+    ) : (
+      <div className="p-6 text-center text-muted-foreground text-sm">
+        This game type isn't supported here.
+      </div>
+    ),
+  [...],
 );
 ```
 
-See `apps/web/app/play/[gameId]/play-client.tsx:46`. If the game belongs to a conversation it wraps the board and a `ConversationView` in a `GameChatSplit`; otherwise it renders the board alone (`apps/web/app/play/[gameId]/play-client.tsx:73`).
+See `apps/web/app/play/[gameId]/play-client.tsx:48`. If the game belongs to a conversation it wraps the board and a `ConversationView` in a `GameChatSplit` (`apps/web/app/play/[gameId]/play-client.tsx:109`); otherwise it renders the board alone (`apps/web/app/play/[gameId]/play-client.tsx:99`).
 
-`PlayClient` also calls `useGameAudioBridge(gameMusicSource(gameType))` once (`apps/web/app/play/[gameId]/play-client.tsx:51`), which pipes the two audio preference atoms (`gameSfxAtom` / `gameMusicAtom`) into the `games-client` `GameAudioEngine`, sets the per-game background-music source, and wires the browser-autoplay gesture unlock. The settings **gear** lives in `GameChatSplit` (it owns the chat docking state): an `absolute top-3 right-3` button that slides horizontally via a CSS transform — the `--gear-shift` custom property + `transition-transform duration-300 ease-out` applied at the `md` breakpoint (`apps/web/app/play/[gameId]/game-settings-gear.tsx:29`), no framer-motion. `GameChatSplit` drives it with `shifted={gearShifted}` and `offset={chatWidth + RESIZE_HANDLE_W}` (`apps/web/app/play/[gameId]/game-chat-split.tsx:297`), where `gearShifted = mode === "mounted" && !minimized` (`apps/web/app/play/[gameId]/game-chat-split.tsx:224`) — so the gear sits left of the docked chat and snaps back to `--gear-shift: 0px` when the chat pops out / minimizes / stashes. The button opens the audio settings modal through `useLayeredPopup`. The no-conversation branch renders a static, non-sliding gear (`shifted={false} offset={0}`). See [audio.md](./audio.md).
+`PlayClient` also calls `useGameAudioBridge(gameMusicSource(gameType))` once (`apps/web/app/play/[gameId]/play-client.tsx:53`), which pipes the two audio preference atoms (`gameSfxAtom` / `gameMusicAtom`) into the `games-client` `GameAudioEngine`, sets the per-game background-music source, and wires the browser-autoplay gesture unlock. The settings **gear** lives in `GameChatSplit` (it owns the chat docking state): an `absolute top-3 right-3` button that slides horizontally via a CSS transform — the `--gear-shift` custom property + `transition-transform duration-300 ease-out` applied at the `md` breakpoint (`apps/web/app/play/[gameId]/game-settings-gear.tsx:29`), no framer-motion. `GameChatSplit` drives it with `shifted={gearShifted}` and `offset={chatWidth + RESIZE_HANDLE_W}` (`apps/web/app/play/[gameId]/game-chat-split.tsx:297`), where `gearShifted = mode === "mounted" && !minimized` (`apps/web/app/play/[gameId]/game-chat-split.tsx:224`) — so the gear sits left of the docked chat and snaps back to `--gear-shift: 0px` when the chat pops out / minimizes / stashes. The button opens the audio settings modal through `useLayeredPopup`. The no-conversation branch renders a static, non-sliding gear (`shifted={false} offset={0}`). See [audio.md](./audio.md).
 
-`getGameClient` (`packages/games-client/src/registry.ts:17`) is just a lookup table of board components (currently the eagerly-imported, SSR'd `TicTacToeGameClient`; the registry type leaves room for a `React.lazy` board to code-split a heavy future game), and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`, and the optional `onViewProfile` callback). `play-client.tsx` pulls `socket`/`status` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx:50`) and passes them down so the board rides the app's single connection. `getGameSkeleton(type)` (`packages/games-client/src/registry.ts:24`) returns the board's `<Suspense>` fallback, falling back to `DefaultGameSkeleton` when a game registers no skeleton (it never returns `null`). Adding a game means adding one row each to `REGISTRY` / `SKELETON_REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, socket event, or driver.**
+`getGameClient` (`packages/games-client/src/registry.ts:17`) is just a lookup table of board components (currently the eagerly-imported, SSR'd `TicTacToeGameClient`; the registry type leaves room for a `React.lazy` board to code-split a heavy future game), and `GameClientProps` (`packages/games-client/src/types.ts`) is the contract every board must accept (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`, and the optional `onViewProfile` callback). `play-client.tsx` pulls `socket`/`status` from `useSocket()` (`apps/web/app/play/[gameId]/play-client.tsx:50`) and passes them down so the board rides the app's single connection. `getGameSkeleton(type)` (`packages/games-client/src/registry.ts:24`) returns the board's `<Suspense>` fallback, falling back to `DefaultGameSkeleton` when a game registers no skeleton (it never returns `null`). Adding a game means adding one row each to `REGISTRY` / `SKELETON_REGISTRY` and one definition to `games-core` — **no new route, endpoint, DB table, or socket event.**
 
 ### Game-over modal & the rematch series UI
 
-`PlayClient` also mounts a `GameOverOverlay` (`apps/web/app/play/[gameId]/game-over-overlay.tsx`) *above* `GameChatSplit` (so it floats over the board and replay toolbar) in both the with-chat and no-conversation branches (`apps/web/app/play/[gameId]/play-client.tsx:75`). The overlay is a `motion`/`AnimatePresence` modal seeded with the SSR `initialGame` that opens automatically when the game is over:
+`PlayClient` also mounts a `GameOverOverlay` (`apps/web/app/play/[gameId]/game-over-overlay.tsx`) *above* `GameChatSplit` (so it floats over the board and replay toolbar) in both the with-chat and no-conversation branches (`apps/web/app/play/[gameId]/play-client.tsx:90`). The overlay is a `motion`/`AnimatePresence` modal seeded with the SSR `initialGame` that opens automatically when the game is over:
 
 ```tsx
-const [open, setOpen] = useState(isOver(initialGame.status));
+const [open, setOpen] = useState(() => isGameOver(initialGame.status));
 
 useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
   setGame(payload.game);
-  if (isOver(payload.game.status)) setOpen(true);
+  if (isGameOver(payload.game.status)) setOpen(true);
 });
 useSocketEvent<{ newGameId: string }>(
   CHAT_EVENTS.rematchCreated,
   (payload) => {
-    setRematchCode(payload.newGameId);
+    setRematch((r) => ({ ...r, code: payload.newGameId }));
   },
 );
 ```
 
-See `apps/web/app/play/[gameId]/game-over-overlay.tsx:43`. Two open triggers: it starts open when the SSR game is already finished (`isOver(initialGame.status)` — the revisit case), and it flips open when a live `game_state` broadcast transitions the game to `completed` / `abandoned`. It is closable and clicking the backdrop dismisses it. The banner (`outcomeLabel`, `:23`) is derived from `game.winner` vs the viewer's `userId` (You won 🎉 / You lost / It's a draw / Game abandoned).
+See `apps/web/app/play/[gameId]/game-over-overlay.tsx:86`. Two open triggers: it starts open when the SSR game is already finished (`isGameOver(initialGame.status)` — the shared `@gamelobby/shared/types` guard, the revisit case), and it flips open when a live `game_state` broadcast transitions the game to `completed` / `abandoned`. It is closable; with no backdrop, a document `mousedown` listener closes it on any outside click — suppressed while a layered popup is open (`game-over-overlay.tsx:119`). The banner (`outcomeLabel`, `:27`) is derived from `game.winner` vs the viewer's `userId` (You won! 🎉 / You lost / It's a draw / Game abandoned).
 
-When the modal is open and the game is over it fetches `GET /api/games/:gameId/series` into a `SeriesDetail` (`game-over-overlay.tsx:62`). The scoreboard and **View series** only appear for a series of ≥ 2 games (`showSeries = (detail?.score.totalGames ?? 0) >= 2`, `:75`) — finishing the very first game shows just the banner + Rematch + Close. **Rematch** (shown only to a player of a `completed` game that has a conversation, `canRematch`, `:73`) `emitAck`s `CHAT_EVENTS.rematch` and routes to `/play/<newCode>`; if a `rematchCreated` event already arrived (the opponent started it), the button reads **Go to rematch** and just navigates to the captured `rematchCode` (`:77`). **View series** opens the `SeriesDetailModal` through `useLayeredPopup`'s `openLayer`. Spectators see the outcome (and scoreboard, if a series) but no action.
+When the modal is open and the game is over it fetches `GET /api/games/:gameId/series` into a `SeriesDetail` (`game-over-overlay.tsx:108`). The scoreboard and **View series** only appear for a series of ≥ 2 games (`showSeries = (detail?.score.totalGames ?? 0) >= 2`, `:133`) — finishing the very first game shows just the banner + Rematch + Close. **Rematch** (shown only to a player of a `completed` game that has a conversation, `canRematch`, `:131`) `emitAck`s `CHAT_EVENTS.rematch` and routes to `/play/<newCode>`; if a `rematchCreated` event already arrived (the opponent started it), the button reads **Go to rematch** and just navigates to the captured `rematch.code` (`:188`). **View series** opens the `SeriesDetailModal` through `useLayeredPopup`'s `openLayer`. Spectators see the outcome (and scoreboard, if a series) but no action.
 
 Two shared components back the series UI, both in `apps/web/components/games/`:
 
@@ -429,7 +436,7 @@ The **chat game card** (`apps/web/app/chat/[handle]/game-card-message.tsx`) read
 
 There are two distinct skeletons, at two different boundaries — don't conflate them:
 
-- **Board fallback** — `getGameSkeleton(gameType)` is the `<Suspense fallback>` for the board *inside* `PlayClient` (`apps/web/app/play/[gameId]/play-client.tsx:55`). It only renders for a board registered with `React.lazy` (covering the gap while that board's chunk loads); the currently registered board is statically imported and SSRs, so this fallback never appears for it. It remains required — every game must ship a skeleton — and matters the moment a heavy future game is registered lazily.
+- **Board fallback** — `getGameSkeleton(gameType)` is the `<Suspense fallback>` for the board *inside* `PlayClient` (`apps/web/app/play/[gameId]/play-client.tsx:60`). It only renders for a board registered with `React.lazy` (covering the gap while that board's chunk loads); the currently registered board is statically imported and SSRs, so this fallback never appears for it. It remains required — every game must ship a skeleton — and matters the moment a heavy future game is registered lazily.
 - **Route loading** — `app/play/[gameId]/loading.tsx` is the App Router `loading.tsx`; Next.js shows it while the `page.tsx` Server Component is still awaiting its SSR fetch. It is unaffected by the eager-vs-lazy board distinction. It reads the chat-layout cookie and renders `<PlaySkeleton layout={parseChatLayoutCookie(cookie)} />` (`apps/web/app/play/[gameId]/loading.tsx:7`).
 
 `PlaySkeleton` (`apps/web/app/play/[gameId]/play-skeleton.tsx:133`) is **layout-aware**: it mirrors the real `GameChatSplit` so the loading shell matches where the chat will actually land. It branches on the parsed `ChatLayout` — a **docked** sidebar (`mode === "mounted"`, sized to `layout.chatWidth`), a fixed **popout** window (`mode === "popout"`, positioned via `popoutStyle` clamped to the viewport), or a **minimized** floating icon / edge tab (`MinimizedSkeleton`, honoring `layout.stashEdge`) — all driven by the same geometry constants from `lib/chat-layout.ts` (`ICON_SIZE`, `EDGE_TAB_*`, `POPOUT_MARGIN`). Because the cookie is mirrored from `localStorage` by `CHAT_LAYOUT_BOOT_SCRIPT` (`apps/web/lib/chat-layout.ts:225`), the server can read the user's last layout and the skeleton lands in the right place without a flash.
@@ -444,13 +451,13 @@ The reason one route can render every game is that the *boundary* between web an
 
 This traces a single move from click to confirmed render, and shows exactly where "the client is never trusted" bites.
 
-1. **User clicks a cell.** `TicTacToeGameClient` only allows it when `canMove` is true — it is the player's turn for their role and the game is `active` (`packages/games-client/src/games/tic-tac-toe/client.tsx:299`).
+1. **User clicks a cell.** `TicTacToeGameClient` only allows it when `canMove` is true — it is the player's turn for their role and the game is `active` (`packages/games-client/src/games/tic-tac-toe/client.tsx:314`).
 2. **Client emits.** `makeMove` emits over the **shared** socket (`props.socket`) — `socket.emit("make_move", { gameId, moveData: { row, col } })`. The client does **not** mutate its board itself here; it waits for the server.
 3. **Server validates against the shared schema + engine.** The game lane's `make_move` handler validates the payload with the `games-core` Zod `moveSchema`, loads the stored state, re-runs the engine's `reduce`, and rejects illegal moves. This is the trust boundary: the same engine that told the client `canMove` is the one that *decides*, and it would reject a forged move from a tampered client. (See `./realtime.md` and `./games-core-engine.md`.)
 4. **Server persists + broadcasts.** It persists the move and broadcasts the new canonical state to the game room.
-5. **Client receives `game_state` / `move_made`.** The board listens for `"game_state"` (full state + moves) and `"move_made"` (just the new `gameState`) and `setGame` / `setMoves` from the payload (`packages/games-client/src/games/tic-tac-toe/client.tsx:259` and `:263`). This overwrites whatever the client believed.
+5. **Client receives `game_state`.** The board listens for `"game_state"` and, in the post-move case, the payload carries `{ game, move }` (the full game plus the single new move delta); the board `setGame`s the record and appends the move (`packages/games-client/src/games/tic-tac-toe/client.tsx:269`). This overwrites whatever the client believed.
 
-So the arrow is: **cell click → `client.tsx:309` `socket.emit("make_move")` → server game lane (Zod-validate + engine `reduce` + persist) → broadcast `game_state` → `client.tsx:259` `setGame`/`setMoves` → React re-renders the board.** The web app never decides the outcome; it requests one and renders the answer.
+So the arrow is: **cell click → `client.tsx:320` `socket.emit("make_move")` → server game lane (Zod-validate + engine `reduce` + persist) → broadcast `game_state` → `client.tsx:269` `setGame`/append move → React re-renders the board.** The web app never decides the outcome; it requests one and renders the answer.
 
 The same shape governs chat: composer optimistically inserts a `pending` message with a `clientId` → emits → server validates/persists → broadcasts `messageNew` → `ChatSocketBridge` calls `upsertMessage`, which finds the pending row by `clientId` and swaps in the confirmed one.
 

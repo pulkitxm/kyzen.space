@@ -8,18 +8,19 @@ import type {
   NotificationRow,
   PublicUserRow,
 } from "@gamelobby/database";
-import type {
-  ConversationJson,
-  FriendshipJson,
-  GameJson,
-  GameType,
-  MemberJson,
-  MessageJson,
-  MoveJson,
-  NotificationJson,
-  PublicUser,
-  SeriesDetail,
-  SeriesScore,
+import {
+  type ConversationJson,
+  type FriendshipJson,
+  type GameJson,
+  type GameType,
+  type MemberJson,
+  type MessageJson,
+  type MoveJson,
+  type NotificationJson,
+  type PublicUser,
+  resolveWinnerUsername,
+  type SeriesDetail,
+  type SeriesScore,
 } from "@gamelobby/shared/types";
 
 function iso(d: Date | null | undefined): string | null {
@@ -41,10 +42,7 @@ export function serializeSeries(
       gameNumber: i + 1,
       status: g.status,
       winner: g.winner,
-      winnerUsername:
-        g.winner && g.winner !== "draw"
-          ? (g.players.find((p) => p.userId === g.winner)?.username ?? null)
-          : null,
+      winnerUsername: resolveWinnerUsername(g.winner, g.players),
       completedAt: iso(g.completedAt),
     })),
   };

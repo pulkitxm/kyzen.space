@@ -307,19 +307,19 @@ each additional player joins
   → role = engine.roles[players.length]               (turn-based.ts:58)
   → insert game_player row (role, seat_order)          (turn-based.ts:63)
   → if min players reached:
-      update game row (status "active", startedAt)     (turn-based.ts:64)
-      game_state kept as-is (gameState ?? …)           (turn-based.ts:67)
+      update game row (status "active", startedAt)     (turn-based.ts:68)
+      game_state kept as-is (gameState ?? …)           (turn-based.ts:71)
 
 client emits make_move { gameId, moveData }
-  → def.moveSchema.safeParse(moveData)                (turn-based.ts:143)
-  → def.stateSchema.safeParse(row.gameState)          (turn-based.ts:145)
-  → result = def.engine.reduce(state, { role }, input) (turn-based.ts:148)
-  → insert move row (move_data, move_number)          (turn-based.ts:156)
-  → update game row (game_state: result.state)        (turn-based.ts:163)
-  → if outcome.status === "completed": finalize       (turn-based.ts:164)
+  → def.moveSchema.safeParse(moveData)                (turn-based.ts:147)
+  → def.stateSchema.safeParse(row.gameState)          (turn-based.ts:149)
+  → result = def.engine.reduce(state, { role }, input) (turn-based.ts:152)
+  → insert move row (move_data, move_number)          (turn-based.ts:160)
+  → update game row (game_state: result.state)        (turn-based.ts:167)
+  → if outcome.status === "completed": finalize       (turn-based.ts:168)
       set winner, status "completed", bump stats
 
-server broadcasts move_made + game_state to room      (turn-based.ts:166)
+server broadcasts one game_state { game, move } to room (turn-based.ts:170)
 ```
 
 ## Gotchas & invariants
@@ -327,7 +327,7 @@ server broadcasts move_made + game_state to room      (turn-based.ts:166)
 - **`game_state` is `unknown` until `safeParse`'d.** Read the raw row and you have bytes. The repository hands you an `unknown`; the caller is responsible for parsing it through the game's Zod schema before passing it to the engine.
 - **`move_number` is dense and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` rejects a double-submit at the constraint level — the server does not need an advisory lock.
 - **Role assignment is seat-order-dependent.** The creator takes `engine.roles[0]` at creation (`games-in-chat-service.ts:118`); each later joiner takes `engine.roles[players.length]`, evaluated *before* their `game_player` row is inserted (`turn-based.ts:58`). Seat `i` always gets `roles[i]` — you cannot choose your role. (A **rematch** instead pre-seats every prior player up front in `computeRematchSeating` order — loser-first for 2 players — so seat 0 / `roles[0]` goes to the loser; see [`realtime.md`](./realtime.md).)
-- **`createInitialState` fires once, at creation.** `createGameInConversation` mints the initial `game_state` in the creating insert (`games-in-chat-service.ts:130`), not when the last seat fills. The `gameRow.gameState ?? engine.createInitialState(...)` guard on join (`turn-based.ts:67`) is a fallback the normal flow never triggers, because the state already exists. Reaching `"active"` only flips `status`; it does not re-mint state.
+- **`createInitialState` fires once, at creation.** `createGameInConversation` mints the initial `game_state` in the creating insert (`games-in-chat-service.ts:130`), not when the last seat fills. The `gameRow.gameState ?? engine.createInitialState(...)` guard on join (`turn-based.ts:71`) is a fallback the normal flow never triggers, because the state already exists. Reaching `"active"` only flips `status`; it does not re-mint state.
 - **`move.player_id` is plain `text`, not a foreign key.** It stores the mover's `user.id` but declares no `references()` constraint — same for `game_player.user_id`. (`user.id` is Better Auth `text`; the game tables hold it without an FK.)
 - **The public id is `code`; the FK/PK id is `uuid`.** Clients only ever see and send the short `code` (`/play/<code>`, socket `gameId`); the server resolves it with `getGameByCode` and uses the internal `uuid` for FK joins and writes. `serializeGame` maps `row.code → GameJson.id`, so the UUID never leaves the server. Only **games** moved to codes — conversations/messages/friendships/users/profiles keep their UUIDs.
 - **No per-game tables, ever.** If you find yourself thinking "I need a `connect_four_state` column," the answer is: add it to the state schema and let it live in `game_state`.

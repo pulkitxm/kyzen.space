@@ -1,24 +1,14 @@
 import type { Socket } from "socket.io";
 import type { ServiceResult } from "../chat/result";
-import { childLogger } from "../logger";
+import { childLogger, type Logger } from "../logger";
 
 const log = childLogger({ mod: "realtime-chat" });
 
 export type AckFn = (res: unknown) => void;
 
-export function isObj(v: unknown): v is Record<string, unknown> {
-  return Boolean(v) && typeof v === "object";
-}
+type GameAck = (err?: string) => void;
 
-export function str(v: unknown): string | null {
-  return typeof v === "string" ? v : null;
-}
-
-export function strArray(v: unknown): string[] {
-  return Array.isArray(v)
-    ? v.filter((x): x is string => typeof x === "string")
-    : [];
-}
+type SafeParseResult<T> = { success: true; data: T } | { success: false };
 
 export function ackErr(cb: AckFn | undefined, error: string): void {
   cb?.({ ok: false, error });
@@ -48,6 +38,45 @@ export function register(
           "chat handler failed",
         );
         cb?.({ ok: false, error: e instanceof Error ? e.message : "error" });
+      }
+    })();
+  });
+}
+
+export function registerGameEvent<T extends { gameId: string }>(
+  socket: Socket,
+  slog: Logger,
+  event: string,
+  schema: { safeParse: (payload: unknown) => SafeParseResult<T> },
+  run: (data: T) => Promise<void>,
+): void {
+  socket.on(event, (payload: unknown, cb?: GameAck) => {
+    void (async () => {
+      const parsed = schema.safeParse(payload);
+      if (!parsed.success) {
+        slog.warn({ payload }, `invalid ${event} payload`);
+        cb?.("Invalid payload");
+        socket.emit("game_error", { message: `Invalid ${event} payload` });
+        return;
+      }
+      const { data } = parsed;
+      const start = performance.now();
+      try {
+        await run(data);
+        slog.info(
+          {
+            event,
+            gameId: data.gameId,
+            durationMs: Math.round((performance.now() - start) * 100) / 100,
+          },
+          `${event} handled`,
+        );
+        cb?.();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : `${event} failed`;
+        slog.error({ err, gameId: data.gameId }, `${event} failed`);
+        cb?.(msg);
+        socket.emit("game_error", { message: msg });
       }
     })();
   });

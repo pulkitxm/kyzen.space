@@ -70,12 +70,8 @@ export type MoveJson = z.infer<typeof moveJsonSchema>;
 
 export type ServerGameStatePayload = {
   game: GameJson;
-  moves: MoveJson[];
-};
-
-export type ServerMoveMadePayload = {
-  move: MoveJson;
-  gameState: unknown;
+  moves?: MoveJson[];
+  move?: MoveJson;
 };
 
 export type ServerGameOverPayload = {
@@ -85,3 +81,20 @@ export type ServerGameOverPayload = {
 export type ServerErrorPayload = {
   message: string;
 };
+
+export function isGameOver(status: string): boolean {
+  return status === "completed" || status === "abandoned";
+}
+
+export function isGameLive(status: string): boolean {
+  return status === "waiting" || status === "active";
+}
+
+export function resolveWinnerUsername(
+  winner: string | null,
+  players: ReadonlyArray<{ userId: string; username: string }>,
+): string | null {
+  return winner && winner !== "draw"
+    ? (players.find((p) => p.userId === winner)?.username ?? null)
+    : null;
+}

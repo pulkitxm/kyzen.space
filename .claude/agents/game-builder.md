@@ -13,16 +13,16 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 
 You implement a new multiplayer game on this monorepo platform. Games are
 **data-driven**: one game = one self-describing `GameDefinition` in a single
-array, plus one React client component. Generic machinery (the realtime driver,
-DB, serializers, lobby, conformance tests) reads games through that definition —
-you never touch platform plumbing. Read `docs/adding-a-game.md` first; it is the
-canonical guide and this prompt mirrors it.
+array, plus one React client component. Generic machinery (the realtime game-lane
+handlers, DB, serializers, lobby, conformance tests) reads games through that
+definition — you never touch platform plumbing. Read `docs/adding-a-game.md`
+first; it is the canonical guide and this prompt mirrors it.
 
 ## Hard rules
 
 - **Never** add a new web route, API endpoint, DB table/column, socket event, or
-  driver for a game. If you think you need one, you've misunderstood — re-read
-  `docs/adding-a-game.md`. The platform is already generic.
+  realtime handler for a game. If you think you need one, you've misunderstood —
+  re-read `docs/adding-a-game.md`. The platform is already generic.
 - **Strict Zod, always — authored in `@gamelobby/shared`.** Every game ships
   `stateSchema`, `moveSchema`, and `configSchema` using `.strict()`, exact enums,
   and integer/range bounds, under `packages/shared/src/types/games/<type>/schemas.ts`.
@@ -83,9 +83,9 @@ canonical guide and this prompt mirrors it.
    flag through `GameClientProps` (`props.socket`, `props.connected`) — **never
    call `io()` to open your own connection.** Emit `join_room` on mount and on the
    socket's `connect`, `make_move` on a move, and `leave_room` on cleanup (unmount);
-   render the board from the `game_state`/`move_made` events. On cleanup remove your
-   listeners with `socket.off(...)` only — never `socket.disconnect()` (that would
-   kill the shared chat lane). Register it in
+   render the board from the `game_state` event (the server emits exactly one per
+   move). On cleanup remove your listeners with `socket.off(...)` only — never
+   `socket.disconnect()` (that would kill the shared chat lane). Register it in
    `packages/games-client/src/registry.ts` (`REGISTRY`) using the imported slug
    constant as the key. `REGISTRY` is typed `Record<GameType, …>` — a missing
    entry is a **compile error**, not a runtime surprise.

@@ -3,10 +3,11 @@
 Games on this platform are **data-driven**. A game is a single self-describing
 `GameDefinition` object — its engine, mode, roles, player bounds, strict Zod
 schemas, metadata, and optional setup fields — plus one React client component.
-Every generic part of the platform (the realtime driver, the database, the
-serializers, the web lobby, the conformance tests) reads a game *only* through
-its definition. **Adding a game requires zero changes to platform plumbing**: no
-new web route, API endpoint, database table/column, socket event, or driver.
+Every generic part of the platform (the realtime game-lane handlers, the
+database, the serializers, the web lobby, the conformance tests) reads a game
+*only* through its definition. **Adding a game requires zero changes to platform
+plumbing**: no new web route, API endpoint, database table/column, or socket
+event.
 
 ## The three places a game lives
 
@@ -67,8 +68,9 @@ schemas are the guardrails that make that JSON safe and strongly typed:
 - **Derive TS types from the schemas** with `z.infer` — never hand-write a type
   that parallels a schema.
 - Put **structural** move validation in `moveSchema`; keep only game *rules*
-  (turns, legality, terminal state) in the engine's `reduce`/`step`. The driver
-  validates `moveSchema` and `stateSchema` before calling the engine.
+  (turns, legality, terminal state) in the engine's `reduce`/`step`. The
+  turn-based handler validates `moveSchema` and `stateSchema` before calling the
+  engine.
 
 ## Worked example: tic-tac-toe
 
@@ -151,8 +153,9 @@ type, `listGameTypes(): GameType[]` returns the narrowed list.
    app passes the **one shared Socket.IO connection** plus a `connected` flag via
    props (`props.socket`, `props.connected`) — **never call `io()`** to open your
    own. Emit `join_room` on mount and on the socket's `connect`, `make_move` on a
-   move, and `leave_room` on cleanup; render from the `game_state`/`move_made`
-   events. On unmount remove your listeners with `socket.off(...)` only — never
+   move, and `leave_room` on cleanup; render from the `game_state` event (the
+   server emits exactly one per move). On unmount remove your listeners with
+   `socket.off(...)` only — never
    `socket.disconnect()` (that would kill the shared chat lane). Register the board
    in `src/registry.ts` (`REGISTRY`) using the imported slug constant as the key —
    both `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>`, so a missing
@@ -207,10 +210,11 @@ These already work for every game — do not duplicate them:
   game `type` isn't known until the fetch resolves.
 - **In-chat card** — `app/chat/[handle]/game-card-message.tsx` renders the live
   card for any game.
-- **Realtime** — the turn-based driver (`apps/server/src/realtime/turn-based.ts`)
-  handles `join_room`/`make_move` for any turn-based engine. Add a new driver in
-  `realtime/drivers.ts` **only** for a genuinely different `mode` (e.g. realtime
-  `step`-based games).
+- **Realtime** — the turn-based handlers (`apps/server/src/realtime/turn-based.ts`,
+  `handleJoinRoom`/`handleMakeMove`) serve any turn-based engine; they are wired to
+  the `join_room`/`make_move` socket events via `registerGameEvent` in
+  `realtime/socket-util.ts`. Write a new handler module and register it there
+  **only** for a genuinely different `mode` (e.g. realtime `step`-based games).
 - **Database** — the generic `game` (+ `config` JSONB), `move`, and `game_player`
   tables in `@gamelobby/database` (`packages/database/src/schema.ts`) store every
   game. Never add a per-game table; the engine owns the typed shape and Zod

@@ -3,15 +3,25 @@ import type {
   ConversationJson,
   FriendshipJson,
   MessageJson,
-  MessageKind,
-  MessageMetadata,
   NotificationJson,
   PresenceStatus,
   TypingUser,
 } from "./dto";
 import type {
+  clientAddMembersSchema,
+  clientConversationRefSchema,
+  clientCreateDmSchema,
   clientCreateGameInConversationSchema,
+  clientCreateGroupSchema,
+  clientFriendRemoveSchema,
+  clientFriendRequestSchema,
+  clientFriendRespondSchema,
+  clientMarkReadSchema,
+  clientNotificationReadSchema,
   clientRematchSchema,
+  clientRemoveMemberSchema,
+  clientRenameGroupSchema,
+  clientSendMessageSchema,
 } from "./schemas";
 
 export type AckResult<T = Record<string, never>> =
@@ -20,38 +30,31 @@ export type AckResult<T = Record<string, never>> =
 
 export type Ack<T = Record<string, never>> = (res: AckResult<T>) => void;
 
-export type ClientSendMessage = {
-  conversationId: string;
-  clientId: string;
-  kind?: MessageKind;
-  body?: string;
-  metadata?: MessageMetadata;
-};
+export type ClientSendMessage = z.infer<typeof clientSendMessageSchema>;
 
-export type ClientConversationRef = { conversationId: string };
+export type ClientConversationRef = z.infer<typeof clientConversationRefSchema>;
 
-export type ClientMarkRead = { conversationId: string; messageId: string };
+export type ClientMarkRead = z.infer<typeof clientMarkReadSchema>;
 
-export type ClientCreateDm = { userId: string };
+export type ClientCreateDm = z.infer<typeof clientCreateDmSchema>;
 
-export type ClientCreateGroup = { name: string; memberIds: string[] };
+export type ClientCreateGroup = z.infer<typeof clientCreateGroupSchema>;
 
-export type ClientAddMembers = { conversationId: string; userIds: string[] };
+export type ClientAddMembers = z.infer<typeof clientAddMembersSchema>;
 
-export type ClientRemoveMember = { conversationId: string; userId: string };
+export type ClientRemoveMember = z.infer<typeof clientRemoveMemberSchema>;
 
-export type ClientRenameGroup = { conversationId: string; name: string };
+export type ClientRenameGroup = z.infer<typeof clientRenameGroupSchema>;
 
-export type ClientFriendRequest = { username: string };
+export type ClientFriendRequest = z.infer<typeof clientFriendRequestSchema>;
 
-export type ClientFriendRespond = {
-  requestId: string;
-  action: "accept" | "decline";
-};
+export type ClientFriendRespond = z.infer<typeof clientFriendRespondSchema>;
 
-export type ClientFriendRemove = { userId: string };
+export type ClientFriendRemove = z.infer<typeof clientFriendRemoveSchema>;
 
-export type ClientNotificationRead = { id: string };
+export type ClientNotificationRead = z.infer<
+  typeof clientNotificationReadSchema
+>;
 
 export type ClientCreateGameInConversation = z.infer<
   typeof clientCreateGameInConversationSchema

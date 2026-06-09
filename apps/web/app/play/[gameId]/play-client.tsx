@@ -11,13 +11,14 @@ import type {
   GameType,
   MessageJson,
 } from "@gamelobby/shared/types";
+import { useAtomValue } from "jotai";
 import { Suspense, useMemo } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import { useProfilePopup } from "@/components/ui";
 import { gameMusicSource } from "@/lib/audio/music-sources";
 import { useGameAudioBridge } from "@/lib/audio/use-audio-bridge";
 import type { ChatLayout } from "@/lib/chat-layout";
-import { useSocket } from "@/lib/socket/socket-context";
+import { socketStatusAtom, useSocket } from "@/lib/socket/socket-context";
 import { GameChatSplit } from "./game-chat-split";
 import { GameOverOverlay } from "./game-over-overlay";
 import { GameSettingsGear } from "./game-settings-gear";
@@ -47,7 +48,8 @@ export function PlayClient({
 }) {
   const GameClient = getGameClient(gameType);
   const GameSkeleton = getGameSkeleton(gameType);
-  const { socket, status } = useSocket();
+  const { socket } = useSocket();
+  const status = useAtomValue(socketStatusAtom);
   const openProfile = useProfilePopup();
 
   useGameAudioBridge(gameMusicSource(gameType));

@@ -23,9 +23,22 @@ export type {
   TypingUser,
 } from "./dto";
 export {
+  clientAddMembersSchema,
+  clientConversationRefSchema,
+  clientCreateDmSchema,
   clientCreateGameInConversationSchema,
+  clientCreateGroupSchema,
+  clientFriendRemoveSchema,
+  clientFriendRequestSchema,
+  clientFriendRespondSchema,
+  clientMarkReadSchema,
+  clientNotificationReadSchema,
   clientRematchSchema,
+  clientRemoveMemberSchema,
+  clientRenameGroupSchema,
+  clientSendMessageSchema,
   gameCardMetaSchema,
+  gifMetaSchema,
   notificationPayloadSchema,
 } from "./schemas";
 export type {

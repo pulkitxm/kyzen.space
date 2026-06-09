@@ -1,10 +1,11 @@
 "use client";
 
 import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type {
-  ConversationJson,
-  GameJson,
-  SeriesDetail,
+import {
+  type ConversationJson,
+  type GameJson,
+  isGameOver,
+  type SeriesDetail,
 } from "@gamelobby/shared/types";
 import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
 import { useRouter } from "next/navigation";
@@ -22,10 +23,6 @@ import {
   useSocketEvent,
 } from "@/lib/socket/socket-context";
 import { cn } from "@/lib/utils";
-
-function isOver(status: string): boolean {
-  return status === "completed" || status === "abandoned";
-}
 
 function outcomeLabel(game: GameJson, userId: string): string {
   if (game.status === "abandoned") return "Game abandoned";
@@ -86,7 +83,7 @@ export function GameOverOverlay({
   const { openLayer, layers } = useLayeredPopup();
   const cardRef = useRef<HTMLDivElement>(null);
   const [game, setGame] = useState<GameJson>(initialGame);
-  const [open, setOpen] = useState(() => isOver(initialGame.status));
+  const [open, setOpen] = useState(() => isGameOver(initialGame.status));
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
   const [rematch, setRematch] = useState<{
     busy: boolean;
@@ -96,7 +93,7 @@ export function GameOverOverlay({
 
   useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
     setGame(payload.game);
-    if (isOver(payload.game.status)) setOpen(true);
+    if (isGameOver(payload.game.status)) setOpen(true);
   });
   useSocketEvent<{ newGameId: string }>(
     CHAT_EVENTS.rematchCreated,
@@ -106,7 +103,7 @@ export function GameOverOverlay({
   );
 
   useEffect(() => {
-    if (!open || !isOver(game.status)) return;
+    if (!open || !isGameOver(game.status)) return;
     let active = true;
     clientFetchJson<SeriesDetail>(`/api/games/${gameId}/series`)
       .then((d) => {
@@ -161,7 +158,7 @@ export function GameOverOverlay({
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
       <LazyMotion features={domAnimation}>
         <AnimatePresence>
-          {open && isOver(game.status) ? (
+          {open && isGameOver(game.status) ? (
             <m.div
               ref={cardRef}
               className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"

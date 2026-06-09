@@ -326,8 +326,11 @@ describe("handleMakeMove — applying moves", () => {
       "O",
     );
     expect(current.status).toBe("active");
-    expect(emits.some((e) => e.event === "move_made")).toBe(true);
-    expect(emits.some((e) => e.event === "game_state")).toBe(true);
+    const stateEmit = emits.find((e) => e.event === "game_state");
+    expect(stateEmit).toBeDefined();
+    expect((stateEmit?.payload as { move?: unknown }).move).toBeDefined();
+    expect((stateEmit?.payload as { moves?: unknown }).moves).toBeUndefined();
+    expect(emits.some((e) => e.event === "move_made")).toBe(false);
     expect(emits.some((e) => e.event === "game_over")).toBe(false);
   });
 

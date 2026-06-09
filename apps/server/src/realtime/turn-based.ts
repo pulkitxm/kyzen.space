@@ -167,11 +167,11 @@ export async function handleMakeMove(
   let updated = await games.updateGame(gameRow.id, { gameState: result.state });
   updated = await finalize(updated, result.outcome);
 
-  emitToGame(io, gameRow.code, "move_made", {
+  const statePayload: ServerGameStatePayload = {
+    game: serializeGame(updated),
     move: serializeMove(moveRow, gameRow.code),
-    gameState: updated.gameState,
-  });
-  await emitFullState(io, updated);
+  };
+  emitToGame(io, gameRow.code, "game_state", statePayload);
 
   if (updated.status === "completed") {
     emitToGame(io, gameRow.code, "game_over", { winner: updated.winner });
