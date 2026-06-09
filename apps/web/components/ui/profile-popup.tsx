@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { clientFetchJson } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
-export type ProfilePopupUser = {
+type ProfilePopupUser = {
   username: string;
   displayName?: string | null;
   avatar?: AvatarConfig | null;

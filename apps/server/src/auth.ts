@@ -7,7 +7,7 @@ import { ensureUsernameForUser } from "./username";
 
 const log = childLogger({ mod: "auth" });
 
-export const auth = betterAuth({
+const auth = betterAuth({
   secret: env.betterAuthSecret,
   baseURL: env.betterAuthUrl,
   trustedOrigins: [env.webUrl],

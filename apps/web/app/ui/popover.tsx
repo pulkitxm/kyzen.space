@@ -5,7 +5,6 @@ import type { ComponentPropsWithoutRef, ComponentRef, Ref } from "react";
 
 const Popover = PopoverPrimitive.Root;
 const PopoverTrigger = PopoverPrimitive.Trigger;
-const PopoverAnchor = PopoverPrimitive.Anchor;
 const PopoverClose = PopoverPrimitive.Close;
 
 function PopoverContent({
@@ -32,4 +31,4 @@ function PopoverContent({
   );
 }
 
-export { Popover, PopoverAnchor, PopoverClose, PopoverContent, PopoverTrigger };
+export { Popover, PopoverClose, PopoverContent, PopoverTrigger };

@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { serverFetchJson } from "@/lib/api-server";
 
-export type SessionUser = {
+type SessionUser = {
   id: string;
   name?: string | null;
   email?: string | null;

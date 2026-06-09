@@ -8,7 +8,7 @@ import { PaginatedRecentGames } from "@/app/[username]/profile-activity-client";
 import { Character } from "@/components/ui";
 import type { ProfileActivityGameRow } from "@/lib/profile-activity-games";
 
-export type ProfileStatGame = {
+type ProfileStatGame = {
   id: string;
   name: string;
   href: string;

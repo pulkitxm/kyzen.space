@@ -22,7 +22,7 @@ const sizes: Record<Size, string> = {
   lg: "h-12 px-5 text-sm",
 };
 
-export type ButtonProps = React.ComponentPropsWithRef<"button"> & {
+type ButtonProps = React.ComponentPropsWithRef<"button"> & {
   variant?: Variant;
   size?: Size;
   loading?: boolean;

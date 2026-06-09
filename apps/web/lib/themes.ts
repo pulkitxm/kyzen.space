@@ -4,7 +4,6 @@ export {
   COLOR_MODES,
   DEFAULT_COLOR_MODE,
   DEFAULT_THEME,
-  getThemeDef,
   PALETTE_STORAGE_KEY,
   THEME_IDS,
   THEMES,
@@ -13,7 +12,6 @@ export {
   type ColorMode,
   isValidColorMode,
   isValidTheme,
-  type ThemeDef,
   type ThemeId,
 } from "@gamelobby/shared/types";
 

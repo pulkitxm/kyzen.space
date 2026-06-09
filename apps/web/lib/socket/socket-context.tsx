@@ -10,7 +10,7 @@ import {
 } from "react";
 import { io, type Socket } from "socket.io-client";
 
-export type SocketStatus = "connecting" | "connected" | "disconnected";
+type SocketStatus = "connecting" | "connected" | "disconnected";
 
 type SocketContextValue = { socket: Socket | null; status: SocketStatus };
 
