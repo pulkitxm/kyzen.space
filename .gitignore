@@ -51,3 +51,7 @@ next-env.d.ts
 
 # Claude Code worktrees (full repo copies; keeps Biome from seeing a nested root config)
 .claude/worktrees/
+
+# wiki sync scratch (generated pages + cloned wiki repo)
+.wiki-build/
+.wiki-clone/
