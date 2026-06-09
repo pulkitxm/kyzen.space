@@ -198,10 +198,31 @@ export async function mergeAccounts(
         targetProfile.stats ?? {},
         anonProfile.stats ?? {},
       );
+      const memberSince =
+        anonProfile.createdAt < targetProfile.createdAt
+          ? anonProfile.createdAt
+          : targetProfile.createdAt;
+      await tx.delete(userProfile).where(eq(userProfile.userId, anonId));
       await tx
         .update(userProfile)
-        .set({ stats: merged, updatedAt: new Date() })
+        .set({
+          username: anonProfile.username,
+          avatar: anonProfile.avatar,
+          theme: anonProfile.theme,
+          colorMode: anonProfile.colorMode,
+          pattern: anonProfile.pattern,
+          chatLayout: anonProfile.chatLayout,
+          usernameChangedAt: anonProfile.usernameChangedAt,
+          stats: merged,
+          createdAt: memberSince,
+          updatedAt: new Date(),
+        })
         .where(eq(userProfile.userId, targetId));
+    } else if (anonProfile && !targetProfile) {
+      await tx
+        .update(userProfile)
+        .set({ userId: targetId, updatedAt: new Date() })
+        .where(eq(userProfile.userId, anonId));
     }
 
     await tx
@@ -335,7 +356,6 @@ export async function mergeAccounts(
       .delete(notification)
       .where(sql`${notification.actorId} = ${notification.userId}`);
 
-    await tx.delete(userProfile).where(eq(userProfile.userId, anonId));
     await tx.delete(user).where(eq(user.id, anonId));
   });
 }

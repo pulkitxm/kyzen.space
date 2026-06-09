@@ -63,7 +63,7 @@ export function AppShellClient({
     <TooltipProvider delayDuration={300}>
       <Provider>
         <SocketProvider enabled={signedIn}>
-          <GuestNudge isAnonymous={isAnonymous} />
+          {isAnonymous ? <GuestNudge /> : null}
           <MergeConsent enabled={signedIn && !isAnonymous} />
           {signedIn && userId ? (
             <ChatSocketBridge

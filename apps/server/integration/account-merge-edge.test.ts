@@ -46,7 +46,7 @@ async function statsOf(userId: string): Promise<unknown> {
 }
 
 describe.skipIf(!DB_UP)("account merge edge", () => {
-  it("loses anon stats when the target has no profile row (documents behavior)", async () => {
+  it("re-points the anon profile to the target when the target has no profile row (anon stats preserved)", async () => {
     const anon = await h.makeUser("np_anon");
     const target = await h.makeUser("np_target");
     await db
@@ -59,7 +59,10 @@ describe.skipIf(!DB_UP)("account merge edge", () => {
 
     await accountMerge.mergeAccounts(anon.id, target.id);
 
-    expect(await statsOf(target.id)).toBeNull();
+    expect(await statsOf(target.id)).toEqual({
+      ttt: { played: 5, won: 3, lost: 2, drawn: 0 },
+    });
+    expect(await statsOf(anon.id)).toBeNull();
     const [aUser] = await db
       .select()
       .from(schema.user)

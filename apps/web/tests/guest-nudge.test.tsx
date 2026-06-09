@@ -5,41 +5,75 @@ mock.module("@/lib/auth-client", () => ({
   authClient: { signIn: { social: async () => ({}) } },
 }));
 
+const { decideGuestNudge } = await import("@/lib/guest-nudge");
 const { GuestNudge } = await import("@/app/guest-nudge");
 
+const NOW = 1_000_000;
+
+describe("decideGuestNudge", () => {
+  it("never shows for a non-anonymous user", () => {
+    expect(
+      decideGuestNudge({
+        isAnonymous: false,
+        seen: null,
+        snoozedUntil: 0,
+        now: NOW,
+      }),
+    ).toEqual({ show: false, markSeen: false });
+    expect(
+      decideGuestNudge({
+        isAnonymous: false,
+        seen: "1",
+        snoozedUntil: 0,
+        now: NOW,
+      }),
+    ).toEqual({ show: false, markSeen: false });
+  });
+
+  it("does not show on the first visit, but records the guest", () => {
+    expect(
+      decideGuestNudge({
+        isAnonymous: true,
+        seen: null,
+        snoozedUntil: 0,
+        now: NOW,
+      }),
+    ).toEqual({ show: false, markSeen: true });
+  });
+
+  it("shows on a return visit when seen before and not snoozed", () => {
+    expect(
+      decideGuestNudge({
+        isAnonymous: true,
+        seen: "1",
+        snoozedUntil: 0,
+        now: NOW,
+      }),
+    ).toEqual({ show: true, markSeen: false });
+  });
+
+  it("stays hidden while snoozed, then shows once the snooze elapses", () => {
+    expect(
+      decideGuestNudge({
+        isAnonymous: true,
+        seen: "1",
+        snoozedUntil: NOW + 1000,
+        now: NOW,
+      }),
+    ).toEqual({ show: false, markSeen: false });
+    expect(
+      decideGuestNudge({
+        isAnonymous: true,
+        seen: "1",
+        snoozedUntil: NOW - 1,
+        now: NOW,
+      }),
+    ).toEqual({ show: true, markSeen: false });
+  });
+});
+
 describe("GuestNudge", () => {
-  it("renders a sign-in prompt for anonymous users", () => {
-    const html = renderToStaticMarkup(<GuestNudge isAnonymous={true} />);
-    expect(html).toContain("Sign in to save");
-  });
-
-  it("renders nothing for non-anonymous users", () => {
-    const html = renderToStaticMarkup(<GuestNudge isAnonymous={false} />);
-    expect(html).toBe("");
-  });
-
-  it("shows the idle sign-in label, not the redirecting label, on first render", () => {
-    const html = renderToStaticMarkup(<GuestNudge isAnonymous={true} />);
-    expect(html).toContain(">Sign in<");
-    expect(html).not.toContain("Redirecting");
-  });
-
-  it("renders an enabled sign-in button for an anonymous user", () => {
-    const html = renderToStaticMarkup(<GuestNudge isAnonymous={true} />);
-    expect(html).toContain("<button");
-    expect(html).toContain('type="button"');
-    expect(/<button[^>]*\sdisabled(=|\s|>)/.test(html)).toBe(false);
-  });
-
-  it("renders an icon for the sign-in affordance", () => {
-    const html = renderToStaticMarkup(<GuestNudge isAnonymous={true} />);
-    expect(html).toContain("<svg");
-    expect(html).toContain('aria-hidden="true"');
-  });
-
-  it("emits no button or prompt markup at all when not anonymous", () => {
-    const html = renderToStaticMarkup(<GuestNudge isAnonymous={false} />);
-    expect(html).not.toContain("<button");
-    expect(html).not.toContain("Sign in");
+  it("renders nothing on the server (the pop-up is gated on a client return-session)", () => {
+    expect(renderToStaticMarkup(<GuestNudge />)).toBe("");
   });
 });

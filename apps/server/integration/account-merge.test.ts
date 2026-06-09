@@ -87,7 +87,7 @@ describe.skipIf(!DB_UP)("account merge", () => {
     void convId;
   });
 
-  it("merge sums profile stats per gameType and deletes the anon profile + user", async () => {
+  it("merge sums stats, copies the guest username + avatar onto the target, keeps the target name, and deletes the anon profile + user", async () => {
     const anon = await h.makeUser("st_anon");
     const target = await h.makeUser("st_target");
     await db
@@ -98,6 +98,19 @@ describe.skipIf(!DB_UP)("account merge", () => {
       .update(schema.userProfile)
       .set({ stats: { ttt: { played: 1, won: 0, lost: 0, drawn: 1 } } })
       .where(eq(schema.userProfile.userId, target.id));
+    const memberSince = new Date("2020-01-01T00:00:00.000Z");
+    await db
+      .update(schema.userProfile)
+      .set({ createdAt: memberSince })
+      .where(eq(schema.userProfile.userId, anon.id));
+    const [anonBefore] = await db
+      .select()
+      .from(schema.userProfile)
+      .where(eq(schema.userProfile.userId, anon.id));
+    const [targetUserBefore] = await db
+      .select()
+      .from(schema.user)
+      .where(eq(schema.user.id, target.id));
 
     await accountMerge.mergeAccounts(anon.id, target.id);
 
@@ -111,6 +124,14 @@ describe.skipIf(!DB_UP)("account merge", () => {
       lost: 1,
       drawn: 1,
     });
+    expect(tProfile?.username).toBe(anonBefore?.username);
+    expect(tProfile?.avatar).toEqual(anonBefore?.avatar ?? null);
+    expect(tProfile?.createdAt).toEqual(memberSince);
+    const [targetUserAfter] = await db
+      .select()
+      .from(schema.user)
+      .where(eq(schema.user.id, target.id));
+    expect(targetUserAfter?.name).toBe(targetUserBefore?.name);
     const [aProfile] = await db
       .select()
       .from(schema.userProfile)
