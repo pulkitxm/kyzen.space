@@ -62,10 +62,13 @@ mock.module("@gamelobby/database", () => ({
     },
   },
   messages: {},
+  accountMerge: {},
   friends: {},
   notifications: {},
   db: {},
   schema: {},
+  invites: {},
+  generateInviteToken: () => "x".repeat(43),
   createDb: () => ({ db: {}, client: {} }),
 }));
 

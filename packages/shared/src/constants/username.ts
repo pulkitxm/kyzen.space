@@ -10,6 +10,7 @@ export const RESERVED_USERNAMES = new Set([
   "chat",
   "friends",
   "games",
+  "invite",
   "play",
   "profile",
   "settings",

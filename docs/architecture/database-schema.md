@@ -10,9 +10,9 @@ One decision dominates the design: **every game is stored in the same three gene
 
 There are no `tic_tac_toe` or `connect_four` tables. Every game - whatever its rules - lives in three tables:
 
-- **`game`** - one row per game, with a `game_state` JSONB blob (`schema.ts:98`)
-- **`move`** - an append-only log, one row per move, with a `move_data` JSONB blob (`schema.ts:133`)
-- **`game_player`** - one indexed row per seat (`schema.ts:148`)
+- **`game`** - one row per game, with a `game_state` JSONB blob (`schema.ts:100`)
+- **`move`** - an append-only log, one row per move, with a `move_data` JSONB blob (`schema.ts:135`)
+- **`game_player`** - one indexed row per seat (`schema.ts:150`)
 
 `game_state` / `config` / `move_data` are all typed `jsonb(...).$type<unknown>()` - the database is **deliberately ignorant** of what's inside. The truth about those blobs lives in each game's strict Zod `stateSchema` / `moveSchema` / `configSchema` (see [`games-core-schemas.md`](./games-core-schemas.md)), and the server validates the blob against those schemas before the engine ever sees it.
 
@@ -24,23 +24,23 @@ A Drizzle table is a `pgTable(name, columns, (t) => [constraints])` call. Each c
 
 | Piece | What it does | Example |
 | --- | --- | --- |
-| `pgTable("game", {…}, (t) => […])` | Declares a table: name, column map, optional index/constraint list. | `game` (`schema.ts:98`) |
+| `pgTable("game", {…}, (t) => […])` | Declares a table: name, column map, optional index/constraint list. | `game` (`schema.ts:100`) |
 | Column types | `text` / `uuid` / `integer` / `boolean` / `timestamp` / `jsonb` map to Postgres types. | `gameType: text("game_type")` |
 | `.primaryKey()` / `.defaultRandom()` | Primary key; server-side random `uuid` default. | `id: uuid("id").defaultRandom().primaryKey()` |
 | `.notNull()` / `.default(v)` / `.defaultNow()` | Nullability and SQL-side defaults. | `createdAt: timestamp(...).defaultNow().notNull()` |
-| `.$defaultFn(() => …)` | A **JS-side** default (runs in the app, not in SQL). | `code: text("code")...$defaultFn(() => generateGameCode())` (`schema.ts:102`); `createdAt: timestamp(...).$defaultFn(() => new Date())` (`schema.ts:50`) |
+| `.$defaultFn(() => …)` | A **JS-side** default (runs in the app, not in SQL). | `code: text("code")...$defaultFn(() => generateGameCode())` (`schema.ts:107`); `createdAt: timestamp(...).$defaultFn(() => new Date())` (`schema.ts:53`) |
 | `.references(() => t.col, { onDelete })` | Foreign key + delete behavior (`cascade` / `set null`). | `gameId: uuid(...).references(() => game.id, { onDelete: "cascade" })` |
 | `.$type<T>()` | **Compile-time-only** cast - narrows the TS type, with **no runtime check**. | `status: text("status").$type<GameStatus>()`; `gameState: jsonb(...).$type<unknown>()` |
-| `pgEnum(name, VALUES)` | A Postgres enum whose values come from a TS constant. | `themeEnum = pgEnum("app_theme", THEME_IDS)` (`schema.ts:38`) |
+| `pgEnum(name, VALUES)` | A Postgres enum whose values come from a TS constant. | `themeEnum = pgEnum("app_theme", THEME_IDS)` (`schema.ts:39`) |
 | `index()` / `unique()` | Table-level index / unique constraint (the third `pgTable` argument). | `unique("move_game_number_uq").on(t.gameId, t.moveNumber)` |
-| `typeof table.$inferSelect` | Drizzle's inferred row type - **asserted equal** to the hand-written row type in `@gamelobby/shared/types`. | `Expect<Equal<typeof game.$inferSelect, GameRow>>` (`drift-guard.ts:44`) |
+| `typeof table.$inferSelect` | Drizzle's inferred row type - **asserted equal** to the hand-written row type in `@gamelobby/shared/types`. | `Expect<Equal<typeof game.$inferSelect, GameRow>>` (`drift-guard.ts:48`) |
 
 Two of these carry real weight:
 
-- **`$type<…>()` is a cast, not a guard.** `status`, `seatingMode`, `kind`, `role`, etc. are stored as plain `text` narrowed to a TS union (e.g. `GameStatus`, used at `schema.ts:107`); `game_state` is `jsonb` narrowed to `unknown`. Postgres will not stop you writing an illegal value - the repository is responsible for only inserting legal ones, and a JSONB blob stays untrusted until a Zod `safeParse`.
-- **pgEnums are derived from app constants.** `app_theme` / `color_mode` / `app_pattern` (`schema.ts:38`–`40`) take their values from `THEME_IDS` / `COLOR_MODES` / `PATTERN_IDS` in `@gamelobby/shared/constants`, so the DB enum can never disagree with the app's notion of valid values. They back `userProfile.theme` / `colorMode` / `pattern`.
+- **`$type<…>()` is a cast, not a guard.** `status`, `seatingMode`, `kind`, `role`, etc. are stored as plain `text` narrowed to a TS union (e.g. `GameStatus`, used at `schema.ts:109`); `game_state` is `jsonb` narrowed to `unknown`. Postgres will not stop you writing an illegal value - the repository is responsible for only inserting legal ones, and a JSONB blob stays untrusted until a Zod `safeParse`.
+- **pgEnums are derived from app constants.** `app_theme` / `color_mode` / `app_pattern` (`schema.ts:39`–`41`) take their values from `THEME_IDS` / `COLOR_MODES` / `PATTERN_IDS` in `@gamelobby/shared/constants`, so the DB enum can never disagree with the app's notion of valid values. They back `userProfile.theme` / `colorMode` / `pattern`.
 
-Unlike most Drizzle setups, the `*Row` types are **not** derived with `$inferSelect`. They are hand-written interfaces in `@gamelobby/shared/types` (`types/db/index.ts:39`+) so that `apps/web` - which never imports `@gamelobby/database` (drizzle-orm + `postgres` are server-only) - can still speak the same row shapes. `drift-guard.ts` closes the loop: a list of `Expect<Equal<typeof table.$inferSelect, XRow>>` assertions (`drift-guard.ts:39`) is a compile-time tripwire that fails `type-check` the moment a table and its hand-written row type disagree. `@gamelobby/database` then re-exports those row types so they remain the currency the data-access layer speaks.
+Unlike most Drizzle setups, the `*Row` types are **not** derived with `$inferSelect`. They are hand-written interfaces in `@gamelobby/shared/types` (`types/db/index.ts:39`+) so that `apps/web` - which never imports `@gamelobby/database` (drizzle-orm + `postgres` are server-only) - can still speak the same row shapes. `drift-guard.ts` closes the loop: a list of `Expect<Equal<typeof table.$inferSelect, XRow>>` assertions (`drift-guard.ts:43`) is a compile-time tripwire that fails `type-check` the moment a table and its hand-written row type disagree. `@gamelobby/database` then re-exports those row types so they remain the currency the data-access layer speaks.
 
 ## The tables
 
@@ -85,14 +85,14 @@ export const game = pgTable(
 );
 ```
 
-**Two identifiers, one public.** `id` is the internal `uuid` primary key - it is the FK target for `move.game_id` / `game_player.game_id` and is used for every DB write, but it is **never** serialized to clients. `code` is the **public** identifier: a short, shareable, human-friendly room code (e.g. `K7P2QX`) generated app-side by `$defaultFn(() => generateGameCode())` (from `@gamelobby/shared/types`, imported at `schema.ts:23`) and pinned unique by the `game_code_uq` constraint. `serializeGame` sets `GameJson.id = row.code`, so URLs (`/play/<code>`) and socket payloads (`join_room` / `make_move`) carry the code, never the UUID. Because the code is randomly allocated it can collide, so `createGame` wraps its insert in a retry loop that catches a `game_code_uq` unique violation and re-rolls (see [`database.md`](./database.md)); `getGameByCode` resolves a game by code (normalizing first). See [`generic-game-schema.md`](./generic-game-schema.md) for the full public-code/internal-id story.
+**Two identifiers, one public.** `id` is the internal `uuid` primary key - it is the FK target for `move.game_id` / `game_player.game_id` and is used for every DB write, but it is **never** serialized to clients. `code` is the **public** identifier: a short, shareable, human-friendly room code (e.g. `K7P2QX`) generated app-side by `$defaultFn(() => generateGameCode())` (from `@gamelobby/shared/types`, imported at `schema.ts:24`) and pinned unique by the `game_code_uq` constraint. `serializeGame` sets `GameJson.id = row.code`, so URLs (`/play/<code>`) and socket payloads (`join_room` / `make_move`) carry the code, never the UUID. Because the code is randomly allocated it can collide, so `createGame` wraps its insert in a retry loop that catches a `game_code_uq` unique violation and re-rolls (see [`database.md`](./database.md)); `getGameByCode` resolves a game by code (normalizing first). See [`generic-game-schema.md`](./generic-game-schema.md) for the full public-code/internal-id story.
 
-**`seriesId` links a rematch series.** `seriesId` (`schema.ts:119`) is a nullable `uuid` **self-FK** to `game.id` (`onDelete: "set null"`), backed by the `game_series_idx` index (`schema.ts:129`). Its meaning is *the id of the first game in the series*: a brand-new game's series is itself (`createGame` generates the row id app-side with `randomUUID()` and defaults `seriesId` to that same id, `games.ts:34`/`:44`), and a rematch copies its parent's `seriesId`. So every game in a rematch series - root included - shares one `seriesId`, and the whole series is a single flat query (`WHERE series_id = X`, `getSeriesGames`) rather than a predecessor-pointer chain to walk. The `series_id` column stays nullable for FK-set-null safety, but in practice every game has one. See [`database.md`](./database.md) for `getSeriesGames` / `findLiveGameInConversation` and [`realtime.md`](./realtime.md) for the rematch flow.
+**`seriesId` links a rematch series.** `seriesId` (`schema.ts:121`) is a nullable `uuid` **self-FK** to `game.id` (`onDelete: "set null"`), backed by the `game_series_idx` index (`schema.ts:131`). Its meaning is *the id of the first game in the series*: a brand-new game's series is itself (`createGame` generates the row id app-side with `randomUUID()` and defaults `seriesId` to that same id, `games.ts:34`/`:44`), and a rematch copies its parent's `seriesId`. So every game in a rematch series - root included - shares one `seriesId`, and the whole series is a single flat query (`WHERE series_id = X`, `getSeriesGames`) rather than a predecessor-pointer chain to walk. The `series_id` column stays nullable for FK-set-null safety, but in practice every game has one. See [`database.md`](./database.md) for `getSeriesGames` / `findLiveGameInConversation` and [`realtime.md`](./realtime.md) for the rematch flow.
 
 `move` and `game_player` add the constraints that make the generic model safe:
 
-- **`move`** (`schema.ts:133`) - `unique("move_game_number_uq").on(gameId, moveNumber)` keeps move numbers dense and unique per game, so the DB itself rejects a duplicate / double-submit. `onDelete: "cascade"` drops a game's move log with it. `move.game_id` references the UUID `game.id`, not the code.
-- **`game_player`** (`schema.ts:148`) - one row per seat (a normalization of the old `players` JSONB array). `unique("game_player_uq").on(gameId, userId)` makes it impossible to seat a user twice; `index("game_player_user_idx").on(userId)` turns "all games for this user" into a fast indexed join. `seatOrder` preserves turn order; `role` is the engine's per-seat role string (`"X"` / `"O"`). Its `game_id` also references the UUID `game.id`.
+- **`move`** (`schema.ts:135`) - `unique("move_game_number_uq").on(gameId, moveNumber)` keeps move numbers dense and unique per game, so the DB itself rejects a duplicate / double-submit. `onDelete: "cascade"` drops a game's move log with it. `move.game_id` references the UUID `game.id`, not the code.
+- **`game_player`** (`schema.ts:150`) - one row per seat (a normalization of the old `players` JSONB array). `unique("game_player_uq").on(gameId, userId)` makes it impossible to seat a user twice; `index("game_player_user_idx").on(userId)` turns "all games for this user" into a fast indexed join. `seatOrder` preserves turn order; `role` is the engine's per-seat role string (`"X"` / `"O"`). Its `game_id` also references the UUID `game.id`.
 
 ### Auth, chat, social, profile
 
@@ -100,23 +100,25 @@ The remaining tables are conventional relational shapes - one line each:
 
 | Table | `schema.ts` | Notes |
 | --- | --- | --- |
-| `user` / `session` / `account` / `verification` | `:41`–`95` | The shape Better Auth expects; everything else FKs `user.id`. See [`auth.md`](./auth.md). |
-| `userProfile` | `:160` | One per user (`unique` FK): unique `username`, a `stats` JSONB (`ProfileStats`, column `:167`), `avatar` JSONB, the three pgEnum appearance columns, a `chatLayout` JSONB, `usernameChangedAt` (cooldown gate), `lastSeenAt` (presence). |
-| `conversation` / `conversationMember` | `:202` / `:221` | A `dm` or `group`; DMs carry a unique `dmKey`. Membership has per-member read state + a `leftAt` soft-leave; mirrors the `game_player` `unique + userId index` design. |
-| `message` | `:244` | `kind` (`text` / `game_card` / …), nullable `body`, a `metadata` JSONB, an optional `gameId` link (FK to the UUID `game.id` - but a `game_card`'s *serialized* `MessageJson.gameId` carries the game's public `code`, not this UUID; see [`chat-core.md`](./chat-core.md)), a `deletedAt` soft delete. The composite `(conversationId, createdAt)` index powers keyset pagination. |
-| `friendship` | `:179` | `requester` / `addressee` plus a sorted unique `pairKey` so direction doesn't duplicate; indexed `(addressee, status)` and `(requester, status)`. |
-| `notification` | `:268` | `userId`, `type`, optional `actorId`, a `payload` JSONB, `readAt` / `resolvedAt`; indexed `(userId, createdAt)` for the feed and `(userId, readAt)` for the unread badge. |
+| `user` / `session` / `account` / `verification` | `:43`–`98` | The shape Better Auth expects (`user` also carries `is_anonymous boolean NOT NULL DEFAULT false`, `schema.ts:51`, for guest identities); everything else FKs `user.id`. See [`auth.md`](./auth.md). |
+| `userProfile` | `:169` | One per user (`unique` FK): unique `username`, a `stats` JSONB (`ProfileStats`, column `:176`), `avatar` JSONB, the three pgEnum appearance columns, a `chatLayout` JSONB, `usernameChangedAt` (cooldown gate), `lastSeenAt` (presence). |
+| `conversation` / `conversationMember` | `:211` / `:230` | A `dm` or `group`; DMs carry a unique `dmKey`. Membership has per-member read state + a `leftAt` soft-leave; mirrors the `game_player` `unique + userId index` design. |
+| `message` | `:253` | `kind` (`text` / `game_card` / …), nullable `body`, a `metadata` JSONB, an optional `gameId` link (FK to the UUID `game.id` - but a `game_card`'s *serialized* `MessageJson.gameId` carries the game's public `code`, not this UUID; see [`chat-core.md`](./chat-core.md)), a `deletedAt` soft delete. The composite `(conversationId, createdAt)` index powers keyset pagination. |
+| `friendship` | `:188` | `requester` / `addressee` plus a sorted unique `pairKey` so direction doesn't duplicate; indexed `(addressee, status)` and `(requester, status)`. |
+| `notification` | `:277` | `userId`, `type`, optional `actorId`, a `payload` JSONB, `readAt` / `resolvedAt`; indexed `(userId, createdAt)` for the feed and `(userId, readAt)` for the unread badge. |
+| `accountMerge` | `:302` | The anon-to-real merge ledger (guest identity, Phase 1). `anonUserId` / `targetUserId` (both plain `text`, no FK - the anon row may be deleted by the merge itself), a `status` text union (`pending` / `confirmed` / `discarded`, default `pending`), `createdAt`, nullable `resolvedAt`; indexed `(targetUserId, status)` so the pending-merge lookup is a single index hit. Written by Better Auth's `onLinkAccount` (`accountMerge.recordPending`) and resolved by the `/api/account/merge/*` endpoints. |
+| `gameInvite` | `:320` | The invite-link store (guest identity, Phase 3). A unique `token` (`game_invite_token_uq`; a 43-char base64url string from `crypto.randomBytes(32)`, **not** the 6-char `game.code` - unguessable so a link can't be brute-forced), `inviterUserId` (FK `user.id`, `ON DELETE cascade`), `gameType`, a nullable `config` JSONB, a nullable `seatingMode` text, `expiresAt` (defaults to now + 24h), `createdAt`; indexed `(inviterUserId)`. Links are reusable until expiry (each acceptance spins up a fresh game). Only the `invites` repository touches it. |
 
 ## Migrations: generate vs. push
 
 `drizzle.config.ts` (`:4`) wires drizzle-kit: `dialect: "postgresql"`, `schema: "./packages/database/src/schema.ts"`, `out: "./packages/database/drizzle"`, `strict: true`.
 
 - **`bun run db:generate`** diffs the schema and emits a numbered SQL migration into `packages/database/drizzle` (the repo has `0000_*.sql` … `0007_*.sql`). **`bun run db:migrate`** runs `packages/database/src/migrate.ts` (`:7`), which applies that folder against `db` and exits.
-- **The local dev DB is push-managed.** It was set up with **`bun run db:push`** (drizzle-kit applies the schema directly, leaving the migration ledger empty), so `db:migrate` has no baseline to apply locally - apply schema/enum changes in dev with `db:push` or direct SQL. The numbered migrations exist for reproducible / prod-style application.
+- **The local dev DB is push-managed.** It was set up with **`bun run db:push`** (drizzle-kit applies the schema directly, leaving the migration ledger empty), so `db:migrate` has no baseline to apply locally - apply schema/enum changes in dev with `db:push` or direct SQL. The numbered migrations exist for reproducible / prod-style application. (The guest-identity additions - `user.is_anonymous` at `schema.ts:51`, the `account_merge` table, and the `game_invite` table - were applied this way with `db:push --force`; there are no matching numbered migration files. CI provisions the schema the same way.)
 
 ## Gotchas & invariants
 
-- **`game_state` / `config` / `move_data` are `unknown` by design.** The DB neither knows nor checks their shape; validity is owned by the game's Zod schemas and enforced at the realtime boundary (`apps/server/src/realtime/turn-based.ts:145`). Treat any `gameState` you read as untrusted until `safeParse`'d.
+- **`game_state` / `config` / `move_data` are `unknown` by design.** The DB neither knows nor checks their shape; validity is owned by the game's Zod schemas and enforced at the realtime boundary (`apps/server/src/realtime/turn-based.ts:149`). Treat any `gameState` you read as untrusted until `safeParse`'d.
 - **`$type<…>()` is compile-time only.** `status`, `seatingMode`, `kind`, `role`, etc. are plain `text`; Postgres will not reject an out-of-union value - the repository must only write legal ones.
 - **`game` has two ids: a private UUID and a public `code`.** `id` (uuid PK) is internal - the FK target for `move` / `game_player` and used for all writes - and is never serialized. `code` (`game_code_uq`, `$defaultFn(generateGameCode)`) is the public, shareable room id that appears in URLs and socket payloads (`serializeGame` sets `GameJson.id = row.code`). Resolve by code with `getGameByCode`; `createGame` retries on a `game_code_uq` collision.
 - **`game.seriesId` is a self-FK that defaults to the row's own id.** A fresh game's `seriesId` is set app-side to its own `randomUUID()` id; a rematch copies its parent's `seriesId` (`games.ts:44`). It is the id of the *first* game in the series, so a rematch series is `WHERE series_id = X` - never a chain walk. Don't reintroduce a predecessor pointer.
@@ -127,6 +129,7 @@ The remaining tables are conventional relational shapes - one line each:
 - **Row types are hand-written and drift-guarded.** Change a column and you must change its `*Row` type in `@gamelobby/shared/types`; `drift-guard.ts` fails `type-check` if `$inferSelect` and the hand-written type diverge.
 - **Dev DB is push-managed.** Use `db:push` (or direct SQL) for local schema/enum changes; `db:migrate` expects a baseline the push-managed DB doesn't have.
 - **No per-game tables, ever.** Adding a game is a `packages/` change; this file does not change.
+- **`game_player.userId` / `move.playerId` have no FK, so a user delete does not cascade to them.** The `accountMerge` repository scrubs them explicitly: `mergeAccounts` re-points both anon→target before deleting the anon `user`, and `deleteAnonUserData` (the discard path) deletes the anon's seats and moves directly, deleting only the games where the anon was the *sole* participant so a real opponent's match history survives.
 
 ## Where to go next
 

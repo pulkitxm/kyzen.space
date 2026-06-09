@@ -45,11 +45,14 @@ mock.module("@gamelobby/database", () => ({
     getPublicUsers: async () => [],
   },
   messages: { getGameCardByGameId: async () => null },
+  accountMerge: {},
   conversations: {},
   friends: {},
   notifications: {},
   db: {},
   schema: {},
+  invites: {},
+  generateInviteToken: () => "x".repeat(43),
   createDb: () => ({ db: {}, client: {} }),
 }));
 

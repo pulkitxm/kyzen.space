@@ -2,10 +2,12 @@ export type {
   ConversationMemberRow,
   ConversationRow,
   CreateGameInput,
+  CreateGameInviteInput,
   CreateMessageInput,
   CreateNotificationInput,
   CreateProfileInput,
   FriendshipRow,
+  GameInviteRow,
   GamePlayer,
   GamePlayerRow,
   GameRecord,
@@ -22,9 +24,12 @@ export type {
   UserProfileRow,
 } from "@gamelobby/shared/types";
 export { createDb, type DB, db, schema } from "./client";
+export { generateInviteToken } from "./invite-token";
+export * as accountMerge from "./repositories/account-merge";
 export * as conversations from "./repositories/conversations";
 export * as friends from "./repositories/friends";
 export * as games from "./repositories/games";
+export * as invites from "./repositories/invites";
 export * as messages from "./repositories/messages";
 export * as notifications from "./repositories/notifications";
 export * as profiles from "./repositories/profiles";

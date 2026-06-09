@@ -40,6 +40,25 @@ export const clientMakeMoveSchema = z
   .strict();
 export type ClientMakeMove = z.infer<typeof clientMakeMoveSchema>;
 
+export const clientQueueJoinSchema = z
+  .object({
+    gameType: gameTypeSchema,
+    config: z.unknown().optional(),
+  })
+  .strict();
+export type ClientQueueJoin = z.infer<typeof clientQueueJoinSchema>;
+
+export const clientQueueLeaveSchema = z
+  .object({
+    gameType: gameTypeSchema,
+  })
+  .strict();
+export type ClientQueueLeave = z.infer<typeof clientQueueLeaveSchema>;
+
+export type ServerMatchFoundPayload = {
+  gameId: string;
+};
+
 export const gameJsonSchema = z.object({
   id: z.string(),
   gameType: gameTypeSchema,

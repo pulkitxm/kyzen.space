@@ -23,10 +23,12 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 | `apps/server/src/api/middleware/auth.ts` | `requireAuth` middleware + `AuthEnv`: reads the Better Auth session from request headers, `401`s when absent, and stashes `userId`/`user`/`session` on the context. |
 | `apps/server/src/api/auth-context.ts` | `readJson(c)` (safe body parse). |
 | `apps/server/src/api/serialize.ts` | Pure row -> DTO mappers (`serializeGame`, `serializeMove`, `serializeMessage`, `serializeConversation`, `serializeSeries`, …). The `Date -> ISO string` boundary. |
-| `apps/server/src/api/routes/account.ts` | Session management built on Better Auth: list/sign-out/revoke sessions. |
+| `apps/server/src/api/routes/account.ts` | Session management built on Better Auth (list/sign-out/revoke sessions) plus the anon-to-real merge endpoints `GET /merge/pending`, `POST /merge/:id/confirm`, `POST /merge/:id/discard` (each `requireAuth` + an ownership assert). |
 | `apps/server/src/api/routes/conversations.ts` | The largest router: list/create DMs & groups, messages, read receipts, members, rename, and `POST /:id/games`. Resolution for friendly URLs: `GET /with/:username` (→ DM) and `GET /group/:name` (→ group, member-gated). Group names are unique (enforced on create + rename in `conversations-service.ts`), so a name resolves to one group; `GET /:id` remains for internal id fetches. |
 | `apps/server/src/api/routes/friends.ts` | Friends list, pending requests, user search with friend-state, send/accept/decline/remove. |
 | `apps/server/src/api/routes/games.ts` | The two game REST reads: `GET /:gameId` (serialized game + its moves) and `GET /:gameId/series` (the rematch series via `serializeSeries` + `computeSeriesScore`). |
+| `apps/server/src/api/routes/invite.ts` | Invite links (guest identity, Phase 3): authed `POST /invite` (mint a link), public `GET /invite/:token` (privacy-safe peek), and public `POST /invite/:token/accept` (mints an anonymous session when the opener is logged out, then joins). |
+| `apps/server/src/chat/invite-service.ts` | `createInvite` / `peekInvite` / `acceptInvite`: token minting + TTL, the uniform unknown/expired response, the self-invite no-op, the per-inviter accept rate limit, and the privacy-safe `{ username, avatar }` inviter projection. |
 | `apps/server/src/api/routes/gifs.ts` | Proxy to the Klipy GIF provider: trending + search, with limit/offset clamping. |
 | `apps/server/src/api/routes/messages.ts` | `DELETE /:id` (soft-delete a message). |
 | `apps/server/src/api/routes/notifications.ts` | List / unread-count / mark-read / read-all. |
@@ -86,7 +88,7 @@ Things to notice (`apps/server/src/index.ts:10`):
 
 Two username vars feed profile editing: `NOT_ALLOWED_USERNAMES` (a comma-separated blocklist parsed by `parseUsernameCsv` from `username-rules.ts` into `env.notAllowedUsernames`) and `USERNAME_CHANGE_COOLDOWN_DAYS` (default `30`, `0` disables the cooldown). Both are optional. The realtime layer adds its own optional vars: `REDIS_URL` (enables the Socket.IO Redis adapter and the Redis-backed presence store), `PUBLIC_REALTIME_URL`, and the presence-timer tunables `PRESENCE_HEARTBEAT_MS` (default `10000`), `PRESENCE_STALE_MS` (default `25000`), and `PRESENCE_LASTSEEN_PERSIST_MS` (default `60000`) - see [realtime.md](./realtime.md).
 
-`googleConfigured()` (`apps/server/src/env.ts:58`) returns whether both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. This is the gate `auth.ts` uses to decide whether to register the Google social provider at all (`apps/server/src/auth.ts:15`) - Google OAuth is optional, so a dev `.env` without Google keys still boots with email/session auth.
+`googleConfigured()` (`apps/server/src/env.ts:58`) returns whether both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. This is the gate `auth.ts` uses to decide whether to register the Google social provider at all (`apps/server/src/auth.ts:40`) - Google OAuth is optional, so a dev `.env` without Google keys still boots with email/session auth.
 
 Per the repo's CLAUDE.md, Turbo declares all env vars in `globalEnv`; adding a new var here without adding it to `turbo.json` means builds won't see it.
 
@@ -106,19 +108,20 @@ export const app = new Hono<LoggerEnv>()
   .route("/conversations", conversationsRouter)
   .route("/messages", messagesRouter)
   .route("/notifications", notificationsRouter)
+  .route("/invite", inviteRouter)
   .route("/gifs", gifsRouter);
 ```
 
-Key points (`apps/server/src/api/index.ts:14`):
+Key points (`apps/server/src/api/index.ts:15`):
 
 - **`basePath("/api")`** means every mounted route is implicitly prefixed, e.g. `conversationsRouter`'s `.get("/")` becomes `GET /api/conversations`. The Express regex forwards `/api/*` here, so the prefixes line up exactly.
-- **Better Auth is a catch-all sub-app.** `authApp` (`apps/server/src/api/index.ts:14`) forwards *every* method+path under `/api/auth/*` straight into Better Auth's own handler via `getAuth().handler(c.req.raw)`. Better Auth implements its own routing internally (sign-in, OAuth callback, session, etc.), so the server just gives it the raw web `Request`. The session cookie it sets is what every other route later reads.
+- **Better Auth is a catch-all sub-app.** `authApp` (`apps/server/src/api/index.ts:15`) forwards *every* method+path under `/api/auth/*` straight into Better Auth's own handler via `getAuth().handler(c.req.raw)`. Better Auth implements its own routing internally (sign-in, OAuth callback, session, etc.), so the server just gives it the raw web `Request`. The session cookie it sets is what every other route later reads.
 - **Router-per-feature.** Each domain is an isolated `Hono` instance imported and `.route()`-mounted. This keeps each file small and lets routers carry their own typed env (`gamesRouter` is `new Hono<LoggerEnv>()`, `apps/server/src/api/routes/games.ts:8`).
-- **One global error boundary.** `app.onError` (`apps/server/src/api/index.ts:29`) catches any thrown error, logs it with the request-scoped logger if present (`c.get("log") ?? logger`), and returns a generic `500` - never leaking internals to the client.
+- **One global error boundary.** `app.onError` (`apps/server/src/api/index.ts:31`) catches any thrown error, logs it with the request-scoped logger if present (`c.get("log") ?? logger`), and returns a generic `500` - never leaking internals to the client.
 
 ### Request logging middleware (`middleware/logger.ts`)
 
-`requestLogger` runs first for every `/api/*` request (`apps/server/src/api/index.ts:18`). It mints or reuses a request id (`x-request-id`), attaches a pino **child logger** carrying that id to the Hono context as `log`, echoes the id back in the response header, then times the handler:
+`requestLogger` runs first for every `/api/*` request (`apps/server/src/api/index.ts:19`). It mints or reuses a request id (`x-request-id`), attaches a pino **child logger** carrying that id to the Hono context as `log`, echoes the id back in the response header, then times the handler:
 
 ```ts
 export const requestLogger: MiddlewareHandler<LoggerEnv> = async (c, next) => {
@@ -159,7 +162,32 @@ const userId = c.get("userId");
 
 Routers whose every route needs a session apply it once at the top - `new Hono<AuthEnv>().use("*", requireAuth)` - covering `conversations`, `friends`, `messages`, `notifications`, and `gifs`. `profiles` is **mixed**: the authenticated `/me*` routes opt in per-route (`.put("/me/avatar", requireAuth, …)`) while the public ones (`GET /api/profiles/:username`, `apps/server/src/api/routes/profiles.ts`) stay open. `games` (`GET /api/games/:gameId`) is intentionally public and applies nothing.
 
-Two surfaces deliberately keep their own `getSession` calls instead of `requireAuth`: Better Auth owns `/api/auth/*` end-to-end, and `account` (`apps/server/src/api/routes/account.ts`) is session-management itself - it reads the `session` token, calls `listSessions`/`revokeSession`, and signs out, so the session object is its domain payload, not just a gate.
+Two surfaces deliberately keep their own `getSession` calls instead of `requireAuth`: Better Auth owns `/api/auth/*` end-to-end, and `account` (`apps/server/src/api/routes/account.ts`) is session-management itself - the `/sessions`, `/sign-out`, and `/revoke-*` handlers read the `session` token, call `listSessions`/`revokeSession`, and sign out, so the session object is its domain payload, not just a gate.
+
+The account router additionally owns the anon-to-real account merge (guest identity, Phase 1), and those three routes **do** use `requireAuth` scoped to just the `/merge/*` paths:
+
+- **`GET /api/account/merge/pending`** returns the caller's pending merge row (if any) plus a **counts-only** summary from `accountMerge.summarizeAnonAccount` - games / conversations / friends / stat-line counts and the target's own email, and deliberately **never** raw messages, identities, or the anonymous account's throwaway temp email.
+- **`POST /api/account/merge/:id/confirm`** runs `accountMerge.mergeAccounts` then marks the row `confirmed`.
+- **`POST /api/account/merge/:id/discard`** runs `accountMerge.deleteAnonUserData` then marks the row `discarded`.
+
+Both mutating routes assert `c.get("userId") === row.targetUserId` and return **403** otherwise (a user can only act on a merge targeting their own account), **404** when the row is missing, and **409** when it is already resolved (the merge is idempotent - only a `pending` row is actionable). The anon id is only ever supplied by the server's own `onLinkAccount` recorder, never by the client.
+
+### Invite links (`routes/invite.ts` + `chat/invite-service.ts`)
+
+The invite router (`apps/server/src/api/routes/invite.ts`) backs the share-a-link flow (guest identity, Phase 3) with three endpoints - **one authed, two public** - each delegating to `invite-service.ts`:
+
+- **`POST /api/invite`** (`requireAuth`, `invite.ts:13`) mints a link. It narrows the client `gameType` with `gameTypeSchema.safeParse` (`400 Invalid game type` on a miss), then calls `createInvite({ inviterUserId, gameType, config })` (`invite-service.ts:45`) which generates a 43-char base64url token (`generateInviteToken`), persists a `game_invite` row with a 24h TTL, and returns `{ token, url }` where `url` is `${env.webUrl}/invite/<token>` (`invite-service.ts:60`).
+- **`GET /api/invite/:token`** (**public**, `invite.ts:26`) is the privacy-safe **peek**: `peekInvite(token)` (`invite-service.ts:64`) loads the row and, on an unknown **or** expired token, returns the **identical** `{ gameType: null, inviter: null, expired: true }` - so the response is not an enumeration oracle (you can't tell "never existed" from "expired"). For a live invite it returns `{ gameType, inviter: { username, avatar }, expired: false }` - only the inviter's **username and avatar**, never their email or user id.
+- **`POST /api/invite/:token/accept`** (**public**, `invite.ts:30`) joins the opener to the game. If the request carries a logged-in Better Auth session it uses that user id; otherwise it mints an **anonymous** session server-side via `auth.api.signInAnonymous({ headers, returnHeaders: true })` and appends each minted `Set-Cookie` to the response (`invite.ts:39`) - so a brand-new visitor gets a guest identity in one round trip (see [auth.md](./auth.md)). It then calls `acceptInvite(token, accepterUserId)`.
+
+`acceptInvite` (`invite-service.ts:79`) encodes the safety rules:
+
+- **Unknown / expired** → `fail("Invite not found or expired", 404)` (`invite-service.ts:90`), the same uniform answer as the peek.
+- **Self-invite no-op** → if the accepter is the inviter, it returns `ok({ gameId: null, selfInvite: true, inviter })` without creating a game (`invite-service.ts:99`), so an inviter opening their own link doesn't spawn a useless game against themselves.
+- **Per-inviter rate limit** → a sliding 60s window allows at most `ACCEPT_MAX_PER_WINDOW = 20` accepts per inviter (`acceptAllowed`, `invite-service.ts:31`); exceeding it returns `fail("Too many invites accepted, try again shortly", 409)`. This bounds how fast one shared link can fan out games.
+- Otherwise it `getOrCreateDm`s the inviter↔accepter conversation, spawns a `challenge`-seated game through the shared `createGameInConversation` service (so it inherits the one-live guard and config validation), `notify`s the inviter with a `game_invite` notification, and returns `ok({ gameId, selfInvite: false, inviter })`.
+
+The token itself is **not** the 6-char `game.code` - it is a long random secret minted by `generateInviteToken` and validated for minimum length by the `invites` repository (see [database.md](./database.md)). Because the accept route is public and can mint a session, it lives outside `requireAuth`; the peek is public so an unauthenticated opener can render the inviter's name before deciding to join.
 
 `readJson(c)` (`apps/server/src/api/auth-context.ts`) is the body helper: it `try/catch`-parses the JSON body and returns `null` on failure or a non-object, so routes write `const body = await readJson(c)` and then defensively pull fields. `isUuid(value)` (`apps/server/src/lib/uuid.ts`) is the shared UUID guard used by the conversation routes; the **game** route and the realtime game lane instead validate the public room **code** with `isGameCode` (`@gamelobby/shared/types`).
 
@@ -233,9 +261,9 @@ The division of labor:
 
 - **Services (`chat/*`) own the business rules** and any side effects (DB writes, socket emits, notifications). For example `createDm` (`apps/server/src/chat/conversations-service.ts:28`) enforces "you can only DM friends" (`fail("You can only message friends", 403)`), creates-or-gets the DM, and *fans the new conversation out over the socket* to both members before returning a DTO. The route knows none of this.
 
-- **Repositories (imported as namespaces like `conversations`, `friends`, `games` from `@gamelobby/database`)** are the only code that touches Drizzle/SQL. Services call `conversations.getOrCreateDm(...)`, `friends.areFriends(...)`, etc. The repository layer is re-exported from `packages/database/src/index.ts` (`export * as games from "./repositories/games"` and friends, `packages/database/src/index.ts:27`).
+- **Repositories (imported as namespaces like `conversations`, `friends`, `games` from `@gamelobby/database`)** are the only code that touches Drizzle/SQL. Services call `conversations.getOrCreateDm(...)`, `friends.areFriends(...)`, etc. The repository layer is re-exported from `packages/database/src/index.ts` (`export * as games from "./repositories/games"` and friends, `packages/database/src/index.ts:31`).
 
-Why a hand-rolled `Result` type instead of throwing? Three reasons. (1) **The HTTP status is part of the domain answer** - "not your request" is a 403, "already friends" is a 409 - and encoding it in the return value keeps that decision next to the rule that produced it. (2) **The same service is called from two transports**: `createGameInConversation` is invoked from the REST route (`apps/server/src/api/routes/conversations.ts:129`) *and* from a socket handler (`apps/server/src/realtime/games-in-chat.ts:15`); a thrown exception would have to be caught and re-mapped in two places, whereas a `ServiceResult` is just inspected with `if (!res.ok)`. (3) **Expected failures stay off the exception path**, so the global `onError` boundary is reserved for genuinely unexpected bugs.
+Why a hand-rolled `Result` type instead of throwing? Three reasons. (1) **The HTTP status is part of the domain answer** - "not your request" is a 403, "already friends" is a 409 - and encoding it in the return value keeps that decision next to the rule that produced it. (2) **The same service is called from two transports**: `createGameInConversation` is invoked from the REST route (`apps/server/src/api/routes/conversations.ts:139`) *and* from a socket handler (`apps/server/src/realtime/games-in-chat.ts:15`); a thrown exception would have to be caught and re-mapped in two places, whereas a `ServiceResult` is just inspected with `if (!res.ok)`. (3) **Expected failures stay off the exception path**, so the global `onError` boundary is reserved for genuinely unexpected bugs.
 
 ### Assemblers: the read-side hydration layer (`assemble.ts`)
 
@@ -283,7 +311,7 @@ The one game read the web added for the rematch feature resolves the `:gameId` *
 
 - **Creation** goes through `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:66`). That service is reachable two ways - `POST /api/conversations/:id/games` (`apps/server/src/api/routes/conversations.ts:130`) for the "create a game in this chat" REST action, and the `CHAT_EVENTS.createGameInConversation` socket event (`apps/server/src/realtime/games-in-chat.ts:15`). Both transports first narrow the client-supplied `gameType` to a registered game: the REST route does `gameTypeSchema.safeParse(body?.gameType)` (`apps/server/src/api/routes/conversations.ts:135`, the registry-backed `z.enum` exported from `@gamelobby/shared/types`) and returns `400 Unsupported game type` on a miss, so the service's `gameType` parameter is a typed `GameType`, not a free-form string. The service then enforces the **one-live-game-per-`(conversation, gameType)`** rule - `findLiveGameInConversation` short-circuits to an existing `waiting | active` game rather than creating a duplicate - before validating the config with the game's own Zod schema, seeding the initial state from the engine, persisting, and posting a game-card message. Its result is `{ game; message? }` (no new `message` on a short-circuit). It is *not* a generic game-resource POST; it's a chat action that happens to spawn (or resume) a game.
 - **Rematch** also goes over the socket, not REST: `CHAT_EVENTS.rematch` → `rematchGame` (`apps/server/src/chat/games-in-chat-service.ts:150`) re-spawns a finished game into the same series (shared `seriesId`) with both players pre-seated in loser-first order, applies the same one-live guard, and emits `rematchCreated` to the old game's room. See [realtime.md](./realtime.md).
-- **Playing** (making moves) happens exclusively over the socket `make_move` event (`apps/server/src/realtime/index.ts:98`), routed through a driver that re-validates the move and stored state against the game's Zod schemas before applying `reduce`. A move is inherently a low-latency, broadcast-to-the-room operation; modeling it as an idempotent HTTP resource would be the wrong shape and would also bypass the realtime fan-out every other player needs.
+- **Playing** (making moves) happens exclusively over the socket `make_move` event (`apps/server/src/realtime/index.ts:74`), routed through a driver that re-validates the move and stored state against the game's Zod schemas before applying `reduce`. A move is inherently a low-latency, broadcast-to-the-room operation; modeling it as an idempotent HTTP resource would be the wrong shape and would also bypass the realtime fan-out every other player needs.
 - **Reading** is the one thing that genuinely benefits from a plain request/response: the web app's `/play/[gameId]` page does an SSR/RSC fetch of the current game + move history to render the board before the socket connects. That's exactly what this endpoint serves. The `:gameId` path param is the game's public room **code**, so the route guards with `isGameCode` (cheap rejection of garbage) and resolves via `getGameByCode`, returning `404` for unknown codes so it never leaks whether an id format is valid-but-missing vs. malformed.
 
 In short: HTTP is for fetching durable, cacheable read state; the socket is for the live, authoritative, broadcast lifecycle. The same engine and schemas back both lanes, so neither lane trusts the client.
@@ -318,7 +346,7 @@ if (!parsedConfig.success) return fail("Invalid game config", 400);
 
 ### How services reach the socket without an `io` parameter
 
-Services emit realtime events, but they're plain async functions with no `io` argument. They get the live server via the module-level singleton `getIO()` (`apps/server/src/realtime/io.ts:9`), which `attachRealtime` populated with `setIO(io)` at startup (`apps/server/src/realtime/index.ts:32`). Services guard with `const io = getIO(); if (io) { ... }` so they remain callable in unit tests where no socket server exists. Room targeting goes through the helpers in `apps/server/src/realtime/rooms.ts` - `emitToConv`, `emitToUser`, `emitToGame` - which encode the room-naming convention (`conv:<id>`, `user:<id>`, `game:<id>`).
+Services emit realtime events, but they're plain async functions with no `io` argument. They get the live server via the module-level singleton `getIO()` (`apps/server/src/realtime/io.ts:9`), which `attachRealtime` populated with `setIO(io)` at startup (`apps/server/src/realtime/index.ts:36`). Services guard with `const io = getIO(); if (io) { ... }` so they remain callable in unit tests where no socket server exists. Room targeting goes through the helpers in `apps/server/src/realtime/rooms.ts` - `emitToConv`, `emitToUser`, `emitToGame` - which encode the room-naming convention (`conv:<id>`, `user:<id>`, `game:<id>`).
 
 ## The GIF proxy (`gifs.ts` + `services/gif-provider.ts`)
 
@@ -330,7 +358,7 @@ The GIF routes are a thin, auth-gated proxy to Klipy. `gifsRouter` (`apps/server
 
 - **theme** - the `THEME_IDS` tuple (`packages/shared/src/constants/theme.ts:3`) + `COLOR_MODES` + `isValidTheme`/`isValidColorMode` guards (`z.enum(...).safeParse`, `packages/shared/src/types/theme.ts:10`).
 - **pattern** - `PATTERN_IDS` (`packages/shared/src/constants/pattern.ts:3`) + `isValidPattern` (`packages/shared/src/types/pattern.ts:7`).
-- **chat layout** - `validateChatModePref` (`packages/shared/src/types/chat-layout.ts:16`) coerces arbitrary input to `{ mode: "popout" | "mounted" }`.
+- **chat layout** - `validateChatModePref` (`packages/shared/src/types/chat-layout.ts:10`) coerces arbitrary input to `{ mode: "popout" | "mounted" }`.
 
 `PUT /api/profiles/me/appearance` (`apps/server/src/api/routes/profiles.ts:92`) applies these guards field-by-field, building a partial `patch` and rejecting unknown values with `400 Invalid theme` / `Invalid colorMode` / `Invalid pattern`, and a `400 Nothing to update` if the body changes nothing. The avatar route validates with `validateAvatarConfig` from `@gamelobby/avatar` (`apps/server/src/api/routes/profiles.ts:145`). These are exported pure functions specifically so they're unit-testable without HTTP, matching the repo's test conventions.
 
@@ -364,7 +392,7 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 
 ## Gotchas, invariants & conventions
 
-- **`/api` prefix lives in two places that must agree.** Express forwards `^/api(/.*)?$` (`apps/server/src/index.ts:24`) and Hono declares `basePath("/api")` (`apps/server/src/api/index.ts:17`). Route files use *un-prefixed* paths (`.get("/")`, `.get("/:id")`) - the prefix is added by the basePath, not by the router.
+- **`/api` prefix lives in two places that must agree.** Express forwards `^/api(/.*)?$` (`apps/server/src/index.ts:24`) and Hono declares `basePath("/api")` (`apps/server/src/api/index.ts:18`). Route files use *un-prefixed* paths (`.get("/")`, `.get("/:id")`) - the prefix is added by the basePath, not by the router.
 - **Auth is `requireAuth` middleware, applied per router.** Fully-authed routers call `.use("*", requireAuth)` once at the top (so any route added to them is guarded by default); `profiles` opts in per-route on `/me*` and leaves its public routes open; `games` is public. A *new* router is only protected if it applies the middleware - declaring `Hono<AuthEnv>` types `c.get("userId")` as `string`, but the runtime guarantee comes from the `.use`/per-route `requireAuth`, so the two must go together.
 - **Better Auth owns `/api/auth/*` entirely.** Don't add routes under that prefix - `authApp` (`apps/server/src/api/index.ts`) swallows all methods/paths there. To read the session elsewhere, go through `requireAuth` (or `getSession` directly, as `account` does for session management), never re-implement cookie parsing.
 - **`fail()`'s status is the HTTP status.** The route does `c.json({ error: res.error }, res.status)` verbatim, so a service returning the wrong `ErrorStatus` produces the wrong HTTP code. Statuses are constrained to the `ErrorStatus` union (`apps/server/src/chat/result.ts:1`) - you can't return a 418.
@@ -377,6 +405,7 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 - **Logs redact secrets.** The pino config (`apps/server/src/logger.ts:8`) redacts cookies/auth headers/`*.token`/`*.secret`. Don't log raw request headers expecting to see the session - it's `[redacted]`.
 - **`game_card` status is computed at read time.** It's merged in by `withGameCardStatus`/`enrichGameCardMeta` during assembly, not stored on the message row. When a game ends, push the updated card with `broadcastGameCard` (`apps/server/src/chat/game-card-broadcast.ts:7`).
 - **GIF and profile-config validation are intentionally allow-list based.** Reject unknown themes/patterns/layouts with `400`; clamp GIF limits; never pass user strings straight to the provider or DB.
+- **Invite peek/accept give a uniform "unknown-or-expired" answer.** Both `peekInvite` and `acceptInvite` collapse "no such token" and "expired token" into the same response so neither leaks whether a token ever existed. The peek returns only `{ username, avatar }` of the inviter (never email/id), the accept is a self-invite no-op for the inviter, and accepts are rate-limited per inviter. The accept route is public *because* it can mint an anonymous session for a logged-out opener; don't put it behind `requireAuth`.
 
 ## Where to go next
 

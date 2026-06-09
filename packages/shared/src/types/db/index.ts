@@ -42,8 +42,20 @@ export type UserRow = {
   email: string;
   emailVerified: boolean;
   image: string | null;
+  isAnonymous: boolean;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type AccountMergeStatus = "pending" | "confirmed" | "discarded";
+
+export type AccountMergeRow = {
+  id: string;
+  anonUserId: string;
+  targetUserId: string;
+  status: AccountMergeStatus;
+  createdAt: Date;
+  resolvedAt: Date | null;
 };
 
 export type SessionRow = {
@@ -196,6 +208,17 @@ export type NotificationRow = {
   createdAt: Date;
 };
 
+export type GameInviteRow = {
+  id: string;
+  token: string;
+  inviterUserId: string;
+  gameType: string;
+  config: unknown;
+  seatingMode: SeatingMode | null;
+  expiresAt: Date;
+  createdAt: Date;
+};
+
 export type GameRecord = Omit<GameRow, "gameType"> & {
   gameType: GameType;
   players: GamePlayer[];
@@ -238,6 +261,15 @@ export type CreateProfileInput = {
   userId: string;
   username: string;
   avatar?: AvatarConfig | null;
+};
+
+export type CreateGameInviteInput = {
+  inviterUserId: string;
+  gameType: GameType;
+  token: string;
+  config?: unknown;
+  seatingMode?: SeatingMode | null;
+  expiresAt: Date;
 };
 
 export type PublicUserRow = {

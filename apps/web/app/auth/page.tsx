@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { GuestButton } from "@/app/auth/guest-button";
 import { GoogleSignInButton } from "@/app/google-sign-in-button";
 import { getServerSession } from "@/lib/get-server-session";
 
@@ -38,6 +39,8 @@ export default async function AuthPage() {
           </p>
 
           <GoogleSignInButton googleOAuthReady={googleOAuthReady} />
+
+          <GuestButton />
 
           {!googleOAuthReady ? (
             <p className="mt-4 text-center text-muted-foreground text-xs">

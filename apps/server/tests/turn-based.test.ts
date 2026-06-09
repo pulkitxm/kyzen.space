@@ -68,12 +68,15 @@ const profiles = {
 mock.module("@gamelobby/database", () => ({
   games,
   profiles,
+  accountMerge: {},
   conversations: {},
   friends: {},
   messages: { getGameCardByGameId: async () => null },
   notifications: {},
   db: {},
   schema: {},
+  invites: {},
+  generateInviteToken: () => "x".repeat(43),
   createDb: () => ({ db: {}, client: {} }),
 }));
 

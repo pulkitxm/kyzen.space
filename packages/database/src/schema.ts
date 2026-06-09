@@ -7,6 +7,7 @@ import {
   THEME_IDS,
 } from "@gamelobby/shared/constants";
 import type {
+  AccountMergeStatus,
   AvatarConfig,
   ChatMode,
   ConversationKind,
@@ -47,6 +48,7 @@ export const user = pgTable("user", {
     .$defaultFn(() => false)
     .notNull(),
   image: text("image"),
+  isAnonymous: boolean("is_anonymous").notNull().default(false),
   createdAt: timestamp("created_at")
     .$defaultFn(() => new Date())
     .notNull(),
@@ -295,4 +297,41 @@ export const notification = pgTable(
     index("notification_user_created_idx").on(t.userId, t.createdAt),
     index("notification_user_unread_idx").on(t.userId, t.readAt),
   ],
+);
+
+export const accountMerge = pgTable(
+  "account_merge",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    anonUserId: text("anon_user_id").notNull(),
+    targetUserId: text("target_user_id").notNull(),
+    status: text("status")
+      .$type<AccountMergeStatus>()
+      .notNull()
+      .default("pending"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at"),
+  },
+  (t) => [
+    index("account_merge_target_status_idx").on(t.targetUserId, t.status),
+  ],
+);
+
+export const gameInvite = pgTable(
+  "game_invite",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    token: text("token").notNull().unique("game_invite_token_uq"),
+    inviterUserId: text("inviter_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    gameType: text("game_type").notNull(),
+    config: jsonb("config").$type<unknown>(),
+    seatingMode: text("seating_mode").$type<SeatingMode>(),
+    expiresAt: timestamp("expires_at")
+      .$defaultFn(() => new Date(Date.now() + 24 * 60 * 60 * 1000))
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("game_invite_inviter_idx").on(t.inviterUserId)],
 );

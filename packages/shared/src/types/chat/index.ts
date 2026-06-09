@@ -40,6 +40,7 @@ export {
   gameCardMetaSchema,
   gifMetaSchema,
   notificationPayloadSchema,
+  notificationTypeSchema,
 } from "./schemas";
 export type {
   Ack,

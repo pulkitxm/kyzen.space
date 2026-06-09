@@ -33,6 +33,14 @@ export const notificationPayloadSchema = z.object({
   requestId: z.string().optional(),
 });
 
+export const notificationTypeSchema = z.enum([
+  "friend_request",
+  "friend_accepted",
+  "game_started",
+  "game_challenge",
+  "game_invite",
+]);
+
 export const clientCreateGameInConversationSchema = z
   .object({
     conversationId: z.string().min(1),

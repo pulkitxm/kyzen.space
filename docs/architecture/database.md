@@ -15,7 +15,7 @@ The *shape* of the tables themselves - the schema, the generic JSONB game model,
 | Path | Responsibility |
 | --- | --- |
 | `packages/database/src/client.ts` | `createDb(url, latencyMs)` factory + the singleton it builds: the `postgres-js` connection pool and the Drizzle `db` instance. Re-exports `createDb`, `db`, `client`, `schema`, and the `DB` type. |
-| `packages/database/src/index.ts` | The public facade (`@gamelobby/database`): re-exports each repository as a namespace (`games`, `messages`, `conversations`, `friends`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@gamelobby/shared/types`). |
+| `packages/database/src/index.ts` | The public facade (`@gamelobby/database`): re-exports each repository as a namespace (`accountMerge`, `conversations`, `friends`, `games`, `invites`, `messages`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@gamelobby/shared/types`) and the `generateInviteToken` helper. |
 | `packages/database/src/latency.ts` | `withLatency` Proxy that injects an artificial per-query delay (`DB_LATENCY_MS`) in non-production, for exercising loading states. |
 | `packages/database/src/repositories/games.ts` | Game/move/seat CRUD; assembles `GameRecord` (the `game` row with `players` attached and `gameType` narrowed to the registry `GameType`) via `toGameRecord` and the `getGameById` / `getGameByCode` joins; `createGame` allocates the public `code` (and defaults `seriesId` to the row's own id) and retries on a `game_code_uq` collision; the series reads `getSeriesGames` / `findLiveGameInConversation`. |
 | `packages/database/src/repositories/messages.ts` | Message insert/read/soft-delete + keyset-paginated `listMessages`. |
@@ -23,6 +23,8 @@ The *shape* of the tables themselves - the schema, the generic JSONB game model,
 | `packages/database/src/repositories/friends.ts` | Friendship requests/status keyed by a sorted `pairKey`. |
 | `packages/database/src/repositories/notifications.ts` | Notification create/list (keyset-paginated)/mark-read/resolve. |
 | `packages/database/src/repositories/profiles.ts` | `user_profile` reads/writes: username, avatar, appearance, chat layout, and per-game stats. |
+| `packages/database/src/repositories/account-merge.ts` | The anon-to-real merge layer (guest identity, Phase 1): `recordPending` / `getById` / `getPendingForTarget` / `markResolved`, the privacy-safe `summarizeAnonAccount` (counts only), `deleteAnonUserData` (discard - deletes the anon user plus its FK-less seats/moves, preserving games shared with a real opponent), and the `mergeAccounts(anonId, targetId)` transaction that re-points every row keyed on the anon id, collapsing self-references (self-friendship, self-DM, self-play seat) and summing `user_profile.stats` per gameType. |
+| `packages/database/src/repositories/invites.ts` | Invite-link layer (guest identity, Phase 3): `create` / `getByToken` for the `game_invite` table, validating input with `createGameInviteInputSchema` and rejecting tokens shorter than `INVITE_TOKEN_LENGTH`. The token itself is minted by `packages/database/src/invite-token.ts` (`generateInviteToken` - a 43-char base64url string from `crypto.randomBytes(32)`, deliberately not the 6-char `game.code`). |
 | `packages/database/src/repositories/cursor.ts` | `encodeCursor` / `decodeCursor` - the opaque base64 `(createdAt, id)` cursor used by keyset pagination. |
 
 > `packages/database/src/schema.ts`, `src/migrate.ts`, `src/drift-guard.ts`, and the root `drizzle.config.ts` - the table definitions and migrations - are covered in [`database-schema.md`](./database-schema.md).
@@ -43,7 +45,7 @@ export const client = singleton.client;
 export const db = singleton.db;
 ```
 
-Passing `{ schema }` (`client.ts:16`) gives Drizzle the full table catalog, which is what makes the `db.query.*` relational helpers and good inference available. The exported `db` is a **module-level singleton** built from one `createDb(...)` call (`client.ts:19`) - every repository imports the same instance (`import { db } from "../client"`), so the whole server shares one pool. The package reads its own env directly: `DATABASE_URL` (`client.ts:19`) and `DB_LATENCY_MS` (via `defaultLatencyMs()`, `client.ts:8`) - `apps/server` no longer resolves DB config for it. The `createDb` factory is also exported (`index.ts:24`) so tests can spin up an isolated instance against another URL.
+Passing `{ schema }` (`client.ts:16`) gives Drizzle the full table catalog, which is what makes the `db.query.*` relational helpers and good inference available. The exported `db` is a **module-level singleton** built from one `createDb(...)` call (`client.ts:19`) - every repository imports the same instance (`import { db } from "../client"`), so the whole server shares one pool. The package reads its own env directly: `DATABASE_URL` (`client.ts:19`) and `DB_LATENCY_MS` (via `defaultLatencyMs()`, `client.ts:8`) - `apps/server` no longer resolves DB config for it. The `createDb` factory is also exported (`index.ts:26`) so tests can spin up an isolated instance against another URL.
 
 ## The repository pattern
 
@@ -51,9 +53,12 @@ Every repository is a module of async functions over the shared `db`, exported w
 
 ```ts
 export { createDb, type DB, db, schema } from "./client";
+export { generateInviteToken } from "./invite-token";
+export * as accountMerge from "./repositories/account-merge";
 export * as conversations from "./repositories/conversations";
 export * as friends from "./repositories/friends";
 export * as games from "./repositories/games";
+export * as invites from "./repositories/invites";
 export * as messages from "./repositories/messages";
 export * as notifications from "./repositories/notifications";
 export * as profiles from "./repositories/profiles";
@@ -65,7 +70,7 @@ Repositories also **validate their inputs** with the Zod schemas exported from `
 
 ### `GameRecord` and the seat join
 
-The single most important repository type is `GameRecord`. It is now declared once in `@gamelobby/shared/types` (`packages/shared/src/types/db/index.ts:199`) and re-exported by `@gamelobby/database`:
+The single most important repository type is `GameRecord`. It is now declared once in `@gamelobby/shared/types` (`packages/shared/src/types/db/index.ts:222`) and re-exported by `@gamelobby/database`:
 
 ```ts
 export type GameRecord = Omit<GameRow, "gameType"> & {
@@ -154,7 +159,7 @@ It then fetches `limit + 1` rows ordered `desc(createdAt), desc(id)`, uses the e
 
 ### Raw SQL fragments stay inside repositories
 
-Repositories occasionally need a SQL expression Drizzle's builder doesn't model - but it's always the `sql` *template tag*, which parameterizes inputs (no string concatenation), and it never leaks past the repository. Examples: the per-game max move number, `nextMoveNumber` (`games.ts:196`) uses `` sql<number>`coalesce(max(${move.moveNumber}), 0)` ``; case-insensitive username lookups in `profiles.getProfileByUsername` (`profiles.ts:42`) use `` sql`lower(${userProfile.username}) = lower(${username})` ``; and `notifications.resolveByRequestId` (`notifications.ts:110`) matches a JSONB field with `` sql`${notification.payload} ->> 'requestId' = ${requestId}` ``. The takeaway: "no raw SQL in routes" doesn't mean "no SQL anywhere" - it means the SQL is *encapsulated* behind a typed repository function.
+Repositories occasionally need a SQL expression Drizzle's builder doesn't model - but it's always the `sql` *template tag*, which parameterizes inputs (no string concatenation), and it never leaks past the repository. Examples: the per-game max move number, `nextMoveNumber` (`games.ts:201`) uses `` sql<number>`coalesce(max(${move.moveNumber}), 0)` ``; case-insensitive username lookups in `profiles.getProfileByUsername` (`profiles.ts:42`) use `` sql`lower(${userProfile.username}) = lower(${username})` ``; and `notifications.resolveByRequestId` (`notifications.ts:110`) matches a JSONB field with `` sql`${notification.payload} ->> 'requestId' = ${requestId}` ``. The takeaway: "no raw SQL in routes" doesn't mean "no SQL anywhere" - it means the SQL is *encapsulated* behind a typed repository function.
 
 ### `profiles.bumpStats` - read-modify-write of JSONB
 
@@ -167,9 +172,9 @@ This is the database layer's busiest path, and where the "client is never truste
 1. **Load the aggregate.** `games.getGameByCode(payload.gameId)` (`games.ts:100`) returns the `GameRecord` - game row + seats - resolved from the public room **code** the client sent (the wire never carries the UUID). The handler checks `status === "active"` and that the socket's `userId` is actually a seated player. The DB join is what makes the seat check possible.
 2. **Validate with the shared schemas.** `def.moveSchema.safeParse(payload.moveData)` validates the *client's* input (`turn-based.ts:147`), and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB (`turn-based.ts:149`). Both schemas come from the same `GameDefinition` the client imports. A bad move or corrupt state is rejected before any write.
 3. **Reduce - authoritatively.** `def.engine.reduce(...)` (`turn-based.ts:152`) computes the next state on the server. The client's opinion about legality is irrelevant.
-4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`games.ts:196`) returns `max(moveNumber) + 1` - keyed on the internal UUID `gameRow.id`, since `move.game_id` FKs the UUID. The `move_game_number_uq` constraint is the backstop if two moves race to the same number.
-5. **Append the move.** `games.addMove(...)` (`games.ts:204`) inserts the validated move into the append-only `move` table.
-6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:167`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
+4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`games.ts:201`) returns `max(moveNumber) + 1` - keyed on the internal UUID `gameRow.id`, since `move.game_id` FKs the UUID. The `move_game_number_uq` constraint is the backstop if two moves race to the same number.
+5. **Append the move.** `games.addMove(...)` (`games.ts:209`) inserts the validated move into the append-only `move` table.
+6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:165`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
 7. **Finalize on game over.** If the engine's outcome is `completed`, `finalize` (`turn-based.ts:78`) calls `games.updateGame` again (status / `completedAt` / `winner`) and `profiles.bumpStats` (`profiles.ts:153`) once per seat.
 
 In arrows:

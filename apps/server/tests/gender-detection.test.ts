@@ -40,12 +40,15 @@ mock.module("@gamelobby/database", () => ({
       return createProfileImpl(input);
     },
   },
+  accountMerge: {},
   conversations: {},
   friends: {},
   messages: {},
   notifications: {},
   db: {},
   schema: {},
+  invites: {},
+  generateInviteToken: () => "x".repeat(43),
   createDb: () => ({ db: {}, client: {} }),
 }));
 
@@ -211,6 +214,17 @@ describe("ensureUsernameForUser: avatar style", () => {
     await ensureUsernameForUser("user-2", "Xyzzy");
     expect(createdAvatar?.style).toBe("any");
   });
+
+  it("skips gender detection entirely for guest provisioning", async () => {
+    genderizeFailsIfCalled();
+    detectedGender = "male";
+    const username = await ensureUsernameForUser("guest-1", "Alice", {
+      skipGenderDetection: true,
+    });
+    expect(username).toBe("alice");
+    expect(createdAvatar?.style).toBe("any");
+    expect(fetchCalled).toBe(false);
+  });
 });
 
 describe("ensureUsernameForUser: username selection", () => {
@@ -290,6 +304,10 @@ describe("isUsernameBlocked", () => {
   it("blocks reserved top-level route names", () => {
     expect(isUsernameBlocked("api")).toBe(true);
     expect(isUsernameBlocked("settings")).toBe(true);
+  });
+
+  it("blocks the invite route segment so it cannot shadow /invite", () => {
+    expect(isUsernameBlocked("invite")).toBe(true);
   });
 
   it("allows an ordinary name", () => {

@@ -22,7 +22,7 @@ This doc covers the **schema/contract half** of games-core: the `GameDefinition`
 | `packages/shared/src/types/games/definition.ts` | `GameDefinition<S,I,C>`, `GameMeta` (`type: GameType`, not `string`), `ConfigField` - the self-describing manifest one game ships. Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>`, `Outcome`, `ReduceResult`, `StepResult`, `Seat`, `MoveContext` - the behavioral contract a `GameDefinition` references. Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/code.ts` | The **public game room code**: `GAME_CODE_ALPHABET`/`GAME_CODE_LENGTH`, `generateGameCode`, `normalizeGameCode`, `isGameCode`, and `gameCodeSchema` (normalizes then validates a 6-char Crockford-base32 code). The code is the public game id; the UUID `game.id` stays internal. Exported via `@gamelobby/shared/types`. |
-| `packages/shared/src/types/games/wire.ts` | Shared **wire/socket** Zod schemas: `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, the server→client `Server*Payload` types, and the pure status helpers `isGameOver`/`isGameLive`/`resolveWinnerUsername`. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`). Exported via `@gamelobby/shared/types`. |
+| `packages/shared/src/types/games/wire.ts` | Shared **wire/socket** Zod schemas: `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, the matchmaking-lane `clientQueueJoinSchema`/`clientQueueLeaveSchema`, `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, the server→client `Server*Payload` types (`ServerGameStatePayload`, `ServerGameOverPayload`, `ServerErrorPayload`, `ServerMatchFoundPayload`), and the pure status helpers `isGameOver`/`isGameLive`/`resolveWinnerUsername`. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`). Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/categories.ts` | `GameCategoryDef` type and the `GameCategoryId` union (`GAME_CATEGORIES` ids). Both re-exported via the `types/games` barrel (`index.ts:1-4`). |
 | `packages/shared/src/constants/categories.ts` | The static `GAME_CATEGORIES` list used to group games in the lobby. Exported via `@gamelobby/shared/constants`. |
 | `packages/shared/src/types/games/tic-tac-toe/schemas.ts` | Per-game `stateSchema` / `moveSchema` / `configSchema`, each `.strict()`, with TS types derived via `z.infer`. The slug constant lives in `constants/games.ts`, not here. Exported via `@gamelobby/shared/types`. |
@@ -157,12 +157,33 @@ export const clientMakeMoveSchema = z
 export type ClientMakeMove = z.infer<typeof clientMakeMoveSchema>;
 ```
 
-`clientJoinRoomSchema` validates two inbound events: `join_room` and `leave_room`. The latter only needs `{ gameId }` (it leaves the socket room and runs no game logic), so it reuses the same `.strict()` envelope rather than declaring its own (`apps/server/src/realtime/index.ts:131`).
+`clientJoinRoomSchema` validates two inbound events: `join_room` and `leave_room`. The latter only needs `{ gameId }` (it leaves the socket room and runs no game logic), so it reuses the same `.strict()` envelope rather than declaring its own (`apps/server/src/realtime/index.ts:78`).
 
 Two things to internalize:
 
 1. **`moveData` is `z.unknown()` here, on purpose.** The *envelope* schema (`clientMakeMoveSchema`) only knows there's a `gameId` and some opaque payload. It cannot validate the move's shape, because the generic socket handler doesn't know which game it is yet. The actual move validation is a **second pass**, done by the *per-game* `moveSchema` (below), after the server has looked up the `gameType`. This two-stage validation - generic envelope first, game-specific payload second - is the central design pattern of the realtime lane.
 2. **`gameCodeSchema`** (`packages/shared/src/types/games/code.ts:24`) is the **public game room code** schema: it `transform`s the id through `normalizeGameCode` (uppercases, maps I/L→1 and O→0) then `refine`s it against `^[0-9A-HJKMNP-TV-Z]{6}$`. The same check is duplicated defensively on the server in `code.ts`'s `isGameCode`, which the turn-based handler calls as a belt-and-braces guard (`isGameCode(payload.gameId)`, `apps/server/src/realtime/turn-based.ts:135`) before resolving the game by code with `games.getGameByCode(...)`. (The internal UUID `game.id` is never serialized or accepted over the wire.)
+
+The **matchmaking lane** adds two more inbound envelopes, validated the same way before any queue logic runs:
+
+```ts
+export const clientQueueJoinSchema = z
+  .object({
+    gameType: gameTypeSchema,
+    config: z.unknown().optional(),
+  })
+  .strict();
+export type ClientQueueJoin = z.infer<typeof clientQueueJoinSchema>;
+
+export const clientQueueLeaveSchema = z
+  .object({
+    gameType: gameTypeSchema,
+  })
+  .strict();
+export type ClientQueueLeave = z.infer<typeof clientQueueLeaveSchema>;
+```
+
+`clientQueueJoinSchema` backs the `game:queue_join` event and `clientQueueLeaveSchema` the `game:queue_leave` event (`apps/server/src/realtime/matchmaking.ts:122`, `:138`). Both carry only a `gameType` (validated by `gameTypeSchema`, so an unknown slug is rejected at the boundary); `config` on join is again `z.unknown()` because the matched game's engine validates it against its `configSchema` when the game is actually created. No `userId` is ever read off these payloads - the server uses `socket.data.userId`.
 
 ### Outbound (server → client) wire DTOs
 
@@ -208,9 +229,13 @@ export type ServerGameOverPayload = {
 export type ServerErrorPayload = {
   message: string;
 };
+
+export type ServerMatchFoundPayload = {
+  gameId: string;
+};
 ```
 
-These name the `game_state`, `game_over`, and `game_error` socket events. `ServerGameStatePayload` carries the full serialized `game` plus *either* `moves` (the entire history, sent on join via `emitFullState`) *or* a single `move` delta (the one new move, sent after each `make_move`); the client appends `move` when present, otherwise replaces its move list from `moves`. The handler builds a `ServerGameStatePayload` literally typed (`apps/server/src/realtime/turn-based.ts:26`, `:170`) so the compiler verifies the broadcast matches the contract the client expects. `wire.ts` also exports the pure helpers `isGameOver`/`isGameLive` (status predicates) and `resolveWinnerUsername` (maps a winner user id to a username against a players list), used by both ends to classify a game without re-deriving the rules.
+These name the `game_state`, `game_over`, `game_error`, and `match_found` socket events. `ServerGameStatePayload` carries the full serialized `game` plus *either* `moves` (the entire history, sent on join via `emitFullState`) *or* a single `move` delta (the one new move, sent after each `make_move`); the client appends `move` when present, otherwise replaces its move list from `moves`. The handler builds a `ServerGameStatePayload` literally typed (`apps/server/src/realtime/turn-based.ts:26`, `:170`) so the compiler verifies the broadcast matches the contract the client expects. `ServerMatchFoundPayload` is the transient `match_found` emit the matchmaking lane sends to both paired players (`apps/server/src/realtime/matchmaking.ts:89`); it carries only the `gameId` (the public room code) the client navigates to. `wire.ts` also exports the pure helpers `isGameOver`/`isGameLive` (status predicates) and `resolveWinnerUsername` (maps a winner user id to a username against a players list), used by both ends to classify a game without re-deriving the rules.
 
 ## Per-game schemas and the `.strict()` discipline
 
