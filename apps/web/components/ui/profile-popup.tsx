@@ -3,6 +3,7 @@
 import type { AvatarConfig } from "@gamelobby/shared/types";
 import { atom, useAtomValue, useSetAtom } from "jotai";
 import { m } from "motion/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -45,6 +46,7 @@ export function useProfilePopup() {
 }
 
 function ProfilePopupBody({ user }: { user: ProfilePopupUser }) {
+  const closePopup = useSetAtom(profilePopupUserAtom);
   const [profile, setProfile] = useState<FetchedProfile | null>(null);
   const [failedFor, setFailedFor] = useState<string | null>(null);
 
@@ -84,9 +86,13 @@ function ProfilePopupBody({ user }: { user: ProfilePopupUser }) {
         className="size-24 rounded-2xl border border-border"
       />
       <h2 className="mt-3 max-w-full truncate font-semibold text-lg">{name}</h2>
-      <p className="max-w-full truncate text-muted-foreground text-sm">
+      <Link
+        href={`/${user.username}`}
+        onClick={() => closePopup(null)}
+        className="max-w-full truncate text-muted-foreground text-sm"
+      >
         @{user.username}
-      </p>
+      </Link>
       <div className="mt-2 flex items-center gap-1.5 text-muted-foreground text-xs">
         <FaRegCalendar size={12} aria-hidden="true" />
         {fresh ? (
