@@ -45,6 +45,7 @@ mock.module("@gamelobby/database", () => ({
     getPublicUsers: async () => [],
   },
   messages: { getGameCardByGameId: async () => null },
+  accountMerge: {},
   conversations: {},
   friends: {},
   notifications: {},

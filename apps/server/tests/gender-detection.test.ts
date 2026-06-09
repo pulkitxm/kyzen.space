@@ -40,6 +40,7 @@ mock.module("@gamelobby/database", () => ({
       return createProfileImpl(input);
     },
   },
+  accountMerge: {},
   conversations: {},
   friends: {},
   messages: {},

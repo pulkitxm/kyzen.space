@@ -47,6 +47,17 @@ export type UserRow = {
   updatedAt: Date;
 };
 
+export type AccountMergeStatus = "pending" | "confirmed" | "discarded";
+
+export type AccountMergeRow = {
+  id: string;
+  anonUserId: string;
+  targetUserId: string;
+  status: AccountMergeStatus;
+  createdAt: Date;
+  resolvedAt: Date | null;
+};
+
 export type SessionRow = {
   id: string;
   expiresAt: Date;

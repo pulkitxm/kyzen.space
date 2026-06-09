@@ -7,6 +7,7 @@ import {
   THEME_IDS,
 } from "@gamelobby/shared/constants";
 import type {
+  AccountMergeStatus,
   AvatarConfig,
   ChatMode,
   ConversationKind,
@@ -295,5 +296,23 @@ export const notification = pgTable(
   (t) => [
     index("notification_user_created_idx").on(t.userId, t.createdAt),
     index("notification_user_unread_idx").on(t.userId, t.readAt),
+  ],
+);
+
+export const accountMerge = pgTable(
+  "account_merge",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    anonUserId: text("anon_user_id").notNull(),
+    targetUserId: text("target_user_id").notNull(),
+    status: text("status")
+      .$type<AccountMergeStatus>()
+      .notNull()
+      .default("pending"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at"),
+  },
+  (t) => [
+    index("account_merge_target_status_idx").on(t.targetUserId, t.status),
   ],
 );

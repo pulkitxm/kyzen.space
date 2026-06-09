@@ -62,6 +62,7 @@ mock.module("@gamelobby/database", () => ({
     },
   },
   messages: {},
+  accountMerge: {},
   friends: {},
   notifications: {},
   db: {},

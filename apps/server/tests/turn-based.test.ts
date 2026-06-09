@@ -68,6 +68,7 @@ const profiles = {
 mock.module("@gamelobby/database", () => ({
   games,
   profiles,
+  accountMerge: {},
   conversations: {},
   friends: {},
   messages: { getGameCardByGameId: async () => null },

@@ -61,6 +61,7 @@ mock.module("@gamelobby/database", () => ({
   games: {
     gamesForUser: async () => [],
   },
+  accountMerge: {},
 }));
 
 mock.module("../src/env", () => ({

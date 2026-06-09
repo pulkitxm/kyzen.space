@@ -22,6 +22,7 @@ export type {
   UserProfileRow,
 } from "@gamelobby/shared/types";
 export { createDb, type DB, db, schema } from "./client";
+export * as accountMerge from "./repositories/account-merge";
 export * as conversations from "./repositories/conversations";
 export * as friends from "./repositories/friends";
 export * as games from "./repositories/games";

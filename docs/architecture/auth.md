@@ -24,8 +24,11 @@ A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `
 | `apps/server/src/username-rules.ts` | Username rule helpers: CSV blocklist parse (`parseUsernameCsv`), `slugifyBase`, candidate/suggestion builders (`buildUsernameCandidates` / `selectSuggestions`), and cooldown math (`usernameEditableAt`). Imports `USERNAME_MAX_LENGTH` and `normalizeUsername` from `@gamelobby/shared` - normalize / format-check / `RESERVED_USERNAMES` themselves now live in `@gamelobby/shared` (`packages/shared/src/types/username.ts`, `packages/shared/src/constants/username.ts`). |
 | `apps/server/src/api/index.ts` | Mounts Better Auth's request handler at `/api/auth/*` inside the Hono app. |
 | `apps/server/src/api/middleware/auth.ts` | `requireAuth` middleware - how REST routers read the session from request headers and gate on it. |
-| `apps/server/src/api/routes/account.ts` | Session-management REST: list sessions, sign out, revoke a session, revoke all others. |
-| `packages/database/src/schema.ts` | The `user` / `session` / `account` / `verification` Drizzle tables the adapter maps onto (in `@gamelobby/database`). |
+| `apps/server/src/api/routes/account.ts` | Session-management REST (list sessions, sign out, revoke a session, revoke all others) **plus** the consent-gated account-merge endpoints `GET /merge/pending`, `POST /merge/:id/confirm`, `POST /merge/:id/discard`. |
+| `packages/database/src/repositories/account-merge.ts` | The `accountMerge` repository: `recordPending` (called by `onLinkAccount`), `getById` / `getPendingForTarget` / `markResolved`, the privacy-safe `summarizeAnonAccount` (counts only), `deleteAnonUserData` (discard), and the `mergeAccounts(anonId, targetId)` migration transaction. |
+| `apps/web/app/merge-consent.tsx` | The `MergeConsent` dialog: polls `GET /api/account/merge/pending`, shows the counts-only summary, and runs confirm / discard. Mounted in `app-shell.tsx` only when signed in and **not** anonymous. |
+| `apps/web/lib/account-merge.ts` | The browser merge client: `getPendingMerge`, `confirmMerge(id)`, `discardMerge(id)`, plus the `PendingMerge` / `MergeSummary` types. |
+| `packages/database/src/schema.ts` | The `user` / `session` / `account` / `verification` Drizzle tables the adapter maps onto, plus the `account_merge` ledger (in `@gamelobby/database`). |
 | `packages/database/src/client.ts` | The Drizzle `db` + `schema` singleton handed to `drizzleAdapter` (imported by `auth.ts` from `@gamelobby/database`). |
 | `packages/database/src/repositories/profiles.ts` | `getProfileByUserId`, `getTakenUsernames` (batched availability), `createProfile` used during provisioning. |
 | `apps/server/src/realtime/index.ts` | Socket.IO `io.use(...)` auth middleware: resolve session from the handshake cookie, attach `socket.data.userId`. |
@@ -61,6 +64,23 @@ const auth = betterAuth({
     anonymous({
       disableDeleteAnonymousUser: true,
       generateName: () => generateGuestName(),
+      onLinkAccount: async ({ anonymousUser, newUser }) => {
+        try {
+          await accountMerge.recordPending(
+            anonymousUser.user.id,
+            newUser.user.id,
+          );
+          log.info(
+            { anonId: anonymousUser.user.id, targetId: newUser.user.id },
+            "recorded pending account merge",
+          );
+        } catch (err) {
+          log.error(
+            { err, anonId: anonymousUser.user.id, targetId: newUser.user.id },
+            "failed to record pending account merge",
+          );
+        }
+      },
     }),
   ],
   socialProviders: googleConfigured()
@@ -78,10 +98,10 @@ Key decisions:
 - **`baseURL: env.betterAuthUrl`** (default `http://localhost:4000`, `apps/server/src/env.ts:36`) - Better Auth lives on the **server**, not the web app. The browser hits `${NEXT_PUBLIC_API_URL}/api/auth/...`, and the OAuth callback URI is `[server URL]/api/auth/callback/google` (the sign-in page literally tells you this at `apps/web/app/auth/page.tsx:50`).
 - **`trustedOrigins: [env.webUrl]`** - only the Next.js origin (default `http://localhost:3000`) is allowed to drive auth flows, which is the CSRF/redirect allowlist.
 - **`drizzleAdapter(db, { provider: "pg", schema })`** - `db` and `schema` are imported from `@gamelobby/database` (`apps/server/src/auth.ts:1`), so the adapter persists users/sessions/accounts into the very same Postgres + Drizzle singleton the rest of the server uses (`packages/database/src/client.ts:19`). No separate auth store.
-- **`plugins: [anonymous({ … })]`** (`apps/server/src/auth.ts:17`) enables guest play. `signIn.anonymous` inserts a real `user` row with `isAnonymous = true` and a throwaway email; `generateName: () => generateGuestName()` (`apps/server/src/guest-name.ts:3`) sets the display name to `Guest-<random6>`, and `disableDeleteAnonymousUser: true` stops Better Auth from auto-deleting that row when the guest later links a real account - the guest's history (profile, games, messages) must survive the upgrade. **The upgrade/merge step itself (`onLinkAccount`) is a later phase and is not wired up yet** - today a guest can sign in with Google via the "Sign in to save your games" nudge, but stitching the anonymous user's data onto the Google account is upcoming.
+- **`plugins: [anonymous({ … })]`** (`apps/server/src/auth.ts:17`) enables guest play. `signIn.anonymous` inserts a real `user` row with `isAnonymous = true` and a throwaway email; `generateName: () => generateGuestName()` (`apps/server/src/guest-name.ts:3`) sets the display name to `Guest-<random6>`, and `disableDeleteAnonymousUser: true` stops Better Auth from auto-deleting that row when the guest later links a real account - the guest's history (profile, games, messages) must survive the upgrade. The **`onLinkAccount` hook** (`apps/server/src/auth.ts:21`) fires when a guest signs in with Google: it does **not** migrate any data, it only records a *pending* merge via `accountMerge.recordPending(anonymousUser.user.id, newUser.user.id)` (`packages/database/src/repositories/account-merge.ts:30`), and the failure is caught and logged so a recorder hiccup never blocks the link. The actual data migration is **consent-gated** and runs later, only when the now-real user explicitly confirms (or discards) the merge via the `/api/account/merge/*` endpoints - see "The account-merge flow" below.
 - **`socialProviders`** is conditional on `googleConfigured()` (`apps/server/src/env.ts:58`), which returns `true` only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Without them the object is `{}` and Google sign-in is unavailable, but the **guest button still works** (the anonymous plugin needs no external credentials), and the UI degrades gracefully (see below).
 
-The `advanced` block only turns on in production (`apps/server/src/auth.ts:57`):
+The `advanced` block only turns on in production (`apps/server/src/auth.ts:74`):
 
 ```ts
   advanced: env.isProd
@@ -96,7 +116,7 @@ In production the web and server are expected on sibling subdomains, so cookies 
 
 ### First-sign-in profile provisioning
 
-This is the most load-bearing piece of the config. Better Auth's Drizzle adapter inserts the `user` row - for a Google sign-in *or* a guest `signIn.anonymous` - and the `databaseHooks.user.create.after` hook runs immediately afterward and bootstraps the application-level profile (`apps/server/src/auth.ts:31`):
+This is the most load-bearing piece of the config. Better Auth's Drizzle adapter inserts the `user` row - for a Google sign-in *or* a guest `signIn.anonymous` - and the `databaseHooks.user.create.after` hook runs immediately afterward and bootstraps the application-level profile (`apps/server/src/auth.ts:48`):
 
 ```ts
   databaseHooks: {
@@ -127,7 +147,7 @@ This is the most load-bearing piece of the config. Better Auth's Drizzle adapter
   },
 ```
 
-The hook reads `isAnonymous` off the freshly-created row and threads `{ skipGenderDetection: isAnon }` into `ensureUsernameForUser`, so a guest's avatar uses the neutral `any` style and **never spends genderize.io quota** (their `Guest-<random6>` name carries no gender signal anyway). Note the **catch-and-log**: provisioning failure does not abort account creation. The hook is best-effort; the auth row is the source of truth, and a profile can be (re-)created later because `ensureUsernameForUser` is idempotent (it early-returns an existing profile). The split is deliberate - Better Auth owns the `user`/`session`/`account` tables; the app owns `user_profile` (username, avatar, stats, theme), which is keyed by `userId` with a unique constraint (`packages/database/src/schema.ts:172`).
+The hook reads `isAnonymous` off the freshly-created row and threads `{ skipGenderDetection: isAnon }` into `ensureUsernameForUser`, so a guest's avatar uses the neutral `any` style and **never spends genderize.io quota** (their `Guest-<random6>` name carries no gender signal anyway). Note the **catch-and-log**: provisioning failure does not abort account creation. The hook is best-effort; the auth row is the source of truth, and a profile can be (re-)created later because `ensureUsernameForUser` is idempotent (it early-returns an existing profile). The split is deliberate - Better Auth owns the `user`/`session`/`account` tables; the app owns `user_profile` (username, avatar, stats, theme), which is keyed by `userId` with a unique constraint (`packages/database/src/schema.ts:173`).
 
 ## Username generation
 
@@ -156,16 +176,16 @@ The hook reads `isAnonymous` off the freshly-created row and threads `{ skipGend
   }
 ```
 
-The `try { ... } catch {}` around `createProfile` matters: the batched availability read plus an `INSERT` is still a check-then-act race, and `user_profile.username` carries a `unique` constraint (`packages/database/src/schema.ts:174`). If two sign-ins race to the same username the loser's insert throws, the `catch` swallows it, and the loop moves to the next candidate. If every candidate in the pool is taken, it falls through to a guaranteed-random `player_<random6>` and inserts unconditionally (`apps/server/src/username.ts:76`). The database unique index is the real authority; the candidate scan is just an optimistic fast path that the batching makes cheaper (≤4 queries for 20 candidates instead of up to 20).
+The `try { ... } catch {}` around `createProfile` matters: the batched availability read plus an `INSERT` is still a check-then-act race, and `user_profile.username` carries a `unique` constraint (`packages/database/src/schema.ts:175`). If two sign-ins race to the same username the loser's insert throws, the `catch` swallows it, and the loop moves to the next candidate. If every candidate in the pool is taken, it falls through to a guaranteed-random `player_<random6>` and inserts unconditionally (`apps/server/src/username.ts:76`). The database unique index is the real authority; the candidate scan is just an optimistic fast path that the batching makes cheaper (≤4 queries for 20 candidates instead of up to 20).
 
 ## The auth tables & the Drizzle adapter mapping
 
 Better Auth ships a fixed schema contract; the Drizzle adapter expects tables whose names and columns match. They live alongside the app's domain tables in `packages/database/src/schema.ts`:
 
-- **`user`** (`:42`) - `id` (text PK, not a uuid - Better Auth generates these), `name`, unique `email`, `emailVerified`, `image`, `isAnonymous` (`is_anonymous boolean NOT NULL DEFAULT false`, `schema.ts:50` - the guest flag the `anonymous` plugin sets), timestamps. This is the canonical identity row; `user_profile`, `session`, `account`, friendships, conversations, etc. all `references(() => user.id, { onDelete: "cascade" })`.
-- **`session`** (`:59`) - `id`, `expiresAt`, unique `token`, `ipAddress`, `userAgent`, and `userId` FK with `onDelete: "cascade"`. The cookie carries the `token`; one row per active sign-in (per device/browser). A guest session is an ordinary row here too. `ipAddress`/`userAgent` are what the settings page surfaces per session.
-- **`account`** (`:72`) - links a `user` to an external provider login: `providerId` (`"google"`), `accountId` (the Google subject id), the OAuth `accessToken`/`refreshToken`/`idToken`, and a nullable `password` column reserved for the future email/password provider. One row per linked provider; a guest has no `account` row until they link one.
-- **`verification`** (`:90`) - `identifier`/`value`/`expiresAt` rows used for verification/reset tokens (unused by the Google-only flow today, but required by the contract).
+- **`user`** (`:43`) - `id` (text PK, not a uuid - Better Auth generates these), `name`, unique `email`, `emailVerified`, `image`, `isAnonymous` (`is_anonymous boolean NOT NULL DEFAULT false`, `schema.ts:51` - the guest flag the `anonymous` plugin sets), timestamps. This is the canonical identity row; `user_profile`, `session`, `account`, friendships, conversations, etc. all `references(() => user.id, { onDelete: "cascade" })`.
+- **`session`** (`:60`) - `id`, `expiresAt`, unique `token`, `ipAddress`, `userAgent`, and `userId` FK with `onDelete: "cascade"`. The cookie carries the `token`; one row per active sign-in (per device/browser). A guest session is an ordinary row here too. `ipAddress`/`userAgent` are what the settings page surfaces per session.
+- **`account`** (`:73`) - links a `user` to an external provider login: `providerId` (`"google"`), `accountId` (the Google subject id), the OAuth `accessToken`/`refreshToken`/`idToken`, and a nullable `password` column reserved for the future email/password provider. One row per linked provider; a guest has no `account` row until they link one.
+- **`verification`** (`:91`) - `identifier`/`value`/`expiresAt` rows used for verification/reset tokens (unused by the Google-only flow today, but required by the contract).
 
 The adapter is wired in one line - `drizzleAdapter(db, { provider: "pg", schema })` (`apps/server/src/auth.ts:16`) - where `db` and `schema` are imported from `@gamelobby/database` (`apps/server/src/auth.ts:1`), backed by the singleton in `packages/database/src/client.ts:19`. Because the same `db` instance is shared, auth writes go through the same connection pool (and the same optional `DB_LATENCY_MS` latency wrapper, applied inside the database package) as everything else.
 
@@ -256,8 +276,8 @@ A full trace from clicking the button to being authenticated on all three lanes:
 1. **User clicks "Continue with Google."** `apps/web/app/auth/page.tsx:41` renders `<GoogleSignInButton>`, which calls `authClient.signIn.social({ provider: "google", callbackURL: ".../profile" })` (`apps/web/app/google-sign-in-button.tsx:20`). The `authClient` is a Better Auth React client (with the `anonymousClient()` plugin) pointed at `NEXT_PUBLIC_API_URL` (`apps/web/lib/auth-client.ts:4`).
 2. **Browser → server.** The client hits `POST /api/auth/sign-in/social` on the **server**, which Better Auth handles via the catch-all (`apps/server/src/api/index.ts:14`) and responds with a redirect to Google's consent screen.
 3. **Google OAuth.** User authenticates with Google; Google redirects back to `GET /api/auth/callback/google` on the server.
-4. **Better Auth callback.** Better Auth exchanges the code, and via the Drizzle adapter upserts the `user` (`packages/database/src/schema.ts:42`) and `account` (`:72`) rows and creates a `session` row (`:59`).
-5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:34`) → `ensureUsernameForUser(id, name, { skipGenderDetection })` (`apps/server/src/username.ts:43`) → slugify + batched candidate scan → `createProfile` inserts the `user_profile` row with a seeded avatar (`packages/database/src/repositories/profiles.ts:74`).
+4. **Better Auth callback.** Better Auth exchanges the code, and via the Drizzle adapter upserts the `user` (`packages/database/src/schema.ts:43`) and `account` (`:73`) rows and creates a `session` row (`:60`).
+5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:51`) → `ensureUsernameForUser(id, name, { skipGenderDetection })` (`apps/server/src/username.ts:43`) → slugify + batched candidate scan → `createProfile` inserts the `user_profile` row with a seeded avatar (`packages/database/src/repositories/profiles.ts:74`).
 6. **Cookie set + redirect.** Better Auth sets the session cookie (in prod: `secure`, `SameSite=Lax`, cross-subdomain per `apps/server/src/auth.ts:59`) and redirects the browser to the `callbackURL` (`/profile`).
 7. **RSC reads the session.** The `/profile` (and root layout) server component calls `getServerSession()` → `serverFetchJson("/api/auth/get-session")` (`apps/web/lib/get-server-session.ts:18`). `serverFetch` forwards the browser's cookies from `next/headers` `cookies()` with `cache: "no-store"` (`apps/web/lib/api-server.ts:13`), so the server resolves the session and returns `{ user, session }`. `getServerSession` is wrapped in `react.cache` so multiple components in one render share a single fetch.
 8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:46`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:46`).
@@ -287,14 +307,25 @@ The Account settings tab (`apps/web/app/settings/account/page.tsx:27`) is an RSC
 
 `router.refresh()` is the trick that makes the UI consistent: it re-runs the RSC, which re-fetches `/api/account/sessions` server-side, so the revoked session disappears from the list without a manual client cache.
 
+## The account-merge flow
+
+When a guest signs in with Google, Better Auth **links** the anonymous account to the new real one and fires `onLinkAccount`. The merge of the guest's data is **not** automatic - it is consent-gated, so a user always sees exactly what they're about to fold in before anything moves.
+
+1. **Record (server, automatic).** `onLinkAccount` (`apps/server/src/auth.ts:21`) calls `accountMerge.recordPending(anonId, targetId)` (`packages/database/src/repositories/account-merge.ts:30`), which `parse()`s the ids with `recordAccountMergeInputSchema` (anon ≠ target) and inserts a `pending` row in `account_merge`. No data is touched. The recorder is wrapped in `try/catch` so a failure logs but never aborts the account link.
+2. **Nudge (web).** `MergeConsent` (`apps/web/app/merge-consent.tsx:65`) is mounted in the app shell with `enabled={signedIn && !isAnonymous}` (`apps/web/app/app-shell.tsx:67`). When enabled it calls `getPendingMerge()` → `GET /api/account/merge/pending` (`apps/web/lib/account-merge.ts:20`); a non-null `pending` renders a fixed dialog showing the **counts-only** summary (games / conversations / friends / stat lines) and the target email - never raw guest content.
+3. **Confirm (server).** `POST /api/account/merge/:id/confirm` (`apps/server/src/api/routes/account.ts:73`) loads the row, asserts `c.get("userId") === row.targetUserId` (else **403**), requires it still `pending` (else **404** missing / **409** resolved), runs `accountMerge.mergeAccounts(anonId, targetId)` (`packages/database/src/repositories/account-merge.ts:180`), then `markResolved(id, "confirmed")`. `mergeAccounts` is one transaction that sums `user_profile.stats` per `gameType`, re-points `game` / `game_player` / `move` / `friendship` / `conversation_member` / `message` / `notification` from the anon id onto the target, collapses self-references (self-friendship, self-DM, duplicate seat), and finally deletes the anon `user_profile` + `user`.
+4. **Discard (server).** `POST /api/account/merge/:id/discard` (`apps/server/src/api/routes/account.ts:85`) runs the same ownership / status gate, then `accountMerge.deleteAnonUserData(anonId)` (`packages/database/src/repositories/account-merge.ts:117`) - it deletes the anon's FK-less `game_player` seats and `move` rows directly, deletes only the games where the anon was the *sole* seat (so a real opponent's history survives), and deletes the anon `user`. Then `markResolved(id, "discarded")`.
+
+The web dialog calls `confirmMerge(id)` / `discardMerge(id)` (`apps/web/lib/account-merge.ts:27`) and `router.refresh()` so the merged history shows up immediately. See [`server-api.md`](./server-api.md) for the endpoint contract, [`database.md`](./database.md) for the repository, and [`web.md`](./web.md) for the dialog.
+
 ## Gotchas, invariants & conventions
 
 - **Auth lives on the server, not the web app.** `betterAuth` is configured in `apps/server`, `baseURL` is the server URL, and the OAuth callback is `[server]/api/auth/callback/google`. The web app only holds a thin Better Auth *client* (`apps/web/lib/auth-client.ts`) plus cookie-forwarding fetch helpers.
 - **Identity is always re-derived from the cookie, never trusted from the client.** REST → `requireAuth` reads `c.req.raw.headers`; sockets → `io.use` reads the handshake cookie. No route accepts a `userId` parameter as proof of identity.
 - **Always go through `getAuth()`.** Nothing imports the bare `auth` object; the accessor (`apps/server/src/auth.ts:67`) keeps a single instance and is the mock point in tests (`mock.module` per the repo's test conventions).
-- **A guest is a real `user`, and the rest of the stack must not branch on it.** `isAnonymous` is read in exactly two places - the provisioning hook (to skip gender detection) and the web layout/nudge (to surface the upgrade prompt). Chat, presence, games, and authorization treat a guest `userId` like any other. `disableDeleteAnonymousUser: true` keeps the guest row (and its history) alive after a future account link; **the merge step (`onLinkAccount`) is not implemented yet** - that is a later phase.
+- **A guest is a real `user`, and the rest of the stack must not branch on it.** `isAnonymous` is read in exactly two places - the provisioning hook (to skip gender detection) and the web layout/nudge (to surface the upgrade prompt). Chat, presence, games, and authorization treat a guest `userId` like any other. `disableDeleteAnonymousUser: true` keeps the guest row (and its history) alive after the account link, and the merge that follows is **consent-gated**: `onLinkAccount` only *records* a pending merge (it never moves data), and the migration runs only when the user confirms via `/api/account/merge/:id/confirm`. So a Google sign-in that links a guest never silently rewrites or deletes the guest's rows - nothing changes until consent.
 - **No Google creds → no Google sign-in, but guests still work.** `googleConfigured()` gates the provider (`apps/server/src/env.ts:58`); the sign-in page independently checks `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and shows setup instructions instead of a broken button (`apps/web/app/auth/page.tsx:17`). The `anonymous` plugin needs no external credentials, so the "Continue as a guest" button is always available. `BETTER_AUTH_SECRET` and `DATABASE_URL` are `required()` and crash startup if missing; Google creds are `optional()`.
-- **`user.id` is `text`, not `uuid`.** Better Auth generates the id (`packages/database/src/schema.ts:43`). The app's own tables (`game`, `move`, `user_profile`, …) use uuid PKs but still store the auth user id as `text` in FK columns like `userId` / `creator_user_id`.
+- **`user.id` is `text`, not `uuid`.** Better Auth generates the id (`packages/database/src/schema.ts:44`). The app's own tables (`game`, `move`, `user_profile`, …) use uuid PKs but still store the auth user id as `text` in FK columns like `userId` / `creator_user_id`.
 - **Profile provisioning is best-effort and idempotent.** The `create.after` hook swallows errors (`apps/server/src/auth.ts:47`); `ensureUsernameForUser` early-returns if a profile already exists (`apps/server/src/username.ts:48`). The DB unique constraint on `user_profile.username` - not the in-memory `getTakenUsernames` batch read - is the real collision authority.
 - **`user_profile` ≠ `user`.** Better Auth owns `user`/`session`/`account`/`verification`; the application owns `user_profile` (username, avatar, stats, theme, layout). They join on `userId`, and the profile cascades on user delete.
 - **Two web fetch paths, two env vars.** RSC uses `serverFetch` (`API_URL`, forwards `next/headers` cookies, `cache: "no-store"`); the browser uses `clientFetch` (`NEXT_PUBLIC_API_URL`, `credentials: "include"`). Use the server path inside RSCs and the client path inside `"use client"` components - they read the cookie from different places.

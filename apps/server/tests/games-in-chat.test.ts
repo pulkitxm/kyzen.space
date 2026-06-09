@@ -48,6 +48,7 @@ mock.module("@gamelobby/database", () => ({
     getProfileByUserId: async () => profile,
   },
   messages: {},
+  accountMerge: {},
   friends: {},
   notifications: {},
   db: {},

@@ -12,6 +12,7 @@ import { FaChevronRight } from "react-icons/fa6";
 
 import { ChatSocketBridge } from "@/app/chat-socket-bridge";
 import { GuestNudge } from "@/app/guest-nudge";
+import { MergeConsent } from "@/app/merge-consent";
 import { Sidebar } from "@/app/sidebar";
 import { TooltipProvider } from "@/app/ui/tooltip";
 import { LayeredPopupHost, ProfilePopupHost } from "@/components/ui";
@@ -63,6 +64,7 @@ export function AppShellClient({
       <Provider>
         <SocketProvider enabled={signedIn}>
           <GuestNudge isAnonymous={isAnonymous} />
+          <MergeConsent enabled={signedIn && !isAnonymous} />
           {signedIn && userId ? (
             <ChatSocketBridge
               userId={userId}

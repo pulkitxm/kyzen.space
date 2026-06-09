@@ -1,4 +1,4 @@
-import { db, schema } from "@gamelobby/database";
+import { accountMerge, db, schema } from "@gamelobby/database";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous } from "better-auth/plugins";
@@ -18,6 +18,23 @@ const auth = betterAuth({
     anonymous({
       disableDeleteAnonymousUser: true,
       generateName: () => generateGuestName(),
+      onLinkAccount: async ({ anonymousUser, newUser }) => {
+        try {
+          await accountMerge.recordPending(
+            anonymousUser.user.id,
+            newUser.user.id,
+          );
+          log.info(
+            { anonId: anonymousUser.user.id, targetId: newUser.user.id },
+            "recorded pending account merge",
+          );
+        } catch (err) {
+          log.error(
+            { err, anonId: anonymousUser.user.id, targetId: newUser.user.id },
+            "failed to record pending account merge",
+          );
+        }
+      },
     }),
   ],
   socialProviders: googleConfigured()

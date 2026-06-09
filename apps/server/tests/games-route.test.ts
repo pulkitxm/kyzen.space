@@ -27,6 +27,7 @@ mock.module("@gamelobby/database", () => ({
     },
   },
   profiles: {},
+  accountMerge: {},
   conversations: {},
   friends: {},
   messages: {},

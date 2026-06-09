@@ -15,7 +15,7 @@ The *shape* of the tables themselves - the schema, the generic JSONB game model,
 | Path | Responsibility |
 | --- | --- |
 | `packages/database/src/client.ts` | `createDb(url, latencyMs)` factory + the singleton it builds: the `postgres-js` connection pool and the Drizzle `db` instance. Re-exports `createDb`, `db`, `client`, `schema`, and the `DB` type. |
-| `packages/database/src/index.ts` | The public facade (`@gamelobby/database`): re-exports each repository as a namespace (`games`, `messages`, `conversations`, `friends`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@gamelobby/shared/types`). |
+| `packages/database/src/index.ts` | The public facade (`@gamelobby/database`): re-exports each repository as a namespace (`accountMerge`, `conversations`, `friends`, `games`, `messages`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@gamelobby/shared/types`). |
 | `packages/database/src/latency.ts` | `withLatency` Proxy that injects an artificial per-query delay (`DB_LATENCY_MS`) in non-production, for exercising loading states. |
 | `packages/database/src/repositories/games.ts` | Game/move/seat CRUD; assembles `GameRecord` (the `game` row with `players` attached and `gameType` narrowed to the registry `GameType`) via `toGameRecord` and the `getGameById` / `getGameByCode` joins; `createGame` allocates the public `code` (and defaults `seriesId` to the row's own id) and retries on a `game_code_uq` collision; the series reads `getSeriesGames` / `findLiveGameInConversation`. |
 | `packages/database/src/repositories/messages.ts` | Message insert/read/soft-delete + keyset-paginated `listMessages`. |
@@ -23,6 +23,7 @@ The *shape* of the tables themselves - the schema, the generic JSONB game model,
 | `packages/database/src/repositories/friends.ts` | Friendship requests/status keyed by a sorted `pairKey`. |
 | `packages/database/src/repositories/notifications.ts` | Notification create/list (keyset-paginated)/mark-read/resolve. |
 | `packages/database/src/repositories/profiles.ts` | `user_profile` reads/writes: username, avatar, appearance, chat layout, and per-game stats. |
+| `packages/database/src/repositories/account-merge.ts` | The anon-to-real merge layer (guest identity, Phase 1): `recordPending` / `getById` / `getPendingForTarget` / `markResolved`, the privacy-safe `summarizeAnonAccount` (counts only), `deleteAnonUserData` (discard - deletes the anon user plus its FK-less seats/moves, preserving games shared with a real opponent), and the `mergeAccounts(anonId, targetId)` transaction that re-points every row keyed on the anon id, collapsing self-references (self-friendship, self-DM, self-play seat) and summing `user_profile.stats` per gameType. |
 | `packages/database/src/repositories/cursor.ts` | `encodeCursor` / `decodeCursor` - the opaque base64 `(createdAt, id)` cursor used by keyset pagination. |
 
 > `packages/database/src/schema.ts`, `src/migrate.ts`, `src/drift-guard.ts`, and the root `drizzle.config.ts` - the table definitions and migrations - are covered in [`database-schema.md`](./database-schema.md).
@@ -51,6 +52,7 @@ Every repository is a module of async functions over the shared `db`, exported w
 
 ```ts
 export { createDb, type DB, db, schema } from "./client";
+export * as accountMerge from "./repositories/account-merge";
 export * as conversations from "./repositories/conversations";
 export * as friends from "./repositories/friends";
 export * as games from "./repositories/games";
@@ -65,7 +67,7 @@ Repositories also **validate their inputs** with the Zod schemas exported from `
 
 ### `GameRecord` and the seat join
 
-The single most important repository type is `GameRecord`. It is now declared once in `@gamelobby/shared/types` (`packages/shared/src/types/db/index.ts:199`) and re-exported by `@gamelobby/database`:
+The single most important repository type is `GameRecord`. It is now declared once in `@gamelobby/shared/types` (`packages/shared/src/types/db/index.ts:211`) and re-exported by `@gamelobby/database`:
 
 ```ts
 export type GameRecord = Omit<GameRow, "gameType"> & {

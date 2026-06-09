@@ -19,7 +19,7 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | --- | --- |
 | `apps/web/app/layout.tsx` | Root Server Component; one authenticated fan-out fetch, sets `<html>` theme/pattern attrs, injects no-flash boot scripts, threads an `isAnonymous` flag, wraps everything in `Providers` + `AppShellClient`. |
 | `apps/web/app/providers.tsx` | Client wrapper: `next-themes` `ThemeProvider` (light/dark) + `AppearanceProvider` (palette/pattern). |
-| `apps/web/app/app-shell.tsx` | Client shell: Jotai `Provider`, `SocketProvider`, `GuestNudge`, `ChatSocketBridge`, sidebar + `<main>`. |
+| `apps/web/app/app-shell.tsx` | Client shell: Jotai `Provider`, `SocketProvider`, `GuestNudge`, `MergeConsent`, `ChatSocketBridge`, sidebar + `<main>`. |
 | `apps/web/app/page.tsx` | Home grid of games, rendered from `listGameMeta()`. |
 | `apps/web/app/sidebar.tsx` | The collapsible, resizable left rail rendered by `AppShellClient` (logo, nav, `SidebarSocialNav`, profile/avatar entry); persists collapsed/width via the sidebar atoms + cookie. |
 | `apps/web/app/sidebar-social-nav.tsx` | The "Social" nav cluster in the sidebar (the Chat link with its `totalUnreadAtom` badge; Friends now lives in the profile page's overflow menu, not here). |
@@ -32,6 +32,8 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/lib/auth/ensure-identity.ts` | `ensureIdentity()`: if `authClient.getSession()` has no session, mints a guest one via `authClient.signIn.anonymous()`. |
 | `apps/web/app/auth/guest-button.tsx` | `"use client"` "Continue as a guest" button: `ensureIdentity()` then `router.push("/")` + `router.refresh()`. |
 | `apps/web/app/guest-nudge.tsx` | `"use client"` fixed "Sign in to save your games" prompt; renders `null` unless `isAnonymous`, otherwise a Google `signIn.social` button. |
+| `apps/web/app/merge-consent.tsx` | `"use client"` `MergeConsent` (controller) + `MergeConsentDialog` (the fixed counts-only consent card): when `enabled` (signed in and **not** anonymous) it polls `GET /api/account/merge/pending` and offers Merge / Discard, then `router.refresh()`. |
+| `apps/web/lib/account-merge.ts` | `"use client"` merge client over `clientFetchJson`: `getPendingMerge()`, `confirmMerge(id)`, `discardMerge(id)`, plus the `PendingMerge` / `MergeSummary` types. |
 | `apps/web/lib/socket/socket-context.tsx` | `SocketProvider`, `useSocket`, `useSocketEvent`, `emitAck`: one shared Socket.IO connection + ack-promise helper. |
 | `apps/web/app/chat-socket-bridge.tsx` | Hydrates chat atoms from SSR props, then maps every `CHAT_EVENTS.*` socket event onto a Jotai store mutation. |
 | `apps/web/lib/chat/atoms.ts` | Shared chat state: conversations, messages (atomFamily), friends, requests, notifications, presence, typing, derived totals, pure upsert helpers. |
@@ -174,6 +176,7 @@ See `apps/web/app/layout.tsx:131`. The `style={patternStyle}` writes the `--patt
   <Provider>
     <SocketProvider enabled={signedIn}>
       <GuestNudge isAnonymous={isAnonymous} />
+      <MergeConsent enabled={signedIn && !isAnonymous} />
       {signedIn && userId ? (
         <ChatSocketBridge userId={userId} initialConversations={...} ... />
       ) : null}
@@ -183,7 +186,7 @@ See `apps/web/app/layout.tsx:131`. The `style={patternStyle}` writes the `--patt
 </TooltipProvider>
 ```
 
-See `apps/web/app/app-shell.tsx:62`. The Jotai `<Provider>` must wrap `ChatSocketBridge` (so the bridge has a store to write into) and `SocketProvider` must wrap it too (so it has a socket to listen on). `enabled={signedIn}` means the socket only connects for authenticated users - which **includes guests**, since a guest is signed in. `<GuestNudge isAnonymous={isAnonymous} />` (`apps/web/app/app-shell.tsx:65`) renders the fixed "Sign in to save your games" prompt and returns `null` unless the session is anonymous, so it is inert for Google users. The only `useState` in this file is `mobileOpen` (`apps/web/app/app-shell.tsx:55`) - a textbook case of component-private state that correctly stays out of Jotai.
+See `apps/web/app/app-shell.tsx:63`. The Jotai `<Provider>` must wrap `ChatSocketBridge` (so the bridge has a store to write into) and `SocketProvider` must wrap it too (so it has a socket to listen on). `enabled={signedIn}` means the socket only connects for authenticated users - which **includes guests**, since a guest is signed in. `<GuestNudge isAnonymous={isAnonymous} />` (`apps/web/app/app-shell.tsx:66`) renders the fixed "Sign in to save your games" prompt and returns `null` unless the session is anonymous, so it is inert for Google users. `<MergeConsent enabled={signedIn && !isAnonymous} />` (`apps/web/app/app-shell.tsx:67`) is the converse: it does nothing for a guest, and only for a signed-in **real** user does it poll `GET /api/account/merge/pending` and surface the consent dialog when an anonymous account is waiting to be merged in (see below). The only `useState` in this file is `mobileOpen` (`apps/web/app/app-shell.tsx:56`) - a textbook case of component-private state that correctly stays out of Jotai.
 
 **The shell scrolls an inner element, not the document.** The shell is `h-screen overflow-hidden` with a fixed `Sidebar` and a `<main className="… overflow-auto">` that owns the page scroll - this is what lets chat (pinned composer + reverse-scroll list) and the play/game pages (full-height boards) bound themselves to the viewport. The cost is that the browser's native scroll restoration (which only tracks the *document* scroller) can't restore position on reload. `useScrollRestoration` (`apps/web/lib/use-scroll-restoration.ts`) closes that gap: it persists `<main>`'s `scrollTop` to `sessionStorage` keyed by `pathname`, and on mount / route change it **smoothly animates** back to the saved offset (after paint, via `scrollTo({ behavior: "smooth" })`, honoring `prefers-reduced-motion`; intermediate saves are suppressed while the restore animates). It's a no-op on the full-viewport pages, where `<main>` itself never scrolls.
 

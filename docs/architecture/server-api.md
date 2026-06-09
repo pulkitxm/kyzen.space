@@ -23,7 +23,7 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 | `apps/server/src/api/middleware/auth.ts` | `requireAuth` middleware + `AuthEnv`: reads the Better Auth session from request headers, `401`s when absent, and stashes `userId`/`user`/`session` on the context. |
 | `apps/server/src/api/auth-context.ts` | `readJson(c)` (safe body parse). |
 | `apps/server/src/api/serialize.ts` | Pure row -> DTO mappers (`serializeGame`, `serializeMove`, `serializeMessage`, `serializeConversation`, `serializeSeries`, …). The `Date -> ISO string` boundary. |
-| `apps/server/src/api/routes/account.ts` | Session management built on Better Auth: list/sign-out/revoke sessions. |
+| `apps/server/src/api/routes/account.ts` | Session management built on Better Auth (list/sign-out/revoke sessions) plus the anon-to-real merge endpoints `GET /merge/pending`, `POST /merge/:id/confirm`, `POST /merge/:id/discard` (each `requireAuth` + an ownership assert). |
 | `apps/server/src/api/routes/conversations.ts` | The largest router: list/create DMs & groups, messages, read receipts, members, rename, and `POST /:id/games`. Resolution for friendly URLs: `GET /with/:username` (→ DM) and `GET /group/:name` (→ group, member-gated). Group names are unique (enforced on create + rename in `conversations-service.ts`), so a name resolves to one group; `GET /:id` remains for internal id fetches. |
 | `apps/server/src/api/routes/friends.ts` | Friends list, pending requests, user search with friend-state, send/accept/decline/remove. |
 | `apps/server/src/api/routes/games.ts` | The two game REST reads: `GET /:gameId` (serialized game + its moves) and `GET /:gameId/series` (the rematch series via `serializeSeries` + `computeSeriesScore`). |
@@ -159,7 +159,15 @@ const userId = c.get("userId");
 
 Routers whose every route needs a session apply it once at the top - `new Hono<AuthEnv>().use("*", requireAuth)` - covering `conversations`, `friends`, `messages`, `notifications`, and `gifs`. `profiles` is **mixed**: the authenticated `/me*` routes opt in per-route (`.put("/me/avatar", requireAuth, …)`) while the public ones (`GET /api/profiles/:username`, `apps/server/src/api/routes/profiles.ts`) stay open. `games` (`GET /api/games/:gameId`) is intentionally public and applies nothing.
 
-Two surfaces deliberately keep their own `getSession` calls instead of `requireAuth`: Better Auth owns `/api/auth/*` end-to-end, and `account` (`apps/server/src/api/routes/account.ts`) is session-management itself - it reads the `session` token, calls `listSessions`/`revokeSession`, and signs out, so the session object is its domain payload, not just a gate.
+Two surfaces deliberately keep their own `getSession` calls instead of `requireAuth`: Better Auth owns `/api/auth/*` end-to-end, and `account` (`apps/server/src/api/routes/account.ts`) is session-management itself - the `/sessions`, `/sign-out`, and `/revoke-*` handlers read the `session` token, call `listSessions`/`revokeSession`, and sign out, so the session object is its domain payload, not just a gate.
+
+The account router additionally owns the anon-to-real account merge (guest identity, Phase 1), and those three routes **do** use `requireAuth` scoped to just the `/merge/*` paths:
+
+- **`GET /api/account/merge/pending`** returns the caller's pending merge row (if any) plus a **counts-only** summary from `accountMerge.summarizeAnonAccount` - games / conversations / friends / stat-line counts and the target's own email, and deliberately **never** raw messages, identities, or the anonymous account's throwaway temp email.
+- **`POST /api/account/merge/:id/confirm`** runs `accountMerge.mergeAccounts` then marks the row `confirmed`.
+- **`POST /api/account/merge/:id/discard`** runs `accountMerge.deleteAnonUserData` then marks the row `discarded`.
+
+Both mutating routes assert `c.get("userId") === row.targetUserId` and return **403** otherwise (a user can only act on a merge targeting their own account), **404** when the row is missing, and **409** when it is already resolved (the merge is idempotent - only a `pending` row is actionable). The anon id is only ever supplied by the server's own `onLinkAccount` recorder, never by the client.
 
 `readJson(c)` (`apps/server/src/api/auth-context.ts`) is the body helper: it `try/catch`-parses the JSON body and returns `null` on failure or a non-object, so routes write `const body = await readJson(c)` and then defensively pull fields. `isUuid(value)` (`apps/server/src/lib/uuid.ts`) is the shared UUID guard used by the conversation routes; the **game** route and the realtime game lane instead validate the public room **code** with `isGameCode` (`@gamelobby/shared/types`).
 

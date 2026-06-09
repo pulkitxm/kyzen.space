@@ -53,6 +53,21 @@ export const createNotificationInputSchema = z.object({
   payload: z.unknown().optional(),
 });
 
+export const accountMergeStatusSchema = z.enum([
+  "pending",
+  "confirmed",
+  "discarded",
+]);
+
+export const recordAccountMergeInputSchema = z
+  .object({
+    anonUserId: z.string().min(1),
+    targetUserId: z.string().min(1),
+  })
+  .refine((v) => v.anonUserId !== v.targetUserId, {
+    message: "anonUserId and targetUserId must differ",
+  });
+
 export const createProfileInputSchema = z.object({
   userId: z.string(),
   username: z.string(),
