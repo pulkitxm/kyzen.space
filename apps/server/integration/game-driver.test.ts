@@ -274,7 +274,7 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
     expect(moves.length).toBe(0);
   });
 
-  it("a valid handleMakeMove persists a move and broadcasts move_made + game_state", async () => {
+  it("a valid handleMakeMove persists a move and broadcasts one game_state with a move delta", async () => {
     const x = await h.makeUser("validx");
     const o = await h.makeUser("valido");
     const convId = await h.makeDm(x, o);
@@ -298,8 +298,12 @@ describe.skipIf(!DB_UP)("turn-based driver end-to-end", () => {
     expect(after[0]?.moveData).toEqual({ row: 1, col: 1 });
     expect(after[0]?.playerId).toBe(x.id);
 
-    expect(eventsOf(broadcasts, "move_made").length).toBe(1);
-    expect(eventsOf(broadcasts, "game_state").length).toBe(1);
+    expect(eventsOf(broadcasts, "move_made").length).toBe(0);
+    const states = eventsOf(broadcasts, "game_state");
+    expect(states.length).toBe(1);
+    expect(
+      (states[0]?.payload as { move?: { moveData?: unknown } }).move?.moveData,
+    ).toEqual({ row: 1, col: 1 });
 
     const stored = await games.getGameByCode(gameId);
     expect((stored?.gameState as { currentTurn: string }).currentTurn).toBe(

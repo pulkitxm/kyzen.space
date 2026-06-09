@@ -18,6 +18,7 @@ import {
   type IconPos,
   type StashEdge,
 } from "@/lib/chat-layout";
+import { startPointerDrag } from "@/lib/pointer-drag";
 import { cn } from "@/lib/utils";
 
 const DRAG_THRESHOLD = 4;
@@ -60,48 +61,43 @@ export function ChatFloatingIcon({
 
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
-      e.preventDefault();
       const rect = e.currentTarget.getBoundingClientRect();
       const orig = { x: rect.left, y: rect.top };
       const startX = e.clientX;
       const startY = e.clientY;
       let moved = false;
       let lastInBounds = orig;
-      const onMove = (ev: MouseEvent) => {
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
-        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)
-          moved = true;
-        const raw = { x: orig.x + dx, y: orig.y + dy };
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const edge = edgeForIcon(raw, vw, vh);
-        if (edge) {
-          if (edgeRef.current !== edge) onStashChange(edge);
-        } else {
-          if (edgeRef.current !== null) onStashChange(null);
-          lastInBounds = clampIcon(raw, vw, vh);
+      startPointerDrag(e, {
+        onMove: (ev) => {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)
+            moved = true;
+          const raw = { x: orig.x + dx, y: orig.y + dy };
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          const edge = edgeForIcon(raw, vw, vh);
+          if (edge) {
+            if (edgeRef.current !== edge) onStashChange(edge);
+          } else {
+            if (edgeRef.current !== null) onStashChange(null);
+            lastInBounds = clampIcon(raw, vw, vh);
+            onIconChange(lastInBounds);
+          }
+        },
+        onEnd: () => {
+          if (!moved) {
+            onRestore();
+            return;
+          }
+          justDraggedRef.current = true;
+          requestAnimationFrame(() => {
+            justDraggedRef.current = false;
+          });
           onIconChange(lastInBounds);
-        }
-      };
-      const onUp = () => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        document.body.style.userSelect = "";
-        if (!moved) {
-          onRestore();
-          return;
-        }
-        justDraggedRef.current = true;
-        requestAnimationFrame(() => {
-          justDraggedRef.current = false;
-        });
-        onIconChange(lastInBounds);
-        onCommit();
-      };
-      document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+          onCommit();
+        },
+      });
     },
     [onIconChange, onStashChange, onRestore, onCommit],
   );

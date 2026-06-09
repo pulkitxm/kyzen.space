@@ -13,16 +13,16 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 
 You implement a new multiplayer game on this monorepo platform. Games are
 **data-driven**: one game = one self-describing `GameDefinition` in a single
-array, plus one React client component. Generic machinery (the realtime driver,
-DB, serializers, lobby, conformance tests) reads games through that definition -
-you never touch platform plumbing. Read `docs/adding-a-game.md` first; it is the
-canonical guide and this prompt mirrors it.
+array, plus one React client component. Generic machinery (the realtime game-lane
+handlers, DB, serializers, lobby, conformance tests) reads games through that
+definition - you never touch platform plumbing. Read `docs/adding-a-game.md`
+first; it is the canonical guide and this prompt mirrors it.
 
 ## Hard rules
 
 - **Never** add a new web route, API endpoint, DB table/column, socket event, or
-  driver for a game. If you think you need one, you've misunderstood - re-read
-  `docs/adding-a-game.md`. The platform is already generic.
+  realtime handler for a game. If you think you need one, you've misunderstood -
+  re-read `docs/adding-a-game.md`. The platform is already generic.
 - **Strict Zod, always - authored in `@gamelobby/shared`.** Every game ships
   `stateSchema`, `moveSchema`, and `configSchema` using `.strict()`, exact enums,
   and integer/range bounds, under `packages/shared/src/types/games/<type>/schemas.ts`.
@@ -52,14 +52,14 @@ canonical guide and this prompt mirrors it.
    inputs (→ `configFields`). If anything is ambiguous, ask before coding.
 
 2. **shared (slug + schemas + types)**, then **games-core (logic)**:
-   - **`@gamelobby/shared/constants` (`packages/shared/src/constants/games.ts`)**:
+   - **`@gamelobby/shared/constants` (`packages/shared/src/constants/games.ts`)** -
      add the slug constant (`export const <SLUG> = "<type>";`) and append it to
      `GAME_TYPES` (`export const GAME_TYPES = [TIC_TAC_TOE, <SLUG>] as const;`).
      This is the **only** place the string literal lives; `GameType` /
      `gameTypeSchema` (in `@gamelobby/shared/types`) derive from it automatically.
      Never redeclare the slug in a per-game file. Add a new `GAME_CATEGORIES` entry
      here only if needed.
-   - **`packages/shared/src/types/games/<type>/schemas.ts`**: strict Zod `state`,
+   - **`packages/shared/src/types/games/<type>/schemas.ts`** - strict Zod `state`,
      `move`, `config` schemas + `z.infer` types (use `import { z } from "zod"`,
      allowed because this is inside `@gamelobby/shared`). Re-export them from
      `@gamelobby/shared/types` (via `packages/shared/src/types/games/index.ts`).
@@ -83,18 +83,18 @@ canonical guide and this prompt mirrors it.
    flag through `GameClientProps` (`props.socket`, `props.connected`) - **never
    call `io()` to open your own connection.** Emit `join_room` on mount and on the
    socket's `connect`, `make_move` on a move, and `leave_room` on cleanup (unmount);
-   render the board from the `game_state`/`move_made` events. On cleanup remove your
-   listeners with `socket.off(...)` only - never `socket.disconnect()` (that would
-   kill the shared chat lane). Register it in
+   render the board from the `game_state` event (the server emits exactly one per
+   move). On cleanup remove your listeners with `socket.off(...)` only - never
+   `socket.disconnect()` (that would kill the shared chat lane). Register it in
    `packages/games-client/src/registry.ts` (`REGISTRY`) using the imported slug
    constant as the key. `REGISTRY` is typed `Record<GameType, …>` - a missing
    entry is a **compile error**, not a runtime surprise.
    Tailwind theme tokens (e.g. `bg-surface-raised`, `text-card-foreground`) are
    available.
    Then register a **skeleton** via `getGameSkeleton`: either add
-   `packages/games-client/src/games/<type>/skeleton.tsx` (a prop-less,
+   `packages/games-client/src/games/<type>/skeleton.tsx` - a prop-less,
    `"use client"`-free placeholder built from the shared `SkeletonBox` that mirrors
-   the board's layout) and add it to `SKELETON_REGISTRY` (in `registry.ts`) keyed
+   the board's layout - and add it to `SKELETON_REGISTRY` (in `registry.ts`) keyed
    by the slug constant (`SKELETON_REGISTRY` is also `Record<GameType, …>`), or
    rely on the generic `DefaultGameSkeleton` fallback. Either way
    `getGameSkeleton(type)` resolves to a skeleton (never `null`); it renders as the
@@ -114,8 +114,8 @@ canonical guide and this prompt mirrors it.
    - Registry parity is **enforced**:
      `packages/games-client/tests/registry.test.ts` fails if the game type has no
      board or no skeleton, and `packages/games-core/tests/game-docs.test.ts` fails
-     if it has no `docs/games/<type>.md` (step 5). All three (board, skeleton, doc)
-     must exist or these suites go red.
+     if it has no `docs/games/<type>.md` (step 5). All three - board, skeleton, doc
+     - must exist or these suites go red.
 
 5. **Document the game (required).** Write `docs/games/<type>.md` - create the
    `docs/games/` folder if it doesn't exist, and name the file exactly after the

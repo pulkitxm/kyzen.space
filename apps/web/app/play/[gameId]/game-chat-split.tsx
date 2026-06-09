@@ -2,6 +2,7 @@
 
 import { useAtomValue } from "jotai";
 import {
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -12,7 +13,6 @@ import { clientFetch } from "@/lib/api-client";
 import { conversationUnreadAtomFamily } from "@/lib/chat/atoms";
 import {
   type ChatLayout,
-  type ChatMode,
   clampChatWidth,
   clampGeometry,
   type IconPos,
@@ -22,6 +22,7 @@ import {
   readChatLayout,
   type StashEdge,
 } from "@/lib/chat-layout";
+import { startPointerDrag } from "@/lib/pointer-drag";
 import { cn } from "@/lib/utils";
 import { ChatFloatingIcon } from "./chat-floating-icon";
 import { ChatPopoutWindow } from "./chat-popout-window";
@@ -44,60 +45,33 @@ export function GameChatSplit({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [mode, setMode] = useState<ChatMode>(initialLayout.mode);
-  const [chatWidth, setChatWidth] = useState(initialLayout.chatWidth);
-  const [geometry, setGeometry] = useState<PopoutGeometry>(
-    initialLayout.popout,
-  );
-  const [minimized, setMinimized] = useState(initialLayout.minimized);
-  const [stashEdge, setStashEdge] = useState<StashEdge | null>(
-    initialLayout.stashEdge,
-  );
-  const [lastStashEdge, setLastStashEdge] = useState<StashEdge>(
-    initialLayout.lastStashEdge,
-  );
-  const [icon, setIcon] = useState<IconPos>(initialLayout.icon);
+  const [layout, setLayout] = useState<ChatLayout>(initialLayout);
   const [tab, setTab] = useState<"game" | "chat">("game");
 
-  const modeRef = useRef(mode);
-  const widthRef = useRef(chatWidth);
-  const geomRef = useRef(geometry);
-  const minimizedRef = useRef(minimized);
-  const stashRef = useRef(stashEdge);
-  const lastStashRef = useRef(lastStashEdge);
-  const iconRef = useRef(icon);
-  modeRef.current = mode;
-  widthRef.current = chatWidth;
-  geomRef.current = geometry;
-  minimizedRef.current = minimized;
-  stashRef.current = stashEdge;
-  lastStashRef.current = lastStashEdge;
-  iconRef.current = icon;
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persist = useCallback((override?: Partial<ChatLayout>) => {
-    const layout: ChatLayout = {
-      mode: override?.mode ?? modeRef.current,
-      minimized: override?.minimized ?? minimizedRef.current,
-      stashEdge:
-        override?.stashEdge !== undefined
-          ? override.stashEdge
-          : stashRef.current,
-      lastStashEdge: override?.lastStashEdge ?? lastStashRef.current,
-      chatWidth: override?.chatWidth ?? widthRef.current,
-      popout: override?.popout ?? geomRef.current,
-      icon: override?.icon ?? iconRef.current,
-    };
-    persistChatLayout(layout);
+    const next: ChatLayout = { ...layoutRef.current, ...override };
+    persistChatLayout(next);
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       void clientFetch("/api/profiles/me/chat-layout", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: layout.mode }),
+        body: JSON.stringify({ mode: next.mode }),
       }).catch(() => {});
     }, SAVE_DEBOUNCE_MS);
   }, []);
+
+  const update = useCallback(
+    (patch: Partial<ChatLayout>) => {
+      setLayout((p) => ({ ...p, ...patch }));
+      persist(patch);
+    },
+    [persist],
+  );
 
   useEffect(() => {
     return () => {
@@ -110,24 +84,27 @@ export function GameChatSplit({
     if (!layoutTrusted) {
       const ls = readChatLayout();
       if (ls) {
-        setMode(isDesktop ? ls.mode : "mounted");
-        setChatWidth(ls.chatWidth);
-        setGeometry(ls.popout);
-        setMinimized(isDesktop ? ls.minimized : false);
-        setStashEdge(ls.stashEdge);
-        setLastStashEdge(ls.lastStashEdge);
-        setIcon(ls.icon);
+        setLayout({
+          ...ls,
+          mode: isDesktop ? ls.mode : "mounted",
+          minimized: isDesktop ? ls.minimized : false,
+        });
         return;
       }
     }
-    if (!isDesktop) setMode((m) => (m === "popout" ? "mounted" : m));
+    if (!isDesktop) {
+      setLayout((p) => (p.mode === "popout" ? { ...p, mode: "mounted" } : p));
+    }
   }, [layoutTrusted]);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      setChatWidth((w) => clampChatWidth(w, el.clientWidth));
+      setLayout((p) => ({
+        ...p,
+        chatWidth: clampChatWidth(p.chatWidth, el.clientWidth),
+      }));
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -135,9 +112,10 @@ export function GameChatSplit({
 
   useEffect(() => {
     const onResize = () =>
-      setGeometry((g) =>
-        clampGeometry(g, window.innerWidth, window.innerHeight),
-      );
+      setLayout((p) => ({
+        ...p,
+        popout: clampGeometry(p.popout, window.innerWidth, window.innerHeight),
+      }));
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -146,80 +124,80 @@ export function GameChatSplit({
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
     const onChange = () => {
-      if (!mq.matches && modeRef.current === "popout") {
-        setMode("mounted");
-        persist({ mode: "mounted" });
+      if (mq.matches) return;
+      const cur = layoutRef.current;
+      const patch: Partial<ChatLayout> = {};
+      if (cur.mode === "popout") patch.mode = "mounted";
+      if (cur.minimized) {
+        patch.minimized = false;
+        patch.stashEdge = null;
       }
-      if (!mq.matches && minimizedRef.current) {
-        setMinimized(false);
-        setStashEdge(null);
-        persist({ minimized: false, stashEdge: null });
-      }
+      if (Object.keys(patch).length > 0) update(patch);
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, [persist]);
+  }, [update]);
 
   const startDrag = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
+    (e: ReactMouseEvent) => {
       const el = containerRef.current;
       if (!el) return;
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-      const onMove = (ev: MouseEvent) => {
-        const rect = el.getBoundingClientRect();
-        setChatWidth(clampChatWidth(rect.right - ev.clientX, el.clientWidth));
-      };
-      const onUp = () => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-        persist();
-      };
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+      startPointerDrag(e, {
+        cursor: "col-resize",
+        onMove: (ev) => {
+          const rect = el.getBoundingClientRect();
+          setLayout((p) => ({
+            ...p,
+            chatWidth: clampChatWidth(rect.right - ev.clientX, el.clientWidth),
+          }));
+        },
+        onEnd: () => persist(),
+      });
     },
     [persist],
   );
 
-  const popOut = useCallback(() => {
-    setMode("popout");
-    persist({ mode: "popout" });
-  }, [persist]);
-
-  const dock = useCallback(() => {
-    setMode("mounted");
-    persist({ mode: "mounted" });
-  }, [persist]);
+  const popOut = useCallback(() => update({ mode: "popout" }), [update]);
+  const dock = useCallback(() => update({ mode: "mounted" }), [update]);
 
   const unread = useAtomValue(conversationUnreadAtomFamily(conversationId));
 
-  const minimize = useCallback(() => {
-    setMinimized(true);
-    setStashEdge(null);
-    persist({ minimized: true, stashEdge: null });
-  }, [persist]);
+  const minimize = useCallback(
+    () => update({ minimized: true, stashEdge: null }),
+    [update],
+  );
 
-  const closeToSide = useCallback(() => {
-    const edge = lastStashRef.current;
-    setMinimized(true);
-    setStashEdge(edge);
-    persist({ minimized: true, stashEdge: edge });
-  }, [persist]);
+  const closeToSide = useCallback(
+    () =>
+      update({ minimized: true, stashEdge: layoutRef.current.lastStashEdge }),
+    [update],
+  );
 
-  const restore = useCallback(() => {
-    setMinimized(false);
-    setStashEdge(null);
-    persist({ minimized: false, stashEdge: null });
-  }, [persist]);
+  const restore = useCallback(
+    () => update({ minimized: false, stashEdge: null }),
+    [update],
+  );
 
   const changeStash = useCallback((edge: StashEdge | null) => {
-    setStashEdge(edge);
-    if (edge) setLastStashEdge(edge);
+    setLayout((p) => ({
+      ...p,
+      stashEdge: edge,
+      lastStashEdge: edge ?? p.lastStashEdge,
+    }));
   }, []);
 
+  const setGeometry = useCallback(
+    (g: PopoutGeometry) => setLayout((p) => ({ ...p, popout: g })),
+    [],
+  );
+
+  const setIcon = useCallback(
+    (i: IconPos) => setLayout((p) => ({ ...p, icon: i })),
+    [],
+  );
+
+  const { mode, chatWidth, minimized, stashEdge, icon } = layout;
+  const geometry = layout.popout;
   const isPopout = mode === "popout";
   const gearShifted = mode === "mounted" && !minimized;
 

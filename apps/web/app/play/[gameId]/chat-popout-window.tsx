@@ -8,6 +8,7 @@ import {
   MIN_CHAT_POPOUT_W,
   type PopoutGeometry,
 } from "@/lib/chat-layout";
+import { startPointerDrag } from "@/lib/pointer-drag";
 import { cn } from "@/lib/utils";
 import { ChatWindowControls } from "./chat-window-controls";
 
@@ -44,32 +45,25 @@ export function ChatPopoutWindow({
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
       if (mode !== "popout") return;
-      e.preventDefault();
       const startX = e.clientX;
       const startY = e.clientY;
       const orig = geomRef.current;
-      const onMove = (ev: MouseEvent) => {
-        onGeometryChange(
-          clampGeometry(
-            {
-              ...geomRef.current,
-              x: orig.x + (ev.clientX - startX),
-              y: orig.y + (ev.clientY - startY),
-            },
-            window.innerWidth,
-            window.innerHeight,
-          ),
-        );
-      };
-      const onUp = () => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        document.body.style.userSelect = "";
-        onCommit();
-      };
-      document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+      startPointerDrag(e, {
+        onMove: (ev) => {
+          onGeometryChange(
+            clampGeometry(
+              {
+                ...geomRef.current,
+                x: orig.x + (ev.clientX - startX),
+                y: orig.y + (ev.clientY - startY),
+              },
+              window.innerWidth,
+              window.innerHeight,
+            ),
+          );
+        },
+        onEnd: onCommit,
+      });
     },
     [mode, onGeometryChange, onCommit],
   );
@@ -77,34 +71,27 @@ export function ChatPopoutWindow({
   const startResize = useCallback(
     (e: React.MouseEvent) => {
       if (mode !== "popout") return;
-      e.preventDefault();
       e.stopPropagation();
       const startX = e.clientX;
       const startY = e.clientY;
       const orig = geomRef.current;
-      const onMove = (ev: MouseEvent) => {
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
-        const w = Math.max(MIN_CHAT_POPOUT_W, orig.w - dx);
-        const h = Math.max(MIN_CHAT_POPOUT_H, orig.h + dy);
-        const x = orig.x + (orig.w - w);
-        onGeometryChange(
-          clampGeometry(
-            { x, y: orig.y, w, h },
-            window.innerWidth,
-            window.innerHeight,
-          ),
-        );
-      };
-      const onUp = () => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        document.body.style.userSelect = "";
-        onCommit();
-      };
-      document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+      startPointerDrag(e, {
+        onMove: (ev) => {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          const w = Math.max(MIN_CHAT_POPOUT_W, orig.w - dx);
+          const h = Math.max(MIN_CHAT_POPOUT_H, orig.h + dy);
+          const x = orig.x + (orig.w - w);
+          onGeometryChange(
+            clampGeometry(
+              { x, y: orig.y, w, h },
+              window.innerWidth,
+              window.innerHeight,
+            ),
+          );
+        },
+        onEnd: onCommit,
+      });
     },
     [mode, onGeometryChange, onCommit],
   );

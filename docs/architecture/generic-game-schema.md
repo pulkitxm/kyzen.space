@@ -1,8 +1,8 @@
-# The Generic Game Schema: How One Schema Fits Every Game
+# The Generic Game Schema - How One Schema Fits Every Game
 
 ## What this is / why it matters
 
-Every game in the lobby (tic-tac-toe today, anything else tomorrow) stores its state in exactly the same three Postgres tables: `game`, `move`, and `game_player`. There are no per-game tables. This page explains **how that model works in practice**: what each column holds, how the `GameDefinition` from `packages/games-core` determines the shape of the JSONB blobs, and what a real game looks like in the database row-by-row.
+Every game in the lobby - tic-tac-toe today, anything else tomorrow - stores its state in exactly the same three Postgres tables: `game`, `move`, and `game_player`. There are no per-game tables. This page explains **how that model works in practice**: what each column holds, how the `GameDefinition` from `packages/games-core` determines the shape of the JSONB blobs, and what a real game looks like in the database row-by-row.
 
 If you want to know how the Drizzle declarations look, see [`database-schema.md`](./database-schema.md). If you want to understand the Zod schemas that own the blob shapes, see [`games-core-schemas.md`](./games-core-schemas.md). This page is the bridge between the two.
 
@@ -10,9 +10,9 @@ If you want to know how the Drizzle declarations look, see [`database-schema.md`
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/database/src/schema.ts:97` | `game` table declaration (`id` UUID PK + public `code`) |
-| `packages/database/src/schema.ts:126` | `move` table declaration |
-| `packages/database/src/schema.ts:141` | `game_player` table declaration |
+| `packages/database/src/schema.ts:98` | `game` table declaration (`id` UUID PK + public `code`) |
+| `packages/database/src/schema.ts:133` | `move` table declaration |
+| `packages/database/src/schema.ts:148` | `game_player` table declaration |
 | `packages/shared/src/types/games/definition.ts` | `GameDefinition<S,I,C>` - the self-describing game unit |
 | `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>` - the `reduce` contract |
 | `packages/shared/src/types/games/tic-tac-toe/schemas.ts` | The Zod schemas that own tic-tac-toe's blob shapes |
@@ -51,16 +51,16 @@ If you want to know how the Drizzle declarations look, see [`database-schema.md`
 └────────────────────────┘          └────────────────────────────┘
 ```
 
-Every JSONB column (`game_state`, `config`, `move_data`) is declared as `jsonb(...).$type<unknown>()`. The database stores bytes; it never inspects or validates the shape. The shape contract lives entirely in the game's Zod schemas inside `@gamelobby/shared`.
+Every JSONB column - `game_state`, `config`, `move_data` - is declared as `jsonb(...).$type<unknown>()`. The database stores bytes; it never inspects or validates the shape. The shape contract lives entirely in the game's Zod schemas inside `@gamelobby/shared`.
 
 ## Two ids: public `code`, internal `uuid`
 
 A `game` row has **two** identifiers and they serve opposite audiences:
 
 - **`id` (uuid PK)** - the *internal* key. It is the FK target for `move.game_id` and `game_player.game_id`, and every repository write (`addMove`, `updateGame`, `listMoves`, `seatPlayer`) is keyed on it. It is **never serialized to clients**.
-- **`code` (text, `unique("game_code_uq")`)** - the *public* key. A short, shareable, human-friendly room code (`GAME_CODE_LENGTH = 6` over the Crockford-base32 `GAME_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"`, which drops I/L/O/U, ~1.07B combinations). It is generated app-side by the column's `$defaultFn(() => generateGameCode())` and is the only game id that crosses the wire.
+- **`code` (text, `unique("game_code_uq")`)** - the *public* key. A short, shareable, human-friendly room code (`GAME_CODE_LENGTH = 6` over the Crockford-base32 `GAME_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"`, which drops I/L/O/U - ~1.07B combinations). It is generated app-side by the column's `$defaultFn(() => generateGameCode())` and is the only game id that crosses the wire.
 
-The seam is `serializeGame` (`apps/server/src/api/serialize.ts:26`), which sets `GameJson.id = row.code`. From there on the **code is the game's identity to clients**: the web builds `/play/<code>`, and the socket `join_room` / `make_move` payloads carry the code as `gameId` (validated by `gameCodeSchema` / `isGameCode`, which `normalizeGameCode` first, uppercasing and mapping I/L→1, O→0 so a typed code is forgiving). The server resolves it back to a row with `games.getGameByCode(code)` (`packages/database/src/repositories/games.ts:96`), then uses `row.id` for all DB work. Because the code is random, `createGame` wraps its insert in a `game_code_uq` collision-retry loop. (Conversations, messages, friendships, users, and profiles are **unchanged**, they keep their UUIDs as the public id; only games moved to codes.)
+The seam is `serializeGame` (`apps/server/src/api/serialize.ts:26`), which sets `GameJson.id = row.code`. From there on the **code is the game's identity to clients**: the web builds `/play/<code>`, and the socket `join_room` / `make_move` payloads carry the code as `gameId` (validated by `gameCodeSchema` / `isGameCode`, which `normalizeGameCode` first - uppercasing and mapping I/L→1, O→0 so a typed code is forgiving). The server resolves it back to a row with `games.getGameByCode(code)` (`packages/database/src/repositories/games.ts:96`), then uses `row.id` for all DB work. Because the code is random, `createGame` wraps its insert in a `game_code_uq` collision-retry loop. (Conversations, messages, friendships, users, and profiles are **unchanged** - they keep their UUIDs as the public id; only games moved to codes.)
 
 ## How a `GameDefinition` maps to the columns
 
@@ -90,7 +90,7 @@ The mapping to the database is direct:
 
 The engine and its Zod schemas are the same code the web client imports (`apps/web` → `@gamelobby/games-core` for the engine, `@gamelobby/shared` for the schemas + types) - the server never has a separate validation step. Zod is the single source of truth for what's a valid `game_state` or `move_data`.
 
-## Worked example: tic-tac-toe in the database
+## Worked example - tic-tac-toe in the database
 
 Tic-tac-toe's schemas (`packages/shared/src/types/games/tic-tac-toe/schemas.ts`):
 
@@ -203,7 +203,7 @@ game row (updated)
 
 ### Phase 4 - Bob replies `{1,0}` then `{2,1}`; Alice completes the top row and wins
 
-Play alternates `X, O, X, O, X`: Bob takes `{1,0}` (move 2), Alice `{0,1}` (move 3), Bob `{2,1}` (move 4), and Alice closes the top row with `{0,2}` (move 5). On that last move `reduce` returns a `ReduceResult` whose `outcome` is `{ status: "completed", winnerRole: "X", draw: false }` (the `Outcome` shape from `packages/shared/src/types/games/engine.ts:1`, a *role* string, **not** a user id). `finalize` (`turn-based.ts:74`) maps `winnerRole` → the winning `user_id`, writes it to `game.winner`, flips `status` to `"completed"`, sets `completedAt`, and bumps each player's stats.
+Play alternates `X, O, X, O, X`: Bob takes `{1,0}` (move 2), Alice `{0,1}` (move 3), Bob `{2,1}` (move 4), and Alice closes the top row with `{0,2}` (move 5). On that last move `reduce` returns a `ReduceResult` whose `outcome` is `{ status: "completed", winnerRole: "X", draw: false }` (the `Outcome` shape from `packages/shared/src/types/games/engine.ts:1` - a *role* string, **not** a user id). `finalize` (`turn-based.ts:74`) maps `winnerRole` → the winning `user_id`, writes it to `game.winner`, flips `status` to `"completed"`, sets `completedAt`, and bumps each player's stats.
 
 ```
 game row (final)
@@ -286,7 +286,7 @@ After `step` resolves the tick, a new `game_state` is written with the outcome a
 
 ## Edge cases the model absorbs
 
-**Hidden information.** The server stores the *complete* game state in `game_state`, including cards dealt to each player. The current `GameEngine` contract has no per-role projection (it broadcasts the full state) but the storage model leaves room for one: a `serialize(state, forRole)` step could strip the parts a role should not see before broadcast. The DB holds the full truth; the wire would carry only what each seat is allowed to know.
+**Hidden information.** The server stores the *complete* game state in `game_state`, including cards dealt to each player. The current `GameEngine` contract has no per-role projection - it broadcasts the full state - but the storage model leaves room for one: a `serialize(state, forRole)` step could strip the parts a role should not see before broadcast. The DB holds the full truth; the wire would carry only what each seat is allowed to know.
 
 **Randomness and shuffles.** Shuffled decks, dice rolls, and other randomness live inside `createInitialState` or `reduce` - they are computed at the app layer and stored in `game_state`. The DB receives a deterministic snapshot; randomness never reaches the schema.
 
@@ -307,27 +307,27 @@ each additional player joins
   → role = engine.roles[players.length]               (turn-based.ts:58)
   → insert game_player row (role, seat_order)          (turn-based.ts:63)
   → if min players reached:
-      update game row (status "active", startedAt)     (turn-based.ts:64)
-      game_state kept as-is (gameState ?? …)           (turn-based.ts:67)
+      update game row (status "active", startedAt)     (turn-based.ts:68)
+      game_state kept as-is (gameState ?? …)           (turn-based.ts:71)
 
 client emits make_move { gameId, moveData }
-  → def.moveSchema.safeParse(moveData)                (turn-based.ts:143)
-  → def.stateSchema.safeParse(row.gameState)          (turn-based.ts:145)
-  → result = def.engine.reduce(state, { role }, input) (turn-based.ts:148)
-  → insert move row (move_data, move_number)          (turn-based.ts:156)
-  → update game row (game_state: result.state)        (turn-based.ts:163)
-  → if outcome.status === "completed": finalize       (turn-based.ts:164)
+  → def.moveSchema.safeParse(moveData)                (turn-based.ts:147)
+  → def.stateSchema.safeParse(row.gameState)          (turn-based.ts:149)
+  → result = def.engine.reduce(state, { role }, input) (turn-based.ts:152)
+  → insert move row (move_data, move_number)          (turn-based.ts:160)
+  → update game row (game_state: result.state)        (turn-based.ts:167)
+  → if outcome.status === "completed": finalize       (turn-based.ts:168)
       set winner, status "completed", bump stats
 
-server broadcasts move_made + game_state to room      (turn-based.ts:166)
+server broadcasts one game_state { game, move } to room (turn-based.ts:170)
 ```
 
 ## Gotchas & invariants
 
 - **`game_state` is `unknown` until `safeParse`'d.** Read the raw row and you have bytes. The repository hands you an `unknown`; the caller is responsible for parsing it through the game's Zod schema before passing it to the engine.
 - **`move_number` is dense and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` rejects a double-submit at the constraint level - the server does not need an advisory lock.
-- **Role assignment is seat-order-dependent.** The creator takes `engine.roles[0]` at creation (`games-in-chat-service.ts:118`); each later joiner takes `engine.roles[players.length]`, evaluated *before* their `game_player` row is inserted (`turn-based.ts:58`). Seat `i` always gets `roles[i]` - you cannot choose your role. (A **rematch** instead pre-seats every prior player up front in `computeRematchSeating` order, loser-first for 2 players, so seat 0 / `roles[0]` goes to the loser; see [`realtime.md`](./realtime.md).)
-- **`createInitialState` fires once, at creation.** `createGameInConversation` mints the initial `game_state` in the creating insert (`games-in-chat-service.ts:130`), not when the last seat fills. The `gameRow.gameState ?? engine.createInitialState(...)` guard on join (`turn-based.ts:67`) is a fallback the normal flow never triggers, because the state already exists. Reaching `"active"` only flips `status`; it does not re-mint state.
+- **Role assignment is seat-order-dependent.** The creator takes `engine.roles[0]` at creation (`games-in-chat-service.ts:118`); each later joiner takes `engine.roles[players.length]`, evaluated *before* their `game_player` row is inserted (`turn-based.ts:58`). Seat `i` always gets `roles[i]` - you cannot choose your role. (A **rematch** instead pre-seats every prior player up front in `computeRematchSeating` order - loser-first for 2 players - so seat 0 / `roles[0]` goes to the loser; see [`realtime.md`](./realtime.md).)
+- **`createInitialState` fires once, at creation.** `createGameInConversation` mints the initial `game_state` in the creating insert (`games-in-chat-service.ts:130`), not when the last seat fills. The `gameRow.gameState ?? engine.createInitialState(...)` guard on join (`turn-based.ts:71`) is a fallback the normal flow never triggers, because the state already exists. Reaching `"active"` only flips `status`; it does not re-mint state.
 - **`move.player_id` is plain `text`, not a foreign key.** It stores the mover's `user.id` but declares no `references()` constraint - same for `game_player.user_id`. (`user.id` is Better Auth `text`; the game tables hold it without an FK.)
 - **The public id is `code`; the FK/PK id is `uuid`.** Clients only ever see and send the short `code` (`/play/<code>`, socket `gameId`); the server resolves it with `getGameByCode` and uses the internal `uuid` for FK joins and writes. `serializeGame` maps `row.code → GameJson.id`, so the UUID never leaves the server. Only **games** moved to codes - conversations/messages/friendships/users/profiles keep their UUIDs.
 - **No per-game tables, ever.** If you find yourself thinking "I need a `connect_four_state` column," the answer is: add it to the state schema and let it live in `game_state`.

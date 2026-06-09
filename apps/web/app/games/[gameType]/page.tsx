@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GameLobby } from "@/app/games/_shared/game-lobby";
-import { BackLink, PageContainer, PageHeader } from "@/components/ui/page";
+import { PageContainer, PageHeader } from "@/components/ui/page";
 import { getServerSession } from "@/lib/get-server-session";
 
 export const metadata: Metadata = {
@@ -26,13 +26,10 @@ export default async function GameLobbyPage({
 
   return (
     <PageContainer>
-      <BackLink href="/">← All games</BackLink>
-      <div className="mt-6">
-        <PageHeader
-          title={def.meta.name}
-          description="Games happen inside your chats - pick a friend or group to play with."
-        />
-      </div>
+      <PageHeader
+        title={def.meta.name}
+        description="Games happen inside your chats - pick a friend or group to play with."
+      />
 
       <GameLobby
         meta={def.meta}

@@ -1,23 +1,24 @@
 "use client";
 
+import { atom, useSetAtom } from "jotai";
 import {
   createContext,
   type ReactNode,
   use,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { io, type Socket } from "socket.io-client";
 
-type SocketStatus = "connecting" | "connected" | "disconnected";
+export type SocketStatus = "connecting" | "connected" | "disconnected";
 
-type SocketContextValue = { socket: Socket | null; status: SocketStatus };
+export const socketStatusAtom = atom<SocketStatus>("disconnected");
 
-const SocketContext = createContext<SocketContextValue>({
-  socket: null,
-  status: "disconnected",
-});
+type SocketContextValue = { socket: Socket | null };
+
+const SocketContext = createContext<SocketContextValue>({ socket: null });
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -29,14 +30,13 @@ export function SocketProvider({
   enabled: boolean;
   children: ReactNode;
 }) {
-  const [conn, setConn] = useState<SocketContextValue>({
-    socket: null,
-    status: "disconnected",
-  });
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const setStatus = useSetAtom(socketStatusAtom);
 
   useEffect(() => {
     if (!enabled) {
-      setConn({ socket: null, status: "disconnected" });
+      setSocket(null);
+      setStatus("disconnected");
       return;
     }
     const url =
@@ -50,23 +50,23 @@ export function SocketProvider({
       reconnectionDelay: 500,
       reconnectionDelayMax: 5000,
     });
-    setConn({ socket: s, status: "connecting" });
-    s.on("connect", () => setConn((c) => ({ ...c, status: "connected" })));
-    s.on("disconnect", () =>
-      setConn((c) => ({ ...c, status: "disconnected" })),
-    );
-    s.io.on("reconnect_attempt", () =>
-      setConn((c) => ({ ...c, status: "connecting" })),
-    );
+    setSocket(s);
+    setStatus("connecting");
+    s.on("connect", () => setStatus("connected"));
+    s.on("disconnect", () => setStatus("disconnected"));
+    s.io.on("reconnect_attempt", () => setStatus("connecting"));
 
     return () => {
       s.disconnect();
-      setConn({ socket: null, status: "disconnected" });
+      setSocket(null);
+      setStatus("disconnected");
     };
-  }, [enabled]);
+  }, [enabled, setStatus]);
+
+  const value = useMemo(() => ({ socket }), [socket]);
 
   return (
-    <SocketContext.Provider value={conn}>{children}</SocketContext.Provider>
+    <SocketContext.Provider value={value}>{children}</SocketContext.Provider>
   );
 }
 

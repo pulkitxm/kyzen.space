@@ -1,4 +1,8 @@
-import type { GameCardMeta, SeriesScore } from "@gamelobby/shared/types";
+import {
+  type GameCardMeta,
+  resolveWinnerUsername,
+  type SeriesScore,
+} from "@gamelobby/shared/types";
 
 export type GameCardSnapshot = {
   status: string;
@@ -13,10 +17,7 @@ export function enrichGameCardMeta(
   game: GameCardSnapshot | null,
 ): GameCardMeta {
   if (!game) return base;
-  const winnerUsername =
-    game.winner && game.winner !== "draw"
-      ? (game.players.find((p) => p.userId === game.winner)?.username ?? null)
-      : null;
+  const winnerUsername = resolveWinnerUsername(game.winner, game.players);
   return {
     ...base,
     status: game.status,
