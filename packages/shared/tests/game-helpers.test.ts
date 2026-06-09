@@ -11,6 +11,19 @@ describe("isGameOver", () => {
     expect(isGameOver("waiting")).toBe(false);
     expect(isGameOver("active")).toBe(false);
   });
+
+  test("false for an unknown status string", () => {
+    expect(isGameOver("paused")).toBe(false);
+  });
+
+  test("false for the empty string", () => {
+    expect(isGameOver("")).toBe(false);
+  });
+
+  test("is case-sensitive", () => {
+    expect(isGameOver("Completed")).toBe(false);
+    expect(isGameOver("COMPLETED")).toBe(false);
+  });
 });
 
 describe("isGameLive", () => {
@@ -22,6 +35,20 @@ describe("isGameLive", () => {
   test("false for completed and abandoned", () => {
     expect(isGameLive("completed")).toBe(false);
     expect(isGameLive("abandoned")).toBe(false);
+  });
+
+  test("false for an unknown status string", () => {
+    expect(isGameLive("paused")).toBe(false);
+  });
+
+  test("false for the empty string", () => {
+    expect(isGameLive("")).toBe(false);
+  });
+
+  test("is the complement of isGameOver for every known status", () => {
+    for (const status of ["waiting", "active", "completed", "abandoned"]) {
+      expect(isGameLive(status)).toBe(!isGameOver(status));
+    }
   });
 });
 
@@ -45,5 +72,30 @@ describe("resolveWinnerUsername", () => {
 
   test("returns null when the winner id is not among players", () => {
     expect(resolveWinnerUsername("u9", players)).toBe(null);
+  });
+
+  test("returns null for an empty-string winner id", () => {
+    expect(resolveWinnerUsername("", players)).toBe(null);
+  });
+
+  test("returns null when players is empty", () => {
+    expect(resolveWinnerUsername("u1", [])).toBe(null);
+  });
+
+  test("matches the winner id exactly (case-sensitive)", () => {
+    expect(resolveWinnerUsername("U1", players)).toBe(null);
+  });
+
+  test("returns the first matching player's username on duplicate ids", () => {
+    const dupes = [
+      { userId: "u1", username: "first" },
+      { userId: "u1", username: "second" },
+    ];
+    expect(resolveWinnerUsername("u1", dupes)).toBe("first");
+  });
+
+  test("treats the literal draw sentinel as a draw even if a player has that id", () => {
+    const odd = [{ userId: "draw", username: "trickster" }];
+    expect(resolveWinnerUsername("draw", odd)).toBe(null);
   });
 });
