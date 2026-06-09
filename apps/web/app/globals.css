@@ -272,7 +272,7 @@ body {
   background:
     radial-gradient(
       circle at 50% 35%,
-      color-mix(in srgb, #16a34a 36%, transparent),
+      color-mix(in srgb, var(--primary) 32%, transparent),
       transparent 52%
     ),
     repeating-linear-gradient(
@@ -280,7 +280,12 @@ body {
       color-mix(in srgb, #ffffff 4%, transparent) 0 1px,
       transparent 1px 5px
     ),
-    linear-gradient(145deg, #075a31, #063f28 48%, #052d20);
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--primary) 55%, var(--primary-dark)),
+      color-mix(in srgb, var(--primary-dark) 92%, black) 48%,
+      color-mix(in srgb, var(--primary-dark) 96%, black)
+    );
 }
 
 .old-maid-fan {

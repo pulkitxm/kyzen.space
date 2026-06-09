@@ -9,7 +9,7 @@ export function OldMaidSkeleton() {
         <SkeletonBox className="size-3 rounded-full" />
         <SkeletonBox className="h-4 w-48" />
       </div>
-      <div className="old-maid-table flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-xl border border-emerald-950/40">
+      <div className="old-maid-table flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-xl border border-primary-dark/40">
         <SkeletonBox className="mx-4 mt-3 h-5 w-40 bg-white/25" />
         <div className="old-maid-fan old-maid-opponent-fan mt-2 w-full">
           {CARDS.map((card) => (

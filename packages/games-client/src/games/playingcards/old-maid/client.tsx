@@ -552,7 +552,7 @@ function TurnBanner({
   const tone = mine
     ? "border-amber-300/80 bg-amber-500/20 text-amber-50"
     : picking
-      ? "border-emerald-300/80 bg-emerald-500/25 text-emerald-50"
+      ? "border-primary/80 bg-primary/25 text-primary-foreground"
       : "border-white/20 bg-black/30 text-white/85";
 
   const label = mine
@@ -1397,7 +1397,9 @@ export function OldMaidGameClient({
               New card is last — shuffle or keep order
             </p>
           ) : canDraw ? (
-            <p className="text-emerald-200 text-xs">Your turn — pick a card</p>
+            <p className="text-primary-foreground/80 text-xs">
+              Your turn — pick a card
+            </p>
           ) : (
             <p className="text-white/60 text-xs">
               {roleName(game.players, state.currentTurn)} picks next
@@ -1505,7 +1507,7 @@ export function OldMaidGameClient({
         : null}
 
       <section
-        className={`old-maid-table relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-xl border border-emerald-950/40 shadow-black/25 shadow-inner ${animating ? "old-maid-animating" : ""}`}
+        className={`old-maid-table relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-xl border border-primary-dark/40 shadow-black/25 shadow-inner ${animating ? "old-maid-animating" : ""}`}
       >
         {isPast && showResult ? (
           <GameResultPanel game={game} playerStats={playerStats} />
@@ -1519,7 +1521,7 @@ export function OldMaidGameClient({
               type="button"
               onClick={() => emitHandOrder("keepOrder")}
               disabled={shufflingRole !== null}
-              className="rounded-lg border border-white/30 bg-black/40 px-3 py-2 text-sm text-white/90 ring-2 ring-emerald-300/90 transition hover:bg-black/55 disabled:opacity-60"
+              className="rounded-lg border border-white/30 bg-black/40 px-3 py-2 text-sm text-white/90 ring-2 ring-primary/90 transition hover:bg-black/55 disabled:opacity-60"
             >
               Keep order
             </button>
@@ -1527,7 +1529,7 @@ export function OldMaidGameClient({
               type="button"
               onClick={() => void handleShuffle()}
               disabled={shufflingRole !== null}
-              className="rounded-lg border border-white/30 bg-black/40 px-3 py-2 text-sm text-white/90 ring-2 ring-emerald-300/90 transition hover:bg-black/55 disabled:opacity-60"
+              className="rounded-lg border border-white/30 bg-black/40 px-3 py-2 text-sm text-white/90 ring-2 ring-primary/90 transition hover:bg-black/55 disabled:opacity-60"
             >
               Shuffle
             </button>
