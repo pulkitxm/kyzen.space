@@ -287,7 +287,6 @@ export function ComposerPicker({
     const needGifs = q.trim().length > 0 || tab === "gif";
     if (!needGifs) return;
     if (gifScrollRef.current) gifScrollRef.current.scrollTop = 0;
-    setError(false);
   }, [q, tab]);
 
   useEffect(() => {
@@ -316,6 +315,16 @@ export function ComposerPicker({
     onEmoji(native);
   };
 
+  const changeQuery = (value: string) => {
+    setQ(value);
+    setError(false);
+  };
+
+  const selectTab = (next: Tab) => {
+    setTab(next);
+    setError(false);
+  };
+
   const showSkeletons =
     !error && gifs.length === 0 && (loading || !cache.has(query));
 
@@ -324,7 +333,7 @@ export function ComposerPicker({
       <input
         ref={searchRef}
         value={q}
-        onChange={(e) => setQ(e.target.value)}
+        onChange={(e) => changeQuery(e.target.value)}
         aria-label="Search emoji & GIFs"
         placeholder="Search emoji & GIFs"
         className="m-2 rounded-lg border border-border bg-surface-raised px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -392,7 +401,7 @@ export function ComposerPicker({
         <div className="flex shrink-0 border-border border-t">
           <button
             type="button"
-            onClick={() => setTab("emoji")}
+            onClick={() => selectTab("emoji")}
             className={cn(
               "flex flex-1 items-center justify-center gap-1.5 border-b-2 py-2 text-sm outline-none transition",
               tab === "emoji"
@@ -405,7 +414,7 @@ export function ComposerPicker({
           </button>
           <button
             type="button"
-            onClick={() => setTab("gif")}
+            onClick={() => selectTab("gif")}
             className={cn(
               "flex flex-1 items-center justify-center gap-1.5 border-b-2 py-2 text-sm outline-none transition",
               tab === "gif"
