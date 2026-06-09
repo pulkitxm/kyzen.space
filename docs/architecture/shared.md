@@ -75,7 +75,7 @@ So the runtime edge is one-way (`types` → `constants`), while the type edge po
 
 `THEME_IDS` (`constants/theme.ts:3`, a `readonly` tuple) is the seed everything else derives from:
 
-`THEME_IDS` (`constants/theme.ts:3`) -> `themeIdSchema = z.enum(THEME_IDS)` (`types/theme.ts:4`) -> `type ThemeId = z.infer<typeof themeIdSchema>` (`types/theme.ts:5`) -> `DEFAULT_THEME = "amber" as const satisfies ThemeId` (checked against that type, `constants/theme.ts:17`) -> consumed by the Postgres enum `themeEnum = pgEnum("app_theme", THEME_IDS)` in `@gamelobby/database` (`packages/database/src/schema.ts:37`) **and** by the web palette table (`apps/web/lib/themes.ts`, which re-exports the shared core and adds the presentation-only palette).
+`THEME_IDS` (`constants/theme.ts:3`) -> `themeIdSchema = z.enum(THEME_IDS)` (`types/theme.ts:4`) -> `type ThemeId = z.infer<typeof themeIdSchema>` (`types/theme.ts:5`) -> `DEFAULT_THEME = "amber" as const satisfies ThemeId` (checked against that type, `constants/theme.ts:17`) -> consumed by the Postgres enum `themeEnum = pgEnum("app_theme", THEME_IDS)` in `@gamelobby/database` (`packages/database/src/schema.ts:38`) **and** by the web palette table (`apps/web/lib/themes.ts`, which re-exports the shared core and adds the presentation-only palette).
 
 One tuple, and the DB enum, the Zod validator, the TS union, and the default value can never disagree.
 

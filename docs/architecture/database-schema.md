@@ -10,9 +10,9 @@ One decision dominates the design: **every game is stored in the same three gene
 
 There are no `tic_tac_toe` or `connect_four` tables. Every game — whatever its rules — lives in three tables:
 
-- **`game`** — one row per game, with a `game_state` JSONB blob (`schema.ts:97`)
-- **`move`** — an append-only log, one row per move, with a `move_data` JSONB blob (`schema.ts:126`)
-- **`game_player`** — one indexed row per seat (`schema.ts:141`)
+- **`game`** — one row per game, with a `game_state` JSONB blob (`schema.ts:98`)
+- **`move`** — an append-only log, one row per move, with a `move_data` JSONB blob (`schema.ts:133`)
+- **`game_player`** — one indexed row per seat (`schema.ts:148`)
 
 `game_state` / `config` / `move_data` are all typed `jsonb(...).$type<unknown>()` — the database is **deliberately ignorant** of what's inside. The truth about those blobs lives in each game's strict Zod `stateSchema` / `moveSchema` / `configSchema` (see [`games-core-schemas.md`](./games-core-schemas.md)), and the server validates the blob against those schemas before the engine ever sees it.
 
@@ -24,21 +24,21 @@ A Drizzle table is a `pgTable(name, columns, (t) => [constraints])` call. Each c
 
 | Piece | What it does | Example |
 | --- | --- | --- |
-| `pgTable("game", {…}, (t) => […])` | Declares a table: name, column map, optional index/constraint list. | `game` (`schema.ts:97`) |
+| `pgTable("game", {…}, (t) => […])` | Declares a table: name, column map, optional index/constraint list. | `game` (`schema.ts:98`) |
 | Column types | `text` / `uuid` / `integer` / `boolean` / `timestamp` / `jsonb` map to Postgres types. | `gameType: text("game_type")` |
 | `.primaryKey()` / `.defaultRandom()` | Primary key; server-side random `uuid` default. | `id: uuid("id").defaultRandom().primaryKey()` |
 | `.notNull()` / `.default(v)` / `.defaultNow()` | Nullability and SQL-side defaults. | `createdAt: timestamp(...).defaultNow().notNull()` |
-| `.$defaultFn(() => …)` | A **JS-side** default (runs in the app, not in SQL). | `code: text("code")...$defaultFn(() => generateGameCode())` (`schema.ts:101`); `createdAt: timestamp(...).$defaultFn(() => new Date())` (`schema.ts:49`) |
+| `.$defaultFn(() => …)` | A **JS-side** default (runs in the app, not in SQL). | `code: text("code")...$defaultFn(() => generateGameCode())` (`schema.ts:102`); `createdAt: timestamp(...).$defaultFn(() => new Date())` (`schema.ts:50`) |
 | `.references(() => t.col, { onDelete })` | Foreign key + delete behavior (`cascade` / `set null`). | `gameId: uuid(...).references(() => game.id, { onDelete: "cascade" })` |
 | `.$type<T>()` | **Compile-time-only** cast — narrows the TS type, with **no runtime check**. | `status: text("status").$type<GameStatus>()`; `gameState: jsonb(...).$type<unknown>()` |
-| `pgEnum(name, VALUES)` | A Postgres enum whose values come from a TS constant. | `themeEnum = pgEnum("app_theme", THEME_IDS)` (`schema.ts:37`) |
+| `pgEnum(name, VALUES)` | A Postgres enum whose values come from a TS constant. | `themeEnum = pgEnum("app_theme", THEME_IDS)` (`schema.ts:38`) |
 | `index()` / `unique()` | Table-level index / unique constraint (the third `pgTable` argument). | `unique("move_game_number_uq").on(t.gameId, t.moveNumber)` |
 | `typeof table.$inferSelect` | Drizzle's inferred row type — **asserted equal** to the hand-written row type in `@gamelobby/shared/types`. | `Expect<Equal<typeof game.$inferSelect, GameRow>>` (`drift-guard.ts:44`) |
 
 Two of these carry real weight:
 
-- **`$type<…>()` is a cast, not a guard.** `status`, `seatingMode`, `kind`, `role`, etc. are stored as plain `text` narrowed to a TS union (e.g. `GameStatus`, used at `schema.ts:106`); `game_state` is `jsonb` narrowed to `unknown`. Postgres will not stop you writing an illegal value — the repository is responsible for only inserting legal ones, and a JSONB blob stays untrusted until a Zod `safeParse`.
-- **pgEnums are derived from app constants.** `app_theme` / `color_mode` / `app_pattern` (`schema.ts:37`–`39`) take their values from `THEME_IDS` / `COLOR_MODES` / `PATTERN_IDS` in `@gamelobby/shared/constants`, so the DB enum can never disagree with the app's notion of valid values. They back `userProfile.theme` / `colorMode` / `pattern`.
+- **`$type<…>()` is a cast, not a guard.** `status`, `seatingMode`, `kind`, `role`, etc. are stored as plain `text` narrowed to a TS union (e.g. `GameStatus`, used at `schema.ts:107`); `game_state` is `jsonb` narrowed to `unknown`. Postgres will not stop you writing an illegal value — the repository is responsible for only inserting legal ones, and a JSONB blob stays untrusted until a Zod `safeParse`.
+- **pgEnums are derived from app constants.** `app_theme` / `color_mode` / `app_pattern` (`schema.ts:38`–`40`) take their values from `THEME_IDS` / `COLOR_MODES` / `PATTERN_IDS` in `@gamelobby/shared/constants`, so the DB enum can never disagree with the app's notion of valid values. They back `userProfile.theme` / `colorMode` / `pattern`.
 
 Unlike most Drizzle setups, the `*Row` types are **not** derived with `$inferSelect`. They are hand-written interfaces in `@gamelobby/shared/types` (`types/db/index.ts:39`+) so that `apps/web` — which never imports `@gamelobby/database` (drizzle-orm + `postgres` are server-only) — can still speak the same row shapes. `drift-guard.ts` closes the loop: a list of `Expect<Equal<typeof table.$inferSelect, XRow>>` assertions (`drift-guard.ts:39`) is a compile-time tripwire that fails `type-check` the moment a table and its hand-written row type disagree. `@gamelobby/database` then re-exports those row types so they remain the currency the data-access layer speaks.
 
@@ -91,8 +91,8 @@ export const game = pgTable(
 
 `move` and `game_player` add the constraints that make the generic model safe:
 
-- **`move`** (`schema.ts:126`) — `unique("move_game_number_uq").on(gameId, moveNumber)` keeps move numbers dense and unique per game, so the DB itself rejects a duplicate / double-submit. `onDelete: "cascade"` drops a game's move log with it. `move.game_id` references the UUID `game.id`, not the code.
-- **`game_player`** (`schema.ts:141`) — one row per seat (a normalization of the old `players` JSONB array). `unique("game_player_uq").on(gameId, userId)` makes it impossible to seat a user twice; `index("game_player_user_idx").on(userId)` turns "all games for this user" into a fast indexed join. `seatOrder` preserves turn order; `role` is the engine's per-seat role string (`"X"` / `"O"`). Its `game_id` also references the UUID `game.id`.
+- **`move`** (`schema.ts:133`) — `unique("move_game_number_uq").on(gameId, moveNumber)` keeps move numbers dense and unique per game, so the DB itself rejects a duplicate / double-submit. `onDelete: "cascade"` drops a game's move log with it. `move.game_id` references the UUID `game.id`, not the code.
+- **`game_player`** (`schema.ts:148`) — one row per seat (a normalization of the old `players` JSONB array). `unique("game_player_uq").on(gameId, userId)` makes it impossible to seat a user twice; `index("game_player_user_idx").on(userId)` turns "all games for this user" into a fast indexed join. `seatOrder` preserves turn order; `role` is the engine's per-seat role string (`"X"` / `"O"`). Its `game_id` also references the UUID `game.id`.
 
 ### Auth, chat, social, profile
 

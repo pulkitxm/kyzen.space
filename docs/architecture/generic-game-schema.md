@@ -10,9 +10,9 @@ If you want to know how the Drizzle declarations look, see [`database-schema.md`
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/database/src/schema.ts:97` | `game` table declaration (`id` UUID PK + public `code`) |
-| `packages/database/src/schema.ts:126` | `move` table declaration |
-| `packages/database/src/schema.ts:141` | `game_player` table declaration |
+| `packages/database/src/schema.ts:98` | `game` table declaration (`id` UUID PK + public `code`) |
+| `packages/database/src/schema.ts:133` | `move` table declaration |
+| `packages/database/src/schema.ts:148` | `game_player` table declaration |
 | `packages/shared/src/types/games/definition.ts` | `GameDefinition<S,I,C>` — the self-describing game unit |
 | `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>` — the `reduce` contract |
 | `packages/shared/src/types/games/tic-tac-toe/schemas.ts` | The Zod schemas that own tic-tac-toe's blob shapes |

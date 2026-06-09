@@ -39,7 +39,7 @@ Prerequisites: [Bun](https://bun.sh) `1.3.11+` and Docker (for Postgres).
 ```bash
 bun install                 # install all workspace deps
 cp .env.example .env        # configure env (a single root .env feeds every app)
-bun run db:start            # start Postgres in Docker
+bun run db:start            # start Postgres + Redis in Docker
 bun run db:push             # apply the Drizzle schema to the dev DB
 bun run dev                 # web on :3000 + server on :4000 (watch mode)
 ```
