@@ -247,7 +247,7 @@ export function TicTacToeGameClient({
     return () => window.clearInterval(id);
   }, [isPast, replayPlaying, sortedLen, audio]);
 
-  const [wasLive, setWasLive] = useState(isGameLive(initialGame.status));
+  const [wasLive, setWasLive] = useState(() => isGameLive(initialGame.status));
 
   if (wasLive !== isLive) {
     setWasLive(isLive);
