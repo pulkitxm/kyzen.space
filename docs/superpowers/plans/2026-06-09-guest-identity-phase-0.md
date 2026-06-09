@@ -4,7 +4,7 @@
 
 **Goal:** Let anyone use the app without signing in, by giving guests a real *anonymous* Better Auth account that every existing code path treats identically to a logged-in user.
 
-**Architecture:** Add Better Auth's `anonymous` plugin (server + client). A guest is a real `user` row with `isAnonymous = true`, provisioned with the same username + avatar pipeline as everyone else (but skipping the external genderize.io call). Logged-out visitors get a "Continue as a guest" entry on the auth page; anonymous users get a persistent "Sign in to save your games" nudge. No `isGuest` branching elsewhere — `getServerSession()` already returns a session for anon users, so the socket, chat, games, friends, and notifications all work unchanged.
+**Architecture:** Add Better Auth's `anonymous` plugin (server + client). A guest is a real `user` row with `isAnonymous = true`, provisioned with the same username + avatar pipeline as everyone else (but skipping the external genderize.io call). Logged-out visitors get a "Continue as a guest" entry on the auth page; anonymous users get a persistent "Sign in to save your games" nudge. No `isGuest` branching elsewhere - `getServerSession()` already returns a session for anon users, so the socket, chat, games, friends, and notifications all work unchanged.
 
 **Tech Stack:** Better Auth 1.6.11 (`better-auth/plugins` `anonymous`, `better-auth/client/plugins` `anonymousClient`), Drizzle/Postgres, Next.js 16 App Router, Bun test (`mock.module`).
 
@@ -16,19 +16,19 @@
 
 ## File Structure
 
-- `packages/database/src/schema.ts` — add `isAnonymous` column to the `user` table (modify).
-- `packages/shared/src/types/db/index.ts` — add `isAnonymous` to `UserRow` (modify; keeps `drift-guard` green).
-- `apps/server/src/username.ts` — add a `skipGenderDetection` option to `ensureUsernameForUser` (modify).
-- `apps/server/src/guest-name.ts` — `generateGuestName()` (create).
-- `apps/server/src/auth.ts` — register the `anonymous` plugin; pass `skipGenderDetection` for anon users in the create hook (modify).
-- `apps/web/lib/auth-client.ts` — add `anonymousClient()` (modify).
-- `apps/web/lib/auth/ensure-identity.ts` — `ensureIdentity()` client helper (create).
-- `apps/web/app/auth/guest-button.tsx` — "Continue as a guest" button (create).
-- `apps/web/app/auth/page.tsx` — render the guest button (modify).
-- `apps/web/lib/get-server-session.ts` — add `isAnonymous` to the session user type (modify).
-- `apps/web/app/layout.tsx` — pass `isAnonymous` to the shell (modify).
-- `apps/web/app/app-shell.tsx` — accept `isAnonymous`, render the nudge (modify).
-- `apps/web/app/guest-nudge.tsx` — "Sign in to save" nudge (create).
+- `packages/database/src/schema.ts` - add `isAnonymous` column to the `user` table (modify).
+- `packages/shared/src/types/db/index.ts` - add `isAnonymous` to `UserRow` (modify; keeps `drift-guard` green).
+- `apps/server/src/username.ts` - add a `skipGenderDetection` option to `ensureUsernameForUser` (modify).
+- `apps/server/src/guest-name.ts` - `generateGuestName()` (create).
+- `apps/server/src/auth.ts` - register the `anonymous` plugin; pass `skipGenderDetection` for anon users in the create hook (modify).
+- `apps/web/lib/auth-client.ts` - add `anonymousClient()` (modify).
+- `apps/web/lib/auth/ensure-identity.ts` - `ensureIdentity()` client helper (create).
+- `apps/web/app/auth/guest-button.tsx` - "Continue as a guest" button (create).
+- `apps/web/app/auth/page.tsx` - render the guest button (modify).
+- `apps/web/lib/get-server-session.ts` - add `isAnonymous` to the session user type (modify).
+- `apps/web/app/layout.tsx` - pass `isAnonymous` to the shell (modify).
+- `apps/web/app/app-shell.tsx` - accept `isAnonymous`, render the nudge (modify).
+- `apps/web/app/guest-nudge.tsx` - "Sign in to save" nudge (create).
 - Tests: `apps/server/tests/ensure-username.test.ts`, `apps/server/tests/guest-name.test.ts`, `apps/web/tests/ensure-identity.test.ts`, `apps/web/tests/guest-nudge.test.tsx` (create).
 
 ---
@@ -61,7 +61,7 @@ export type UserRow = {
 - [ ] **Step 2: Run type-check to verify the drift-guard fails**
 
 Run: `bun run type-check`
-Expected: FAIL in `packages/database` — `drift-guard.ts` reports `typeof user.$inferSelect` is not assignable to `UserRow` (missing `isAnonymous`).
+Expected: FAIL in `packages/database` - `drift-guard.ts` reports `typeof user.$inferSelect` is not assignable to `UserRow` (missing `isAnonymous`).
 
 - [ ] **Step 3: Add the column to the `user` table**
 
@@ -173,7 +173,7 @@ describe("ensureUsernameForUser", () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `cd apps/server && bun test tests/ensure-username.test.ts`
-Expected: FAIL — `ensureUsernameForUser` does not accept a third argument / still calls `predictAvatarStyle` when `skipGenderDetection` is set.
+Expected: FAIL - `ensureUsernameForUser` does not accept a third argument / still calls `predictAvatarStyle` when `skipGenderDetection` is set.
 
 - [ ] **Step 3: Implement the option**
 
@@ -246,7 +246,7 @@ describe("generateGuestName", () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `cd apps/server && bun test tests/guest-name.test.ts`
-Expected: FAIL — module `../src/guest-name` does not exist.
+Expected: FAIL - module `../src/guest-name` does not exist.
 
 - [ ] **Step 3: Implement `generateGuestName`**
 
@@ -324,7 +324,7 @@ git commit -m "feat(server): register Better Auth anonymous plugin for guest acc
 
 ---
 
-## Task 4: Web client — `anonymousClient` plugin + `ensureIdentity()`
+## Task 4: Web client - `anonymousClient` plugin + `ensureIdentity()`
 
 **Files:**
 - Modify: `apps/web/lib/auth-client.ts`
@@ -390,7 +390,7 @@ describe("ensureIdentity", () => {
 - [ ] **Step 3: Run the test to verify it fails**
 
 Run: `cd apps/web && bun test tests/ensure-identity.test.ts`
-Expected: FAIL — module `@/lib/auth/ensure-identity` does not exist.
+Expected: FAIL - module `@/lib/auth/ensure-identity` does not exist.
 
 - [ ] **Step 4: Implement `ensureIdentity`**
 
@@ -561,7 +561,7 @@ describe("GuestNudge", () => {
 - [ ] **Step 3: Run the test to verify it fails**
 
 Run: `cd apps/web && bun test tests/guest-nudge.test.tsx`
-Expected: FAIL — module `@/app/guest-nudge` does not exist.
+Expected: FAIL - module `@/app/guest-nudge` does not exist.
 
 - [ ] **Step 4: Implement the nudge**
 
@@ -694,11 +694,11 @@ Expected: PASS across workspaces (new tests: `ensure-username`, `guest-name`, `e
 
 ## Self-review notes (coverage against spec §5.1)
 
-- Anon = real account via `anonymous()` plugin — Task 3. ✅
-- `isAnonymous` schema + `UserRow` — Task 1. ✅
-- Auto username/avatar via existing hook, skipping the external genderize call — Tasks 2–3. ✅
-- `ensureIdentity()` lazy-mint helper (reused by Phases 2–3) — Task 4. ✅
-- Guest entry point — Task 5 (auth page). Lobby/play entry deferred to Phases 2/3 per scope note. ✅
-- "Sign in to save" nudge keyed on `isAnonymous` — Task 6. ✅
-- `disableDeleteAnonymousUser: true` set now so Phase 1 adds `onLinkAccount` without reconfiguring — Task 3. ✅
+- Anon = real account via `anonymous()` plugin - Task 3. ✅
+- `isAnonymous` schema + `UserRow` - Task 1. ✅
+- Auto username/avatar via existing hook, skipping the external genderize call - Tasks 2-3. ✅
+- `ensureIdentity()` lazy-mint helper (reused by Phases 2-3) - Task 4. ✅
+- Guest entry point - Task 5 (auth page). Lobby/play entry deferred to Phases 2/3 per scope note. ✅
+- "Sign in to save" nudge keyed on `isAnonymous` - Task 6. ✅
+- `disableDeleteAnonymousUser: true` set now so Phase 1 adds `onLinkAccount` without reconfiguring - Task 3. ✅
 - Out of this phase: merge (`onLinkAccount`, `account_merge`), matchmaking, invites.
