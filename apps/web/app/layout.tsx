@@ -61,6 +61,7 @@ export default async function RootLayout({
 }>) {
   const session = await getServerSession();
   const signedIn = Boolean(session?.user);
+  const isAnonymous = Boolean(session?.user?.isAnonymous);
 
   let username: string | null = null;
   let avatar: AvatarConfig | null = null;
@@ -170,6 +171,7 @@ export default async function RootLayout({
             avatar={avatar}
             userId={session?.user?.id ?? null}
             signedIn={signedIn}
+            isAnonymous={isAnonymous}
             profileHref={profileHref}
             sidebarPrefsTrusted={sidebarPrefsTrusted}
             sidebarPrefs={sidebarPrefs}

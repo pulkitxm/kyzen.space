@@ -1,7 +1,9 @@
 import { db, schema } from "@gamelobby/database";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { anonymous } from "better-auth/plugins";
 import { env, googleConfigured } from "./env";
+import { generateGuestName } from "./guest-name";
 import { childLogger } from "./logger";
 import { ensureUsernameForUser } from "./username";
 
@@ -12,6 +14,12 @@ const auth = betterAuth({
   baseURL: env.betterAuthUrl,
   trustedOrigins: [env.webUrl],
   database: drizzleAdapter(db, { provider: "pg", schema }),
+  plugins: [
+    anonymous({
+      disableDeleteAnonymousUser: true,
+      generateName: () => generateGuestName(),
+    }),
+  ],
   socialProviders: googleConfigured()
     ? {
         google: {
@@ -25,12 +33,15 @@ const auth = betterAuth({
       create: {
         after: async (createdUser) => {
           try {
+            const isAnon =
+              (createdUser as { isAnonymous?: boolean }).isAnonymous === true;
             const username = await ensureUsernameForUser(
               createdUser.id,
               createdUser.name,
+              { skipGenderDetection: isAnon },
             );
             log.info(
-              { userId: createdUser.id, username },
+              { userId: createdUser.id, username, isAnon },
               "provisioned profile on first sign-in",
             );
           } catch (err) {

@@ -2,22 +2,25 @@
 
 ## What this is / why it matters
 
-GameLobby has exactly **one** notion of identity, and it lives on the **server**. Authentication is implemented with [Better Auth](https://better-auth.com), configured once in `apps/server/src/auth.ts:10`, mounted as a catch-all route at `/api/auth/*`, and backed by four Drizzle/Postgres tables (`user`, `session`, `account`, `verification`). Sign-in is **Google OAuth only** today (email/password is stubbed out in the UI). The server is the sole issuer and validator of session cookies; the Next.js frontend never mints or inspects credentials itself - it always asks the server.
+GameLobby has exactly **one** notion of identity, and it lives on the **server**. Authentication is implemented with [Better Auth](https://better-auth.com), configured once in `apps/server/src/auth.ts:12`, mounted as a catch-all route at `/api/auth/*`, and backed by four Drizzle/Postgres tables (`user`, `session`, `account`, `verification`). Sign-in is **Google OAuth** or an **anonymous guest session** today (email/password is stubbed out in the UI). The server is the sole issuer and validator of session cookies; the Next.js frontend never mints or inspects credentials itself - it always asks the server.
+
+A **guest is a real identity, not a sessionless escape hatch.** The Better Auth `anonymous` plugin (`apps/server/src/auth.ts:18`) mints a genuine `user` row with `isAnonymous = true` and a throwaway email, so a guest gets the exact same session cookie, the same provisioned `user_profile` (username + avatar), and the same authenticated socket/REST lanes as a Google user. Everything downstream of identity - chat, presence, games - is identical for guests and is never branched on `isAnonymous`.
 
 This matters because of the repo's core architectural principle: **the client is never trusted.** The same way the server authoritatively validates game moves against shared Zod schemas (see `./games-core-engine.md`), it also authoritatively decides *who you are*. There are exactly three places a request can prove identity, and **all three resolve the same Better Auth session from the same cookie**:
 
-1. **RSC / SSR** - Next.js server components call the server over HTTP, forwarding the browser's cookies (`apps/web/lib/get-server-session.ts:16`).
+1. **RSC / SSR** - Next.js server components call the server over HTTP, forwarding the browser's cookies (`apps/web/lib/get-server-session.ts:17`).
 2. **Browser fetches** - `"use client"` components call the server with `credentials: "include"` (`apps/web/lib/api-client.ts:6`).
 3. **Socket.IO handshake** - the realtime middleware reads the cookie off the WebSocket handshake and resolves the session before any game/chat event is allowed (`apps/server/src/realtime/index.ts:35`).
 
-A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `databaseHooks.user.create.after` hook that provisions a `user_profile` row (username + a name-styled DiceBear avatar). So "auth" and "profile bootstrap" are a single atomic flow - by the time a session cookie exists, the user already has a username.
+A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `databaseHooks.user.create.after` hook that provisions a `user_profile` row (username + a name-styled DiceBear avatar). So "auth" and "profile bootstrap" are a single atomic flow - by the time a session cookie exists, the user already has a username. The same hook runs for guests; it passes `{ skipGenderDetection: true }` when the new row is anonymous so a guest never triggers the external genderize.io call.
 
 ## Files at a glance
 
 | Path | Responsibility |
 | --- | --- |
-| `apps/server/src/auth.ts` | The Better Auth instance: secret, base URL, trusted origins, Drizzle adapter, Google provider, first-sign-in profile hook, prod cookie attributes. |
-| `apps/server/src/username.ts` | `ensureUsernameForUser` (provisioning) + `isUsernameBlocked` / `suggestUsernames`, wiring the `username-rules.ts` helpers to env + DB. |
+| `apps/server/src/auth.ts` | The Better Auth instance: secret, base URL, trusted origins, Drizzle adapter, `anonymous` (guest) plugin, Google provider, first-sign-in profile hook, prod cookie attributes. |
+| `apps/server/src/guest-name.ts` | `generateGuestName()` - the `Guest-<random6>` display name the `anonymous` plugin assigns to a new guest `user` row. |
+| `apps/server/src/username.ts` | `ensureUsernameForUser` (provisioning, with an `opts?: { skipGenderDetection? }` for guests) + `isUsernameBlocked` / `suggestUsernames`, wiring the `username-rules.ts` helpers to env + DB. |
 | `apps/server/src/username-rules.ts` | Username rule helpers: CSV blocklist parse (`parseUsernameCsv`), `slugifyBase`, candidate/suggestion builders (`buildUsernameCandidates` / `selectSuggestions`), and cooldown math (`usernameEditableAt`). Imports `USERNAME_MAX_LENGTH` and `normalizeUsername` from `@gamelobby/shared` - normalize / format-check / `RESERVED_USERNAMES` themselves now live in `@gamelobby/shared` (`packages/shared/src/types/username.ts`, `packages/shared/src/constants/username.ts`). |
 | `apps/server/src/api/index.ts` | Mounts Better Auth's request handler at `/api/auth/*` inside the Hono app. |
 | `apps/server/src/api/middleware/auth.ts` | `requireAuth` middleware - how REST routers read the session from request headers and gate on it. |
@@ -27,8 +30,11 @@ A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `
 | `packages/database/src/repositories/profiles.ts` | `getProfileByUserId`, `getTakenUsernames` (batched availability), `createProfile` used during provisioning. |
 | `apps/server/src/realtime/index.ts` | Socket.IO `io.use(...)` auth middleware: resolve session from the handshake cookie, attach `socket.data.userId`. |
 | `apps/server/src/env.ts` | `betterAuthSecret`, `betterAuthUrl`, `webUrl`, Google credentials, `googleConfigured()`. |
-| `apps/web/lib/auth-client.ts` | Better Auth React client (`signIn.social`, etc.), pointed at `NEXT_PUBLIC_API_URL`. |
-| `apps/web/lib/get-server-session.ts` | `getServerSession()` - RSC-side, cookie-forwarding, `react.cache`-deduped session read. |
+| `apps/web/lib/auth-client.ts` | Better Auth React client (`signIn.social`, `signIn.anonymous`, etc.) with the `anonymousClient()` plugin, pointed at `NEXT_PUBLIC_API_URL`. |
+| `apps/web/lib/auth/ensure-identity.ts` | `ensureIdentity()` - lazily mints an anonymous session via `authClient.signIn.anonymous()` when none exists. |
+| `apps/web/app/auth/guest-button.tsx` | The "Continue as a guest" button on the auth page → `ensureIdentity()` then `router.push("/")`. |
+| `apps/web/app/guest-nudge.tsx` | The fixed "Sign in to save your games" nudge, rendered only when the session is `isAnonymous`. |
+| `apps/web/lib/get-server-session.ts` | `getServerSession()` - RSC-side, cookie-forwarding, `react.cache`-deduped session read; the user shape carries an optional `isAnonymous`. |
 | `apps/web/lib/get-account-sessions.ts` | `getAccountSessions()` - RSC read of the full session list for the settings page. |
 | `apps/web/lib/api-server.ts` | `serverFetch*` - forwards the user's cookies from RSC to the server, `cache: "no-store"`. |
 | `apps/web/lib/api-client.ts` | `clientFetch*` - browser fetch with `credentials: "include"`. |
@@ -43,14 +49,20 @@ A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `
 
 ## The Better Auth instance
 
-Everything funnels through one configured instance in `apps/server/src/auth.ts:10`. There is a single accessor, `getAuth()` (`apps/server/src/auth.ts:56`), so the rest of the codebase never imports the raw `auth` object directly - it asks for it, which keeps the dependency surface tiny and makes the instance trivially mockable in tests.
+Everything funnels through one configured instance in `apps/server/src/auth.ts:12`. There is a single accessor, `getAuth()` (`apps/server/src/auth.ts:67`), so the rest of the codebase never imports the raw `auth` object directly - it asks for it, which keeps the dependency surface tiny and makes the instance trivially mockable in tests.
 
 ```ts
-export const auth = betterAuth({
+const auth = betterAuth({
   secret: env.betterAuthSecret,
   baseURL: env.betterAuthUrl,
   trustedOrigins: [env.webUrl],
   database: drizzleAdapter(db, { provider: "pg", schema }),
+  plugins: [
+    anonymous({
+      disableDeleteAnonymousUser: true,
+      generateName: () => generateGuestName(),
+    }),
+  ],
   socialProviders: googleConfigured()
     ? {
         google: {
@@ -66,9 +78,10 @@ Key decisions:
 - **`baseURL: env.betterAuthUrl`** (default `http://localhost:4000`, `apps/server/src/env.ts:36`) - Better Auth lives on the **server**, not the web app. The browser hits `${NEXT_PUBLIC_API_URL}/api/auth/...`, and the OAuth callback URI is `[server URL]/api/auth/callback/google` (the sign-in page literally tells you this at `apps/web/app/auth/page.tsx:50`).
 - **`trustedOrigins: [env.webUrl]`** - only the Next.js origin (default `http://localhost:3000`) is allowed to drive auth flows, which is the CSRF/redirect allowlist.
 - **`drizzleAdapter(db, { provider: "pg", schema })`** - `db` and `schema` are imported from `@gamelobby/database` (`apps/server/src/auth.ts:1`), so the adapter persists users/sessions/accounts into the very same Postgres + Drizzle singleton the rest of the server uses (`packages/database/src/client.ts:19`). No separate auth store.
-- **`socialProviders`** is conditional on `googleConfigured()` (`apps/server/src/env.ts:58`), which returns `true` only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Without them the object is `{}` and there is no working sign-in - the UI degrades gracefully (see below).
+- **`plugins: [anonymous({ … })]`** (`apps/server/src/auth.ts:17`) enables guest play. `signIn.anonymous` inserts a real `user` row with `isAnonymous = true` and a throwaway email; `generateName: () => generateGuestName()` (`apps/server/src/guest-name.ts:3`) sets the display name to `Guest-<random6>`, and `disableDeleteAnonymousUser: true` stops Better Auth from auto-deleting that row when the guest later links a real account - the guest's history (profile, games, messages) must survive the upgrade. **The upgrade/merge step itself (`onLinkAccount`) is a later phase and is not wired up yet** - today a guest can sign in with Google via the "Sign in to save your games" nudge, but stitching the anonymous user's data onto the Google account is upcoming.
+- **`socialProviders`** is conditional on `googleConfigured()` (`apps/server/src/env.ts:58`), which returns `true` only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Without them the object is `{}` and Google sign-in is unavailable, but the **guest button still works** (the anonymous plugin needs no external credentials), and the UI degrades gracefully (see below).
 
-The `advanced` block only turns on in production (`apps/server/src/auth.ts:46`):
+The `advanced` block only turns on in production (`apps/server/src/auth.ts:57`):
 
 ```ts
   advanced: env.isProd
@@ -83,7 +96,7 @@ In production the web and server are expected on sibling subdomains, so cookies 
 
 ### First-sign-in profile provisioning
 
-This is the most load-bearing piece of the config. Better Auth's Drizzle adapter inserts the `user` row; the `databaseHooks.user.create.after` hook runs immediately afterward and bootstraps the application-level profile (`apps/server/src/auth.ts:23`):
+This is the most load-bearing piece of the config. Better Auth's Drizzle adapter inserts the `user` row - for a Google sign-in *or* a guest `signIn.anonymous` - and the `databaseHooks.user.create.after` hook runs immediately afterward and bootstraps the application-level profile (`apps/server/src/auth.ts:31`):
 
 ```ts
   databaseHooks: {
@@ -91,12 +104,15 @@ This is the most load-bearing piece of the config. Better Auth's Drizzle adapter
       create: {
         after: async (createdUser) => {
           try {
+            const isAnon =
+              (createdUser as { isAnonymous?: boolean }).isAnonymous === true;
             const username = await ensureUsernameForUser(
               createdUser.id,
               createdUser.name,
+              { skipGenderDetection: isAnon },
             );
             log.info(
-              { userId: createdUser.id, username },
+              { userId: createdUser.id, username, isAnon },
               "provisioned profile on first sign-in",
             );
           } catch (err) {
@@ -111,16 +127,16 @@ This is the most load-bearing piece of the config. Better Auth's Drizzle adapter
   },
 ```
 
-Note the **catch-and-log**: provisioning failure does not abort account creation. The hook is best-effort; the auth row is the source of truth, and a profile can be (re-)created later because `ensureUsernameForUser` is idempotent (it early-returns an existing profile). The split is deliberate - Better Auth owns the `user`/`session`/`account` tables; the app owns `user_profile` (username, avatar, stats, theme), which is keyed by `userId` with a unique constraint (`packages/database/src/schema.ts:171`).
+The hook reads `isAnonymous` off the freshly-created row and threads `{ skipGenderDetection: isAnon }` into `ensureUsernameForUser`, so a guest's avatar uses the neutral `any` style and **never spends genderize.io quota** (their `Guest-<random6>` name carries no gender signal anyway). Note the **catch-and-log**: provisioning failure does not abort account creation. The hook is best-effort; the auth row is the source of truth, and a profile can be (re-)created later because `ensureUsernameForUser` is idempotent (it early-returns an existing profile). The split is deliberate - Better Auth owns the `user`/`session`/`account` tables; the app owns `user_profile` (username, avatar, stats, theme), which is keyed by `userId` with a unique constraint (`packages/database/src/schema.ts:172`).
 
 ## Username generation
 
 `ensureUsernameForUser` (`apps/server/src/username.ts:43`) turns a Google display name into a unique, URL-safe username and creates the profile. The flow:
 
-1. **Idempotency guard** - `getProfileByUserId` first; if a profile exists, return its username (`apps/server/src/username.ts:47`). This is why the hook is safe to retry.
-2. **Name-styled seeded avatar** - `predictAvatarStyle(displayName)` (`apps/server/src/services/gender-detection.ts`) guesses a `feminine`/`masculine`/`any` style from the user's first name, then `randomAvatarConfig(userId, style)` produces a deterministic DiceBear avataaars config seeded by the user id with that style bias (`apps/server/src/username.ts:51`). Same user → same starting avatar; the style only nudges hairstyle and facial-hair probability and stays fully editable afterwards. The guess calls the genderize.io API (keyed by `GENDERIZE_API_KEY`, ~2s timeout) and falls back to an offline name dictionary (`gender-detection-from-name`), then to a neutral `any`, whenever the API is unavailable, the result is low-confidence, the key is unset, or `NODE_ENV=test` (so tests never spend API quota). (See `./README.md` for the avatar package; the repo uses ready-made DiceBear assets rather than hand-drawn art.)
-3. **Slugify + build a candidate pool** - `slugifyBase` lowercases, collapses whitespace to `_`, strips anything outside `[a-z0-9_]`, caps at `USERNAME_MAX_LENGTH` (30) chars, and falls back to `"player"` if nothing survives (`apps/server/src/username-rules.ts:11`). `buildUsernameCandidates(base, CANDIDATE_COUNT)` then produces up to `CANDIDATE_COUNT` (20) candidates - the base, then `base_<random6>` variants (`apps/server/src/username-rules.ts:26`) - filtered through `isUsernameBlocked`, so a reserved route name or a `NOT_ALLOWED_USERNAMES` entry is never auto-assigned (`apps/server/src/username.ts:53`).
-4. **Batched availability check** - instead of one `SELECT`-per-candidate, the candidates are scanned in batches of `BATCH_SIZE` (5). Each batch does a single `getTakenUsernames(batch)` lookup (a case-insensitive `lower(username)` `IN (...)` query, `packages/database/src/repositories/profiles.ts:62`) and inserts the first candidate the batch reports free (`apps/server/src/username.ts:59`):
+1. **Idempotency guard** - `getProfileByUserId` first; if a profile exists, return its username (`apps/server/src/username.ts:48`). This is why the hook is safe to retry.
+2. **Name-styled seeded avatar** - `predictAvatarStyle(displayName)` (`apps/server/src/services/gender-detection.ts`) guesses a `feminine`/`masculine`/`any` style from the user's first name, then `randomAvatarConfig(userId, style)` produces a deterministic DiceBear avataaars config seeded by the user id with that style bias (`apps/server/src/username.ts:54`). Same user → same starting avatar; the style only nudges hairstyle and facial-hair probability and stays fully editable afterwards. The guess calls the genderize.io API (keyed by `GENDERIZE_API_KEY`, ~2s timeout) and falls back to an offline name dictionary (`gender-detection-from-name`), then to a neutral `any`, whenever the API is unavailable, the result is low-confidence, the key is unset, or `NODE_ENV=test` (so tests never spend API quota). When the caller passes `opts.skipGenderDetection` (the guest case, `apps/server/src/username.ts:51`) the prediction is skipped entirely and the style is forced to `any`. (See `./README.md` for the avatar package; the repo uses ready-made DiceBear assets rather than hand-drawn art.)
+3. **Slugify + build a candidate pool** - `slugifyBase` lowercases, collapses whitespace to `_`, strips anything outside `[a-z0-9_]`, caps at `USERNAME_MAX_LENGTH` (30) chars, and falls back to `"player"` if nothing survives (`apps/server/src/username-rules.ts:11`). `buildUsernameCandidates(base, CANDIDATE_COUNT)` then produces up to `CANDIDATE_COUNT` (20) candidates - the base, then `base_<random6>` variants (`apps/server/src/username-rules.ts:26`) - filtered through `isUsernameBlocked`, so a reserved route name or a `NOT_ALLOWED_USERNAMES` entry is never auto-assigned (`apps/server/src/username.ts:56`).
+4. **Batched availability check** - instead of one `SELECT`-per-candidate, the candidates are scanned in batches of `BATCH_SIZE` (5). Each batch does a single `getTakenUsernames(batch)` lookup (a case-insensitive `lower(username)` `IN (...)` query, `packages/database/src/repositories/profiles.ts:62`) and inserts the first candidate the batch reports free (`apps/server/src/username.ts:60`):
 
 ```ts
   for (let start = 0; start < candidates.length; start += BATCH_SIZE) {
@@ -140,18 +156,18 @@ Note the **catch-and-log**: provisioning failure does not abort account creation
   }
 ```
 
-The `try { ... } catch {}` around `createProfile` matters: the batched availability read plus an `INSERT` is still a check-then-act race, and `user_profile.username` carries a `unique` constraint (`packages/database/src/schema.ts:173`). If two sign-ins race to the same username the loser's insert throws, the `catch` swallows it, and the loop moves to the next candidate. If every candidate in the pool is taken, it falls through to a guaranteed-random `player_<random6>` and inserts unconditionally (`apps/server/src/username.ts:73`). The database unique index is the real authority; the candidate scan is just an optimistic fast path that the batching makes cheaper (≤4 queries for 20 candidates instead of up to 20).
+The `try { ... } catch {}` around `createProfile` matters: the batched availability read plus an `INSERT` is still a check-then-act race, and `user_profile.username` carries a `unique` constraint (`packages/database/src/schema.ts:174`). If two sign-ins race to the same username the loser's insert throws, the `catch` swallows it, and the loop moves to the next candidate. If every candidate in the pool is taken, it falls through to a guaranteed-random `player_<random6>` and inserts unconditionally (`apps/server/src/username.ts:76`). The database unique index is the real authority; the candidate scan is just an optimistic fast path that the batching makes cheaper (≤4 queries for 20 candidates instead of up to 20).
 
 ## The auth tables & the Drizzle adapter mapping
 
 Better Auth ships a fixed schema contract; the Drizzle adapter expects tables whose names and columns match. They live alongside the app's domain tables in `packages/database/src/schema.ts`:
 
-- **`user`** (`:42`) - `id` (text PK, not a uuid - Better Auth generates these), `name`, unique `email`, `emailVerified`, `image`, timestamps. This is the canonical identity row; `user_profile`, `session`, `account`, friendships, conversations, etc. all `references(() => user.id, { onDelete: "cascade" })`.
-- **`session`** (`:58`) - `id`, `expiresAt`, unique `token`, `ipAddress`, `userAgent`, and `userId` FK with `onDelete: "cascade"`. The cookie carries the `token`; one row per active sign-in (per device/browser). `ipAddress`/`userAgent` are what the settings page surfaces per session.
-- **`account`** (`:71`) - links a `user` to an external provider login: `providerId` (`"google"`), `accountId` (the Google subject id), the OAuth `accessToken`/`refreshToken`/`idToken`, and a nullable `password` column reserved for the future email/password provider. One row per linked provider.
-- **`verification`** (`:89`) - `identifier`/`value`/`expiresAt` rows used for verification/reset tokens (unused by the Google-only flow today, but required by the contract).
+- **`user`** (`:42`) - `id` (text PK, not a uuid - Better Auth generates these), `name`, unique `email`, `emailVerified`, `image`, `isAnonymous` (`is_anonymous boolean NOT NULL DEFAULT false`, `schema.ts:50` - the guest flag the `anonymous` plugin sets), timestamps. This is the canonical identity row; `user_profile`, `session`, `account`, friendships, conversations, etc. all `references(() => user.id, { onDelete: "cascade" })`.
+- **`session`** (`:59`) - `id`, `expiresAt`, unique `token`, `ipAddress`, `userAgent`, and `userId` FK with `onDelete: "cascade"`. The cookie carries the `token`; one row per active sign-in (per device/browser). A guest session is an ordinary row here too. `ipAddress`/`userAgent` are what the settings page surfaces per session.
+- **`account`** (`:72`) - links a `user` to an external provider login: `providerId` (`"google"`), `accountId` (the Google subject id), the OAuth `accessToken`/`refreshToken`/`idToken`, and a nullable `password` column reserved for the future email/password provider. One row per linked provider; a guest has no `account` row until they link one.
+- **`verification`** (`:90`) - `identifier`/`value`/`expiresAt` rows used for verification/reset tokens (unused by the Google-only flow today, but required by the contract).
 
-The adapter is wired in one line - `drizzleAdapter(db, { provider: "pg", schema })` (`apps/server/src/auth.ts:14`) - where `db` and `schema` are imported from `@gamelobby/database` (`apps/server/src/auth.ts:1`), backed by the singleton in `packages/database/src/client.ts:19`. Because the same `db` instance is shared, auth writes go through the same connection pool (and the same optional `DB_LATENCY_MS` latency wrapper, applied inside the database package) as everything else.
+The adapter is wired in one line - `drizzleAdapter(db, { provider: "pg", schema })` (`apps/server/src/auth.ts:16`) - where `db` and `schema` are imported from `@gamelobby/database` (`apps/server/src/auth.ts:1`), backed by the singleton in `packages/database/src/client.ts:19`. Because the same `db` instance is shared, auth writes go through the same connection pool (and the same optional `DB_LATENCY_MS` latency wrapper, applied inside the database package) as everything else.
 
 ## Mounting `/api/auth/*`
 
@@ -237,13 +253,13 @@ After this point, **every** chat and game handler trusts `socket.data.userId` as
 
 A full trace from clicking the button to being authenticated on all three lanes:
 
-1. **User clicks "Continue with Google."** `apps/web/app/auth/page.tsx:41` renders `<GoogleSignInButton>`, which calls `authClient.signIn.social({ provider: "google", callbackURL: ".../profile" })` (`apps/web/app/google-sign-in-button.tsx:20`). The `authClient` is a Better Auth React client pointed at `NEXT_PUBLIC_API_URL` (`apps/web/lib/auth-client.ts:3`).
+1. **User clicks "Continue with Google."** `apps/web/app/auth/page.tsx:41` renders `<GoogleSignInButton>`, which calls `authClient.signIn.social({ provider: "google", callbackURL: ".../profile" })` (`apps/web/app/google-sign-in-button.tsx:20`). The `authClient` is a Better Auth React client (with the `anonymousClient()` plugin) pointed at `NEXT_PUBLIC_API_URL` (`apps/web/lib/auth-client.ts:4`).
 2. **Browser → server.** The client hits `POST /api/auth/sign-in/social` on the **server**, which Better Auth handles via the catch-all (`apps/server/src/api/index.ts:14`) and responds with a redirect to Google's consent screen.
 3. **Google OAuth.** User authenticates with Google; Google redirects back to `GET /api/auth/callback/google` on the server.
-4. **Better Auth callback.** Better Auth exchanges the code, and via the Drizzle adapter upserts the `user` (`packages/database/src/schema.ts:42`) and `account` (`:71`) rows and creates a `session` row (`:58`).
-5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:26`) → `ensureUsernameForUser(id, name)` (`apps/server/src/username.ts:43`) → slugify + batched candidate scan → `createProfile` inserts the `user_profile` row with a seeded avatar (`packages/database/src/repositories/profiles.ts:74`).
-6. **Cookie set + redirect.** Better Auth sets the session cookie (in prod: `secure`, `SameSite=Lax`, cross-subdomain per `apps/server/src/auth.ts:48`) and redirects the browser to the `callbackURL` (`/profile`).
-7. **RSC reads the session.** The `/profile` (and root layout) server component calls `getServerSession()` → `serverFetchJson("/api/auth/get-session")` (`apps/web/lib/get-server-session.ts:17`). `serverFetch` forwards the browser's cookies from `next/headers` `cookies()` with `cache: "no-store"` (`apps/web/lib/api-server.ts:13`), so the server resolves the session and returns `{ user, session }`. `getServerSession` is wrapped in `react.cache` so multiple components in one render share a single fetch.
+4. **Better Auth callback.** Better Auth exchanges the code, and via the Drizzle adapter upserts the `user` (`packages/database/src/schema.ts:42`) and `account` (`:72`) rows and creates a `session` row (`:59`).
+5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:34`) → `ensureUsernameForUser(id, name, { skipGenderDetection })` (`apps/server/src/username.ts:43`) → slugify + batched candidate scan → `createProfile` inserts the `user_profile` row with a seeded avatar (`packages/database/src/repositories/profiles.ts:74`).
+6. **Cookie set + redirect.** Better Auth sets the session cookie (in prod: `secure`, `SameSite=Lax`, cross-subdomain per `apps/server/src/auth.ts:59`) and redirects the browser to the `callbackURL` (`/profile`).
+7. **RSC reads the session.** The `/profile` (and root layout) server component calls `getServerSession()` → `serverFetchJson("/api/auth/get-session")` (`apps/web/lib/get-server-session.ts:18`). `serverFetch` forwards the browser's cookies from `next/headers` `cookies()` with `cache: "no-store"` (`apps/web/lib/api-server.ts:13`), so the server resolves the session and returns `{ user, session }`. `getServerSession` is wrapped in `react.cache` so multiple components in one render share a single fetch.
 8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:46`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:46`).
 9. **Browser fetches.** Any subsequent client-side mutation (`SignOutForm`, friend actions, settings) uses `clientFetch(..., { credentials: "include" })` (`apps/web/lib/api-client.ts:12`), and the `requireAuth` middleware re-derives identity into `c.get("userId")` (`apps/server/src/api/middleware/auth.ts:16`).
 
@@ -253,11 +269,13 @@ Arrow summary:
 click → authClient.signIn.social (auth-client.ts) → POST /api/auth/sign-in/social
   → Better Auth handler (api/index.ts:14) → Google consent
   → GET /api/auth/callback/google → drizzleAdapter upserts user/account/session
-  → user.create.after hook (auth.ts:26) → ensureUsernameForUser (username.ts:43) → createProfile
+  → user.create.after hook (auth.ts:34) → ensureUsernameForUser (username.ts:43) → createProfile
   → Set-Cookie + redirect /profile
   → RSC getServerSession → serverFetch forwards cookie → /api/auth/get-session
   → socket handshake (withCredentials) → io.use getSession → socket.data.userId
 ```
+
+**The guest flow is the same trace with one shortcut.** "Continue as a guest" (`apps/web/app/auth/guest-button.tsx`) calls `ensureIdentity()` (`apps/web/lib/auth/ensure-identity.ts:3`), which does `authClient.signIn.anonymous()` instead of `signIn.social` - there is no OAuth round-trip, so steps 1-4 collapse into a single `POST /api/auth/sign-in/anonymous` that inserts the `user` (`isAnonymous = true`) + `session` rows. The same `user.create.after` provisioning hook (step 5, now with `skipGenderDetection: true`), cookie set (step 6), RSC read (step 7), and socket connect (step 8) all run identically. From the socket and REST layers' perspective a guest is indistinguishable from a Google user.
 
 ## Sign-out & session management flow
 
@@ -273,10 +291,11 @@ The Account settings tab (`apps/web/app/settings/account/page.tsx:27`) is an RSC
 
 - **Auth lives on the server, not the web app.** `betterAuth` is configured in `apps/server`, `baseURL` is the server URL, and the OAuth callback is `[server]/api/auth/callback/google`. The web app only holds a thin Better Auth *client* (`apps/web/lib/auth-client.ts`) plus cookie-forwarding fetch helpers.
 - **Identity is always re-derived from the cookie, never trusted from the client.** REST → `requireAuth` reads `c.req.raw.headers`; sockets → `io.use` reads the handshake cookie. No route accepts a `userId` parameter as proof of identity.
-- **Always go through `getAuth()`.** Nothing imports the bare `auth` object; the accessor (`apps/server/src/auth.ts:56`) keeps a single instance and is the mock point in tests (`mock.module` per the repo's test conventions).
-- **No Google creds → no sign-in, gracefully.** `googleConfigured()` gates the provider (`apps/server/src/env.ts:58`); the sign-in page independently checks `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and shows setup instructions instead of a broken button (`apps/web/app/auth/page.tsx:10`). `BETTER_AUTH_SECRET` and `DATABASE_URL` are `required()` and crash startup if missing; Google creds are `optional()`.
+- **Always go through `getAuth()`.** Nothing imports the bare `auth` object; the accessor (`apps/server/src/auth.ts:67`) keeps a single instance and is the mock point in tests (`mock.module` per the repo's test conventions).
+- **A guest is a real `user`, and the rest of the stack must not branch on it.** `isAnonymous` is read in exactly two places - the provisioning hook (to skip gender detection) and the web layout/nudge (to surface the upgrade prompt). Chat, presence, games, and authorization treat a guest `userId` like any other. `disableDeleteAnonymousUser: true` keeps the guest row (and its history) alive after a future account link; **the merge step (`onLinkAccount`) is not implemented yet** - that is a later phase.
+- **No Google creds → no Google sign-in, but guests still work.** `googleConfigured()` gates the provider (`apps/server/src/env.ts:58`); the sign-in page independently checks `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and shows setup instructions instead of a broken button (`apps/web/app/auth/page.tsx:17`). The `anonymous` plugin needs no external credentials, so the "Continue as a guest" button is always available. `BETTER_AUTH_SECRET` and `DATABASE_URL` are `required()` and crash startup if missing; Google creds are `optional()`.
 - **`user.id` is `text`, not `uuid`.** Better Auth generates the id (`packages/database/src/schema.ts:43`). The app's own tables (`game`, `move`, `user_profile`, …) use uuid PKs but still store the auth user id as `text` in FK columns like `userId` / `creator_user_id`.
-- **Profile provisioning is best-effort and idempotent.** The `create.after` hook swallows errors (`apps/server/src/auth.ts:36`); `ensureUsernameForUser` early-returns if a profile already exists (`apps/server/src/username.ts:47`). The DB unique constraint on `user_profile.username` - not the in-memory `getTakenUsernames` batch read - is the real collision authority.
+- **Profile provisioning is best-effort and idempotent.** The `create.after` hook swallows errors (`apps/server/src/auth.ts:47`); `ensureUsernameForUser` early-returns if a profile already exists (`apps/server/src/username.ts:48`). The DB unique constraint on `user_profile.username` - not the in-memory `getTakenUsernames` batch read - is the real collision authority.
 - **`user_profile` ≠ `user`.** Better Auth owns `user`/`session`/`account`/`verification`; the application owns `user_profile` (username, avatar, stats, theme, layout). They join on `userId`, and the profile cascades on user delete.
 - **Two web fetch paths, two env vars.** RSC uses `serverFetch` (`API_URL`, forwards `next/headers` cookies, `cache: "no-store"`); the browser uses `clientFetch` (`NEXT_PUBLIC_API_URL`, `credentials: "include"`). Use the server path inside RSCs and the client path inside `"use client"` components - they read the cookie from different places.
 - **Auth-dependent pages set `export const dynamic = "force-dynamic"`** (e.g. `apps/web/app/auth/page.tsx:7`, `apps/web/app/settings/account/page.tsx:24`) because they depend on per-request cookies and must not be statically cached.

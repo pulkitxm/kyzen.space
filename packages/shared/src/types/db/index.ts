@@ -42,6 +42,7 @@ export type UserRow = {
   email: string;
   emailVerified: boolean;
   image: string | null;
+  isAnonymous: boolean;
   createdAt: Date;
   updatedAt: Date;
 };

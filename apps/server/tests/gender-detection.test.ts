@@ -211,6 +211,17 @@ describe("ensureUsernameForUser: avatar style", () => {
     await ensureUsernameForUser("user-2", "Xyzzy");
     expect(createdAvatar?.style).toBe("any");
   });
+
+  it("skips gender detection entirely for guest provisioning", async () => {
+    genderizeFailsIfCalled();
+    detectedGender = "male";
+    const username = await ensureUsernameForUser("guest-1", "Alice", {
+      skipGenderDetection: true,
+    });
+    expect(username).toBe("alice");
+    expect(createdAvatar?.style).toBe("any");
+    expect(fetchCalled).toBe(false);
+  });
 });
 
 describe("ensureUsernameForUser: username selection", () => {

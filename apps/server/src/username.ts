@@ -1,4 +1,4 @@
-import { randomAvatarConfig } from "@gamelobby/avatar";
+import { type AvatarStyle, randomAvatarConfig } from "@gamelobby/avatar";
 import { profiles } from "@gamelobby/database";
 import {
   isReservedUsername,
@@ -43,11 +43,14 @@ export async function suggestUsernames(
 export async function ensureUsernameForUser(
   userId: string,
   displayName: string | null | undefined,
+  opts?: { skipGenderDetection?: boolean },
 ): Promise<string> {
   const existing = await profiles.getProfileByUserId(userId);
   if (existing) return existing.username;
 
-  const style = await predictAvatarStyle(displayName);
+  const style: AvatarStyle = opts?.skipGenderDetection
+    ? "any"
+    : await predictAvatarStyle(displayName);
   const avatar = randomAvatarConfig(userId, style);
   const base = slugifyBase(displayName ?? "player");
   const candidates = buildUsernameCandidates(base, CANDIDATE_COUNT).filter(

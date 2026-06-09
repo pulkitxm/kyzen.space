@@ -11,6 +11,7 @@ import { useCallback, useRef, useState } from "react";
 import { FaChevronRight } from "react-icons/fa6";
 
 import { ChatSocketBridge } from "@/app/chat-socket-bridge";
+import { GuestNudge } from "@/app/guest-nudge";
 import { Sidebar } from "@/app/sidebar";
 import { TooltipProvider } from "@/app/ui/tooltip";
 import { LayeredPopupHost, ProfilePopupHost } from "@/components/ui";
@@ -24,6 +25,7 @@ export function AppShellClient({
   avatar,
   userId,
   signedIn,
+  isAnonymous,
   profileHref,
   sidebarPrefsTrusted,
   sidebarPrefs,
@@ -39,6 +41,7 @@ export function AppShellClient({
   avatar: AvatarConfig | null;
   userId: string | null;
   signedIn: boolean;
+  isAnonymous: boolean;
   profileHref: string;
   sidebarPrefsTrusted: boolean;
   sidebarPrefs: SidebarPrefs;
@@ -59,6 +62,7 @@ export function AppShellClient({
     <TooltipProvider delayDuration={300}>
       <Provider>
         <SocketProvider enabled={signedIn}>
+          <GuestNudge isAnonymous={isAnonymous} />
           {signedIn && userId ? (
             <ChatSocketBridge
               userId={userId}

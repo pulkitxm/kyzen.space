@@ -17,9 +17,9 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 
 | Path | Responsibility |
 | --- | --- |
-| `apps/web/app/layout.tsx` | Root Server Component; one authenticated fan-out fetch, sets `<html>` theme/pattern attrs, injects no-flash boot scripts, wraps everything in `Providers` + `AppShellClient`. |
+| `apps/web/app/layout.tsx` | Root Server Component; one authenticated fan-out fetch, sets `<html>` theme/pattern attrs, injects no-flash boot scripts, threads an `isAnonymous` flag, wraps everything in `Providers` + `AppShellClient`. |
 | `apps/web/app/providers.tsx` | Client wrapper: `next-themes` `ThemeProvider` (light/dark) + `AppearanceProvider` (palette/pattern). |
-| `apps/web/app/app-shell.tsx` | Client shell: Jotai `Provider`, `SocketProvider`, `ChatSocketBridge`, sidebar + `<main>`. |
+| `apps/web/app/app-shell.tsx` | Client shell: Jotai `Provider`, `SocketProvider`, `GuestNudge`, `ChatSocketBridge`, sidebar + `<main>`. |
 | `apps/web/app/page.tsx` | Home grid of games, rendered from `listGameMeta()`. |
 | `apps/web/app/sidebar.tsx` | The collapsible, resizable left rail rendered by `AppShellClient` (logo, nav, `SidebarSocialNav`, profile/avatar entry); persists collapsed/width via the sidebar atoms + cookie. |
 | `apps/web/app/sidebar-social-nav.tsx` | The "Social" nav cluster in the sidebar (the Chat link with its `totalUnreadAtom` badge; Friends now lives in the profile page's overflow menu, not here). |
@@ -27,7 +27,11 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/[username]/profile-ui.tsx` | Client profile UI: header, stats, activity feed, and the overflow menu that now hosts the Friends entry. |
 | `apps/web/lib/api-server.ts` | `server-only` `serverFetch` / `serverFetchJson`: forwards cookies, `cache: "no-store"`, uses `API_URL`. |
 | `apps/web/lib/api-client.ts` | `"use client"` `clientFetch` / `clientFetchJson`: `credentials: "include"`, uses `NEXT_PUBLIC_API_URL`. |
-| `apps/web/lib/get-server-session.ts` | `cache()`-wrapped `serverFetchJson("/api/auth/get-session")`; one session lookup per request. |
+| `apps/web/lib/get-server-session.ts` | `cache()`-wrapped `serverFetchJson("/api/auth/get-session")`; one session lookup per request. The session user carries an optional `isAnonymous` (a guest is still a real session). |
+| `apps/web/lib/auth-client.ts` | Better Auth React client with the `anonymousClient()` plugin (`signIn.social`, `signIn.anonymous`), pointed at `NEXT_PUBLIC_API_URL`. |
+| `apps/web/lib/auth/ensure-identity.ts` | `ensureIdentity()`: if `authClient.getSession()` has no session, mints a guest one via `authClient.signIn.anonymous()`. |
+| `apps/web/app/auth/guest-button.tsx` | `"use client"` "Continue as a guest" button: `ensureIdentity()` then `router.push("/")` + `router.refresh()`. |
+| `apps/web/app/guest-nudge.tsx` | `"use client"` fixed "Sign in to save your games" prompt; renders `null` unless `isAnonymous`, otherwise a Google `signIn.social` button. |
 | `apps/web/lib/socket/socket-context.tsx` | `SocketProvider`, `useSocket`, `useSocketEvent`, `emitAck`: one shared Socket.IO connection + ack-promise helper. |
 | `apps/web/app/chat-socket-bridge.tsx` | Hydrates chat atoms from SSR props, then maps every `CHAT_EVENTS.*` socket event onto a Jotai store mutation. |
 | `apps/web/lib/chat/atoms.ts` | Shared chat state: conversations, messages (atomFamily), friends, requests, notifications, presence, typing, derived totals, pure upsert helpers. |
@@ -140,9 +144,9 @@ const [me, convs, fr, reqs, notif, notifList] = await Promise.all([
 ]);
 ```
 
-See `apps/web/app/layout.tsx:77`. Everything here becomes `initial*` props handed down to `AppShellClient`, which become the seed values for Jotai atoms. That is why a signed-in user's sidebar, unread badges, and friends list are *already correct in the server-rendered HTML* - no client loading spinner, no flash.
+See `apps/web/app/layout.tsx:78`. Everything here becomes `initial*` props handed down to `AppShellClient`, which become the seed values for Jotai atoms. That is why a signed-in user's sidebar, unread badges, and friends list are *already correct in the server-rendered HTML* - no client loading spinner, no flash.
 
-`getServerSession` is wrapped in React's `cache()` (`apps/web/lib/get-server-session.ts`), so even though the layout and individual pages all call it, the underlying `/api/auth/get-session` round-trip happens at most once per request.
+`getServerSession` is wrapped in React's `cache()` (`apps/web/lib/get-server-session.ts`), so even though the layout and individual pages all call it, the underlying `/api/auth/get-session` round-trip happens at most once per request. A guest counts as "signed in" here: the session it returns is a real one (its user simply carries `isAnonymous: true`), so the layout computes `isAnonymous = Boolean(session?.user?.isAnonymous)` (`apps/web/app/layout.tsx:64`), runs the same authenticated fan-out, and threads `isAnonymous` down to `AppShellClient` (`apps/web/app/layout.tsx:174`). Because of this, **the socket and chat work unchanged for guests** - nothing branches on the flag except the upgrade nudge.
 
 The layout also sets appearance state on `<html>` from the server-known profile so there is no theme flash:
 
@@ -157,7 +161,7 @@ The layout also sets appearance state on `<html>` from the server-known profile 
 >
 ```
 
-See `apps/web/app/layout.tsx:130`. The `style={patternStyle}` writes the `--pattern-url` / `--pattern-tile` CSS vars at SSR (from `patternVars`, `apps/web/app/layout.tsx:115`) so the doodle background lands without a flash. For *signed-out* users (whose preference lives only in `localStorage`, not on the server), four inline `dangerouslySetInnerHTML` boot scripts run before first paint to apply the stored theme/pattern/sidebar prefs synchronously (`apps/web/app/layout.tsx:140`). `suppressHydrationWarning` is set because these scripts intentionally mutate the DOM before React hydrates. The cookie path (`SIDEBAR_PREFS_COOKIE`, read at `apps/web/app/layout.tsx:124`) lets the server pre-trust sidebar prefs it can read from the request.
+See `apps/web/app/layout.tsx:131`. The `style={patternStyle}` writes the `--pattern-url` / `--pattern-tile` CSS vars at SSR (from `patternVars`, `apps/web/app/layout.tsx:116`) so the doodle background lands without a flash. For *signed-out* users (whose preference lives only in `localStorage`, not on the server), four inline `dangerouslySetInnerHTML` boot scripts run before first paint to apply the stored theme/pattern/sidebar prefs synchronously (`apps/web/app/layout.tsx:141`). `suppressHydrationWarning` is set because these scripts intentionally mutate the DOM before React hydrates. The cookie path (`SIDEBAR_PREFS_COOKIE`, read at `apps/web/app/layout.tsx:125`) lets the server pre-trust sidebar prefs it can read from the request.
 
 ### Provider stack
 
@@ -169,6 +173,7 @@ See `apps/web/app/layout.tsx:130`. The `style={patternStyle}` writes the `--patt
 <TooltipProvider delayDuration={300}>
   <Provider>
     <SocketProvider enabled={signedIn}>
+      <GuestNudge isAnonymous={isAnonymous} />
       {signedIn && userId ? (
         <ChatSocketBridge userId={userId} initialConversations={...} ... />
       ) : null}
@@ -178,7 +183,7 @@ See `apps/web/app/layout.tsx:130`. The `style={patternStyle}` writes the `--patt
 </TooltipProvider>
 ```
 
-See `apps/web/app/app-shell.tsx:59`. The Jotai `<Provider>` must wrap `ChatSocketBridge` (so the bridge has a store to write into) and `SocketProvider` must wrap it too (so it has a socket to listen on). `enabled={signedIn}` means the socket only connects for authenticated users. The only `useState` in this file is `mobileOpen` (`apps/web/app/app-shell.tsx:52`) - a textbook case of component-private state that correctly stays out of Jotai.
+See `apps/web/app/app-shell.tsx:62`. The Jotai `<Provider>` must wrap `ChatSocketBridge` (so the bridge has a store to write into) and `SocketProvider` must wrap it too (so it has a socket to listen on). `enabled={signedIn}` means the socket only connects for authenticated users - which **includes guests**, since a guest is signed in. `<GuestNudge isAnonymous={isAnonymous} />` (`apps/web/app/app-shell.tsx:65`) renders the fixed "Sign in to save your games" prompt and returns `null` unless the session is anonymous, so it is inert for Google users. The only `useState` in this file is `mobileOpen` (`apps/web/app/app-shell.tsx:55`) - a textbook case of component-private state that correctly stays out of Jotai.
 
 **The shell scrolls an inner element, not the document.** The shell is `h-screen overflow-hidden` with a fixed `Sidebar` and a `<main className="… overflow-auto">` that owns the page scroll - this is what lets chat (pinned composer + reverse-scroll list) and the play/game pages (full-height boards) bound themselves to the viewport. The cost is that the browser's native scroll restoration (which only tracks the *document* scroller) can't restore position on reload. `useScrollRestoration` (`apps/web/lib/use-scroll-restoration.ts`) closes that gap: it persists `<main>`'s `scrollTop` to `sessionStorage` keyed by `pathname`, and on mount / route change it **smoothly animates** back to the saved offset (after paint, via `scrollTo({ behavior: "smooth" })`, honoring `prefers-reduced-motion`; intermediate saves are suppressed while the restore animates). It's a no-op on the full-viewport pages, where `<main>` itself never scrolls.
 
