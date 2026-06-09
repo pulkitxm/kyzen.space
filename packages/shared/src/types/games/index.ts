@@ -48,8 +48,12 @@ export {
 export {
   type ClientJoinRoom,
   type ClientMakeMove,
+  type ClientQueueJoin,
+  type ClientQueueLeave,
   clientJoinRoomSchema,
   clientMakeMoveSchema,
+  clientQueueJoinSchema,
+  clientQueueLeaveSchema,
   type GameJson,
   type GamePlayerDto,
   type GameStatusDto,
@@ -65,5 +69,6 @@ export {
   type ServerErrorPayload,
   type ServerGameOverPayload,
   type ServerGameStatePayload,
+  type ServerMatchFoundPayload,
   seatingModeSchema,
 } from "./wire";

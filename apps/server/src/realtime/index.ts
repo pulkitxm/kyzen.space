@@ -11,6 +11,10 @@ import { attachChatHandlers, joinUserRooms } from "./chat";
 import { attachFriendHandlers } from "./friends";
 import { attachGameChatHandlers } from "./games-in-chat";
 import { setIO } from "./io";
+import {
+  attachMatchmakingHandlers,
+  dequeueUserFromAllQueues,
+} from "./matchmaking";
 import { handlePresenceConnect, handlePresenceDisconnect } from "./presence";
 import { startPresenceHeartbeats } from "./presence-heartbeat";
 import { attachRedisAdapter } from "./redis";
@@ -60,6 +64,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
     attachFriendHandlers(io, socket);
     attachTypingHandlers(io, socket);
     attachGameChatHandlers(io, socket);
+    attachMatchmakingHandlers(io, socket);
     void handlePresenceConnect(io, socket);
 
     registerGameEvent(socket, slog, "join_room", clientJoinRoomSchema, (data) =>
@@ -87,6 +92,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
 
     socket.on("disconnect", (reason) => {
       slog.info({ reason }, "socket disconnected");
+      void dequeueUserFromAllQueues(socket.data.userId);
       void handlePresenceDisconnect(io, socket);
     });
   });
