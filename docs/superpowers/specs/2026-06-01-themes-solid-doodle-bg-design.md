@@ -9,10 +9,10 @@ Evolve the existing appearance system (added in #15) along four axes the user as
 
 1. Expand from 4 to **10** color palettes.
 2. Make **light mode** look better (cleaner, higher contrast, reliable across all palettes).
-3. Use **solid colors only** — remove every gradient.
+3. Use **solid colors only** - remove every gradient.
 4. Add a **theme-tinted doodle SVG background** whose background color and line color both follow the active palette and adapt per light/dark mode.
 
-The two-axis model is unchanged: **palette** (`<html data-theme>`) × **color mode** (light/dark/system via `next-themes`). Palette and mode stay independent — colors are resolved per-mode.
+The two-axis model is unchanged: **palette** (`<html data-theme>`) × **color mode** (light/dark/system via `next-themes`). Palette and mode stay independent - colors are resolved per-mode.
 
 ## Background (current state)
 
@@ -48,10 +48,10 @@ Keep the existing 4 (`sangria`, `crimson-nights`, `midnight-blue`, `royal-ember`
 
 Synced touch points:
 
-- `apps/web/lib/themes.ts` — `THEME_IDS` + `THEMES`.
-- `apps/server/src/lib/theme.ts` — `THEME_IDS`.
-- `apps/web/app/globals.css` — one `html[data-theme="…"]{ --d; --v }` block per new id.
-- **Drizzle migration** — `ALTER TYPE "public"."app_theme" ADD VALUE …` for each new id (additive; default stays `midnight-blue`). Generated via `bun run db:generate`; hand-authored following the existing migration style if generation is unavailable.
+- `apps/web/lib/themes.ts`: `THEME_IDS` + `THEMES`.
+- `apps/server/src/lib/theme.ts`: `THEME_IDS`.
+- `apps/web/app/globals.css`: one `html[data-theme="…"]{ --d; --v }` block per new id.
+- **Drizzle migration**: `ALTER TYPE "public"."app_theme" ADD VALUE …` for each new id (additive; default stays `midnight-blue`). Generated via `bun run db:generate`; hand-authored following the existing migration style if generation is unavailable.
 - Update `apps/web/tests/themes.test.ts` and `apps/server/tests/theme.test.ts` (counts + drop the gradient assertion).
 
 ### C. Better light mode
@@ -65,8 +65,8 @@ The current light mode washes every surface with a heavy vivid tint (12–26% mi
 
 ### D. Theme-tinted doodle background (both modes)
 
-- Ship one **seamless doodle SVG** at `apps/web/public/patterns/doodles.svg` (sourced CC0/MIT, or generated fallback — see Risk).
-- Render it as a fixed, behind-content layer via `.app-canvas::before`, tinted with a CSS `mask` so the asset's own colors are irrelevant — the line color comes entirely from a theme token:
+- Ship one **seamless doodle SVG** at `apps/web/public/patterns/doodles.svg` (sourced CC0/MIT, or generated fallback - see Risk).
+- Render it as a fixed, behind-content layer via `.app-canvas::before`, tinted with a CSS `mask` so the asset's own colors are irrelevant - the line color comes entirely from a theme token:
 
   ```css
   .app-canvas::before {
@@ -78,7 +78,7 @@ The current light mode washes every surface with a heavy vivid tint (12–26% mi
   }
   ```
 
-- `--pattern-ink` / `--pattern-opacity` are **per-mode, per-theme tokens**. Solid `--background` (deep in dark, near-white in light) sits underneath; the doodle lines are a subtle `--v`-derived tint. So both bg color and line color follow the palette, and light vs dark get distinct, subtle treatments (very subtle in dark, even subtler in light) — matching the reference.
+- `--pattern-ink` / `--pattern-opacity` are **per-mode, per-theme tokens**. Solid `--background` (deep in dark, near-white in light) sits underneath; the doodle lines are a subtle `--v`-derived tint. So both bg color and line color follow the palette, and light vs dark get distinct, subtle treatments (very subtle in dark, even subtler in light) - matching the reference.
 - `.app-canvas` gets `isolation: isolate` (or its content wrapper gets `position: relative; z-index: 1`) so the sidebar/main stay above the pattern.
 
 ### Out of scope
@@ -89,7 +89,7 @@ The current light mode washes every surface with a heavy vivid tint (12–26% mi
 
 ## Risks
 
-- **Doodle asset licensing/tiling**: the pattern must be seamlessly tileable and freely licensed (CC0/MIT). If no clean exact-match doodle tile is found, fall back to a generated scatter of simple playful primitives (circles, crosses, squiggles, triangles) — still doodle-flavored and theme-tinted, just not the exact icon set. The chosen approach will be noted in the implementation.
+- **Doodle asset licensing/tiling**: the pattern must be seamlessly tileable and freely licensed (CC0/MIT). If no clean exact-match doodle tile is found, fall back to a generated scatter of simple playful primitives (circles, crosses, squiggles, triangles) - still doodle-flavored and theme-tinted, just not the exact icon set. The chosen approach will be noted in the implementation.
 - **Enum migration**: `ALTER TYPE … ADD VALUE` is additive and safe; existing rows keep their values. No down-migration for enum value removal is provided (Postgres doesn't support it cleanly), consistent with the project's forward-only migrations.
 
 ## Verification

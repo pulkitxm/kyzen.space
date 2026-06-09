@@ -1,4 +1,4 @@
-# Game-chat pop-out + responsive split — Implementation Plan
+# Game-chat pop-out + responsive split: Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6,27 +6,27 @@
 
 **Architecture:** A pure layout-math module (web + a mirror on the server) holds bounds + clamp helpers and is unit-tested. The chat subtree stays mounted at one stable JSX position; mode toggling only flips classNames/styles (in-flow flex child ↔ `position: fixed` floating window), so the chat never remounts and `position: fixed` resolves to the viewport (no transformed ancestors above `<main>`). Layout state lives in `game-chat-split.tsx`; it persists to `localStorage` synchronously and to `PUT /api/profiles/me/chat-layout` (debounced). The play page SSR-fetches the DB layout and passes it down; localStorage overrides it on mount.
 
-**Tech Stack:** Next.js 16 / React 19 (web), Hono + Drizzle/Postgres (server), Bun test, Tailwind v4. No new runtime dependencies — drag/resize use the existing hand-rolled mouse-handler pattern.
+**Tech Stack:** Next.js 16 / React 19 (web), Hono + Drizzle/Postgres (server), Bun test, Tailwind v4. No new runtime dependencies - drag/resize use the existing hand-rolled mouse-handler pattern.
 
 ---
 
 ## File structure
 
 **Server**
-- `apps/server/src/lib/chat-layout.ts` *(create)* — `ChatLayout` type, bounds constants, `validateChatLayout()` (pure, tested).
-- `apps/server/src/db/schema.ts` *(modify)* — add `chatLayout` jsonb column to `userProfile`.
-- `apps/server/src/db/repositories/profiles.ts` *(modify)* — add `updateChatLayout()`.
-- `apps/server/src/api/routes/profiles.ts` *(modify)* — `GET /me` returns `chatLayout`; add `PUT /me/chat-layout`.
-- `apps/server/drizzle/*` *(generated)* — migration adding the column.
-- `apps/server/tests/chat-layout.test.ts` *(create)* — validator tests.
+- `apps/server/src/lib/chat-layout.ts` *(create)*: `ChatLayout` type, bounds constants, `validateChatLayout()` (pure, tested).
+- `apps/server/src/db/schema.ts` *(modify)*: add `chatLayout` jsonb column to `userProfile`.
+- `apps/server/src/db/repositories/profiles.ts` *(modify)*: add `updateChatLayout()`.
+- `apps/server/src/api/routes/profiles.ts` *(modify)*: `GET /me` returns `chatLayout`; add `PUT /me/chat-layout`.
+- `apps/server/drizzle/*` *(generated)*: migration adding the column.
+- `apps/server/tests/chat-layout.test.ts` *(create)*: validator tests.
 
 **Web**
-- `apps/web/lib/chat-layout.ts` *(create)* — `ChatLayout` type, bounds, clamp helpers, parse/normalize, localStorage read/write (pure, tested; **no `"use client"`** so the type imports into the RSC page).
-- `apps/web/app/play/[gameId]/chat-popout-window.tsx` *(create)* — presentational wrapper rendering the stable chat structure with mounted-vs-popout chrome, drag/resize handlers.
-- `apps/web/app/play/[gameId]/game-chat-split.tsx` *(rewrite)* — owns mode/width/geometry state, ResizeObserver clamp, persistence, scrollbar fix, full-width game when popped out.
-- `apps/web/app/play/[gameId]/play-client.tsx` *(modify)* — thread `dbLayout` prop.
-- `apps/web/app/play/[gameId]/page.tsx` *(modify)* — SSR-fetch `chatLayout` from `/api/profiles/me`.
-- `apps/web/tests/chat-layout.test.ts` *(create)* — clamp/parse tests.
+- `apps/web/lib/chat-layout.ts` *(create)*: `ChatLayout` type, bounds, clamp helpers, parse/normalize, localStorage read/write (pure, tested; **no `"use client"`** so the type imports into the RSC page).
+- `apps/web/app/play/[gameId]/chat-popout-window.tsx` *(create)*: presentational wrapper rendering the stable chat structure with mounted-vs-popout chrome, drag/resize handlers.
+- `apps/web/app/play/[gameId]/game-chat-split.tsx` *(rewrite)*: owns mode/width/geometry state, ResizeObserver clamp, persistence, scrollbar fix, full-width game when popped out.
+- `apps/web/app/play/[gameId]/play-client.tsx` *(modify)*: thread `dbLayout` prop.
+- `apps/web/app/play/[gameId]/page.tsx` *(modify)*: SSR-fetch `chatLayout` from `/api/profiles/me`.
+- `apps/web/tests/chat-layout.test.ts` *(create)*: clamp/parse tests.
 
 ---
 
@@ -93,7 +93,7 @@ describe("validateChatLayout", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/server && bun test tests/chat-layout.test.ts`
-Expected: FAIL — cannot find module `../src/lib/chat-layout`.
+Expected: FAIL - cannot find module `../src/lib/chat-layout`.
 
 - [ ] **Step 3: Write the module**
 
@@ -101,7 +101,7 @@ Create `apps/server/src/lib/chat-layout.ts`:
 
 ```ts
 // Source of truth for chat-layout validation (server side). Mirror of the web
-// catalog in apps/web/lib/chat-layout.ts — keep the bounds in sync.
+// catalog in apps/web/lib/chat-layout.ts - keep the bounds in sync.
 
 export type ChatMode = "mounted" | "popout";
 
@@ -214,7 +214,7 @@ Expected: a new file under `apps/server/drizzle/` adding `chat_layout` to `user_
 - [ ] **Step 4: Apply it (requires DB running)**
 
 Run: `bun run db:start` then `bun run db:migrate`
-Expected: migration applies cleanly. (If no DB is available in this environment, note it and let the executor apply later — but still commit the generated SQL.)
+Expected: migration applies cleanly. (If no DB is available in this environment, note it and let the executor apply later - but still commit the generated SQL.)
 
 - [ ] **Step 5: Type-check**
 
@@ -398,15 +398,15 @@ describe("parseChatLayout", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/web && bun test tests/chat-layout.test.ts`
-Expected: FAIL — cannot find module `../lib/chat-layout`.
+Expected: FAIL - cannot find module `../lib/chat-layout`.
 
 - [ ] **Step 3: Write the module**
 
-Create `apps/web/lib/chat-layout.ts` (no `"use client"` — pure, importable from the RSC page for its type):
+Create `apps/web/lib/chat-layout.ts` (no `"use client"`, pure, importable from the RSC page for its type):
 
 ```ts
 // Pure layout math + persistence helpers for the play-page game/chat split.
-// Mirror of apps/server/src/lib/chat-layout.ts — keep bounds in sync.
+// Mirror of apps/server/src/lib/chat-layout.ts - keep bounds in sync.
 
 export type ChatMode = "mounted" | "popout";
 
@@ -423,7 +423,7 @@ export const MIN_GAME = 360;
 export const MAX_GAME = 760;
 export const DEFAULT_GAME = 480;
 
-// Chat pane (mounted) bounds — chat is deliberately kept small.
+// Chat pane (mounted) bounds - chat is deliberately kept small.
 export const MIN_CHAT = 280;
 export const MAX_CHAT = 420;
 
@@ -740,7 +740,7 @@ export function ChatPopoutWindow({
         <FaExpand className="size-3.5" />
       </button>
 
-      {/* Chat content — STABLE position across modes (never remounts). */}
+      {/* Chat content - STABLE position across modes (never remounts). */}
       <div className="relative min-h-0 flex-1">{children}</div>
 
       {/* Resize handle (popout only), bottom-left corner. */}
@@ -858,7 +858,7 @@ export function GameChatSplit({
   }, []);
 
   // Resolve initial layout: localStorage wins, then DB, then defaults.
-  // Pop-out is desktop-only — force mounted below md.
+  // Pop-out is desktop-only - force mounted below md.
   useEffect(() => {
     const resolved = readChatLayout() ?? dbLayout ?? DEFAULT_CHAT_LAYOUT;
     const isDesktop =
@@ -1009,7 +1009,7 @@ export function GameChatSplit({
 - [ ] **Step 2: Type-check**
 
 Run: `cd apps/web && bun run type-check`
-Expected: FAIL — `play-client.tsx` does not yet pass `dbLayout`. Proceed to Task 7 (the error is expected and resolved there).
+Expected: FAIL - `play-client.tsx` does not yet pass `dbLayout`. Proceed to Task 7 (the error is expected and resolved there).
 
 - [ ] **Step 3: Commit**
 
@@ -1138,7 +1138,7 @@ Run: `bun run db:start` (if not running) then `bun run dev`. Open a play page wi
 - Shrink/grow the browser window: the divider width re-clamps so both panes stay in-bounds.
 - Click the pop-out button (top-right of chat): chat detaches to a floating window at the bottom-right; the game pane fills the full width.
 - Drag the window by its header; resize from the bottom-left corner: it stays within the viewport; min size respected.
-- Confirm the chat keeps its scroll position and live socket (send/receive a message) across pop-out ↔ dock — i.e. it did not remount.
+- Confirm the chat keeps its scroll position and live socket (send/receive a message) across pop-out ↔ dock - i.e. it did not remount.
 - Reload: the mode + geometry + divider width restore from localStorage.
 - In devtools, clear `localStorage gl_chat_layout`, reload: layout restores from the DB value instead.
 - Narrow to a mobile width: the tab switcher returns and pop-out is unavailable; if popped out when narrowing, it falls back to mounted.

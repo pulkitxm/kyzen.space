@@ -1,4 +1,4 @@
-# Shared Packages Refactor — `@gamelobby/{constants,types,database}`
+# Shared Packages Refactor: `@gamelobby/{constants,types,database}`
 
 Date: 2026-06-06 · Branch: `batch-username-provisioning`
 
@@ -7,13 +7,13 @@ Date: 2026-06-06 · Branch: `batch-username-provisioning`
 Eliminate all cross-boundary (web ↔ server) duplication by introducing three shared
 workspace packages and centralizing every type + every Zod schema into one place.
 
-- **`@gamelobby/constants`** — pure constant values shared by web and server.
-- **`@gamelobby/types`** — ALL types and ALL Zod schemas. The **only** package that
+- **`@gamelobby/constants`** - pure constant values shared by web and server.
+- **`@gamelobby/types`** - ALL types and ALL Zod schemas. The **only** package that
   declares `zod` as a dependency. Re-exports `z` so nothing else imports `zod` directly.
-- **`@gamelobby/database`** — Drizzle tables + repositories (the data layer), validating
+- **`@gamelobby/database`** - Drizzle tables + repositories (the data layer), validating
   strictly against the `types` schemas.
 
-`@gamelobby/chat-core` is **deleted** — it is purely types/schemas/const, so its contents
+`@gamelobby/chat-core` is **deleted** - it is purely types/schemas/const, so its contents
 move into `types/chat/` and `constants` and the empty package is removed.
 
 ## Non-negotiable rules (these become agent + CLAUDE.md rules)
@@ -29,8 +29,8 @@ move into `types/chat/` and `constants` and the empty package is removed.
 ## Dependency graph (acyclic)
 
 ```
-constants     pure values                                   — zero internal deps
-avatar        AvatarConfig + generate/compare (unchanged)   — zero internal deps, NO zod
+constants     pure values                                   - zero internal deps
+avatar        AvatarConfig + generate/compare (unchanged)   - zero internal deps, NO zod
 types         ALL types + ALL zod; re-exports z + AvatarConfig   → constants, avatar, zod
 games-core    engines + registry + GAMES                    → types, constants
 games-client  React boards                                  → types (+ games-core)
@@ -57,7 +57,7 @@ the deliberate exception to rule 2.
 - `chat.ts`: `CHAT_EVENTS`
 
 ### `@gamelobby/types` (all types + all zod; deps: constants, avatar, zod)
-- `z.ts`: `export { z } from "zod"` + `export type { ZodType, ... }` — the only zod touch
+- `z.ts`: `export { z } from "zod"` + `export type { ZodType, ... }`, the only zod touch
 - `theme.ts`: `themeIdSchema`, `ThemeId`, `colorModeSchema`, `ColorMode`,
   `isValidTheme`, `isValidColorMode` (guards via schema.safeParse)
 - `pattern.ts`: `patternIdSchema`, `PatternId`, `isValidPattern`
@@ -116,9 +116,9 @@ the deliberate exception to rule 2.
 ## Execution order (verify `bun run type-check` after each layer)
 
 1. Scaffold the 3 packages (manifests, tsconfig, empty index).
-2. `constants` — move values.
-3. `types` — schemas + types (theme/pattern/chat-layout/username/avatar re-export/chat/games/db).
-4. `database` — tables + client factory + repositories + validation + drift guards + migrations.
+2. `constants` - move values.
+3. `types` - schemas + types (theme/pattern/chat-layout/username/avatar re-export/chat/games/db).
+4. `database` - tables + client factory + repositories + validation + drift guards + migrations.
 5. Migrate `games-core` + `games-client` to import from packages.
 6. Migrate `apps/server` (delete db/, lib/theme, lib/pattern; rewrite imports; createDb).
 7. Migrate `apps/web` (dedup themes/patterns/chat-layout/username; rewrite imports).

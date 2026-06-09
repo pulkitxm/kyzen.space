@@ -205,7 +205,7 @@ describe("PUT /me/appearance", () => {
   });
 });
 
-describe("PUT /me/avatar — auth gate", () => {
+describe("PUT /me/avatar - auth gate", () => {
   it("returns 401 when unauthenticated", async () => {
     const res = await put(VALID_AVATAR);
     expect(res.status).toBe(401);
@@ -213,7 +213,7 @@ describe("PUT /me/avatar — auth gate", () => {
   });
 });
 
-describe("PUT /me/avatar — payload validation", () => {
+describe("PUT /me/avatar - payload validation", () => {
   beforeEach(() => {
     currentSession = { user: { id: "user-1", name: "T", email: "t@e.com" } };
   });
@@ -244,7 +244,7 @@ describe("PUT /me/avatar — payload validation", () => {
   });
 });
 
-describe("PUT /me/avatar — success", () => {
+describe("PUT /me/avatar - success", () => {
   beforeEach(() => {
     currentSession = { user: { id: "user-42", name: "T", email: "t@e.com" } };
   });
@@ -337,7 +337,7 @@ function putName(body: object) {
   });
 }
 
-describe("GET /me — usernameEditableAt", () => {
+describe("GET /me - usernameEditableAt", () => {
   it("is null when the username was never changed", async () => {
     authed("user-1", { usernameChangedAt: null });
     const res = await profilesRouter.request("/me");

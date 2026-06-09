@@ -6,7 +6,7 @@ const SETUP_HELP = [
   "Checklist:",
   "(1) DATABASE_URL and BETTER_AUTH_SECRET must be set",
   "(a missing one throws 'Missing required env var' before this check);",
-  "(2) Postgres must be running — `bun run db:start` locally,",
+  "(2) Postgres must be running - `bun run db:start` locally,",
   "or a `postgres` service in CI;",
   "(3) apply the schema with `bun run db:push`.",
 ].join(" ");

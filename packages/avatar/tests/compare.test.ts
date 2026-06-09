@@ -4,7 +4,7 @@ import { AVATAR_CONFIG_KEYS, configsEqual, randomAvatarConfig } from "../src";
 
 const BASE: AvatarConfig = randomAvatarConfig("compare-base");
 
-describe("configsEqual — identity", () => {
+describe("configsEqual: identity", () => {
   it("a config equals itself", () => {
     expect(configsEqual(BASE, BASE)).toBe(true);
   });
@@ -14,7 +14,7 @@ describe("configsEqual — identity", () => {
   });
 });
 
-describe("configsEqual — every field is compared", () => {
+describe("configsEqual: every field is compared", () => {
   for (const key of AVATAR_CONFIG_KEYS) {
     it(`detects a change in ${key}`, () => {
       const mutated: AvatarConfig = { ...BASE, [key]: "__different__" };
@@ -23,7 +23,7 @@ describe("configsEqual — every field is compared", () => {
   }
 });
 
-describe("configsEqual — style normalization", () => {
+describe("configsEqual: style normalization", () => {
   it("treats explicit 'any' and omitted style as equal", () => {
     const withAny: AvatarConfig = { ...BASE, style: "any" };
     const { style: _omit, ...withoutStyle } = BASE;
@@ -59,7 +59,7 @@ describe("configsEqual — style normalization", () => {
   });
 });
 
-describe("configsEqual — symmetry", () => {
+describe("configsEqual: symmetry", () => {
   it("is symmetric for equal configs", () => {
     const clone = { ...BASE };
     expect(configsEqual(BASE, clone)).toBe(configsEqual(clone, BASE));

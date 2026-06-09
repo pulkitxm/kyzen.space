@@ -30,7 +30,7 @@ export default async function GameLobbyPage({
       <div className="mt-6">
         <PageHeader
           title={def.meta.name}
-          description="Games happen inside your chats — pick a friend or group to play with."
+          description="Games happen inside your chats - pick a friend or group to play with."
         />
       </div>
 

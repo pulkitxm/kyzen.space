@@ -4,7 +4,7 @@ import { randomAvatarConfig, toDicebearOptions } from "../src";
 
 const BASE: AvatarConfig = randomAvatarConfig("mapping-base");
 
-describe("toDicebearOptions — single-value forcing", () => {
+describe("toDicebearOptions - single-value forcing", () => {
   it("wraps each rendered field in a single-element array", () => {
     const o = toDicebearOptions(BASE);
     expect(o.skinColor).toEqual([BASE.skinColor]);
@@ -24,7 +24,7 @@ describe("toDicebearOptions — single-value forcing", () => {
   });
 });
 
-describe("toDicebearOptions — optional parts (accessories)", () => {
+describe("toDicebearOptions - optional parts (accessories)", () => {
   it("enables accessories at 100% when one is chosen", () => {
     const cfg: AvatarConfig = { ...BASE, accessories: "sunglasses" };
     const o = toDicebearOptions(cfg);
@@ -40,7 +40,7 @@ describe("toDicebearOptions — optional parts (accessories)", () => {
   });
 });
 
-describe("toDicebearOptions — optional parts (facial hair)", () => {
+describe("toDicebearOptions - optional parts (facial hair)", () => {
   it("enables facial hair at 100% when one is chosen", () => {
     const cfg: AvatarConfig = { ...BASE, facialHair: "beardMajestic" };
     const o = toDicebearOptions(cfg);
@@ -56,7 +56,7 @@ describe("toDicebearOptions — optional parts (facial hair)", () => {
   });
 });
 
-describe("toDicebearOptions — purity", () => {
+describe("toDicebearOptions - purity", () => {
   it("does not mutate the input config", () => {
     const snapshot = structuredClone(BASE);
     toDicebearOptions(BASE);

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { GameCard } from "@/app/game-card";
 
 export const metadata: Metadata = {
-  title: "GameLobby — Play live multiplayer games",
+  title: "GameLobby: Play live multiplayer games",
   description:
     "Browse the game library and start a live multiplayer match with your friends.",
 };

@@ -78,7 +78,7 @@ describe("gameCodeSchema", () => {
 const UUID_V4 = "a0927a0b-1234-4abc-89ef-0123456789ab";
 const UUID_ONES = "11111111-1111-1111-1111-111111111111";
 
-describe("normalizeGameCode — mapping matrix and idempotency", () => {
+describe("normalizeGameCode - mapping matrix and idempotency", () => {
   test("maps every ambiguous letter in both cases", () => {
     expect(normalizeGameCode("i")).toBe("1");
     expect(normalizeGameCode("I")).toBe("1");
@@ -88,7 +88,7 @@ describe("normalizeGameCode — mapping matrix and idempotency", () => {
     expect(normalizeGameCode("O")).toBe("0");
   });
 
-  test("leaves U unmapped — it is neither remapped nor in the alphabet", () => {
+  test("leaves U unmapped - it is neither remapped nor in the alphabet", () => {
     expect(normalizeGameCode("u")).toBe("U");
     expect(normalizeGameCode("U")).toBe("U");
     expect(normalizeGameCode("KUP2QX")).toBe("KUP2QX");
@@ -106,7 +106,7 @@ describe("normalizeGameCode — mapping matrix and idempotency", () => {
     expect(isGameCode("k7 p2qx")).toBe(false);
   });
 
-  test("is idempotent — re-normalizing a code returns the same code", () => {
+  test("is idempotent - re-normalizing a code returns the same code", () => {
     for (const raw of ["k7p2qx", "  ilo123  ", "K7P2Q1", "ABCDEF", "iloilo"]) {
       const once = normalizeGameCode(raw);
       expect(normalizeGameCode(once)).toBe(once);
@@ -121,7 +121,7 @@ describe("normalizeGameCode — mapping matrix and idempotency", () => {
   });
 });
 
-describe("isGameCode — boundaries and the UUID migration guard", () => {
+describe("isGameCode - boundaries and the UUID migration guard", () => {
   test("accepts a canonical six-char code", () => {
     expect(isGameCode("K7P2QX")).toBe(true);
   });
@@ -156,7 +156,7 @@ describe("isGameCode — boundaries and the UUID migration guard", () => {
   });
 });
 
-describe("gameCodeSchema — non-string, empty, and canonical output", () => {
+describe("gameCodeSchema - non-string, empty, and canonical output", () => {
   test("rejects non-string inputs", () => {
     expect(gameCodeSchema.safeParse(123456).success).toBe(false);
     expect(gameCodeSchema.safeParse(null).success).toBe(false);

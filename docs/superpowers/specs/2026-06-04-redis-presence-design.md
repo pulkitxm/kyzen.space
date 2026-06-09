@@ -50,10 +50,10 @@ Two stores of truth, each matched to what it is good at:
 
 Two decoupled cadences:
 
-- **Redis presence heartbeat — short (~10s).** Each node refreshes the Redis entries for
+- **Redis presence heartbeat: short (~10s).** Each node refreshes the Redis entries for
   its own connected sockets. Stale window ~25s, so a crashed node's users age out of every
   read within ~25s.
-- **DB `last_seen_at` write — long (~60s while online, plus immediately on graceful disconnect).**
+- **DB `last_seen_at` write: long (~60s while online, plus immediately on graceful disconnect).**
   After a crash, last-seen is accurate to within ~60s; on a clean disconnect it is exact.
 
 ## Components
@@ -72,12 +72,12 @@ onlineAmong(userIds[])         -> Set<userId>                 // batch, for the 
 
 ### 2. Two implementations, selected by `REDIS_URL`
 
-- **`RedisPresenceStore`** — one sorted set per user, `presence:<userId>`, members are
+- **`RedisPresenceStore`**: one sorted set per user, `presence:<userId>`, members are
   `socketId`, scores are the last-heartbeat epoch ms.
   - `markOnline` / `refresh`: `ZADD presence:<userId> <now> <socketId>`, then bump a
     key-level `EXPIRE` (≈ stale window + grace) so an abandoned key self-cleans.
   - `markOffline`: `ZREM presence:<userId> <socketId>`.
-  - `isOnline`: `ZCOUNT presence:<userId> (now - staleMs) +inf` > 0 — members whose last
+  - `isOnline`: `ZCOUNT presence:<userId> (now - staleMs) +inf` > 0 - members whose last
     heartbeat is older than the stale window are ignored, so a crashed node's entries
     simply age out. Reads are always crash-correct.
   - `onlineAmong`: a pipeline of `ZCOUNT`s (one per audience member).
@@ -85,16 +85,16 @@ onlineAmong(userIds[])         -> Set<userId>                 // batch, for the 
     the adapter's `pub`/`sub` clients exist (`apps/server/src/realtime/redis.ts`); this adds
     a single lazily-created `ioredis` client for normal commands, reusing `env.redisUrl`.
 
-- **`InMemoryPresenceStore`** — the current `Map<userId, Set<socketId>>` behavior for
+- **`InMemoryPresenceStore`**: the current `Map<userId, Set<socketId>>` behavior for
   single-node dev. `refresh` is a no-op; `isOnline` / `onlineAmong` read the map. Keeps
   `REDIS_URL`-unset deployments working.
 
 ### 3. Two per-node heartbeat timers (started in `attachRealtime`)
 
-- **Redis refresh** — every `PRESENCE_HEARTBEAT_MS` (~10s): collect this node's local
+- **Redis refresh**: every `PRESENCE_HEARTBEAT_MS` (~10s): collect this node's local
   connected sockets, group by `userId`, `refresh` each (pipelined). No-op under the
   in-memory store.
-- **DB persist** — every `PRESENCE_LASTSEEN_PERSIST_MS` (~60s): one batched
+- **DB persist**: every `PRESENCE_LASTSEEN_PERSIST_MS` (~60s): one batched
   `touchLastSeen(distinctLocalUserIds, now)` write. Runs in both modes (it is what keeps
   last-seen near-accurate across a crash).
 
@@ -107,8 +107,8 @@ it is responsible for refreshing.
   Apply locally with `db:push` (this repo's dev DB is push-managed; `db:migrate` fails locally);
   generate the migration file with `db:generate` for prod.
 - `apps/server/src/db/repositories/profiles.ts`:
-  - `touchLastSeen(userIds: string[], when: Date)` — batched update, no-op on empty input.
-  - `getLastSeen(userIds: string[]) -> Map<userId, Date | null>` — batch read for building
+  - `touchLastSeen(userIds: string[], when: Date)`: batched update, no-op on empty input.
+  - `getLastSeen(userIds: string[]) -> Map<userId, Date | null>`: batch read for building
     snapshot entries for offline users.
 
 ### 5. Configuration
@@ -134,7 +134,7 @@ all optional with defaults:
 - **Crash:** no disconnect handler runs. The node stops refreshing, so the user's ZSET
   members go stale and `isOnline` reads return offline within ~`PRESENCE_STALE_MS`. The DB
   heartbeat had stamped `last_seen_at` within ~`PRESENCE_LASTSEEN_PERSIST_MS`, so last-seen
-  is close to correct. (No live push to existing observers — see Deferred work.)
+  is close to correct. (No live push to existing observers - see Deferred work.)
 
 The audience computation (`audienceFor`: accepted friends + conversation members) is unchanged.
 `isOnline` becomes async, but it is module-private (only `payloadFor` uses it today), so the
@@ -144,7 +144,7 @@ change does not ripple outside `presence.ts`.
 
 - Redis command failures in the store are caught and logged via the realtime child logger;
   a failed `isOnline` / `onlineAmong` degrades to treating the user(s) as offline rather than
-  throwing into a socket handler. A failed `refresh` is logged and skipped — the entry simply
+  throwing into a socket handler. A failed `refresh` is logged and skipped - the entry simply
   goes stale and is re-established on the next tick.
 - `touchLastSeen` failures are logged and swallowed; last-seen is best-effort and must never
   break connect/disconnect.

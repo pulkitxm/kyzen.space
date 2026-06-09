@@ -36,7 +36,7 @@ beforeEach(() => {
   dbState.card = null;
 });
 
-describe("assembleMessage — game-card code/UUID split", () => {
+describe("assembleMessage - game-card code/UUID split", () => {
   test("swaps the wire gameId to the game code when the game is found", async () => {
     dbState.game = {
       id: UUID,

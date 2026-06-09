@@ -12,17 +12,17 @@
 
 ## File Structure
 
-- `apps/web/lib/chat-layout.ts` — extend types/constants/defaults/normalize; add `clampIcon`, `edgeForIcon`, `stashTabPos`. (pure, unit-tested)
-- `apps/web/tests/chat-layout.test.ts` — extend with tests for the new helpers/fields.
-- `apps/server/src/lib/chat-layout.ts` — replace `validateChatLayout` with a `mode`-only `validateChatModePref`.
-- `apps/server/src/api/routes/profiles.ts` — PUT `/me/chat-layout` stores `{ mode }` only.
-- `apps/server/src/db/repositories/profiles.ts` — `updateChatLayout` takes `{ mode }`.
-- `apps/server/src/db/schema.ts` — `chat_layout` jsonb `$type` narrows to `{ mode } | null` (no migration; jsonb is schemaless).
-- `apps/server/tests/chat-layout.test.ts` — rewrite for `validateChatModePref`.
-- `apps/web/app/play/[gameId]/chat-floating-icon.tsx` — NEW: bubble + edge-tab + drag.
-- `apps/web/app/play/[gameId]/chat-popout-window.tsx` — add minimize button + `minimized` hide.
-- `apps/web/app/play/[gameId]/game-chat-split.tsx` — own minimize/stash/icon state, unread, render the icon.
-- `apps/web/app/play/[gameId]/play-client.tsx` — pass `conversationId`.
+- `apps/web/lib/chat-layout.ts`: extend types/constants/defaults/normalize; add `clampIcon`, `edgeForIcon`, `stashTabPos`. (pure, unit-tested)
+- `apps/web/tests/chat-layout.test.ts`: extend with tests for the new helpers/fields.
+- `apps/server/src/lib/chat-layout.ts`: replace `validateChatLayout` with a `mode`-only `validateChatModePref`.
+- `apps/server/src/api/routes/profiles.ts`: PUT `/me/chat-layout` stores `{ mode }` only.
+- `apps/server/src/db/repositories/profiles.ts`: `updateChatLayout` takes `{ mode }`.
+- `apps/server/src/db/schema.ts`: `chat_layout` jsonb `$type` narrows to `{ mode } | null` (no migration; jsonb is schemaless).
+- `apps/server/tests/chat-layout.test.ts`: rewrite for `validateChatModePref`.
+- `apps/web/app/play/[gameId]/chat-floating-icon.tsx`: NEW: bubble + edge-tab + drag.
+- `apps/web/app/play/[gameId]/chat-popout-window.tsx`: add minimize button + `minimized` hide.
+- `apps/web/app/play/[gameId]/game-chat-split.tsx`: own minimize/stash/icon state, unread, render the icon.
+- `apps/web/app/play/[gameId]/play-client.tsx`: pass `conversationId`.
 
 ---
 
@@ -39,7 +39,7 @@ Add to `apps/web/tests/chat-layout.test.ts` (extend the import list with `DEFAUL
 ```ts
 import { DEFAULT_ICON } from "../lib/chat-layout";
 
-describe("parseChatLayout — minimize fields", () => {
+describe("parseChatLayout - minimize fields", () => {
   it("defaults the new fields", () => {
     const out = parseChatLayout(JSON.stringify({ mode: "popout" }));
     expect(out.minimized).toBe(false);
@@ -70,7 +70,7 @@ describe("parseChatLayout — minimize fields", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/web && bun test tests/chat-layout.test.ts`
-Expected: FAIL — `DEFAULT_ICON` is not exported / `minimized` is undefined.
+Expected: FAIL - `DEFAULT_ICON` is not exported / `minimized` is undefined.
 
 - [ ] **Step 3: Implement the model changes**
 
@@ -197,7 +197,7 @@ describe("clampIcon", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/web && bun test tests/chat-layout.test.ts`
-Expected: FAIL — `clampIcon` is not exported.
+Expected: FAIL - `clampIcon` is not exported.
 
 - [ ] **Step 3: Implement**
 
@@ -263,7 +263,7 @@ describe("edgeForIcon", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/web && bun test tests/chat-layout.test.ts`
-Expected: FAIL — `edgeForIcon` is not exported.
+Expected: FAIL - `edgeForIcon` is not exported.
 
 - [ ] **Step 3: Implement**
 
@@ -343,7 +343,7 @@ describe("stashTabPos", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/web && bun test tests/chat-layout.test.ts`
-Expected: FAIL — `stashTabPos` is not exported.
+Expected: FAIL - `stashTabPos` is not exported.
 
 - [ ] **Step 3: Implement**
 
@@ -435,7 +435,7 @@ describe("validateChatModePref", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/server && bun test tests/chat-layout.test.ts`
-Expected: FAIL — `validateChatModePref` is not exported.
+Expected: FAIL - `validateChatModePref` is not exported.
 
 - [ ] **Step 3: Implement the server changes**
 
@@ -458,7 +458,7 @@ export function validateChatModePref(input: unknown): ChatModePref | null {
 
 Delete the old `validateChatLayout` export (it is only used by the route, updated below). Leave the type/constant exports in place.
 
-In `apps/server/src/db/schema.ts:160`, narrow the jsonb type (compile-time only — no migration needed; add the `ChatMode` import if missing):
+In `apps/server/src/db/schema.ts:160`, narrow the jsonb type (compile-time only, no migration needed; add the `ChatMode` import if missing):
 
 ```ts
   chatLayout: jsonb("chat_layout").$type<{ mode: ChatMode } | null>(),
@@ -512,7 +512,7 @@ git commit -m "feat(server): persist only chat mode (geometry is device-local)"
 
 **Files:**
 - Modify: `apps/web/app/play/[gameId]/game-chat-split.tsx:67-82`
-- Verify: `apps/web/app/play/[gameId]/page.tsx:62-68` (already runs `normalizeChatLayout` on the DB value; `{ mode }` normalizes to full defaults — no change needed, just confirm).
+- Verify: `apps/web/app/play/[gameId]/page.tsx:62-68` (already runs `normalizeChatLayout` on the DB value; `{ mode }` normalizes to full defaults - no change needed, just confirm).
 
 - [ ] **Step 1: Trim the PUT payload**
 
@@ -757,7 +757,7 @@ In the outer `<div>` className, add a `hidden` branch when minimized. Replace th
       )}
 ```
 
-In the popout header, add a minimize button before the dock button (inside the existing `<div>` that holds the `<span>Chat</span>` and dock button — wrap the two buttons in a flex span):
+In the popout header, add a minimize button before the dock button (inside the existing `<div>` that holds the `<span>Chat</span>` and dock button - wrap the two buttons in a flex span):
 
 ```tsx
         <span className="font-medium text-muted-foreground text-xs">Chat</span>
@@ -813,7 +813,7 @@ For the mounted-mode overlay, wrap the existing pop-out button and a new minimiz
 - [ ] **Step 2: Typecheck**
 
 Run: `cd apps/web && bun run typecheck`
-Expected: FAIL — `GameChatSplit` does not yet pass `minimized`/`onMinimize` (fixed in Task 9). It is acceptable for this task's typecheck to fail on the missing props; verify the failure is ONLY about those two props.
+Expected: FAIL - `GameChatSplit` does not yet pass `minimized`/`onMinimize` (fixed in Task 9). It is acceptable for this task's typecheck to fail on the missing props; verify the failure is ONLY about those two props.
 
 - [ ] **Step 3: Commit**
 
@@ -912,7 +912,7 @@ Update the `persist` callback's `layout` object to include the new fields:
     };
 ```
 
-> Note: `stashEdge` is nullable, so use the `!== undefined` guard (not `??`) — `null` is a valid value the caller may set.
+> Note: `stashEdge` is nullable, so use the `!== undefined` guard (not `??`) - `null` is a valid value the caller may set.
 
 In the post-hydration reconciliation effect (the one that reads `readChatLayout()`), also seed the new fields when adopting localStorage:
 
@@ -1017,7 +1017,7 @@ Pass the new props to `<ChatPopoutWindow>`:
         </ChatPopoutWindow>
 ```
 
-Render the floating icon as a sibling, after `</ChatPopoutWindow>` but still inside the container `<div ref={containerRef}>` (it is `position: fixed`, so placement in the tree only matters for it being mounted alongside the chat). Guard on desktop via the same md logic used elsewhere — render only when `minimized`:
+Render the floating icon as a sibling, after `</ChatPopoutWindow>` but still inside the container `<div ref={containerRef}>` (it is `position: fixed`, so placement in the tree only matters for it being mounted alongside the chat). Guard on desktop via the same md logic used elsewhere - render only when `minimized`:
 
 ```tsx
         {minimized && (
@@ -1091,6 +1091,6 @@ git commit -m "chore: formatting + fixups for chat minimize feature"
 ## Notes for the implementer
 
 - **Why the wrapper hides instead of unmounting:** the chat subtree must keep its socket subscription and message store alive while minimized (so the unread badge works and there's no reconnect flash). This mirrors the existing "children never remount across modes" rule in `ChatPopoutWindow`.
-- **`stashEdge` is nullable** — when threading it through `persist`/overrides, distinguish `null` (a real value) from `undefined` (use current), as called out in Task 9.
-- **No DB migration** — `chat_layout` is a schemaless jsonb column; narrowing the `$type` is compile-time only. Existing rows holding the old full layout still parse (the web reads geometry from the cookie; the server only ever reads/writes `mode` going forward).
-- **Touch drag is out of scope** — desktop mouse drag only, matching the existing popout drag.
+- **`stashEdge` is nullable:** when threading it through `persist`/overrides, distinguish `null` (a real value) from `undefined` (use current), as called out in Task 9.
+- **No DB migration:** `chat_layout` is a schemaless jsonb column; narrowing the `$type` is compile-time only. Existing rows holding the old full layout still parse (the web reads geometry from the cookie; the server only ever reads/writes `mode` going forward).
+- **Touch drag is out of scope:** desktop mouse drag only, matching the existing popout drag.

@@ -9,7 +9,7 @@ const h = createHarness("gi");
 afterAll(h.cleanup);
 
 describe.skipIf(!DB_UP)(
-  "createGameInConversation — error and branch matrix",
+  "createGameInConversation - error and branch matrix",
   () => {
     it("returns 404 for a non-existent conversation", async () => {
       const a = await h.makeUser("noconv");

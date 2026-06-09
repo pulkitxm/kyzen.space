@@ -56,7 +56,7 @@ function fakeSql(): FakeSql {
 const DELAY = 60;
 const TOLERANCE = 15;
 
-describe("resolveDbLatencyMs — production safety", () => {
+describe("resolveDbLatencyMs - production safety", () => {
   it("forces 0 in production regardless of the requested value", () => {
     expect(resolveDbLatencyMs("production", 800)).toBe(0);
     expect(resolveDbLatencyMs("production", 999999)).toBe(0);
@@ -70,7 +70,7 @@ describe("resolveDbLatencyMs — production safety", () => {
   });
 });
 
-describe("withLatency — disabled", () => {
+describe("withLatency - disabled", () => {
   it("returns the same client untouched when ms is 0", () => {
     const sql = fakeSql();
     expect(withLatency(sql, 0)).toBe(sql);
@@ -83,7 +83,7 @@ describe("withLatency — disabled", () => {
   });
 });
 
-describe("withLatency — enabled", () => {
+describe("withLatency - enabled", () => {
   it("delays an `unsafe` query and preserves its result", async () => {
     const slow = withLatency(fakeSql(), DELAY);
     const start = performance.now();
