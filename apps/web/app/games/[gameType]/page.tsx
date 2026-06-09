@@ -28,7 +28,7 @@ export default async function GameLobbyPage({
     <PageContainer>
       <PageHeader
         title={def.meta.name}
-        description="Games happen inside your chats — pick a friend or group to play with."
+        description="Games happen inside your chats - pick a friend or group to play with."
       />
 
       <GameLobby

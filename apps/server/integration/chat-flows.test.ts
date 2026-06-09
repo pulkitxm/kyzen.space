@@ -440,6 +440,6 @@ describe.skipIf(!DB_UP)("notifications", () => {
 
 if (!DB_UP) {
   describe("chat integration", () => {
-    it.skip("skipped — database unreachable; run `bun run db:start`", () => {});
+    it.skip("skipped - database unreachable; run `bun run db:start`", () => {});
   });
 }

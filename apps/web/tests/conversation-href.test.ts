@@ -17,7 +17,7 @@ type Conv = Pick<ConversationJson, "id" | "kind" | "name" | "members">;
 const viewer = member("u1", "alice");
 const other = member("u2", "bob");
 
-describe("conversationHref — group branch", () => {
+describe("conversationHref - group branch", () => {
   it("routes a named group to its name route", () => {
     const conv: Conv = {
       id: "c1",
@@ -61,7 +61,7 @@ describe("conversationHref — group branch", () => {
   });
 });
 
-describe("conversationHref — DM branch", () => {
+describe("conversationHref - DM branch", () => {
   it("routes a DM to the other member's username, never the viewer's", () => {
     const conv: Conv = {
       id: "c1",
@@ -84,7 +84,7 @@ describe("conversationHref — DM branch", () => {
   });
 });
 
-describe("conversationHref — no other member fallback", () => {
+describe("conversationHref - no other member fallback", () => {
   it("falls back to the conversation id when the viewer is the only member (self)", () => {
     const conv: Conv = {
       id: "c1",

@@ -38,7 +38,7 @@ function expectValidShape(c: AvatarConfig) {
   }
 }
 
-describe("randomAvatarConfig — determinism", () => {
+describe("randomAvatarConfig - determinism", () => {
   it("is stable for the same seed", () => {
     expect(randomAvatarConfig("user-123")).toEqual(
       randomAvatarConfig("user-123"),
@@ -71,7 +71,7 @@ describe("randomAvatarConfig — determinism", () => {
   });
 });
 
-describe("randomAvatarConfig — always valid", () => {
+describe("randomAvatarConfig - always valid", () => {
   it("only ever emits in-range values (seeded)", () => {
     for (let i = 0; i < 200; i++) {
       expectValidShape(randomAvatarConfig(`v-${i}`));
@@ -92,7 +92,7 @@ describe("randomAvatarConfig — always valid", () => {
   });
 });
 
-describe("randomAvatarConfig — style biasing", () => {
+describe("randomAvatarConfig - style biasing", () => {
   it("defaults to style 'any'", () => {
     expect(randomAvatarConfig("x").style).toBe("any");
   });

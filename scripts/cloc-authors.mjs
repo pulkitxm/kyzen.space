@@ -148,7 +148,7 @@ const rows = [...byEmail.values()]
   .sort((a, b) => b.lines - a.lines);
 
 console.log(
-  `Contributor LOC share — ${ref}  (git blame, co-authors split evenly, non-blank lines)\n`,
+  `Contributor LOC share - ${ref}  (git blame, co-authors split evenly, non-blank lines)\n`,
 );
 const fmtLines = (n) => Math.round(n).toLocaleString();
 const nameW = Math.max(6, ...rows.map((r) => r.name.length));

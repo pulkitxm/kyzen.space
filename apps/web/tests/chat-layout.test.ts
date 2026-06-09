@@ -65,7 +65,7 @@ describe("parseChatLayout", () => {
   });
 });
 
-describe("parseChatLayout — minimize fields", () => {
+describe("parseChatLayout - minimize fields", () => {
   it("defaults the new fields", () => {
     const out = parseChatLayout(JSON.stringify({ mode: "popout" }));
     expect(out.minimized).toBe(false);

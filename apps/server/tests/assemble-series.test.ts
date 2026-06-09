@@ -106,7 +106,7 @@ beforeEach(() => {
   state.seriesCalls = [];
 });
 
-describe("assembleMessage — series enrichment", () => {
+describe("assembleMessage - series enrichment", () => {
   test("a single-game series carries no seriesScore and is not superseded", async () => {
     state.game = seriesGame({ seriesId: null });
     // biome-ignore lint/suspicious/noExplicitAny: test message row

@@ -33,7 +33,7 @@ function fakeSocket() {
   return { join, leave, socket };
 }
 
-describe("rooms — room key builders", () => {
+describe("rooms: room key builders", () => {
   test("gameRoom prefixes with game:", () => {
     expect(gameRoom("abc")).toBe("game:abc");
   });
@@ -54,7 +54,7 @@ describe("rooms — room key builders", () => {
   });
 });
 
-describe("rooms — socket join/leave", () => {
+describe("rooms: socket join/leave", () => {
   test("joinGameRoom joins the game room", () => {
     const { join, socket } = fakeSocket();
     joinGameRoom(socket as never, "g1");
@@ -84,7 +84,7 @@ describe("rooms — socket join/leave", () => {
   });
 });
 
-describe("rooms — emit helpers", () => {
+describe("rooms: emit helpers", () => {
   test("emitToGame targets the game room with event and payload", () => {
     const { io, emits } = fakeIo();
     emitToGame(io as never, "g1", "game_state", { board: [] });

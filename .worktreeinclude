@@ -8,5 +8,5 @@
 
 # Installed deps: root + every workspace node_modules (the bare pattern matches all levels).
 # Bun's symlinks (.bun/* and the @gamelobby/* workspace links) are relative, so they
-# resolve correctly inside the copied worktree — no `bun install` needed.
+# resolve correctly inside the copied worktree - no `bun install` needed.
 node_modules/

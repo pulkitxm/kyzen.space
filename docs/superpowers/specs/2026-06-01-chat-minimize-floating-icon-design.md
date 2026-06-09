@@ -1,4 +1,4 @@
-# Chat minimize-to-floating-icon + Apple-PiP edge-stash — Design
+# Chat minimize-to-floating-icon + Apple-PiP edge-stash: Design
 
 **Date:** 2026-06-01
 **Branch:** feat/game-chat-popout
@@ -53,21 +53,21 @@ target while `minimized` is true. `minimized` + `stashEdge` + `icon` are new.
 
 ### New constants
 
-- `ICON_SIZE` — floating bubble diameter (≈ 56px).
-- `EDGE_TAB_W` / `EDGE_TAB_H` — thin chevron tab dimensions.
-- `ICON_MARGIN` — keep-on-screen margin for the floating bubble (reuse/mirror
+- `ICON_SIZE` - floating bubble diameter (≈ 56px).
+- `EDGE_TAB_W` / `EDGE_TAB_H` - thin chevron tab dimensions.
+- `ICON_MARGIN` - keep-on-screen margin for the floating bubble (reuse/mirror
   `POPOUT_MARGIN` semantics).
-- `DEFAULT_ICON` — sentinel pulled to bottom-right by `clampIcon` (mirrors the
+- `DEFAULT_ICON` - sentinel pulled to bottom-right by `clampIcon` (mirrors the
   `DEFAULT_POPOUT` sentinel pattern).
 
 ### New pure helpers (unit-tested)
 
-- `clampIcon(icon: IconPos, vw: number, vh: number): IconPos` — keep the bubble fully
+- `clampIcon(icon: IconPos, vw: number, vh: number): IconPos` - keep the bubble fully
   on-screen within `ICON_MARGIN`. Resolves the bottom-right sentinel.
-- `edgeForIcon(icon: IconPos, vw: number, vh: number): StashEdge | null` — given a live
+- `edgeForIcon(icon: IconPos, vw: number, vh: number): StashEdge | null` - given a live
   drag position, return the edge whose boundary the bubble center has crossed, else null.
   When multiple are crossed (corner), pick the one with the greatest overshoot.
-- `stashTabPos(icon: IconPos, edge: StashEdge, vw: number, vh: number)` — coordinate +
+- `stashTabPos(icon: IconPos, edge: StashEdge, vw: number, vh: number)` - coordinate +
   orientation for the edge-tab, derived from the bubble's last on-screen position
   (clamped along the edge).
 
@@ -128,7 +128,7 @@ Props: `{ minimized, stashEdge, icon, mode, unread, onRestore, onIconChange, onC
   Both md+ only.
 - New props `minimized` + `onMinimize`. When `minimized`, the window/pane chrome is
   hidden but the **chat children stay mounted and hidden** (display:none-style) so the
-  socket subscription and message store stay alive for unread counting — consistent with
+  socket subscription and message store stay alive for unread counting, consistent with
   the existing "children never remount across modes" rule.
 
 ### `apps/web/app/play/[gameId]/game-chat-split.tsx`
@@ -139,7 +139,7 @@ Props: `{ minimized, stashEdge, icon, mode, unread, onRestore, onIconChange, onC
   All persist through the existing `persist(override?)` path.
 - **Unread badge:** on `minimize()`, snapshot `messagesAtomFamily(conversationId).length`;
   `unread = currentLength − snapshot` (floored at 0); cleared to snapshot on `restore()`.
-  Reads the in-memory message list — not server-backed unread.
+  Reads the in-memory message list, not server-backed unread.
 - Renders `<ChatFloatingIcon>` when `minimized`; keeps `<ChatPopoutWindow>` mounted but
   hidden so chat children persist.
 - Desktop-only: minimize controls hidden below md; dropping below md while minimized

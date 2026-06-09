@@ -121,7 +121,7 @@ beforeEach(() => {
   seatedBatches = [];
 });
 
-describe("createGame — code collision retry", () => {
+describe("createGame - code collision retry", () => {
   test("creates a game on the first attempt when there is no collision", async () => {
     behaviors = ["ok"];
     const rec = await createGame(validInput());
@@ -140,7 +140,7 @@ describe("createGame — code collision retry", () => {
     expect(rec.gameType).toBe(TIC_TAC_TOE);
   });
 
-  test("allows exactly five attempts — succeeds on the last after four collisions", async () => {
+  test("allows exactly five attempts - succeeds on the last after four collisions", async () => {
     behaviors = ["collide", "collide", "collide", "collide", "ok"];
     const rec = await createGame(validInput());
     expect(txCalls).toBe(5);
