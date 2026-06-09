@@ -357,6 +357,6 @@ describe.skipIf(!DB_UP)("messages edge cases", () => {
 
 if (!DB_UP) {
   describe("messages edge cases", () => {
-    it.skip("skipped — database unreachable; run `bun run db:start`", () => {});
+    it.skip("skipped - database unreachable; run `bun run db:start`", () => {});
   });
 }
