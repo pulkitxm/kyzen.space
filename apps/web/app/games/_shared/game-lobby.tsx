@@ -8,9 +8,10 @@ import type {
 import { useAtom } from "jotai";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
-import { FaMagnifyingGlass, FaXmark } from "react-icons/fa6";
+import { FaLink, FaMagnifyingGlass, FaXmark } from "react-icons/fa6";
 import { ConversationPicker } from "@/app/games/components/conversation-picker";
 import { ensureIdentity } from "@/lib/auth/ensure-identity";
+import { createInviteLink } from "@/lib/invite-client";
 import { matchmakingAtom } from "@/lib/matchmaking-atoms";
 import { useSocket, useSocketEvent } from "@/lib/socket/socket-context";
 
@@ -34,6 +35,24 @@ export function GameLobby({
 
   const setField = (key: string, value: unknown) =>
     setConfig((c) => ({ ...c, [key]: value }));
+
+  const [inviteStatus, setInviteStatus] = useState<
+    "idle" | "busy" | "copied" | "error"
+  >("idle");
+
+  const inviteByLink = useCallback(async () => {
+    setInviteStatus("busy");
+    try {
+      await ensureIdentity();
+      const { url } = await createInviteLink(meta.type, config);
+      await navigator.clipboard.writeText(url);
+      setInviteStatus("copied");
+      setTimeout(() => setInviteStatus("idle"), 2500);
+    } catch {
+      setInviteStatus("error");
+      setTimeout(() => setInviteStatus("idle"), 2500);
+    }
+  }, [meta.type, config]);
 
   const searching = matchmaking.searching === meta.type;
 
@@ -82,6 +101,22 @@ export function GameLobby({
         className="w-full rounded-xl bg-primary px-4 py-3 font-medium text-primary-foreground text-sm shadow outline-none transition hover:opacity-90"
       >
         Play with a friend
+      </button>
+
+      <button
+        type="button"
+        onClick={inviteByLink}
+        disabled={inviteStatus === "busy"}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 py-3 font-medium text-card-foreground text-sm outline-none transition hover:bg-surface-overlay disabled:pointer-events-none disabled:opacity-50"
+      >
+        <FaLink size={16} className="shrink-0" aria-hidden="true" />
+        {inviteStatus === "busy"
+          ? "Creating link…"
+          : inviteStatus === "copied"
+            ? "Link copied!"
+            : inviteStatus === "error"
+              ? "Couldn't create link"
+              : "Invite a friend (link)"}
       </button>
 
       {searching ? (

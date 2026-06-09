@@ -75,6 +75,8 @@ mock.module("@gamelobby/database", () => ({
   notifications: {},
   db: {},
   schema: {},
+  invites: {},
+  generateInviteToken: () => "x".repeat(43),
   createDb: () => ({ db: {}, client: {} }),
 }));
 

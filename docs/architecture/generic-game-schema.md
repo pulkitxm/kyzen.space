@@ -10,9 +10,9 @@ If you want to know how the Drizzle declarations look, see [`database-schema.md`
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/database/src/schema.ts:98` | `game` table declaration (`id` UUID PK + public `code`) |
-| `packages/database/src/schema.ts:133` | `move` table declaration |
-| `packages/database/src/schema.ts:148` | `game_player` table declaration |
+| `packages/database/src/schema.ts:100` | `game` table declaration (`id` UUID PK + public `code`) |
+| `packages/database/src/schema.ts:135` | `move` table declaration |
+| `packages/database/src/schema.ts:150` | `game_player` table declaration |
 | `packages/shared/src/types/games/definition.ts` | `GameDefinition<S,I,C>` - the self-describing game unit |
 | `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>` - the `reduce` contract |
 | `packages/shared/src/types/games/tic-tac-toe/schemas.ts` | The Zod schemas that own tic-tac-toe's blob shapes |
@@ -60,7 +60,7 @@ A `game` row has **two** identifiers and they serve opposite audiences:
 - **`id` (uuid PK)** - the *internal* key. It is the FK target for `move.game_id` and `game_player.game_id`, and every repository write (`addMove`, `updateGame`, `listMoves`, `seatPlayer`) is keyed on it. It is **never serialized to clients**.
 - **`code` (text, `unique("game_code_uq")`)** - the *public* key. A short, shareable, human-friendly room code (`GAME_CODE_LENGTH = 6` over the Crockford-base32 `GAME_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"`, which drops I/L/O/U - ~1.07B combinations). It is generated app-side by the column's `$defaultFn(() => generateGameCode())` and is the only game id that crosses the wire.
 
-The seam is `serializeGame` (`apps/server/src/api/serialize.ts:26`), which sets `GameJson.id = row.code`. From there on the **code is the game's identity to clients**: the web builds `/play/<code>`, and the socket `join_room` / `make_move` payloads carry the code as `gameId` (validated by `gameCodeSchema` / `isGameCode`, which `normalizeGameCode` first - uppercasing and mapping I/L→1, O→0 so a typed code is forgiving). The server resolves it back to a row with `games.getGameByCode(code)` (`packages/database/src/repositories/games.ts:96`), then uses `row.id` for all DB work. Because the code is random, `createGame` wraps its insert in a `game_code_uq` collision-retry loop. (Conversations, messages, friendships, users, and profiles are **unchanged** - they keep their UUIDs as the public id; only games moved to codes.)
+The seam is `serializeGame` (`apps/server/src/api/serialize.ts:51`), which sets `GameJson.id = row.code`. From there on the **code is the game's identity to clients**: the web builds `/play/<code>`, and the socket `join_room` / `make_move` payloads carry the code as `gameId` (validated by `gameCodeSchema` / `isGameCode`, which `normalizeGameCode` first - uppercasing and mapping I/L→1, O→0 so a typed code is forgiving). The server resolves it back to a row with `games.getGameByCode(code)` (`packages/database/src/repositories/games.ts:100`), then uses `row.id` for all DB work. Because the code is random, `createGame` wraps its insert in a `game_code_uq` collision-retry loop. (Conversations, messages, friendships, users, and profiles are **unchanged** - they keep their UUIDs as the public id; only games moved to codes.)
 
 ## How a `GameDefinition` maps to the columns
 
@@ -156,7 +156,7 @@ game_player row
 
 ### Phase 2 - Bob joins, the last seat fills (status: `"active"`)
 
-Bob opens the game and the server seats him through `ensureSeated` (`apps/server/src/realtime/turn-based.ts:33`). `players.length` is `1` now, so his role is `engine.roles[1]` → `"O"` (`turn-based.ts:58`), and `seatPlayer` inserts his row (`:63`). Because `nextPlayers.length` (2) reaches `engine.minPlayers`, the game flips to `"active"` and `startedAt` is set (`:64`–`:66`). `game_state` is **left as-is**: the `gameRow.gameState ?? engine.createInitialState(...)` guard (`:67`–`:69`) keeps the state Alice's creation already minted - `createInitialState` does **not** run again here.
+Bob opens the game and the server seats him through `ensureSeated` (`apps/server/src/realtime/turn-based.ts:33`). `players.length` is `1` now, so his role is `engine.roles[1]` → `"O"` (`turn-based.ts:58`), and `seatPlayer` inserts his row (`:63`). Because `nextPlayers.length` (2) reaches `engine.minPlayers`, the game flips to `"active"` and `startedAt` is set (`:68`–`:70`). `game_state` is **left as-is**: the `gameRow.gameState ?? engine.createInitialState(...)` guard (`:71`–`:73`) keeps the state Alice's creation already minted - `createInitialState` does **not** run again here.
 
 ```
 game_player row
@@ -177,16 +177,16 @@ The nine-element `board` array is index-mapped as `board[row * 3 + col]`. All `n
 
 ### Phase 3 - Alice plays `{ row: 0, col: 0 }`
 
-`handleMakeMove` (`turn-based.ts:125`) runs the full validate → reduce → persist cycle:
+`handleMakeMove` (`turn-based.ts:129`) runs the full validate → reduce → persist cycle:
 
-1. **Parse the move** - `def.moveSchema.safeParse({ row: 0, col: 0 })` → ok (`turn-based.ts:143`).
-2. **Parse the stored state** - `def.stateSchema.safeParse(row.gameState)` → ok (`:145`).
-3. **Authoritative reduce** - `def.engine.reduce(state, { role: "X" }, { row: 0, col: 0 })` (`:148`). The context is just `{ role }` (`MoveContext`, `packages/shared/src/types/games/engine.ts:13`) - the engine never sees a user id.
+1. **Parse the move** - `def.moveSchema.safeParse({ row: 0, col: 0 })` → ok (`turn-based.ts:147`).
+2. **Parse the stored state** - `def.stateSchema.safeParse(row.gameState)` → ok (`:149`).
+3. **Authoritative reduce** - `def.engine.reduce(state, { role: "X" }, { row: 0, col: 0 })` (`:152`). The context is just `{ role }` (`MoveContext`, `packages/shared/src/types/games/engine.ts:13`) - the engine never sees a user id.
    - Checks `ctx.role === state.currentTurn` → `"X" === "X"` ✓
    - Checks `board[0]` is `null` ✓
    - Returns `{ board: ["X",null,…], currentTurn: "O" }`.
-4. **Insert move** - `games.addMove(...)` (`:156`); the row's `player_id` holds the mover's user id.
-5. **Update game** - `games.updateGame(...)` (`:163`) with the new `game_state`.
+4. **Insert move** - `games.addMove(...)` (`:160`); the row's `player_id` holds the mover's user id.
+5. **Update game** - `games.updateGame(...)` (`:167`) with the new `game_state`.
 
 ```
 move row

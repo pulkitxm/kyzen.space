@@ -9,8 +9,8 @@ A **guest is a real identity, not a sessionless escape hatch.** The Better Auth 
 This matters because of the repo's core architectural principle: **the client is never trusted.** The same way the server authoritatively validates game moves against shared Zod schemas (see `./games-core-engine.md`), it also authoritatively decides *who you are*. There are exactly three places a request can prove identity, and **all three resolve the same Better Auth session from the same cookie**:
 
 1. **RSC / SSR** - Next.js server components call the server over HTTP, forwarding the browser's cookies (`apps/web/lib/get-server-session.ts:17`).
-2. **Browser fetches** - `"use client"` components call the server with `credentials: "include"` (`apps/web/lib/api-client.ts:6`).
-3. **Socket.IO handshake** - the realtime middleware reads the cookie off the WebSocket handshake and resolves the session before any game/chat event is allowed (`apps/server/src/realtime/index.ts:35`).
+2. **Browser fetches** - `"use client"` components call the server with `credentials: "include"` (`apps/web/lib/api-client.ts:11`).
+3. **Socket.IO handshake** - the realtime middleware reads the cookie off the WebSocket handshake and resolves the session before any game/chat event is allowed (`apps/server/src/realtime/index.ts:42`).
 
 A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `databaseHooks.user.create.after` hook that provisions a `user_profile` row (username + a name-styled DiceBear avatar). So "auth" and "profile bootstrap" are a single atomic flow - by the time a session cookie exists, the user already has a username. The same hook runs for guests; it passes `{ skipGenderDetection: true }` when the new row is anonymous so a guest never triggers the external genderize.io call.
 
@@ -52,7 +52,7 @@ A nice second-order effect: on a user's **first** sign-in, Better Auth fires a `
 
 ## The Better Auth instance
 
-Everything funnels through one configured instance in `apps/server/src/auth.ts:12`. There is a single accessor, `getAuth()` (`apps/server/src/auth.ts:67`), so the rest of the codebase never imports the raw `auth` object directly - it asks for it, which keeps the dependency surface tiny and makes the instance trivially mockable in tests.
+Everything funnels through one configured instance in `apps/server/src/auth.ts:12`. There is a single accessor, `getAuth()` (`apps/server/src/auth.ts:84`), so the rest of the codebase never imports the raw `auth` object directly - it asks for it, which keeps the dependency surface tiny and makes the instance trivially mockable in tests.
 
 ```ts
 const auth = betterAuth({
@@ -191,7 +191,7 @@ The adapter is wired in one line - `drizzleAdapter(db, { provider: "pg", schema 
 
 ## Mounting `/api/auth/*`
 
-Better Auth exposes a single WHATWG-`Request`→`Response` handler. It's mounted as a Hono sub-app that forwards *every* method and path to it (`apps/server/src/api/index.ts:14`):
+Better Auth exposes a single WHATWG-`Request`→`Response` handler. It's mounted as a Hono sub-app that forwards *every* method and path to it (`apps/server/src/api/index.ts:15`):
 
 ```ts
 const authApp = new Hono().all("*", (c) => getAuth().handler(c.req.raw));
@@ -242,7 +242,7 @@ Fully-authed routers (`conversations`, `friends`, `messages`, `notifications`, `
 
 ## How the socket reads the session (realtime)
 
-The realtime layer authenticates **once, at connection time**, before any handler is attached. Socket.IO middleware (`io.use`) reads the raw `cookie` header from the handshake, hands it to the same `getSession`, and either attaches `socket.data.userId` or rejects the connection (`apps/server/src/realtime/index.ts:35`):
+The realtime layer authenticates **once, at connection time**, before any handler is attached. Socket.IO middleware (`io.use`) reads the raw `cookie` header from the handshake, hands it to the same `getSession`, and either attaches `socket.data.userId` or rejects the connection (`apps/server/src/realtime/index.ts:39`):
 
 ```ts
   io.use(async (socket, next) => {
@@ -265,37 +265,39 @@ The realtime layer authenticates **once, at connection time**, before any handle
   });
 ```
 
-The cookie reaches the handshake because the web client opens the socket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:46`) and the server enables `cors: { origin: env.webUrl, credentials: true }` on the IO server (`apps/server/src/realtime/index.ts:28`).
+The cookie reaches the handshake because the web client opens the socket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:47`) and the server enables `cors: { origin: env.webUrl, credentials: true }` on the IO server (`apps/server/src/realtime/index.ts:32`).
 
-After this point, **every** chat and game handler trusts `socket.data.userId` as the authenticated identity for the lifetime of the connection - `join_room`, `make_move`, chat sends, friend requests, presence, etc. (`apps/server/src/realtime/index.ts:54`). Note the layering: this middleware only proves *who you are*; per-move/per-room authorization (are you a player in this game? a member of this conversation?) happens later in the game driver and chat handlers. See `./realtime.md`.
+After this point, **every** chat and game handler trusts `socket.data.userId` as the authenticated identity for the lifetime of the connection - `join_room`, `make_move`, chat sends, friend requests, presence, etc. (`apps/server/src/realtime/index.ts:58`). Note the layering: this middleware only proves *who you are*; per-move/per-room authorization (are you a player in this game? a member of this conversation?) happens later in the game driver and chat handlers. See `./realtime.md`.
 
 ## End-to-end sign-in flow
 
 A full trace from clicking the button to being authenticated on all three lanes:
 
 1. **User clicks "Continue with Google."** `apps/web/app/auth/page.tsx:41` renders `<GoogleSignInButton>`, which calls `authClient.signIn.social({ provider: "google", callbackURL: ".../profile" })` (`apps/web/app/google-sign-in-button.tsx:20`). The `authClient` is a Better Auth React client (with the `anonymousClient()` plugin) pointed at `NEXT_PUBLIC_API_URL` (`apps/web/lib/auth-client.ts:4`).
-2. **Browser → server.** The client hits `POST /api/auth/sign-in/social` on the **server**, which Better Auth handles via the catch-all (`apps/server/src/api/index.ts:14`) and responds with a redirect to Google's consent screen.
+2. **Browser → server.** The client hits `POST /api/auth/sign-in/social` on the **server**, which Better Auth handles via the catch-all (`apps/server/src/api/index.ts:15`) and responds with a redirect to Google's consent screen.
 3. **Google OAuth.** User authenticates with Google; Google redirects back to `GET /api/auth/callback/google` on the server.
 4. **Better Auth callback.** Better Auth exchanges the code, and via the Drizzle adapter upserts the `user` (`packages/database/src/schema.ts:43`) and `account` (`:73`) rows and creates a `session` row (`:60`).
 5. **Profile provisioning (first sign-in only).** Creating the `user` row fires `databaseHooks.user.create.after` (`apps/server/src/auth.ts:51`) → `ensureUsernameForUser(id, name, { skipGenderDetection })` (`apps/server/src/username.ts:43`) → slugify + batched candidate scan → `createProfile` inserts the `user_profile` row with a seeded avatar (`packages/database/src/repositories/profiles.ts:74`).
-6. **Cookie set + redirect.** Better Auth sets the session cookie (in prod: `secure`, `SameSite=Lax`, cross-subdomain per `apps/server/src/auth.ts:59`) and redirects the browser to the `callbackURL` (`/profile`).
+6. **Cookie set + redirect.** Better Auth sets the session cookie (in prod: `secure`, `SameSite=Lax`, cross-subdomain per `apps/server/src/auth.ts:74`) and redirects the browser to the `callbackURL` (`/profile`).
 7. **RSC reads the session.** The `/profile` (and root layout) server component calls `getServerSession()` → `serverFetchJson("/api/auth/get-session")` (`apps/web/lib/get-server-session.ts:18`). `serverFetch` forwards the browser's cookies from `next/headers` `cookies()` with `cache: "no-store"` (`apps/web/lib/api-server.ts:13`), so the server resolves the session and returns `{ user, session }`. `getServerSession` is wrapped in `react.cache` so multiple components in one render share a single fetch.
-8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:46`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:46`).
-9. **Browser fetches.** Any subsequent client-side mutation (`SignOutForm`, friend actions, settings) uses `clientFetch(..., { credentials: "include" })` (`apps/web/lib/api-client.ts:12`), and the `requireAuth` middleware re-derives identity into `c.get("userId")` (`apps/server/src/api/middleware/auth.ts:16`).
+8. **Socket connects.** Once `signedIn` is known, `<SocketProvider enabled>` opens the WebSocket with `withCredentials: true` (`apps/web/lib/socket/socket-context.tsx:47`); the handshake carries the same cookie; `io.use` resolves the session and sets `socket.data.userId` (`apps/server/src/realtime/index.ts:50`).
+9. **Browser fetches.** Any subsequent client-side mutation (`SignOutForm`, friend actions, settings) uses `clientFetch(..., { credentials: "include" })` (`apps/web/lib/api-client.ts:11`), and the `requireAuth` middleware re-derives identity into `c.get("userId")` (`apps/server/src/api/middleware/auth.ts:16`).
 
 Arrow summary:
 
 ```
 click → authClient.signIn.social (auth-client.ts) → POST /api/auth/sign-in/social
-  → Better Auth handler (api/index.ts:14) → Google consent
+  → Better Auth handler (api/index.ts:15) → Google consent
   → GET /api/auth/callback/google → drizzleAdapter upserts user/account/session
-  → user.create.after hook (auth.ts:34) → ensureUsernameForUser (username.ts:43) → createProfile
+  → user.create.after hook (auth.ts:51) → ensureUsernameForUser (username.ts:43) → createProfile
   → Set-Cookie + redirect /profile
   → RSC getServerSession → serverFetch forwards cookie → /api/auth/get-session
   → socket handshake (withCredentials) → io.use getSession → socket.data.userId
 ```
 
 **The guest flow is the same trace with one shortcut.** "Continue as a guest" (`apps/web/app/auth/guest-button.tsx`) calls `ensureIdentity()` (`apps/web/lib/auth/ensure-identity.ts:3`), which does `authClient.signIn.anonymous()` instead of `signIn.social` - there is no OAuth round-trip, so steps 1-4 collapse into a single `POST /api/auth/sign-in/anonymous` that inserts the `user` (`isAnonymous = true`) + `session` rows. The same `user.create.after` provisioning hook (step 5, now with `skipGenderDetection: true`), cookie set (step 6), RSC read (step 7), and socket connect (step 8) all run identically. From the socket and REST layers' perspective a guest is indistinguishable from a Google user.
+
+**A guest can also be minted server-side, with no client call at all.** The public invite-accept route `POST /api/invite/:token/accept` (guest identity, Phase 3) does this: when the opener carries no session it calls `auth.api.signInAnonymous({ headers, returnHeaders: true })` from the server and forwards each minted `Set-Cookie` onto the response (`apps/server/src/api/routes/invite.ts:39`). So a brand-new visitor who clicks a shared link gets a real guest identity in the same round trip that joins them to the game - the same `anonymous` plugin and the same `user.create.after` provisioning run, just driven by the server API instead of the browser client. See [`server-api.md`](./server-api.md) for the full invite-accept contract.
 
 ## Sign-out & session management flow
 
@@ -322,16 +324,16 @@ The web dialog calls `confirmMerge(id)` / `discardMerge(id)` (`apps/web/lib/acco
 
 - **Auth lives on the server, not the web app.** `betterAuth` is configured in `apps/server`, `baseURL` is the server URL, and the OAuth callback is `[server]/api/auth/callback/google`. The web app only holds a thin Better Auth *client* (`apps/web/lib/auth-client.ts`) plus cookie-forwarding fetch helpers.
 - **Identity is always re-derived from the cookie, never trusted from the client.** REST → `requireAuth` reads `c.req.raw.headers`; sockets → `io.use` reads the handshake cookie. No route accepts a `userId` parameter as proof of identity.
-- **Always go through `getAuth()`.** Nothing imports the bare `auth` object; the accessor (`apps/server/src/auth.ts:67`) keeps a single instance and is the mock point in tests (`mock.module` per the repo's test conventions).
+- **Always go through `getAuth()`.** Nothing imports the bare `auth` object; the accessor (`apps/server/src/auth.ts:84`) keeps a single instance and is the mock point in tests (`mock.module` per the repo's test conventions).
 - **A guest is a real `user`, and the rest of the stack must not branch on it.** `isAnonymous` is read in exactly two places - the provisioning hook (to skip gender detection) and the web layout/nudge (to surface the upgrade prompt). Chat, presence, games, and authorization treat a guest `userId` like any other. `disableDeleteAnonymousUser: true` keeps the guest row (and its history) alive after the account link, and the merge that follows is **consent-gated**: `onLinkAccount` only *records* a pending merge (it never moves data), and the migration runs only when the user confirms via `/api/account/merge/:id/confirm`. So a Google sign-in that links a guest never silently rewrites or deletes the guest's rows - nothing changes until consent.
 - **No Google creds → no Google sign-in, but guests still work.** `googleConfigured()` gates the provider (`apps/server/src/env.ts:58`); the sign-in page independently checks `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and shows setup instructions instead of a broken button (`apps/web/app/auth/page.tsx:17`). The `anonymous` plugin needs no external credentials, so the "Continue as a guest" button is always available. `BETTER_AUTH_SECRET` and `DATABASE_URL` are `required()` and crash startup if missing; Google creds are `optional()`.
 - **`user.id` is `text`, not `uuid`.** Better Auth generates the id (`packages/database/src/schema.ts:44`). The app's own tables (`game`, `move`, `user_profile`, …) use uuid PKs but still store the auth user id as `text` in FK columns like `userId` / `creator_user_id`.
-- **Profile provisioning is best-effort and idempotent.** The `create.after` hook swallows errors (`apps/server/src/auth.ts:47`); `ensureUsernameForUser` early-returns if a profile already exists (`apps/server/src/username.ts:48`). The DB unique constraint on `user_profile.username` - not the in-memory `getTakenUsernames` batch read - is the real collision authority.
+- **Profile provisioning is best-effort and idempotent.** The `create.after` hook swallows errors (`apps/server/src/auth.ts:64`); `ensureUsernameForUser` early-returns if a profile already exists (`apps/server/src/username.ts:48`). The DB unique constraint on `user_profile.username` - not the in-memory `getTakenUsernames` batch read - is the real collision authority.
 - **`user_profile` ≠ `user`.** Better Auth owns `user`/`session`/`account`/`verification`; the application owns `user_profile` (username, avatar, stats, theme, layout). They join on `userId`, and the profile cascades on user delete.
 - **Two web fetch paths, two env vars.** RSC uses `serverFetch` (`API_URL`, forwards `next/headers` cookies, `cache: "no-store"`); the browser uses `clientFetch` (`NEXT_PUBLIC_API_URL`, `credentials: "include"`). Use the server path inside RSCs and the client path inside `"use client"` components - they read the cookie from different places.
-- **Auth-dependent pages set `export const dynamic = "force-dynamic"`** (e.g. `apps/web/app/auth/page.tsx:7`, `apps/web/app/settings/account/page.tsx:24`) because they depend on per-request cookies and must not be statically cached.
+- **Auth-dependent pages set `export const dynamic = "force-dynamic"`** (e.g. `apps/web/app/auth/page.tsx:14`, `apps/web/app/settings/account/page.tsx:24`) because they depend on per-request cookies and must not be statically cached.
 - **`getServerSession`/`getAccountSessions` are `react.cache`-wrapped** so the layout and a page in the same render share one network round-trip; don't reach for module-level memoization.
-- **Cookies cross origins only because CORS allows it.** Both the Express HTTP layer (`apps/server/src/index.ts:12`) and the Socket.IO server (`apps/server/src/realtime/index.ts:28`) set `origin: env.webUrl, credentials: true`; the client mirrors this with `credentials: "include"` / `withCredentials: true`. Change the web origin and you must update `WEB_URL`.
+- **Cookies cross origins only because CORS allows it.** Both the Express HTTP layer (`apps/server/src/index.ts:12`) and the Socket.IO server (`apps/server/src/realtime/index.ts:32`) set `origin: env.webUrl, credentials: true`; the client mirrors this with `credentials: "include"` / `withCredentials: true`. Change the web origin and you must update `WEB_URL`.
 
 ## Where to go next
 

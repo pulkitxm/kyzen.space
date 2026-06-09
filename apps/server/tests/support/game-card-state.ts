@@ -22,6 +22,8 @@ export function gameCardDbMock() {
     accountMerge: {},
     conversations: {},
     friends: {},
+    invites: {},
+    generateInviteToken: () => "x".repeat(43),
     notifications: {},
     db: {},
     schema: {},

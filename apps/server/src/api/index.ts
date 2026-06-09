@@ -7,6 +7,7 @@ import { conversationsRouter } from "./routes/conversations";
 import { friendsRouter } from "./routes/friends";
 import { gamesRouter } from "./routes/games";
 import { gifsRouter } from "./routes/gifs";
+import { inviteRouter } from "./routes/invite";
 import { messagesRouter } from "./routes/messages";
 import { notificationsRouter } from "./routes/notifications";
 import { profilesRouter } from "./routes/profiles";
@@ -24,6 +25,7 @@ export const app = new Hono<LoggerEnv>()
   .route("/conversations", conversationsRouter)
   .route("/messages", messagesRouter)
   .route("/notifications", notificationsRouter)
+  .route("/invite", inviteRouter)
   .route("/gifs", gifsRouter);
 
 app.onError((err, c) => {

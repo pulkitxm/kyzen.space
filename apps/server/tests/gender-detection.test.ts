@@ -47,6 +47,8 @@ mock.module("@gamelobby/database", () => ({
   notifications: {},
   db: {},
   schema: {},
+  invites: {},
+  generateInviteToken: () => "x".repeat(43),
   createDb: () => ({ db: {}, client: {} }),
 }));
 
@@ -302,6 +304,10 @@ describe("isUsernameBlocked", () => {
   it("blocks reserved top-level route names", () => {
     expect(isUsernameBlocked("api")).toBe(true);
     expect(isUsernameBlocked("settings")).toBe(true);
+  });
+
+  it("blocks the invite route segment so it cannot shadow /invite", () => {
+    expect(isUsernameBlocked("invite")).toBe(true);
   });
 
   it("allows an ordinary name", () => {

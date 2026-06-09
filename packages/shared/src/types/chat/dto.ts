@@ -88,7 +88,8 @@ export type NotificationType =
   | "friend_request"
   | "friend_accepted"
   | "game_started"
-  | "game_challenge";
+  | "game_challenge"
+  | "game_invite";
 
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 

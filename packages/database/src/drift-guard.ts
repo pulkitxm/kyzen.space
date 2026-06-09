@@ -4,6 +4,7 @@ import type {
   ConversationMemberRow,
   ConversationRow,
   FriendshipRow,
+  GameInviteRow,
   GamePlayerRow,
   GameRow,
   MessageRow,
@@ -21,6 +22,7 @@ import type {
   conversationMember,
   friendship,
   game,
+  gameInvite,
   gamePlayer,
   message,
   move,
@@ -53,4 +55,5 @@ export type SchemaDriftChecks = [
   Expect<Equal<typeof message.$inferSelect, MessageRow>>,
   Expect<Equal<typeof notification.$inferSelect, NotificationRow>>,
   Expect<Equal<typeof accountMerge.$inferSelect, AccountMergeRow>>,
+  Expect<Equal<typeof gameInvite.$inferSelect, GameInviteRow>>,
 ];
