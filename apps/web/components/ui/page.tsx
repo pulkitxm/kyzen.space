@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -37,22 +36,5 @@ export function PageHeader({
       </div>
       {children}
     </div>
-  );
-}
-
-export function BackLink({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 text-muted-foreground text-sm underline-offset-4 transition hover:text-foreground hover:underline"
-    >
-      {children}
-    </Link>
   );
 }

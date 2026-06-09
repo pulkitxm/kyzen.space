@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { GoogleSignInButton } from "@/app/google-sign-in-button";
@@ -29,13 +28,6 @@ export default async function AuthPage() {
       </div>
 
       <main className="w-full max-w-90">
-        <Link
-          href="/"
-          className="mb-10 inline-block text-muted-foreground text-xs underline-offset-4 hover:text-foreground hover:underline"
-        >
-          ← Back home
-        </Link>
-
         <div className="rounded-2xl border border-border bg-card p-8 shadow-black/5 shadow-xl">
           <h1 className="text-center font-semibold text-card-foreground text-xl tracking-tight">
             Sign in
