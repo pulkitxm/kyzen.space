@@ -82,7 +82,7 @@ declare module "socket.io" {
 }
 ```
 
-The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:112`, `chat.ts:17`, `friends.ts:7`, `typing.ts:41`, `presence.ts:63`, `games-in-chat.ts:25`). A forged `userId` in a payload is simply ignored - the only `userId` that exists came from a verified session.
+The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:112`, `chat.ts:28`, `friends.ts:12`, `typing.ts:43`, `presence.ts:63`, `games-in-chat.ts:25`). A forged `userId` in a payload is simply ignored - the only `userId` that exists came from a verified session.
 
 ### Per-connection wiring
 

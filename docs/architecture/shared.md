@@ -99,7 +99,7 @@ The game contract that the engine (`@gamelobby/games-core`) and the boards (`@ga
 
 ## What lives under `types/chat/`
 
-The chat/social contract that web and server share: `dto.ts` (the `*Json` DTOs, `MessageMetadata`, `NotificationPayload`, `PublicUser`, …), `schemas.ts` (`gameCardMetaSchema:13` - now carrying an optional `seriesScore` (`schemas.ts:24`) - `notificationPayloadSchema:28`, `clientCreateGameInConversationSchema:35`, and `clientRematchSchema:45`), and `socket-events.ts` (the `Client*` / `Server*` payload types - including `ClientRematch` and `ServerRematchCreated` (`socket-events.ts:60`/`:62`) - and the `Ack` discriminated union). The matching event-name registry, `CHAT_EVENTS` (with `rematch` / `rematchCreated`), is a value, so it lives in `constants/chat.ts:1`. The deep dive is in [`chat-core.md`](./chat-core.md).
+The chat/social contract that web and server share: `dto.ts` (the `*Json` DTOs, `MessageMetadata`, `NotificationPayload`, `PublicUser`, …), `schemas.ts` (`gameCardMetaSchema:13` - now carrying an optional `seriesScore` (`schemas.ts:24`) - `notificationPayloadSchema:29`, `clientCreateGameInConversationSchema:36`, and `clientRematchSchema:46`), and `socket-events.ts` (the `Client*` / `Server*` payload types - including `ClientRematch` and `ServerRematchCreated` (`socket-events.ts:63`/`:65`) - and the `Ack` discriminated union). The matching event-name registry, `CHAT_EVENTS` (with `rematch` / `rematchCreated`), is a value, so it lives in `constants/chat.ts:1`. The deep dive is in [`chat-core.md`](./chat-core.md).
 
 ## Gotchas, invariants & conventions
 
