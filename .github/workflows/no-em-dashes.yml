@@ -1,0 +1,20 @@
+name: No em dashes
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  no-em-dashes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for em dashes (U+2014)
+        run: |
+          dash=$(printf '\xe2\x80\x94')
+          if git grep -nIF "$dash"; then
+            echo "::error::Em dashes (U+2014) are not allowed in any file. Replace each one above with an ASCII alternative."
+            exit 1
+          fi
+          echo "No em dashes found."
