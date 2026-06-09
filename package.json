@@ -25,6 +25,8 @@
     "fix:tw": "cd apps/web && tailwind-suggest-canonical-classes \"app/**/*.{tsx,jsx,ts,js}\" \"components/**/*.{tsx,jsx,ts,js}\" \"lib/**/*.{tsx,jsx,ts,js}\" \"../../packages/games-client/src/**/*.{tsx,jsx,ts,js}\" --css app/globals.css",
     "fix:tw:check": "cd apps/web && tailwind-suggest-canonical-classes \"app/**/*.{tsx,jsx,ts,js}\" \"components/**/*.{tsx,jsx,ts,js}\" \"lib/**/*.{tsx,jsx,ts,js}\" \"../../packages/games-client/src/**/*.{tsx,jsx,ts,js}\" --css app/globals.css --check",
     "check": "biome check .",
+    "dead-code": "knip",
+    "dead-code:fix": "knip --fix",
     "strip-comments": "bun scripts/strip-comments.mjs",
     "db:start": "docker compose --project-directory . -f scripts/docker-compose.yml up -d postgres redis",
     "db:stop": "docker compose --project-directory . -f scripts/docker-compose.yml down",
@@ -39,6 +41,7 @@
     "@biomejs/biome": "2.4.16",
     "@laststance/tailwind-suggest-canonical-classes": "^0.1.1",
     "drizzle-kit": "^0.30.1",
+    "knip": "^6.16.1",
     "turbo": "^2.3.3",
     "typescript": "^5"
   },
