@@ -175,7 +175,7 @@ function endWithNewline(text) {
 
 function buildHome() {
   const lines = [
-    "Reference documentation for **GameLobby**, auto-generated from the `docs/` directory of the main repository. Edit the docs in the repo — these pages are overwritten on every push to `main`.",
+    "Reference documentation for **GameLobby**, auto-generated from the `docs/` directory of the main repository. Edit the docs in the repo - these pages are overwritten on every push to `main`.",
     "",
   ];
   for (const section of SECTIONS) {
@@ -212,7 +212,7 @@ function buildSidebar() {
 
 function buildFooter() {
   return endWithNewline(
-    `_Auto-generated from [\`docs/\`](${treeBase}/docs) — edit the docs in the repo, not the wiki._`,
+    `_Auto-generated from [\`docs/\`](${treeBase}/docs) - edit the docs in the repo, not the wiki._`,
   );
 }
 

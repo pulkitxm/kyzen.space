@@ -197,7 +197,7 @@ describe("predictAvatarStyle", () => {
   });
 });
 
-describe("ensureUsernameForUser — avatar style", () => {
+describe("ensureUsernameForUser: avatar style", () => {
   it("threads the name-predicted style into the seeded avatar", async () => {
     genderizeReturns({ gender: "female", probability: 0.97 });
     const username = await ensureUsernameForUser("user-1", "Alice");
@@ -213,7 +213,7 @@ describe("ensureUsernameForUser — avatar style", () => {
   });
 });
 
-describe("ensureUsernameForUser — username selection", () => {
+describe("ensureUsernameForUser: username selection", () => {
   it("returns the existing username without provisioning a new profile", async () => {
     existingProfile = { username: "already_here" };
     const username = await ensureUsernameForUser("user-x", "Some Name");

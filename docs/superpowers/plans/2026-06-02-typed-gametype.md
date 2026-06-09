@@ -1,4 +1,4 @@
-# Typed `gameType` at the parse layer — Implementation Plan
+# Typed `gameType` at the parse layer: Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -18,7 +18,7 @@
 
 ---
 
-### Task 1: Single source — `game-types.ts` (slug + tuple + type + schema) and registry
+### Task 1: Single source: `game-types.ts` (slug + tuple + type + schema) and registry
 
 **Files:**
 - Create: `packages/games-core/src/game-types.ts`
@@ -60,7 +60,7 @@ describe("game-types", () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `cd packages/games-core && bun test tests/game-types.test.ts`
-Expected: FAIL — `GAME_TYPES`, `gameTypeSchema` are not exported yet.
+Expected: FAIL: `GAME_TYPES`, `gameTypeSchema` are not exported yet.
 
 - [ ] **Step 3: Create the leaf module**
 
@@ -183,7 +183,7 @@ export {
 - [ ] **Step 9: Run the test and the type-check**
 
 Run: `cd packages/games-core && bun test tests/game-types.test.ts && bunx tsc --noEmit`
-Expected: PASS, no type errors. Then from the repo root: `bun run type-check` — Expected: green (GameJson is still `string`, so no consumer breaks yet).
+Expected: PASS, no type errors. Then from the repo root: `bun run type-check` - Expected: green (GameJson is still `string`, so no consumer breaks yet).
 
 - [ ] **Step 10: Commit**
 
@@ -194,7 +194,7 @@ git commit -m "feat(games-core): single-source GameType + gameTypeSchema from a 
 
 ---
 
-### Task 2: Drift guard — `GAME_TYPES` must match the registry
+### Task 2: Drift guard: `GAME_TYPES` must match the registry
 
 **Files:**
 - Modify: `packages/games-core/tests/conformance.test.ts`
@@ -300,7 +300,7 @@ git commit -m "feat(games-client): drive board/skeleton registries from GameType
 
 ---
 
-### Task 4: Server read side — `GameRecord.gameType` becomes `GameType`
+### Task 4: Server read side: `GameRecord.gameType` becomes `GameType`
 
 **Files:**
 - Modify: `apps/server/src/db/repositories/games.ts`
@@ -433,7 +433,7 @@ describe("clientCreateGameInConversationSchema", () => {
 - [ ] **Step 3: Run the test to verify it fails**
 
 Run: `cd packages/chat-core && bun test tests/schemas.test.ts`
-Expected: FAIL — `"chess"` currently passes `z.string().min(1)`.
+Expected: FAIL: `"chess"` currently passes `z.string().min(1)`.
 
 - [ ] **Step 4: Swap the three `gameType` fields to `gameTypeSchema`**
 
@@ -452,7 +452,7 @@ Then change the three fields:
 - [ ] **Step 5: Run the test and type-check**
 
 Run: `cd packages/chat-core && bun test tests/schemas.test.ts` then from root `bun run type-check`
-Expected: PASS; green. (Server builds `GameCardMeta` from `GameRecord.gameType`, now `GameType` — assignable.)
+Expected: PASS; green. (Server builds `GameCardMeta` from `GameRecord.gameType`, now `GameType` - assignable.)
 
 - [ ] **Step 6: Commit**
 
@@ -463,7 +463,7 @@ git commit -m "feat(chat-core): validate gameType against the registry enum"
 
 ---
 
-### Task 6: Narrow the wire DTO — `gameJsonSchema.gameType`
+### Task 6: Narrow the wire DTO: `gameJsonSchema.gameType`
 
 **Files:**
 - Modify: `packages/games-core/src/schemas.ts`
@@ -490,7 +490,7 @@ In `packages/games-core/tests/schemas.test.ts`, add after the existing `"gameJso
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `cd packages/games-core && bun test tests/schemas.test.ts`
-Expected: FAIL — `gameType: z.string()` still accepts `"chess"`.
+Expected: FAIL: `gameType: z.string()` still accepts `"chess"`.
 
 - [ ] **Step 3: Use the registry enum in `gameJsonSchema`**
 
@@ -609,13 +609,13 @@ git commit -m "feat(server): accept GameType on the game-creation paths"
 
 - [ ] **Step 1: `play-client.tsx`**
 
-Add `GameType` to the games-client import block (it already imports from `@gamelobby/games-client`, but `GameType` lives in games-core — add a games-core import):
+Add `GameType` to the games-client import block (it already imports from `@gamelobby/games-client`, but `GameType` lives in games-core - add a games-core import):
 
 ```ts
 import type { GameType } from "@gamelobby/games-core";
 ```
 
-Change the prop type `gameType: string;` to `gameType: GameType;`. (The value comes from the loaded game's `gameType`, now `GameType`; if the parent passes a `string`, narrow it at the source — `initialGame.gameType` is `GameType`.)
+Change the prop type `gameType: string;` to `gameType: GameType;`. (The value comes from the loaded game's `gameType`, now `GameType`; if the parent passes a `string`, narrow it at the source - `initialGame.gameType` is `GameType`.)
 
 - [ ] **Step 2: `conversation-picker.tsx`**
 
@@ -695,7 +695,7 @@ git commit -m "feat(web): type gameType props/args as GameType"
 
 ### Task 9: Replace raw slug literals in test fixtures with the constant
 
-Convert **fixture/setup** usages of `"tic-tac-toe"` to the imported `TIC_TAC_TOE`. **Leave assertions** that check the literal value (`expect(...).toBe("tic-tac-toe")`, `.toContain("tic-tac-toe")`, object-key reads like `stats["tic-tac-toe"]`) as raw strings — they intentionally pin the wire contract.
+Convert **fixture/setup** usages of `"tic-tac-toe"` to the imported `TIC_TAC_TOE`. **Leave assertions** that check the literal value (`expect(...).toBe("tic-tac-toe")`, `.toContain("tic-tac-toe")`, object-key reads like `stats["tic-tac-toe"]`) as raw strings - they intentionally pin the wire contract.
 
 **Files (fixtures only):**
 - `packages/games-core/tests/schemas.test.ts`
@@ -718,10 +718,10 @@ Add to each file's imports (games-core test uses the relative path, the rest use
 - [ ] **Step 2: Swap fixture occurrences**
 
 In each file, replace `gameType: "tic-tac-toe"` (object fixtures passed into create/serialize helpers) with `gameType: TIC_TAC_TOE`. Do **not** touch:
-- `expect(g.gameType).toBe("tic-tac-toe")` (serialize.test.ts) — assertion.
-- `expect(meta.gameType).toBe("tic-tac-toe")` (game-card.test.ts) — assertion.
-- `expect(getEngine("tic-tac-toe"))...`, `expect(hasEngine("tic-tac-toe"))...`, `expect(listGameTypes()).toContain("tic-tac-toe")` (tic-tac-toe.test.ts is not in this list, but apply the same rule anywhere) — assertions.
-- `profile?.stats?.["tic-tac-toe"]` (game-driver.test.ts) — keyed read asserting the stored key.
+- `expect(g.gameType).toBe("tic-tac-toe")` (serialize.test.ts) - assertion.
+- `expect(meta.gameType).toBe("tic-tac-toe")` (game-card.test.ts) - assertion.
+- `expect(getEngine("tic-tac-toe"))...`, `expect(hasEngine("tic-tac-toe"))...`, `expect(listGameTypes()).toContain("tic-tac-toe")` (tic-tac-toe.test.ts is not in this list, but apply the same rule anywhere) - assertions.
+- `profile?.stats?.["tic-tac-toe"]` (game-driver.test.ts) - keyed read asserting the stored key.
 
 - [ ] **Step 3: Type-check + run the full test suite**
 
@@ -787,7 +787,7 @@ Expected: all green. `bun run type-check` is the real proof that props/args now 
 - [ ] **Step 2: Confirm no stray raw slug literals remain in production code**
 
 Run: `rg -n '"tic-tac-toe"' packages apps | rg -v 'tests/|integration/|/tests|\.test\.'`
-Expected: only `packages/games-core/src/game-types.ts` (the single declaration). Any other production hit is a miss — replace it with `TIC_TAC_TOE`.
+Expected: only `packages/games-core/src/game-types.ts` (the single declaration). Any other production hit is a miss - replace it with `TIC_TAC_TOE`.
 
 - [ ] **Step 3: Final commit (only if Step 2 required fixes)**
 
@@ -811,7 +811,7 @@ git commit -m "chore: remove remaining raw gameType slug literals"
 - Drift guard test → Task 2. ✅
 - Docs/agents sync → Task 10. ✅
 - Non-goal honored: DB column stays `text` (no migration task); `getDefinition`/`getEngine` keep `string` (untouched). ✅
-- Boundary decision: `api/routes/profiles.ts` `activityRow` consumes raw `GameRow`s and stays `string` (a DB-read boundary, not an app-level arg) — deliberately not in scope; matches the spec's "raw rows stay string" stance.
+- Boundary decision: `api/routes/profiles.ts` `activityRow` consumes raw `GameRow`s and stays `string` (a DB-read boundary, not an app-level arg) - deliberately not in scope; matches the spec's "raw rows stay string" stance.
 
 **Placeholder scan:** No TBD/TODO; every code step has concrete code; the only ellipses are in prose referencing existing handlers, not in code to be written.
 

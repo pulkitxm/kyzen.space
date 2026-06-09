@@ -23,12 +23,12 @@
 ## File map
 
 **Create:**
-- `packages/shared/src/types/games/series.ts` — series Zod schemas + inferred types.
-- `apps/server/src/chat/series.ts` — pure `computeSeriesScore`.
-- `apps/server/src/chat/rematch-seating.ts` — pure `computeRematchSeating`.
-- `apps/web/components/games/series-scoreboard.tsx` — avatars-over-score block.
-- `apps/web/components/games/series-detail-modal.tsx` — series modal content (score + game list).
-- `apps/web/app/play/[gameId]/game-over-overlay.tsx` — the game-over modal.
+- `packages/shared/src/types/games/series.ts` - series Zod schemas + inferred types.
+- `apps/server/src/chat/series.ts` - pure `computeSeriesScore`.
+- `apps/server/src/chat/rematch-seating.ts` - pure `computeRematchSeating`.
+- `apps/web/components/games/series-scoreboard.tsx` - avatars-over-score block.
+- `apps/web/components/games/series-detail-modal.tsx` - series modal content (score + game list).
+- `apps/web/app/play/[gameId]/game-over-overlay.tsx` - the game-over modal.
 - Tests: `packages/shared/tests/series.test.ts`, `apps/server/tests/series.test.ts`, `apps/server/tests/rematch-seating.test.ts`, `apps/server/tests/rematch.test.ts`.
 
 **Modify:**
@@ -40,7 +40,7 @@
 
 ---
 
-## Phase A — Shared types & constants
+## Phase A: Shared types & constants
 
 ### Task 1: Series Zod schemas + types
 
@@ -105,7 +105,7 @@ describe("series detail schema", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd packages/shared && bun test tests/series.test.ts`
-Expected: FAIL — `seriesScoreSchema`/`seriesDetailSchema` are not exported.
+Expected: FAIL - `seriesScoreSchema`/`seriesDetailSchema` are not exported.
 
 - [ ] **Step 3: Create the schemas**
 
@@ -241,11 +241,11 @@ describe("game card meta with series score", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd packages/shared && bun test tests/series.test.ts`
-Expected: FAIL — `clientRematchSchema` not exported; `gameCardMetaSchema` rejects unknown `seriesScore` (it is `.strict()`).
+Expected: FAIL - `clientRematchSchema` not exported; `gameCardMetaSchema` rejects unknown `seriesScore` (it is `.strict()`).
 
 - [ ] **Step 3: Add the events**
 
-In `packages/shared/src/constants/chat.ts`, add inside `CHAT_EVENTS` — `rematch` next to `createGameInConversation`, and `rematchCreated` in the server-events block:
+In `packages/shared/src/constants/chat.ts`, add inside `CHAT_EVENTS` - `rematch` next to `createGameInConversation`, and `rematchCreated` in the server-events block:
 
 ```ts
   createGameInConversation: "game:create_in_conversation",
@@ -307,7 +307,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Phase B — Database
+## Phase B: Database
 
 ### Task 3: `seriesId` column + types + create-time population
 
@@ -442,7 +442,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 4: Repository reads — `getSeriesGames` + `findLiveGameInConversation`
+### Task 4: Repository reads - `getSeriesGames` + `findLiveGameInConversation`
 
 **Files:**
 - Modify: `packages/database/src/repositories/games.ts`
@@ -512,7 +512,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Phase C — Server logic
+## Phase C: Server logic
 
 ### Task 5: `computeSeriesScore` (pure)
 
@@ -572,7 +572,7 @@ describe("computeSeriesScore", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/server && bun test tests/series.test.ts`
-Expected: FAIL — `computeSeriesScore` not found.
+Expected: FAIL - `computeSeriesScore` not found.
 
 - [ ] **Step 3: Implement**
 
@@ -677,7 +677,7 @@ describe("computeRematchSeating (2 players)", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/server && bun test tests/rematch-seating.test.ts`
-Expected: FAIL — `computeRematchSeating` not found.
+Expected: FAIL - `computeRematchSeating` not found.
 
 - [ ] **Step 3: Implement**
 
@@ -855,7 +855,7 @@ describe("rematchGame", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/server && bun test tests/rematch.test.ts`
-Expected: FAIL — `rematchGame` not exported.
+Expected: FAIL - `rematchGame` not exported.
 
 - [ ] **Step 3: Refactor card-posting into `announceGame` and add `rematchGame`**
 
@@ -1011,7 +1011,7 @@ export async function rematchGame(input: {
 }
 ```
 
-> `becomesActive` when starting active relies on `createInitialState` accepting the full seat list; the existing `createGameInConversation` seeds only one seat, so confirm the engine's `createInitialState` handles the 2-seat list (tic-tac-toe ignores seats and returns a fresh board — safe).
+> `becomesActive` when starting active relies on `createInitialState` accepting the full seat list; the existing `createGameInConversation` seeds only one seat, so confirm the engine's `createInitialState` handles the 2-seat list (tic-tac-toe ignores seats and returns a fresh board - safe).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -1250,7 +1250,7 @@ export function serializeSeries(
 }
 ```
 
-> `GameRecord`/`GameType` may already be imported in this file — merge rather than duplicate the import.
+> `GameRecord`/`GameType` may already be imported in this file - merge rather than duplicate the import.
 
 - [ ] **Step 2: Add the route**
 
@@ -1301,7 +1301,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 11: Integration test — rematch end-to-end
+### Task 11: Integration test - rematch end-to-end
 
 **Files:**
 - Create: `apps/server/integration/rematch.test.ts`
@@ -1384,7 +1384,7 @@ bun run db:start
 cd apps/server && bun run test:integration
 ```
 
-Expected: the rematch test passes (or is skipped if `DB_UP` is false — then run it after `db:start`).
+Expected: the rematch test passes (or is skipped if `DB_UP` is false - then run it after `db:start`).
 
 - [ ] **Step 3: Commit**
 
@@ -1397,7 +1397,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Phase D — Web UI
+## Phase D: Web UI
 
 ### Task 12: `SeriesScoreboard` component
 
@@ -1739,7 +1739,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 15: Game card — scoreboard, View series, Rematch
+### Task 15: Game card - scoreboard, View series, Rematch
 
 **Files:**
 - Modify: `apps/web/app/chat/[handle]/game-card-message.tsx`
@@ -1882,7 +1882,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Phase E — Docs
+## Phase E: Docs
 
 ### Task 17: Sync architecture docs
 
@@ -1912,7 +1912,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Phase F — Maintainers, review & PR
+## Phase F: Maintainers, review & PR
 
 ### Task 18: Run the docs-maintainer and test-maintainer agents
 
@@ -1950,12 +1950,12 @@ gh pr create --base main --head feat/rematch-and-game-over --title "feat: rematc
 
 - [ ] **Step 3: Drive checks green + resolve review comments**
 
-Monitor `gh pr checks` until all are green; fix any failures and push. Resolve every review comment (including CodeRabbit) — address the feedback in code or reply with rationale, push, and re-check — so that when the user returns there are **no unresolved review threads and all checks pass**.
+Monitor `gh pr checks` until all are green; fix any failures and push. Resolve every review comment (including CodeRabbit) - address the feedback in code or reply with rationale, push, and re-check - so that when the user returns there are **no unresolved review threads and all checks pass**.
 
 ## Final verification
 
 - [ ] `bun run type-check` (all workspaces) passes.
 - [ ] `bun run check` passes (no comments introduced; Tailwind classes sorted).
 - [ ] `bun test` passes across workspaces; `apps/server` integration tests pass with `db:start`.
-- [ ] Manual: full DM flow — play → game-over overlay → rematch (loser first) → scoreboard from game 2 → View series modal with working links → one-live rule routes to existing game.
+- [ ] Manual: full DM flow - play → game-over overlay → rematch (loser first) → scoreboard from game 2 → View series modal with working links → one-live rule routes to existing game.
 - [ ] docs-maintainer + test-maintainer agents run; PR opened; all CI checks green; no unresolved review comments.

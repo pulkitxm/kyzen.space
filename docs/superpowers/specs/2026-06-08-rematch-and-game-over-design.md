@@ -54,14 +54,14 @@ a single flat query: `WHERE series_id = X`.
 
 Touches the strict-typing chain:
 
-- `packages/database/src/schema.ts` — the column + self-FK.
-- `packages/shared/src/types/db/index.ts` — `GameRow` (drift-guard asserts
+- `packages/database/src/schema.ts`: the column + self-FK.
+- `packages/shared/src/types/db/index.ts`: `GameRow` (drift-guard asserts
   `game.$inferSelect` equals `GameRow`, so both must match).
-- `packages/shared/src/types/db/io.ts` — `createGameInputSchema` /
+- `packages/shared/src/types/db/io.ts`: `createGameInputSchema` /
   `CreateGameInput` gain an optional `seriesId`.
 
 Migration generated via `drizzle-kit generate`; applied locally with `db:push`
-(the dev DB is push-managed — `db:migrate` is not used locally).
+(the dev DB is push-managed, `db:migrate` is not used locally).
 
 ## 2. Shared types (new)
 
@@ -88,16 +88,16 @@ SeriesDetail = {
 ```
 
 - `GameCardMeta` gains `seriesScore?: SeriesScore`. The card renders the
-  scoreboard only when `seriesScore` is present **and** `totalGames ≥ 2` — i.e. a
+  scoreboard only when `seriesScore` is present **and** `totalGames ≥ 2` - i.e. a
   rematch exists (see §5). `completedGames` (= sum of `wins` + `draws`) is the
   score's denominator; `totalGames` counts every game in the series, including the
   in-progress one, which is what gates the series UI.
 - `CHAT_EVENTS` gains:
-  - `rematch` — client → server, payload `{ gameId }`, acks the new game's code.
-  - `rematchCreated` — server → the *old* game room, payload `{ newGameId }`.
+  - `rematch`: client → server, payload `{ gameId }`, acks the new game's code.
+  - `rematchCreated`: server → the *old* game room, payload `{ newGameId }`.
 - Socket-event types in `chat/socket-events.ts` for both.
 
-## 3. Server — rematch flow
+## 3. Server: rematch flow
 
 New handler for `game:rematch { gameId }` (ack returns the new game's code, or an
 error), implemented alongside the existing in-chat game handlers and reusing the
@@ -106,7 +106,7 @@ error), implemented alongside the existing in-chat game handlers and reusing the
 1. Load the finished game; require `status === "completed"` and that the requester
    was one of its players.
 2. **One-live / de-dupe check (shared with §7):** if a `waiting | active` game of
-   this `gameType` already exists in the conversation, return **that** game's id —
+   this `gameType` already exists in the conversation, return **that** game's id -
    never create a duplicate. (Covers two players clicking Rematch at once, and a
    stray "new game" attempt while a rematch is live.)
 3. Create the new game in the **same conversation**, with `seriesId` = the parent's
@@ -128,7 +128,7 @@ error), implemented alongside the existing in-chat game handlers and reusing the
    rematch-flavored notification, and emit `rematchCreated { newGameId }` to the
    **old** game's room so an open game-over modal can switch to **Go to rematch**.
 
-## 4. Server — series read
+## 4. Server: series read
 
 `GET /api/games/:gameId/series` → `SeriesDetail`:
 
@@ -146,10 +146,10 @@ error), implemented alongside the existing in-chat game handlers and reusing the
 The endpoint lives under `/api/*` (the server's Hono app), so it adds no top-level
 web route and no `RESERVED_USERNAMES` entry is needed.
 
-## 5. Chat — game card
+## 5. Chat: game card
 
 Each game (the initial game and every rematch) posts its own `game_card` at the
-bottom of the thread (existing infra — the card is the invite and keeps new games
+bottom of the thread (existing infra: the card is the invite and keeps new games
 visible). The card's presentation depends on series size:
 
 - **Series of 1** (never rematched): plain single-game result. When completed and
@@ -159,7 +159,7 @@ visible). The card's presentation depends on series size:
 
 ```
 ┌─────────────────────────────────────┐
-│  Tic-Tac-Toe · Game 3 — aman won     │
+│  Tic-Tac-Toe · Game 3 - aman won     │
 │                                      │
 │      (av)  aman      riya  (av)      │
 │        2     –        1              │
@@ -177,14 +177,14 @@ A rematch being **created** already makes the series 2 games (`totalGames`
 counts the in-progress rematch), so the original game's card upgrades to the
 series presentation the moment a rematch starts.
 
-## 6. Chat — series modal
+## 6. Chat: series modal
 
 **View series** opens a web modal (the `LayeredPopupHost` / `openLayerAtom`
 pattern) that fetches `GET /api/games/:gameId/series` on open:
 
 ```
 ╭──────────────────────────────────────────╮
-│  Tic-Tac-Toe — Series                     │
+│  Tic-Tac-Toe - Series                     │
 │                                           │
 │       (av) aman        riya (av)          │
 │          2      –        1                │
@@ -200,7 +200,7 @@ pattern) that fetches `GET /api/games/:gameId/series` on open:
 ╰──────────────────────────────────────────╯
 ```
 
-- Each row links to `/play/{code}` — replay for finished games, resume/spectate
+- Each row links to `/play/{code}` - replay for finished games, resume/spectate
   for the live one.
 - **Rematch** here runs the same `game:rematch` flow and respects the one-live
   rule.
@@ -212,26 +212,26 @@ pattern) that fetches `GET /api/games/:gameId/series` on open:
 At most one `waiting | active` game per `(conversation, gameType)`:
 
 - **Server (authoritative):** the create-in-conversation service runs the same
-  check as §3.2 — if a live game of that type already exists in the conversation,
+  check as §3.2 - if a live game of that type already exists in the conversation,
   return its id instead of creating a duplicate.
 - **Client (UX):** the create / "Play with…" entry for that game type shows
   **Resume game** (linking to the live one) rather than letting the user click and
   bounce off a server error.
-- Completed/abandoned games never block — that is exactly when **Rematch** takes
+- Completed/abandoned games never block - that is exactly when **Rematch** takes
   over.
 
 Default scope is `(conversation, gameType)`. In a group conversation this means
 one live tic-tac-toe in the whole group at a time; per-pair scoping inside groups
 is deferred (§13).
 
-## 8. Play page — game-over modal
+## 8. Play page: game-over modal
 
 `game-over-modal.tsx` is mounted in `apps/web/app/play/[gameId]/play-client.tsx`
 (above `GameChatSplit`, so it stays visible over the board and replay toolbar) and
 shown via `openLayerAtom`. It auto-opens when:
 
 - the live game transitions to `completed` / `abandoned`, **and**
-- on mount when the game is already finished (`pastInitially` — the revisit case).
+- on mount when the game is already finished (`pastInitially`: the revisit case).
 
 It is closable and re-openable via a small "results" button on the finished view.
 
@@ -260,10 +260,10 @@ It is closable and re-openable via a small "results" button on the finished view
 
 ## 9. Shared web components
 
-- `series-scoreboard.tsx` — avatars-over-score (wins + draws). Used by the chat
+- `series-scoreboard.tsx`: avatars-over-score (wins + draws). Used by the chat
   card, the series modal, and the game-over modal. Lays out N avatars (wraps past
   two).
-- `series-game-list.tsx` — ordered rows with per-game result + `/play/{code}`
+- `series-game-list.tsx`: ordered rows with per-game result + `/play/{code}`
   link. Used by the series modal.
 
 Avatars use the existing `Character` / `PresenceAvatar` (DiceBear) components.
@@ -273,8 +273,8 @@ Avatars use the existing `Character` / `PresenceAvatar` (DiceBear) components.
 These already generalize to any player count and need no rework for a future
 multiplayer game:
 
-- Roster — read from the finished game's `game_player` rows (any N).
-- `seriesId` and the score tally — a `Map<userId, …>`.
+- Roster: read from the finished game's `game_player` rows (any N).
+- `seriesId` and the score tally: a `Map<userId, …>`.
 - The de-dupe / one-live rule and the scoreboard layout.
 
 The only 2-player-specific logic is `computeRematchSeating`. Deferred until a 3+

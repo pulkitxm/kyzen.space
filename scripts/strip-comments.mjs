@@ -324,7 +324,7 @@ function buildSummary(findings, { totalRemoved, changedFiles, totalKept }) {
   return [
     `## ❌ ${totalRemoved} disallowed code comment${totalRemoved === 1 ? "" : "s"}`,
     "",
-    `Comments are not allowed in code — found in **${changedFiles}** file${changedFiles === 1 ? "" : "s"} (**${totalKept}** functional directive${totalKept === 1 ? "" : "s"} like \`biome-ignore\` were ignored). Remove them locally with:`,
+    `Comments are not allowed in code - found in **${changedFiles}** file${changedFiles === 1 ? "" : "s"} (**${totalKept}** functional directive${totalKept === 1 ? "" : "s"} like \`biome-ignore\` were ignored). Remove them locally with:`,
     "",
     "```bash",
     "bun run strip-comments",

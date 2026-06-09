@@ -73,7 +73,7 @@ afterAll(async () => {
   }
 });
 
-describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
+describe.skipIf(!DB_UP)("game flows - normalized game_player", () => {
   it("creates a game in a DM, seats the creator, posts a card", async () => {
     const a = await makeUser("a");
     const b = await makeUser("b");

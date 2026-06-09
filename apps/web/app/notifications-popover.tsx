@@ -27,7 +27,7 @@ function notifText(n: NotificationJson): string {
     case "friend_accepted":
       return `${who} accepted your friend request`;
     case "game_started":
-      return `${who} started a game — tap to join`;
+      return `${who} started a game - tap to join`;
     case "game_challenge":
       return `${who} challenged you to a game`;
     default:

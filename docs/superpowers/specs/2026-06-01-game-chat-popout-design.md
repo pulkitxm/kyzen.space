@@ -40,7 +40,7 @@ side-by-side via `game-chat-split.tsx` (the "mounted" layout). Three issues:
 
 ### A. Scrollbar fix
 
-The split panes should not scroll themselves — each child owns its scrolling
+The split panes should not scroll themselves - each child owns its scrolling
 (the board renders within its own bounds; `MessageList` already scrolls
 internally). Change the game-pane wrapper from `overflow-auto` to
 `overflow-hidden`, and ensure the chat-pane wrapper is `overflow-hidden` too.
@@ -84,7 +84,7 @@ its DOM with `createPortal`, swapping only the portal *target*:
   ancestor cleanly).
 
 Because the `createPortal(chat, target)` call stays at the same tree position and
-only `target` changes, React preserves the subtree — no remount, no re-hydrate,
+only `target` changes, React preserves the subtree - no remount, no re-hydrate,
 no re-join.
 
 **Floating window** (`chat-popout-window.tsx`):
@@ -93,7 +93,7 @@ no re-join.
 - **Draggable** by its header bar; **resizable** from a bottom-left corner handle
   (window is pinned bottom-right by default, so the free corner resizes). Both
   use the same hand-rolled `mousedown`/`mousemove`/`mouseup` pattern already used
-  by the divider — **no new dependency**.
+  by the divider - **no new dependency**.
 - Constrained to the viewport: position clamped so the header stays on-screen;
   size clamped to `[POPOUT_MIN_W, POPOUT_MAX_W] × [POPOUT_MIN_H, POPOUT_MAX_H]`
   and to the viewport. Re-clamped on window resize.
@@ -122,7 +122,7 @@ type ChatLayout = {
 **Client (`game-chat-split.tsx`):**
 
 - On mount, resolve initial layout as `localStorage(gl_chat_layout) ?? dbLayout
-  ?? DEFAULT_CHAT_LAYOUT` — localStorage prevails.
+  ?? DEFAULT_CHAT_LAYOUT` - localStorage prevails.
 - `dbLayout` is fetched server-side in `play/[gameId]/page.tsx` (one extra
   `serverFetchJson` to `/api/profiles/me`, which now also returns `chatLayout`)
   and passed down through `PlayClient`.
@@ -135,7 +135,7 @@ type ChatLayout = {
   (`apps/server/src/db/schema.ts`), typed `ChatLayout | null`, default null.
   Generate + apply a Drizzle migration (`db:generate`, `db:migrate`).
 - `GET /api/profiles/me` response includes `chatLayout`.
-- New `PUT /api/profiles/me/chat-layout` — validates the shape (mode enum;
+- New `PUT /api/profiles/me/chat-layout` - validates the shape (mode enum;
   finite, in-range numbers; clamps server-side as defense) and calls a new
   `updateChatLayout(userId, layout)` repo fn (mirrors `updateAppearance`).
 - Validation lives in a small pure helper so it is unit-testable without HTTP.
@@ -144,12 +144,12 @@ type ChatLayout = {
 
 `game-chat-split.tsx` is doing enough that we split it:
 
-- `game-chat-split.tsx` — owns mode + layout state, the stable chat portal, the
+- `game-chat-split.tsx` - owns mode + layout state, the stable chat portal, the
   `ResizeObserver`/clamp, persistence (localStorage + debounced PUT), and renders
   the mounted layout (with divider) vs full-width game.
-- `chat-popout-window.tsx` — the floating window: drag, resize, viewport clamp,
+- `chat-popout-window.tsx` - the floating window: drag, resize, viewport clamp,
   header + dock button.
-- `lib/chat-layout.ts` (web) — `ChatLayout` type, defaults, bounds constants,
+- `lib/chat-layout.ts` (web) - `ChatLayout` type, defaults, bounds constants,
   parse/clamp helpers (pure, unit-testable), localStorage read/write.
 
 Server validation helper colocated with the profiles route or in
@@ -157,11 +157,11 @@ Server validation helper colocated with the profiles route or in
 
 ## Testing
 
-- **Web unit** (`apps/web/tests/`): `chat-layout` parse/clamp helpers — bad
+- **Web unit** (`apps/web/tests/`): `chat-layout` parse/clamp helpers - bad
   localStorage JSON falls back to defaults; out-of-range widths/geometry clamp;
   game-width clamp respects both panes' min/max across container widths;
   viewport clamp keeps the window header on-screen.
-- **Server unit** (`apps/server/tests/`): `chat-layout` validation helper —
+- **Server unit** (`apps/server/tests/`): `chat-layout` validation helper -
   rejects bad mode, non-finite numbers, out-of-range values; accepts and clamps
   valid input. Mirror `theme.test.ts`.
 - Manual: toggle pop-out/dock (chat keeps scroll + socket), drag/resize within

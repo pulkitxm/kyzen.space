@@ -138,7 +138,7 @@ beforeEach(() => {
   bumpCalls.length = 0;
 });
 
-describe("handleJoinRoom — seating", () => {
+describe("handleJoinRoom - seating", () => {
   test("seats a second player and activates the game", async () => {
     const { io, emits } = fakeIo();
     const { socket } = fakeSocket("u2");
@@ -228,7 +228,7 @@ describe("handleJoinRoom — seating", () => {
   });
 });
 
-describe("handleMakeMove — validation", () => {
+describe("handleMakeMove - validation", () => {
   function activeGame() {
     return freshGame({
       status: "active",
@@ -300,7 +300,7 @@ describe("handleMakeMove — validation", () => {
   });
 });
 
-describe("handleMakeMove — applying moves", () => {
+describe("handleMakeMove - applying moves", () => {
   function activeGame(over: Partial<GameRec> = {}) {
     return freshGame({
       status: "active",
@@ -366,7 +366,7 @@ const INVALID_IDS = [
   "",
 ];
 
-describe("handleJoinRoom — code guard", () => {
+describe("handleJoinRoom - code guard", () => {
   for (const bad of INVALID_IDS) {
     test(`rejects ${JSON.stringify(bad)} without a DB lookup or broadcast`, async () => {
       const { io, emits } = fakeIo();
@@ -396,7 +396,7 @@ describe("handleJoinRoom — code guard", () => {
   });
 });
 
-describe("handleMakeMove — code guard", () => {
+describe("handleMakeMove - code guard", () => {
   function activeGame() {
     return freshGame({
       status: "active",
