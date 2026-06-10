@@ -181,12 +181,19 @@ function applyLens(el: HTMLElement): void {
   }
 }
 
+const RESIZE_SETTLE_MS = 150;
+
 function attachLens(el: HTMLElement): () => void {
-  const observer = new ResizeObserver(() => applyLens(el));
+  let settle: ReturnType<typeof setTimeout> | null = null;
+  const observer = new ResizeObserver(() => {
+    if (settle) clearTimeout(settle);
+    settle = setTimeout(() => applyLens(el), RESIZE_SETTLE_MS);
+  });
   observer.observe(el);
   applyLens(el);
   return () => {
     observer.disconnect();
+    if (settle) clearTimeout(settle);
     el.style.removeProperty("backdrop-filter");
     el.style.removeProperty("-webkit-backdrop-filter");
   };
