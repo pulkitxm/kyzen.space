@@ -106,7 +106,11 @@ function appendAdd(
 function ensureLensFilter(w: number, h: number, radius: number): string {
   const key = `${w}x${h}r${radius}`;
   const cached = filterIds.get(key);
-  if (cached && svgHost?.isConnected) return cached;
+  if (cached && svgHost?.isConnected) {
+    filterIds.delete(key);
+    filterIds.set(key, cached);
+    return cached;
+  }
 
   const host = ensureSvgHost();
   if (filterIds.size >= FILTER_CACHE_LIMIT) {
