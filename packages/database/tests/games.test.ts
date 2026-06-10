@@ -96,6 +96,7 @@ mock.module("../src/client", () => ({
   client: {},
   schema: {},
   createDb: () => ({ db, client: {} }),
+  ping: async () => {},
 }));
 
 const { createGame } = await import("../src/repositories/games");

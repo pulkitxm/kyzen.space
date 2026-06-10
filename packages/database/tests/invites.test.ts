@@ -36,6 +36,7 @@ mock.module("../src/client", () => ({
   client: {},
   schema: {},
   createDb: () => ({ db, client: {} }),
+  ping: async () => {},
 }));
 
 const { create, getByToken } = await import("../src/repositories/invites");
