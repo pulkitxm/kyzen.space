@@ -21,7 +21,8 @@ This is also why the chat contract no longer has its own package: the former `@g
 | --- | --- |
 | `packages/shared/package.json` | Declares the two subpath exports (`./constants`, `./types`) and the lone `zod` dependency (`:6`–`:18`). |
 | `packages/shared/src/index.ts` | Root barrel: `export * from "./constants"` + `export * from "./types"`. |
-| `packages/shared/src/constants/index.ts` | Barrel for all constant **values** (audio, theme, pattern, chat-layout, username, games, categories, chat, playing-cards). |
+| `packages/shared/src/constants/index.ts` | Barrel for all constant **values** (anon-limit, audio, theme, pattern, chat-layout, username, games, categories, chat, playing-cards). |
+| `packages/shared/src/constants/anon-limit.ts` | `ANON_MAX_FRIENDS` (guest friend cap) and `ANON_FRIEND_LIMIT_MESSAGE` - the one place guest restrictions are tuned (enforced in `apps/server/src/chat/friends-service.ts`). |
 | `packages/shared/src/constants/audio.ts` | `GAME_SFX_STORAGE_KEY` / `GAME_MUSIC_STORAGE_KEY`, `DEFAULT_SFX_VOLUME` / `DEFAULT_MUSIC_VOLUME`, `VOLUME_MIN` / `VOLUME_MAX` / `VOLUME_STEP` - the client-only game-audio preference keys + bounds (see [audio.md](./audio.md)). |
 | `packages/shared/src/constants/theme.ts` | `THEME_IDS`, `DEFAULT_THEME`, `COLOR_MODES`, `DEFAULT_COLOR_MODE`. |
 | `packages/shared/src/constants/pattern.ts` | `PATTERN_IDS`, `DEFAULT_PATTERN`. |

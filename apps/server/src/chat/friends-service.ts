@@ -1,11 +1,25 @@
 import { friends, notifications, profiles } from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { FriendshipJson } from "@gamelobby/shared/types";
+import {
+  ANON_FRIEND_LIMIT_MESSAGE,
+  ANON_MAX_FRIENDS,
+  CHAT_EVENTS,
+} from "@gamelobby/shared/constants";
+import type { FriendshipJson, FriendshipRow } from "@gamelobby/shared/types";
 import { getIO } from "../realtime/io";
 import { notify } from "../realtime/notify";
 import { emitToUser } from "../realtime/rooms";
 import { assembleFriendship } from "./assemble";
 import { fail, ok, type ServiceResult } from "./result";
+
+async function checkAnonFriendLimit(
+  userId: string,
+): Promise<ServiceResult<never> | null> {
+  if (!(await profiles.isAnonymousUser(userId))) return null;
+  const count = await friends.countFriendsAndOutgoing(userId);
+  return count >= ANON_MAX_FRIENDS
+    ? fail(ANON_FRIEND_LIMIT_MESSAGE, 403)
+    : null;
+}
 
 export async function sendFriendRequest(
   requesterId: string,
@@ -17,18 +31,19 @@ export async function sendFriendRequest(
   if (addresseeId === requesterId) return fail("You can't add yourself");
 
   const existing = await friends.getFriendshipBetween(requesterId, addresseeId);
-  let row = existing;
-  if (existing) {
-    if (existing.status === "accepted") return fail("Already friends", 409);
-    if (existing.status === "pending") {
-      if (existing.addresseeId === requesterId) {
-        row = await friends.setStatus(existing.id, "accepted");
-      } else {
-        return fail("Friend request already sent", 409);
-      }
-    } else {
-      row = await friends.reopenRequest(existing.id, requesterId, addresseeId);
-    }
+  if (existing?.status === "accepted") return fail("Already friends", 409);
+  if (existing?.status === "pending" && existing.addresseeId !== requesterId) {
+    return fail("Friend request already sent", 409);
+  }
+
+  const limit = await checkAnonFriendLimit(requesterId);
+  if (limit) return limit;
+
+  let row: FriendshipRow | null;
+  if (existing?.status === "pending") {
+    row = await friends.setStatus(existing.id, "accepted");
+  } else if (existing) {
+    row = await friends.reopenRequest(existing.id, requesterId, addresseeId);
   } else {
     row = await friends.createRequest(requesterId, addresseeId);
   }

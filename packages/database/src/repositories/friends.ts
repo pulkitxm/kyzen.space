@@ -1,5 +1,5 @@
 import type { FriendStatus, FriendshipRow } from "@gamelobby/shared/types";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "../client";
 import { friendship } from "../schema";
 
@@ -123,6 +123,22 @@ export async function listPendingOutgoing(
       and(eq(friendship.status, "pending"), eq(friendship.requesterId, userId)),
     )
     .orderBy(desc(friendship.createdAt));
+}
+
+export async function countFriendsAndOutgoing(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(friendship)
+    .where(
+      or(
+        and(eq(friendship.status, "accepted"), involvesUser(userId)),
+        and(
+          eq(friendship.status, "pending"),
+          eq(friendship.requesterId, userId),
+        ),
+      ),
+    );
+  return row?.count ?? 0;
 }
 
 export async function acceptedFriendIds(userId: string): Promise<string[]> {
