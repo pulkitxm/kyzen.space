@@ -259,8 +259,8 @@ html[data-pattern="none"] .app-canvas::before {
 html[data-glass] {
   --glass-blur: 10px;
   --glass-saturate: 170%;
-  --glass-brighten: 1.05;
-  --glass-bg: color-mix(in srgb, #ffffff 28%, transparent);
+  --glass-brighten: 0.9;
+  --glass-bg: color-mix(in srgb, #ffffff 16%, transparent);
   --glass-border: color-mix(in srgb, #ffffff 55%, transparent);
   --glass-rim-hi: color-mix(in srgb, #ffffff 95%, transparent);
   --glass-rim-lo: color-mix(in srgb, #ffffff 55%, transparent);
@@ -270,6 +270,7 @@ html[data-glass] {
 }
 
 html.dark[data-glass] {
+  --glass-brighten: 1.05;
   --glass-bg: color-mix(in srgb, var(--d) 35%, transparent);
   --glass-border: color-mix(in srgb, #ffffff 16%, transparent);
   --glass-rim-hi: color-mix(in srgb, #ffffff 50%, transparent);
@@ -282,8 +283,8 @@ html.dark[data-glass] {
 html[data-glass="tinted"] {
   --glass-bg: color-mix(
     in srgb,
-    var(--v) 16%,
-    color-mix(in srgb, #ffffff 22%, transparent)
+    var(--v) 14%,
+    color-mix(in srgb, #ffffff 12%, transparent)
   );
   --glass-border: color-mix(
     in srgb,
@@ -383,7 +384,8 @@ html[data-glass] .glass-scrim {
   background: rgb(0 0 0 / 0.25);
 }
 
-html[data-glass] .glass-pane .glass-press {
+html[data-glass] .glass-pane .glass-press,
+html[data-glass] .glass-pane.glass-press {
   transition:
     transform 0.35s cubic-bezier(0.34, 1.8, 0.5, 1),
     box-shadow 0.2s ease,
@@ -392,7 +394,8 @@ html[data-glass] .glass-pane .glass-press {
     border-color 0.15s ease;
 }
 
-html[data-glass] .glass-pane .glass-press:active {
+html[data-glass] .glass-pane .glass-press:active,
+html[data-glass] .glass-pane.glass-press:active {
   transform: scale(0.96);
 }
 

@@ -149,7 +149,7 @@ export function ChatPopoutWindow({
         minimized
           ? "hidden"
           : isPopout
-            ? "glass-pane fixed z-50 flex rounded-xl border border-border shadow-2xl"
+            ? "glass-pane fixed z-50 flex overflow-hidden rounded-xl border border-border shadow-2xl"
             : cn(
                 "relative border-border max-md:w-full! md:shrink-0 md:border-l",
                 mountedVisible ? "flex" : "hidden md:flex",

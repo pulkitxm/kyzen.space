@@ -8,6 +8,7 @@ import {
   FaChevronUp,
   FaCommentDots,
 } from "react-icons/fa6";
+import { useGlassMode } from "@/lib/appearance";
 import {
   clampIcon,
   EDGE_TAB_LENGTH,
@@ -58,6 +59,8 @@ export function ChatFloatingIcon({
   const edgeRef = useRef(stashEdge);
   edgeRef.current = stashEdge;
   const justDraggedRef = useRef(false);
+  const { glass } = useGlassMode();
+  const glassOn = glass !== "off";
 
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
@@ -135,7 +138,10 @@ export function ChatFloatingIcon({
         aria-label="Restore chat"
         style={style}
         className={cn(
-          "fixed z-50 flex items-center justify-center bg-primary text-primary-foreground shadow-lg outline-none transition hover:bg-primary-hover",
+          "fixed z-50 flex items-center justify-center shadow-lg outline-none transition",
+          glassOn
+            ? "glass-pane glass-press text-foreground"
+            : "bg-primary text-primary-foreground hover:bg-primary-hover",
           stashEdge === "left" && "rounded-r-lg",
           stashEdge === "right" && "rounded-l-lg",
           stashEdge === "top" && "rounded-b-lg",
@@ -158,7 +164,12 @@ export function ChatFloatingIcon({
         width: ICON_SIZE,
         height: ICON_SIZE,
       }}
-      className="fixed z-50 flex cursor-grab items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl outline-none transition hover:bg-primary-hover active:cursor-grabbing"
+      className={cn(
+        "fixed z-50 flex cursor-grab items-center justify-center rounded-full shadow-xl outline-none transition active:cursor-grabbing",
+        glassOn
+          ? "glass-pane glass-press text-foreground"
+          : "bg-primary text-primary-foreground hover:bg-primary-hover",
+      )}
     >
       <FaCommentDots className="size-6" />
       {unread > 0 && (
