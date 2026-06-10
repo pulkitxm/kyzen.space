@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaRegCalendar, FaRegMessage, FaXmark } from "react-icons/fa6";
-import { useLiquidLens } from "@/components/glass/liquid-glass";
+import { GlassMotionPane } from "@/components/glass/glass-pane";
 import { Button } from "@/components/ui/button";
 import { Character } from "@/components/ui/character";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -115,7 +115,6 @@ export function ProfilePopupHost() {
   const [mounted, setMounted] = useState(false);
   const [shown, setShown] = useState<ProfilePopupUser | null>(null);
   const [hidden, setHidden] = useState(true);
-  const lensRef = useLiquidLens<HTMLDivElement>();
 
   const open = user !== null;
 
@@ -170,11 +169,10 @@ export function ProfilePopupHost() {
         animate={{ opacity: open ? 1 : 0 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
       />
-      <m.div
-        ref={lensRef}
+      <GlassMotionPane
         role="dialog"
         aria-modal="true"
-        className="glass-pane relative w-full max-w-sm rounded-2xl border border-border bg-card p-4 shadow-xl"
+        className="relative w-full max-w-sm rounded-2xl border border-border bg-card p-4 shadow-xl"
         initial={false}
         animate={{
           opacity: open ? 1 : 0,
@@ -205,7 +203,7 @@ export function ProfilePopupHost() {
             </Button>
           </div>
         ) : null}
-      </m.div>
+      </GlassMotionPane>
     </div>,
     document.body,
   );

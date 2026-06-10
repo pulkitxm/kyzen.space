@@ -82,7 +82,7 @@ export function AppShellClient({
             {mobileOpen && (
               <button
                 type="button"
-                className="fixed inset-0 z-40 bg-black/50 md:hidden"
+                className="glass-scrim fixed inset-0 z-40 bg-black/50 md:hidden"
                 onClick={closeMobile}
                 aria-label="Close menu"
               />

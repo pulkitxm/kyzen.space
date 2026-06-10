@@ -2,7 +2,7 @@
 
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import type { ComponentPropsWithoutRef, ComponentRef, Ref } from "react";
-import { useLiquidLens } from "@/components/glass/liquid-glass";
+import { useGlassPaneRef } from "@/components/glass/glass-pane";
 
 const Popover = PopoverPrimitive.Root;
 const PopoverTrigger = PopoverPrimitive.Trigger;
@@ -18,16 +18,12 @@ function PopoverContent({
 }: ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> & {
   ref?: Ref<ComponentRef<typeof PopoverPrimitive.Content>>;
 }) {
-  const lensRef =
-    useLiquidLens<ComponentRef<typeof PopoverPrimitive.Content>>();
+  const paneRef =
+    useGlassPaneRef<ComponentRef<typeof PopoverPrimitive.Content>>(ref);
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
-        ref={(node) => {
-          lensRef(node);
-          if (typeof ref === "function") ref(node);
-          else if (ref) ref.current = node;
-        }}
+        ref={paneRef}
         align={align}
         side={side}
         sideOffset={sideOffset}

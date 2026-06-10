@@ -5,7 +5,7 @@ import { useAtomValue } from "jotai";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useLiquidLens } from "@/components/glass/liquid-glass";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { Button } from "@/components/ui";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import { friendsAtom } from "@/lib/chat/atoms";
@@ -25,7 +25,6 @@ export function NewGroupDialog({
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
-  const lensRef = useLiquidLens<HTMLDivElement>();
 
   if (!open) return null;
 
@@ -62,10 +61,7 @@ export function NewGroupDialog({
         className="glass-scrim absolute inset-0 bg-black/50"
         onClick={onClose}
       />
-      <div
-        ref={lensRef}
-        className="glass-pane relative w-full max-w-md rounded-2xl border border-border bg-card p-4 shadow-xl"
-      >
+      <GlassPane className="relative w-full max-w-md rounded-2xl border border-border bg-card p-4 shadow-xl">
         <h2 className="mb-3 font-semibold text-lg">New group</h2>
         <input
           value={name}
@@ -138,7 +134,7 @@ export function NewGroupDialog({
             </Button>
           </div>
         </div>
-      </div>
+      </GlassPane>
     </div>
   );
 }

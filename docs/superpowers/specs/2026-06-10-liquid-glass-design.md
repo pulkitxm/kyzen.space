@@ -64,13 +64,15 @@ In `globals.css`, scoped under `html[data-glass]`:
 - `appearance-tabs.tsx` gains a **Glass** tab (`FaDroplet`, fa6).
 - `apps/web/app/settings/appearance/glass/page.tsx` + `glass-picker.tsx`: mode cards (Off / Neutral / Tinted / Smoke) following the theme-picker pattern - hover/focus live-preview by setting `data-glass` directly, click to commit, restore on leave; a live preview pane sits above the grid so the material is visible over the user's actual theme + doodles.
 
-### Surface mapping (revised: popups only)
+### Surface mapping (revised: all popups + sidebar)
 
-Scope was narrowed after implementation review: v1 applies glass to **popup surfaces only**.
+Scope settled on **every popup surface plus the sidebar**, delivered through shared building blocks (`GlassPane` / `GlassMotionPane` / `useGlassPaneRef` in `components/glass/glass-pane.tsx`) so new popups get glass by construction.
 
-- Glass (`.glass-pane` + lens): the shared popover wrapper (all popovers, incl. notifications), layered-popup dialogs (all stacked modals), the profile popup, the two bespoke chat dialogs (new group, group settings), and the game-over overlay on the play page.
+- Glass (`.glass-pane` + lens): the shared popover wrapper (all popovers, incl. notifications), layered-popup dialogs (all stacked modals), the profile popup, the two chat dialogs (new group, group settings), the game-over overlay, the conversation picker, the guest nudge, the account-identity confirm dialog, the avatar editor (sheet + confirm), the chat game-launcher menu, and the composer emoji/GIF picker.
+- Sidebar (`.glass-sidebar`): the dark-tinted material variant, no lens (permanent surface).
+- Scrims (`.glass-scrim`): popup overlays lighten from `bg-black/40-60` to 25% black while glass is on.
 - Pressure (`.glass-press`): the shared `Button` carries the class, but the CSS only activates it inside a `.glass-pane`, so press physics exist solely within glass popups.
-- Unchanged: sidebar, game lobby cards, settings cards, standalone buttons, the game-settings gear, the chat-popout controls pill, modal scrims (`bg-black/50`), text inputs, game-board internals in `games-client`, generated art/avatars.
+- Unchanged: game lobby cards, settings cards, standalone buttons, the game-settings gear, the chat-popout controls pill, text inputs, game-board internals in `games-client`, generated art/avatars.
 
 ## Data flow
 

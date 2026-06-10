@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { FaGoogle, FaXmark } from "react-icons/fa6";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { authClient } from "@/lib/auth-client";
 import {
   decideGuestNudge,
@@ -55,9 +56,9 @@ export function GuestNudge() {
         type="button"
         aria-label="Dismiss"
         onClick={dismiss}
-        className="absolute inset-0 bg-black/40"
+        className="glass-scrim absolute inset-0 bg-black/40"
       />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
+      <GlassPane className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
         <button
           type="button"
           aria-label="Close"
@@ -89,7 +90,7 @@ export function GuestNudge() {
         >
           Maybe later
         </button>
-      </div>
+      </GlassPane>
     </div>
   );
 }

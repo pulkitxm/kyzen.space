@@ -7,13 +7,13 @@ import {
   isGameOver,
   type SeriesDetail,
 } from "@gamelobby/shared/types";
-import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
+import { AnimatePresence, domAnimation, LazyMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FaTrophy } from "react-icons/fa6";
 import { SeriesDetailModal } from "@/components/games/series-detail-modal";
 import { SeriesScoreboard } from "@/components/games/series-scoreboard";
-import { useLiquidLens } from "@/components/glass/liquid-glass";
+import { GlassMotionPane } from "@/components/glass/glass-pane";
 import { Button, Character } from "@/components/ui";
 import { clientFetchJson } from "@/lib/api-client";
 import { conversationHref } from "@/lib/chat/conversation-href";
@@ -83,7 +83,6 @@ export function GameOverOverlay({
   const { socket } = useSocket();
   const { openLayer, layers } = useLayeredPopup();
   const cardRef = useRef<HTMLDivElement>(null);
-  const lensRef = useLiquidLens<HTMLDivElement>();
   const [game, setGame] = useState<GameJson>(initialGame);
   const [open, setOpen] = useState(() => isGameOver(initialGame.status));
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
@@ -161,12 +160,9 @@ export function GameOverOverlay({
       <LazyMotion features={domAnimation}>
         <AnimatePresence>
           {open && isGameOver(game.status) ? (
-            <m.div
-              ref={(node: HTMLDivElement | null) => {
-                cardRef.current = node;
-                lensRef(node);
-              }}
-              className="glass-pane pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"
+            <GlassMotionPane
+              ref={cardRef}
+              className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"
               initial={{ opacity: 0, y: 8, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.97 }}
@@ -221,7 +217,7 @@ export function GameOverOverlay({
                   Close
                 </Button>
               </div>
-            </m.div>
+            </GlassMotionPane>
           ) : null}
         </AnimatePresence>
       </LazyMotion>

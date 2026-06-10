@@ -2,11 +2,10 @@
 
 import { useAtomValue, useSetAtom } from "jotai";
 import { AnimatePresence, m } from "motion/react";
-import type { ComponentPropsWithoutRef } from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaXmark } from "react-icons/fa6";
-import { useLiquidLens } from "@/components/glass/liquid-glass";
+import { GlassMotionPane } from "@/components/glass/glass-pane";
 import {
   closeAllAtom,
   closeLayerAtom,
@@ -17,11 +16,6 @@ import {
   popupLayersAtom,
 } from "@/lib/popups/atoms";
 import { cn } from "@/lib/utils";
-
-function GlassDialogPane(props: ComponentPropsWithoutRef<typeof m.div>) {
-  const lensRef = useLiquidLens<HTMLDivElement>();
-  return <m.div ref={lensRef} {...props} />;
-}
 
 const SIZE_CLASS: Record<PopupSize, string> = {
   sm: "max-w-sm",
@@ -97,11 +91,11 @@ export function LayeredPopupHost() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
             />
-            <GlassDialogPane
+            <GlassMotionPane
               role="dialog"
               aria-modal="true"
               className={cn(
-                "glass-pane relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-xl",
+                "relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-xl",
                 SIZE_CLASS[layer.size],
               )}
               initial={{ opacity: 0, y: 8, scale: 0.97 }}
@@ -132,7 +126,7 @@ export function LayeredPopupHost() {
                   {renderNode(layer.footer, api)}
                 </div>
               )}
-            </GlassDialogPane>
+            </GlassMotionPane>
           </m.div>
         );
       })}

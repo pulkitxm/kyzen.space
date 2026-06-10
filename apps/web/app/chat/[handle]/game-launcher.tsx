@@ -6,6 +6,7 @@ import type { ConversationJson, GameType } from "@gamelobby/shared/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FaGamepad } from "react-icons/fa6";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 
 export function GameLauncher({
@@ -61,7 +62,7 @@ export function GameLauncher({
             className="fixed inset-0 z-10 cursor-default"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute bottom-full left-0 z-20 mb-2 w-60 rounded-xl border border-border bg-card p-1 shadow-xl">
+          <GlassPane className="absolute bottom-full left-0 z-20 mb-2 w-60 rounded-xl border border-border bg-card p-1 shadow-xl">
             <div className="px-2 py-1 font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
               {gameName}
             </div>
@@ -82,7 +83,7 @@ export function GameLauncher({
                 Challenge {m.displayName ?? m.username}
               </button>
             ))}
-          </div>
+          </GlassPane>
         </>
       ) : null}
       <button
