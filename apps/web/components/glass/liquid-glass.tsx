@@ -173,7 +173,7 @@ function applyLens(el: HTMLElement): void {
   }
   try {
     const id = ensureLensFilter(w, h, Math.round(readCornerRadius(el, w, h)));
-    const value = `url(#${id}) blur(2px) saturate(170%) brightness(1.05)`;
+    const value = `url(#${id}) blur(2px) saturate(var(--glass-saturate, 170%)) brightness(var(--glass-brighten, 1.05))`;
     el.style.setProperty("backdrop-filter", value);
     el.style.setProperty("-webkit-backdrop-filter", value);
   } catch (err) {

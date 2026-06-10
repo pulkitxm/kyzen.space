@@ -91,7 +91,7 @@ export function LayeredPopupHost() {
               tabIndex={-1}
               disabled={layer.persistent}
               onClick={() => !layer.persistent && closeLayer(layerNumber)}
-              className="absolute inset-0 bg-black/50 disabled:cursor-default"
+              className="glass-scrim absolute inset-0 bg-black/50 disabled:cursor-default"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

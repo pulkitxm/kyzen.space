@@ -250,10 +250,10 @@ html[data-pattern="none"] .app-canvas::before {
 }
 
 html[data-glass] {
-  --glass-blur: 14px;
+  --glass-blur: 10px;
   --glass-saturate: 170%;
   --glass-brighten: 1.05;
-  --glass-bg: color-mix(in srgb, #ffffff 55%, transparent);
+  --glass-bg: color-mix(in srgb, #ffffff 28%, transparent);
   --glass-border: color-mix(in srgb, #ffffff 55%, transparent);
   --glass-rim-hi: color-mix(in srgb, #ffffff 95%, transparent);
   --glass-rim-lo: color-mix(in srgb, #ffffff 55%, transparent);
@@ -263,7 +263,7 @@ html[data-glass] {
 }
 
 html.dark[data-glass] {
-  --glass-bg: color-mix(in srgb, var(--d) 55%, transparent);
+  --glass-bg: color-mix(in srgb, var(--d) 35%, transparent);
   --glass-border: color-mix(in srgb, #ffffff 16%, transparent);
   --glass-rim-hi: color-mix(in srgb, #ffffff 50%, transparent);
   --glass-rim-lo: color-mix(in srgb, #ffffff 25%, transparent);
@@ -275,8 +275,8 @@ html.dark[data-glass] {
 html[data-glass="tinted"] {
   --glass-bg: color-mix(
     in srgb,
-    var(--v) 22%,
-    color-mix(in srgb, #ffffff 50%, transparent)
+    var(--v) 16%,
+    color-mix(in srgb, #ffffff 22%, transparent)
   );
   --glass-border: color-mix(
     in srgb,
@@ -303,8 +303,8 @@ html[data-glass="tinted"] {
 html.dark[data-glass="tinted"] {
   --glass-bg: color-mix(
     in srgb,
-    var(--v) 25%,
-    color-mix(in srgb, var(--d) 50%, transparent)
+    var(--v) 16%,
+    color-mix(in srgb, var(--d) 28%, transparent)
   );
   --glass-border: color-mix(
     in srgb,
@@ -330,13 +330,18 @@ html.dark[data-glass="tinted"] {
 
 html[data-glass="smoke"],
 html.dark[data-glass="smoke"] {
-  --glass-bg: color-mix(in srgb, #0a0c18 50%, transparent);
+  --glass-bg: color-mix(in srgb, #0a0c18 42%, transparent);
   --glass-border: color-mix(in srgb, #ffffff 14%, transparent);
   --glass-rim-hi: color-mix(in srgb, #ffffff 40%, transparent);
   --glass-rim-lo: color-mix(in srgb, #ffffff 18%, transparent);
   --glass-shine: color-mix(in srgb, #ffffff 6%, transparent);
   --glass-drop: color-mix(in srgb, #000000 50%, transparent);
   --glass-contact: color-mix(in srgb, #000000 32%, transparent);
+}
+
+html:not(.dark)[data-glass="smoke"] {
+  --glass-brighten: 0.72;
+  --glass-bg: color-mix(in srgb, #0a0c18 58%, transparent);
 }
 
 html[data-glass] .glass-pane {
@@ -365,6 +370,10 @@ html[data-glass="smoke"] .glass-pane {
   --surface-hover: color-mix(in srgb, #ffffff 10%, transparent);
   --border: color-mix(in srgb, #ffffff 14%, transparent);
   color: var(--card-foreground);
+}
+
+html[data-glass] .glass-scrim {
+  background: rgb(0 0 0 / 0.25);
 }
 
 html[data-glass] .glass-pane .glass-press {

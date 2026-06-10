@@ -165,7 +165,7 @@ export function ProfilePopupHost() {
         aria-label="Close"
         tabIndex={-1}
         onClick={close}
-        className="absolute inset-0 bg-black/50"
+        className="glass-scrim absolute inset-0 bg-black/50"
         initial={false}
         animate={{ opacity: open ? 1 : 0 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
