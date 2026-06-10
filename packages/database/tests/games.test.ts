@@ -199,3 +199,123 @@ describe("createGame - code collision retry", () => {
     expect(txCalls).toBe(0);
   });
 });
+
+describe("createGame - input validation rejects before any transaction", () => {
+  test("rejects a player missing its role without opening a transaction", async () => {
+    const bad = {
+      ...validInput(),
+      players: [{ userId: "u1", username: "alice" }],
+    } as unknown as CreateGameInput;
+    const err = await capture(createGame(bad));
+    expect(err).toBeInstanceOf(Error);
+    expect(txCalls).toBe(0);
+  });
+
+  test("rejects a missing players array", async () => {
+    const { players, ...rest } = validInput();
+    const err = await capture(createGame(rest as unknown as CreateGameInput));
+    expect(err).toBeInstanceOf(Error);
+    expect(txCalls).toBe(0);
+  });
+
+  test("rejects a non-array players value", async () => {
+    const bad = {
+      ...validInput(),
+      players: "u1",
+    } as unknown as CreateGameInput;
+    const err = await capture(createGame(bad));
+    expect(err).toBeInstanceOf(Error);
+    expect(txCalls).toBe(0);
+  });
+
+  test("rejects an out-of-union status", async () => {
+    const bad = {
+      ...validInput(),
+      status: "midgame",
+    } as unknown as CreateGameInput;
+    const err = await capture(createGame(bad));
+    expect(err).toBeInstanceOf(Error);
+    expect(txCalls).toBe(0);
+  });
+
+  test("rejects an out-of-union seatingMode", async () => {
+    const bad = {
+      ...validInput(),
+      seatingMode: "weird",
+    } as unknown as CreateGameInput;
+    const err = await capture(createGame(bad));
+    expect(err).toBeInstanceOf(Error);
+    expect(txCalls).toBe(0);
+  });
+
+  test("accepts an empty players array (a seatless game)", async () => {
+    behaviors = ["ok"];
+    const rec = await createGame({ ...validInput(), players: [] });
+    expect(txCalls).toBe(1);
+    expect(rec.players).toEqual([]);
+    expect(seatedBatches).toHaveLength(0);
+  });
+});
+
+describe("createGame - default threading", () => {
+  test("defaults status to 'waiting', config/seatingMode/winner to null", async () => {
+    behaviors = ["ok"];
+    const rec = await createGame(validInput());
+    expect(rec.status).toBe("waiting");
+    expect(rec.config).toBeNull();
+    expect(rec.seatingMode).toBeNull();
+    expect(rec.winner).toBeNull();
+  });
+
+  test("defaults seriesId to the row's own id when none is supplied (fresh series root)", async () => {
+    behaviors = ["ok"];
+    const rec = await createGame(validInput());
+    expect(rec.seriesId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+  });
+
+  test("threads an explicit seriesId through (a rematch inherits the parent's series)", async () => {
+    behaviors = ["ok"];
+    const rec = await createGame({
+      ...validInput(),
+      seriesId: "parent-series-id",
+    });
+    expect(rec.seriesId).toBe("parent-series-id");
+  });
+
+  test("threads conversation / creator / challenged / seatingMode / config through", async () => {
+    behaviors = ["ok"];
+    const rec = await createGame({
+      ...validInput(),
+      conversationId: "conv-1",
+      creatorUserId: "creator-1",
+      challengedUserId: "challenged-1",
+      seatingMode: "challenge",
+      config: { difficulty: 3 },
+      status: "active",
+    });
+    expect(rec.conversationId).toBe("conv-1");
+    expect(rec.creatorUserId).toBe("creator-1");
+    expect(rec.challengedUserId).toBe("challenged-1");
+    expect(rec.seatingMode).toBe("challenge");
+    expect(rec.config).toEqual({ difficulty: 3 });
+    expect(rec.status).toBe("active");
+  });
+
+  test("attaches the input players (not the inserted row) onto the returned record", async () => {
+    behaviors = ["ok"];
+    const players = [
+      { userId: "u1", username: "alice", role: "X" },
+      { userId: "u2", username: "bob", role: "O" },
+    ];
+    const rec = await createGame({ ...validInput(), players });
+    expect(rec.players).toEqual(players);
+    expect(seatedBatches).toHaveLength(1);
+    const seated = seatedBatches[0] as Array<Record<string, unknown>>;
+    expect(seated).toHaveLength(2);
+    expect(seated[0]?.seatOrder).toBe(0);
+    expect(seated[1]?.seatOrder).toBe(1);
+    expect(seated[1]?.role).toBe("O");
+  });
+});

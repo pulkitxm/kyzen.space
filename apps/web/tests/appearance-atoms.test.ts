@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { isValidTheme, type ThemeId } from "@gamelobby/shared/types";
-import { rawAppearanceStorage } from "../lib/appearance-atoms";
+import { createStore } from "jotai";
+import {
+  glassAtom,
+  paletteAtom,
+  patternAtom,
+  rawAppearanceStorage,
+  serverAppearanceAtom,
+} from "../lib/appearance-atoms";
 
 type Listener = (e: {
   key: string | null;
@@ -101,5 +108,32 @@ describe("rawAppearanceStorage", () => {
     unsubscribe();
     fire("gl-palette", "violet");
     expect(seen).toEqual(["csk", "amber", "amber"]);
+  });
+
+  it("invokes the no-op unsubscribe without a window", () => {
+    delete (globalThis as { window?: unknown }).window;
+    const unsubscribe = storage.subscribe("gl-palette", () => {}, "amber");
+    expect(() => unsubscribe()).not.toThrow();
+  });
+
+  it("setItem and removeItem are no-ops without a window", () => {
+    delete (globalThis as { window?: unknown }).window;
+    expect(() => storage.setItem("gl-palette", "rose")).not.toThrow();
+    expect(() => storage.removeItem("gl-palette")).not.toThrow();
+  });
+});
+
+describe("serverAppearanceAtom", () => {
+  it("fans a server appearance payload out to all three atoms", () => {
+    delete (globalThis as { window?: unknown }).window;
+    const store = createStore();
+    store.set(serverAppearanceAtom, {
+      palette: "rose",
+      pattern: "none",
+      glass: "tinted",
+    });
+    expect(store.get(paletteAtom)).toBe("rose");
+    expect(store.get(patternAtom)).toBe("none");
+    expect(store.get(glassAtom)).toBe("tinted");
   });
 });

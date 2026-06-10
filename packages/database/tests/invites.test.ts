@@ -6,6 +6,7 @@ let insertedValues: Record<string, unknown> | null = null;
 let insertCalls = 0;
 let selectCalls = 0;
 let storedRow: Record<string, unknown> | null = null;
+let insertReturnsEmpty = false;
 
 const db = {
   insert: () => ({
@@ -13,6 +14,7 @@ const db = {
       returning: async () => {
         insertCalls += 1;
         insertedValues = vals;
+        if (insertReturnsEmpty) return [];
         return [{ id: "inv-1", createdAt: new Date(), ...vals }];
       },
     }),
@@ -61,6 +63,7 @@ beforeEach(() => {
   insertCalls = 0;
   selectCalls = 0;
   storedRow = null;
+  insertReturnsEmpty = false;
 });
 
 describe("invites.create", () => {
@@ -108,6 +111,51 @@ describe("invites.create", () => {
     );
     expect(err).toBeInstanceOf(Error);
     expect(insertCalls).toBe(0);
+  });
+
+  test("rejects an empty token via the schema (min(1)) before the length guard", async () => {
+    const err = await capture(create(validInput({ token: "" })));
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).not.toContain("too short");
+    expect(insertCalls).toBe(0);
+  });
+
+  test("rejects a one-char token via the explicit length guard, not the schema", async () => {
+    const err = await capture(create(validInput({ token: "a" })));
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("too short");
+    expect(insertCalls).toBe(0);
+  });
+
+  test("rejects a token one short of the full length", async () => {
+    const err = await capture(
+      create(validInput({ token: "a".repeat(INVITE_TOKEN_LENGTH - 1) })),
+    );
+    expect((err as Error).message).toContain("too short");
+    expect(insertCalls).toBe(0);
+  });
+
+  test("accepts a token longer than the minimum length", async () => {
+    const row = await create(
+      validInput({ token: "a".repeat(INVITE_TOKEN_LENGTH + 5) }),
+    );
+    expect(insertCalls).toBe(1);
+    expect(row.id).toBe("inv-1");
+  });
+
+  test("throws 'Failed to create invite' when the insert returns no row", async () => {
+    insertReturnsEmpty = true;
+    const err = await capture(create(validInput()));
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("Failed to create invite");
+    expect(insertCalls).toBe(1);
+  });
+
+  test("does not reject an extra unknown key (the input schema is not strict)", async () => {
+    const row = await create(validInput({ unexpected: "ignored" }));
+    expect(insertCalls).toBe(1);
+    expect(row.id).toBe("inv-1");
+    expect(insertedValues?.unexpected).toBeUndefined();
   });
 });
 
