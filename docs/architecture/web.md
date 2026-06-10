@@ -20,7 +20,10 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/layout.tsx` | Root Server Component; one authenticated fan-out fetch, sets `<html>` theme/pattern attrs, injects no-flash boot scripts, threads an `isAnonymous` flag, wraps everything in `Providers` + `AppShellClient`. |
 | `apps/web/app/providers.tsx` | Client wrapper: `next-themes` `ThemeProvider` (light/dark) + `AppearanceProvider` (palette/pattern). |
 | `apps/web/app/app-shell.tsx` | Client shell: Jotai `Provider`, `SocketProvider`, `GuestNudge`, `MergeConsent`, `ChatSocketBridge`, sidebar + `<main>`. |
-| `apps/web/app/page.tsx` | Home grid of games, rendered from `listGameMeta()`. |
+| `apps/web/app/page.tsx` | Server-first home **dashboard**: a greeting header ("Welcome back, {firstName}" for a session, marketing tagline for guests), a "Jump back in" strip of the user's live games (fetched from `GET /api/games/mine`), then the game library grouped by category via `getCategoryGroups()` - each section header showing the label + game count. Entrance motion via the `Reveal` island. |
+| `apps/web/app/jump-back-in.tsx` | Server component rendering the "Jump back in" strip from the live-games list: per game a cover thumb, the opponent's avatar + "vs {name}", and a waiting/in-progress status chip, each linking to `/play/<code>`. Filters to games with a registered engine (`hasEngine`); renders `null` if none. |
+| `apps/web/app/game-card.tsx` | The library cover-art card: a `next/link` to `/games/<type>` with a hover lift (`-translate-y-1`) and a cover-image zoom (`group-hover:scale-105`); the description slides in on hover/focus. Falls back to a text-only card when a game has no `coverImage`. |
+| `apps/web/components/motion/reveal.tsx` | `<Reveal delay>` client island: wraps server-rendered children in a `motion` fade/rise-in (`opacity`+`y`), staggered by `delay`; renders a plain `<div>` under `prefers-reduced-motion`. |
 | `apps/web/app/sidebar.tsx` | The collapsible, resizable left rail rendered by `AppShellClient` (logo, nav, `SidebarSocialNav`, profile/avatar entry); persists collapsed/width via the sidebar atoms + cookie. |
 | `apps/web/app/sidebar-social-nav.tsx` | The "Social" nav cluster in the sidebar (the Chat link with its `totalUnreadAtom` badge; Friends now lives in the profile page's overflow menu, not here). |
 | `apps/web/app/[username]/page.tsx` | Catch-all `/[username]` profile route (Server Component): resolves the handle, fetches the profile + activity, renders `ProfilePageView`. Shadowed by `RESERVED` segments / `RESERVED_USERNAMES`. |
@@ -46,8 +49,8 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/lib/sidebar-atoms-shared.ts` | Storage keys + `clampWidth` / `clampWidthSafe` helpers shared by the atoms and the cookie/boot-script machinery. |
 | `apps/web/lib/sidebar-prefs.ts` | `SIDEBAR_PREFS_COOKIE` + `SIDEBAR_LS_BOOT_SCRIPT` + `parseSidebarPrefsCookieValue` / `persistSidebarPrefsToCookie`: the cookie contract and the no-flash boot script the layout injects. |
 | `apps/web/lib/appearance.tsx` | `AppearanceProvider` + `usePalette`/`usePattern`/`useColorModeSetting`; persists appearance via `clientFetch` PUT. |
-| `apps/web/app/games/[gameType]/page.tsx` | The single dynamic game-lobby route; `hasEngine` gate + `getDefinition` drive `GameLobby`. |
-| `apps/web/app/games/_shared/game-lobby.tsx` | Renders the `configFields` form, the "Play with a friend" button → `ConversationPicker`, the matchmaking "Find a match" button + Searching/Cancel state (`game:queue_join` / `game:queue_leave`, navigate on `match_found`), and the "Invite a friend (link)" button (`ensureIdentity()` → `createInviteLink` → clipboard). |
+| `apps/web/app/games/[gameType]/page.tsx` | The single dynamic game-lobby route; `hasEngine` gate + `getDefinition` drive a two-column layout - a cover-art hero card (with a category chip resolved from `GAME_CATEGORIES`) next to a "Start playing" action card wrapping `GameLobby` and the chat explainer. Per-game `generateMetadata`. Entrance via `Reveal`. |
+| `apps/web/app/games/_shared/game-lobby.tsx` | Renders the `configFields` form, three `m.button` CTAs (`whileTap` scale): the "Play with a friend" button → `ConversationPicker`, the "Invite a friend (link)" button (`ensureIdentity()` → `createInviteLink` → clipboard), and the matchmaking "Find a match" button + Searching/Cancel state (`game:queue_join` / `game:queue_leave`, navigate on `match_found`) whose "searching" row shows a looping expanding-ring pulse around the magnifying glass (static icon under reduced motion). |
 | `apps/web/lib/matchmaking-atoms.ts` | `matchmakingAtom`: a single Jotai atom holding `{ searching: gameType | null }` so the lobby's Searching/Cancel state survives a route change while a match is being found. |
 | `apps/web/lib/invite-client.ts` | `createInviteLink(gameType, config?)`: `POST /api/invite` → `{ token, url }` for the lobby's link button. |
 | `apps/web/app/invite/[token]/page.tsx` | The public `/invite/[token]` client page (guest identity, Phase 3): peeks `GET /api/invite/:token`, paints `getGameSkeleton(gameType)` + a "Joining <inviter>'s game…" banner on the first frame, fires `POST /api/invite/:token/accept` underneath (minting a guest cookie if needed), then crossfades (motion) and `router.replace`s to `/play/<gameId>` (or `/games` for a self/expired link); a non-blocking "<inviter> invited you · Add as friend" popup fires the existing `friend:request` socket flow. `invite` is in `RESERVED_USERNAMES`. |
@@ -55,7 +58,8 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/games/[gameType]/[gameId]/page.tsx` | Legacy redirect: `/games/<type>/<id>` → `/play/<id>` (the `[gameId]` segment is now a room code, passed straight through). |
 | `apps/web/app/play/[gameId]/page.tsx` | SSR-fetches game + moves (+ conversation + messages), gates on auth + game **code** (`isGameCode`, then normalizes and redirects to the canonical uppercase code), resolves the chat layout, renders `PlayClient`. |
 | `apps/web/app/play/[gameId]/play-client.tsx` | Resolves `getGameClient` / `getGameSkeleton`, renders the board in `<Suspense>` over the shared socket, optionally side-by-side with chat via `GameChatSplit`, and mounts the `GameOverOverlay` above it. |
-| `apps/web/app/play/[gameId]/game-over-overlay.tsx` | The game-over popup (chess.com-style): auto-opens on completion / abandon (and on revisit of a finished game), shows the outcome + both players' avatars with the winner highlighted (or the `SeriesScoreboard` for a series of ≥ 2), and offers Rematch / Go to rematch / Chat (back to the conversation via its friendly URL) / View series / Close. It is **non-blocking** - no backdrop, zero shadow, the container is `pointer-events-none` so the sidebar/chat/settings stay clickable, and a document `mousedown` listener closes it on any outside click (suppressed while a layered popup is open). |
+| `apps/web/app/play/[gameId]/game-over-overlay.tsx` | The game-over popup (chess.com-style): auto-opens on completion / abandon (and on revisit of a finished game), shows the outcome + both players' avatars with the winner highlighted (or the `SeriesScoreboard` for a series of ≥ 2), and offers Rematch / Go to rematch / Chat (back to the conversation via its friendly URL) / View series / Close. Entrance is a `motion` spring (card pop + a delayed `m.h2` heading pop); the winner's avatar ring does a one-shot scale bounce. It is **non-blocking** - no backdrop, zero shadow, the container is `pointer-events-none` so the sidebar/chat/settings stay clickable, and a document `mousedown` listener closes it on any outside click (suppressed while a layered popup is open). |
+| `apps/web/app/play/[gameId]/confetti-burst.tsx` | `ConfettiBurst`: a one-shot, capped (22 particles) confetti burst over the game-over card, shown only when the viewer **won** and the game transitioned to over during this session (`wasLiveAtMountRef`) - not when opening an already-finished game. Renders nothing under reduced motion. |
 | `apps/web/components/games/series-scoreboard.tsx` | `SeriesScoreboard`: avatars-over-score (wins + a draw tally) for the series, shared by the game-over modal, the series modal, and the chat game card. |
 | `apps/web/components/games/series-detail-modal.tsx` | `SeriesDetailModal`: fetches `GET /api/games/:gameId/series` and renders the scoreboard + a linked list of every game in the series. |
 | `apps/web/app/chat/[handle]/game-card-message.tsx` | The chat game card: status pill + Open/Join/Spectate/View link, plus (once the series has ≥ 2 games) the scoreboard, "View series", and a "Rematch" button. |
@@ -316,13 +320,25 @@ Appearance is split across three layers, and which layer owns what is the key to
 
 ---
 
+## The home dashboard
+
+`app/page.tsx` is a server-first **player dashboard** (`export const dynamic = "force-dynamic"`). It resolves the session via `getServerSession()`, then:
+
+- renders a **greeting header** - `"Welcome back{, firstName}"` for a session (the first name derived from `user.name`, `apps/web/app/page.tsx:26`) or a marketing tagline for a guest/signed-out viewer;
+- when there's a user, server-fetches their live games with `serverFetchJson<{ games: GameJson[] }>("/api/games/mine")` (`apps/web/app/page.tsx:22`) and renders a **"Jump back in" strip** (`JumpBackIn`, `apps/web/app/jump-back-in.tsx`) - one card per live game with a cover thumb, the opponent's avatar + "vs {name}", and a waiting/in-progress status chip, each linking to `/play/<code>`. `JumpBackIn` filters to games with a registered engine and renders nothing if none remain;
+- renders the **game library grouped by category** via `getCategoryGroups()` from games-core (`apps/web/app/page.tsx:27`) - each `section` a category header (`group.category.label` + a game count) over a grid of `GameCard`s (`apps/web/app/game-card.tsx`), which lift (`-translate-y-1`) and zoom their cover image (`group-hover:scale-105`) on hover.
+
+The whole page is server-rendered; entrance motion comes from a small client island, **`Reveal`** (`apps/web/components/motion/reveal.tsx`), which wraps server children in a `motion` fade/rise-in staggered by a `delay` prop and degrades to a plain `<div>` under `prefers-reduced-motion`. So the dashboard is correct and personalized in the first SSR paint, with the animation layered on top client-side.
+
+---
+
 ## One route renders every game
 
 There are no `app/games/tic-tac-toe/` folders. Two dynamic routes plus the shared packages cover all games.
 
 ### The lobby route
 
-`app/games/[gameType]/page.tsx` is a Server Component. It gates on `hasEngine(gameType)` (from `games-core`) → `notFound()`, then pulls the `GameDefinition` and hands its metadata + config fields to the client lobby:
+`app/games/[gameType]/page.tsx` is a Server Component. It gates on `hasEngine(gameType)` (from `games-core`) → `notFound()`, then pulls the `GameDefinition` and lays out a **two-column** lobby: a cover-art hero card (with a category chip whose label is resolved from `GAME_CATEGORIES` by `def.meta.categoryId`, via the local `categoryLabel` helper, `apps/web/app/games/[gameType]/page.tsx:27`) next to a "Start playing" action card that wraps `GameLobby` and the chat explainer paragraph:
 
 ```tsx
 const { gameType } = await params;
@@ -330,24 +346,24 @@ if (!hasEngine(gameType)) notFound();
 
 const def = getDefinition(gameType);
 const session = await getServerSession();
+const category = categoryLabel(def.meta.categoryId);
 
 return (
-  <PageContainer>
-    ...
-    <GameLobby
-      meta={def.meta}
-      configFields={def.configFields ?? []}
-      userId={session?.user?.id ?? null}
-    />
-    ...
+  ...
+  <GameLobby
+    meta={def.meta}
+    configFields={def.configFields ?? []}
+    userId={session?.user?.id ?? null}
+  />
+  ...
 );
 ```
 
-See `apps/web/app/games/[gameType]/page.tsx:21`. Everything game-specific (display name, config schema) comes from the definition in `games-core`, so this one file works for any game ever added. (Note `params` is a `Promise` you `await` - a Next.js 16 convention; verify against `node_modules/next/dist/docs/` before relying on framework-version specifics.)
+See `apps/web/app/games/[gameType]/page.tsx:34`. The page also exports a per-game `generateMetadata` (`page.tsx:11`) that titles the tab `"{name}: Game lobby"`. Both columns are wrapped in `Reveal` for a staggered entrance. Everything game-specific (display name, config schema, cover art, category) comes from the definition in `games-core`, so this one file works for any game ever added. (Note `params` is a `Promise` you `await` - a Next.js 16 convention; verify against `node_modules/next/dist/docs/` before relying on framework-version specifics.)
 
-`GameLobby` (`apps/web/app/games/_shared/game-lobby.tsx`) renders the config form by mapping each `ConfigField` to a toggle/number/select control (`ConfigFieldRow`, `apps/web/app/games/_shared/game-lobby.tsx:169`), seeds form state from each field's `default`, and on "Play with a friend" opens the `ConversationPicker` (or routes to `/auth` if signed out). The config the user picks is carried as opaque data - the lobby does not understand it; the server's engine validates it against the game's Zod `configSchema`.
+`GameLobby` (`apps/web/app/games/_shared/game-lobby.tsx`) renders the config form by mapping each `ConfigField` to a toggle/number/select control (`ConfigFieldRow`, `apps/web/app/games/_shared/game-lobby.tsx:190`), seeds form state from each field's `default`, and on "Play with a friend" opens the `ConversationPicker` (or routes to `/auth` if signed out). The three CTAs are `m.button`s with a `whileTap` scale (skipped under reduced motion, `game-lobby.tsx:85`). The config the user picks is carried as opaque data - the lobby does not understand it; the server's engine validates it against the game's Zod `configSchema`.
 
-Below the friend flow the lobby offers **matchmaking**: a "Find a match" button (`game-lobby.tsx:65`) that calls `ensureIdentity()` (minting a guest session if needed), emits `game:queue_join { gameType: meta.type, config }` over the shared socket, and flips the lobby into a Searching state. That state lives in `matchmakingAtom` (`apps/web/lib/matchmaking-atoms.ts`), an atom of `{ searching: gameType | null }`, so it is keyed by game type (`searching = matchmaking.searching === meta.type`, `game-lobby.tsx:57`) and survives any re-render. While searching, the UI shows "Searching for an opponent…" with a Cancel button that emits `game:queue_leave { gameType }` and clears the atom (`cancelMatch`, `game-lobby.tsx:78`). A `useSocketEvent` listener for `match_found` (`game-lobby.tsx:59`) clears the atom and `router.push("/play/<gameId>")` the moment the server pairs you - the matched game already exists in a DM, so the play route just joins it. See [the matchmaking lane in realtime](./realtime.md#matchmaking-lane).
+Below the friend flow the lobby offers **matchmaking**: a "Find a match" button (`game-lobby.tsx:67`) that calls `ensureIdentity()` (minting a guest session if needed), emits `game:queue_join { gameType: meta.type, config }` over the shared socket, and flips the lobby into a Searching state. That state lives in `matchmakingAtom` (`apps/web/lib/matchmaking-atoms.ts`), an atom of `{ searching: gameType | null }`, so it is keyed by game type (`searching = matchmaking.searching === meta.type`, `game-lobby.tsx:59`) and survives any re-render. While searching, the UI shows "Searching for an opponent…" with a looping expanding-ring pulse around the magnifying glass (a `motion` `m.span` scaling/fading on repeat, replaced by a static icon under reduced motion, `game-lobby.tsx:131`) and a Cancel button that emits `game:queue_leave { gameType }` and clears the atom (`cancelMatch`, `game-lobby.tsx:80`). A `useSocketEvent` listener for `match_found` (`game-lobby.tsx:61`) clears the atom and `router.push("/play/<gameId>")` the moment the server pairs you - the matched game already exists in a DM, so the play route just joins it. See [the matchmaking lane in realtime](./realtime.md#matchmaking-lane).
 
 The lobby also has an **"Invite a friend (link)"** button: `inviteByLink` (`game-lobby.tsx`) calls `ensureIdentity()` (so a logged-out visitor can mint a link), then `createInviteLink(meta.type, config)` (`POST /api/invite`) and copies the returned `url` to the clipboard, cycling the button label through "Creating link…" → "Link copied!" (or "Couldn't create link"). Opening that URL lands on the snappy **`/invite/[token]` page** (`apps/web/app/invite/[token]/page.tsx`), a client component that paints the game skeleton first from a fast public peek (`GET /api/invite/:token` → `{ gameType, inviter, expired }`) so the board materializes before any account exists, then fires `POST /api/invite/:token/accept` underneath (the server mints a guest cookie if the opener is logged out, no-ops a self-link, and rejects expired/unknown tokens uniformly). On success it crossfades the skeleton out via `motion`'s `AnimatePresence` + `m.div` and `router.replace`s to `/play/<gameId>`; a non-blocking "<inviter> invited you · Add as friend" popup fires the **existing** friend-request socket flow (`emitAck(socket, CHAT_EVENTS.friendRequest, { username })`) - accepting an invite never auto-friends. The page keeps each async resolution to a single `setState` and derives `inviterName` / the reveal flag during render (no prop-to-state sync, no cascading set-state). The new top-level `/invite` segment is reserved in `RESERVED_USERNAMES`. See [the invite-link accept path in realtime](./realtime.md#invite-link-accept-path).
 
@@ -363,7 +379,7 @@ onClose();
 router.push(`/play/${res.game.id}`);
 ```
 
-See `apps/web/app/games/components/conversation-picker.tsx:41`. Games are created **over the socket**, never via a REST POST - the only game REST endpoints are reads (`GET /api/games/:gameId` and `GET /api/games/:gameId/series`). Note `res.game.id` is the game's public room **code** - `serializeGame` sets `GameJson.id = row.code` - so `/play/<code>` is the canonical play URL and that same code is later sent as the socket `gameId`; the internal UUID never reaches the browser.
+See `apps/web/app/games/components/conversation-picker.tsx:41`. Games are created **over the socket**, never via a REST POST - the only game REST endpoints are reads (`GET /api/games/mine`, `GET /api/games/:gameId`, and `GET /api/games/:gameId/series`). Note `res.game.id` is the game's public room **code** - `serializeGame` sets `GameJson.id = row.code` - so `/play/<code>` is the canonical play URL and that same code is later sent as the socket `gameId`; the internal UUID never reaches the browser.
 
 ### The play route
 
@@ -420,7 +436,7 @@ See `apps/web/app/play/[gameId]/play-client.tsx:58`. If the game belongs to a co
 
 ### Game-over modal & the rematch series UI
 
-`PlayClient` also mounts a `GameOverOverlay` (`apps/web/app/play/[gameId]/game-over-overlay.tsx`) *above* `GameChatSplit` (so it floats over the board and replay toolbar) in both the with-chat and no-conversation branches (`apps/web/app/play/[gameId]/play-client.tsx:92`). The overlay is a `motion`/`AnimatePresence` modal seeded with the SSR `initialGame` that opens automatically when the game is over:
+`PlayClient` also mounts a `GameOverOverlay` (`apps/web/app/play/[gameId]/game-over-overlay.tsx`) *above* `GameChatSplit` (so it floats over the board and replay toolbar) in both the with-chat and no-conversation branches (`apps/web/app/play/[gameId]/play-client.tsx:92`). The overlay is a `motion`/`AnimatePresence` modal seeded with the SSR `initialGame` that opens automatically when the game is over. Its entrance is a **spring**: the card pops in (`{ type: "spring", … }`, `game-over-overlay.tsx:173`), the `m.h2` heading pops in on a short delay (`:178`), and the winner's avatar ring does a one-shot scale bounce (`PlayersRow`, `:43`). When the **viewer won** and the game went over *during this session* (`wasLiveAtMountRef`, set at mount, `:89`) it also renders a one-shot `ConfettiBurst` (`:175`) - so a fresh win celebrates, but revisiting an already-finished win does not:
 
 ```tsx
 const [open, setOpen] = useState(() => isGameOver(initialGame.status));
@@ -437,9 +453,9 @@ useSocketEvent<{ newGameId: string }>(
 );
 ```
 
-See `apps/web/app/play/[gameId]/game-over-overlay.tsx:86`. Two open triggers: it starts open when the SSR game is already finished (`isGameOver(initialGame.status)` - the shared `@gamelobby/shared/types` guard, the revisit case), and it flips open when a live `game_state` broadcast transitions the game to `completed` / `abandoned`. It is closable; with no backdrop, a document `mousedown` listener closes it on any outside click - suppressed while a layered popup is open (`game-over-overlay.tsx:119`). The banner (`outcomeLabel`, `:27`) is derived from `game.winner` vs the viewer's `userId` (You won! 🎉 / You lost / It's a draw / Game abandoned).
+See `apps/web/app/play/[gameId]/game-over-overlay.tsx:91`. Two open triggers: it starts open when the SSR game is already finished (`isGameOver(initialGame.status)` - the shared `@gamelobby/shared/types` guard, the revisit case), and it flips open when a live `game_state` broadcast transitions the game to `completed` / `abandoned`. It is closable; with no backdrop, a document `mousedown` listener closes it on any outside click - suppressed while a layered popup is open (`game-over-overlay.tsx:124`). The banner (`outcomeLabel`, `:29`) is derived from `game.winner` vs the viewer's `userId` (You won! 🎉 / You lost / It's a draw / Game abandoned).
 
-When the modal is open and the game is over it fetches `GET /api/games/:gameId/series` into a `SeriesDetail` (`game-over-overlay.tsx:108`). The scoreboard and **View series** only appear for a series of ≥ 2 games (`showSeries = (detail?.score.totalGames ?? 0) >= 2`, `:133`) - finishing the very first game shows just the banner + Rematch + Close. **Rematch** (shown only to a player of a `completed` game that has a conversation, `canRematch`, `:131`) `emitAck`s `CHAT_EVENTS.rematch` and routes to `/play/<newCode>`; if a `rematchCreated` event already arrived (the opponent started it), the button reads **Go to rematch** and just navigates to the captured `rematch.code` (`:188`). **View series** opens the `SeriesDetailModal` through `useLayeredPopup`'s `openLayer`. Spectators see the outcome (and scoreboard, if a series) but no action.
+When the modal is open and the game is over it fetches `GET /api/games/:gameId/series` into a `SeriesDetail` (`game-over-overlay.tsx:113`). The scoreboard and **View series** only appear for a series of ≥ 2 games (`showSeries = (detail?.score.totalGames ?? 0) >= 2`, `:138`) - finishing the very first game shows just the banner + Rematch + Close. **Rematch** (shown only to a player of a `completed` game that has a conversation, `canRematch`, `:136`) `emitAck`s `CHAT_EVENTS.rematch` and routes to `/play/<newCode>`; if a `rematchCreated` event already arrived (the opponent started it), the button reads **Go to rematch** and just navigates to the captured `rematch.code` (`:206`). **View series** opens the `SeriesDetailModal` through `useLayeredPopup`'s `openLayer`. Spectators see the outcome (and scoreboard, if a series) but no action.
 
 Two shared components back the series UI, both in `apps/web/components/games/`:
 
@@ -467,13 +483,13 @@ The reason one route can render every game is that the *boundary* between web an
 
 This traces a single move from click to confirmed render, and shows exactly where "the client is never trusted" bites.
 
-1. **User clicks a cell.** `TicTacToeGameClient` only allows it when `canMove` is true - it is the player's turn for their role and the game is `active` (`packages/games-client/src/games/tic-tac-toe/client.tsx:314`).
+1. **User clicks a cell.** `TicTacToeGameClient` only allows it when `canMove` is true - it is the player's turn for their role and the game is `active` (`packages/games-client/src/games/tic-tac-toe/client.tsx:214`).
 2. **Client emits.** `makeMove` emits over the **shared** socket (`props.socket`) - `socket.emit("make_move", { gameId, moveData: { row, col } })`. The client does **not** mutate its board itself here; it waits for the server.
 3. **Server validates against the shared schema + engine.** The game lane's `make_move` handler validates the payload with the `games-core` Zod `moveSchema`, loads the stored state, re-runs the engine's `reduce`, and rejects illegal moves. This is the trust boundary: the same engine that told the client `canMove` is the one that *decides*, and it would reject a forged move from a tampered client. (See `./realtime.md` and `./games-core-engine.md`.)
 4. **Server persists + broadcasts.** It persists the move and broadcasts the new canonical state to the game room.
-5. **Client receives `game_state`.** The board listens for `"game_state"` and, in the post-move case, the payload carries `{ game, move }` (the full game plus the single new move delta); the board `setGame`s the record and appends the move (`packages/games-client/src/games/tic-tac-toe/client.tsx:269`). This overwrites whatever the client believed.
+5. **Client receives `game_state`.** The board listens for `"game_state"` and, in the post-move case, the payload carries `{ game, move }` (the full game plus the single new move delta); the board `setGame`s the record and appends the move (`packages/games-client/src/games/tic-tac-toe/client.tsx:174`). This overwrites whatever the client believed.
 
-So the arrow is: **cell click → `client.tsx:320` `socket.emit("make_move")` → server game lane (Zod-validate + engine `reduce` + persist) → broadcast `game_state` → `client.tsx:269` `setGame`/append move → React re-renders the board.** The web app never decides the outcome; it requests one and renders the answer.
+So the arrow is: **cell click → `client.tsx:233` `socket.emit("make_move")` → server game lane (Zod-validate + engine `reduce` + persist) → broadcast `game_state` → `client.tsx:174` `setGame`/append move → React re-renders the board.** The web app never decides the outcome; it requests one and renders the answer.
 
 The same shape governs chat: composer optimistically inserts a `pending` message with a `clientId` → emits → server validates/persists → broadcasts `messageNew` → `ChatSocketBridge` calls `upsertMessage`, which finds the pending row by `clientId` and swaps in the confirmed one.
 
@@ -520,7 +536,7 @@ Two small but easy-to-trip-over config facts let the shared packages work in the
 - **The socket bridge hydrates atoms exactly once.** `useHydrateAtoms` runs on first render only; subsequent updates must come through socket events / `store.set`, not by re-hydrating.
 - **`useSocketEvent` keeps the handler in a ref.** Pass any closure you like; it always calls the latest one without re-subscribing. Do not memoize the handler to "fix" subscriptions - it's already handled.
 - **`emitAck` rejects on `{ ok: false }`.** Wrap socket actions in `try/catch`; a thrown error means the server refused (validation, permission, etc.).
-- **Games are created/rematched over the socket, read over REST.** The game REST endpoints are reads only - `GET /api/games/:gameId` (the game + moves, used by SSR in `play/page.tsx`) and `GET /api/games/:gameId/series` (the rematch series, fetched by the game-over modal and `SeriesDetailModal`). Creation goes through `emitAck(..., CHAT_EVENTS.createGameInConversation, ...)` and rematch through `emitAck(..., CHAT_EVENTS.rematch, { gameId })`.
+- **Games are created/rematched over the socket, read over REST.** The game REST endpoints are reads only - `GET /api/games/mine` (the caller's live games, used by SSR on the home dashboard), `GET /api/games/:gameId` (the game + moves, used by SSR in `play/page.tsx`), and `GET /api/games/:gameId/series` (the rematch series, fetched by the game-over modal and `SeriesDetailModal`). Creation goes through `emitAck(..., CHAT_EVENTS.createGameInConversation, ...)` and rematch through `emitAck(..., CHAT_EVENTS.rematch, { gameId })`.
 - **The game-over modal mounts above the board, not inside it.** `GameOverOverlay` lives in `play-client.tsx` (not in a game's board), so every game gets the same outcome/rematch/series experience for free. It auto-opens on a `completed`/`abandoned` transition and on revisit of an already-finished game; the series scoreboard + View series appear only when the series has ≥ 2 games.
 - **Per-game UI lives in `games-client`, not in `apps/web`.** The play route renders whatever `getGameClient(type)` returns inside `<Suspense>`. To add a game, register it in `packages/games-client/src/registry.ts` and define it in `games-core` - do **not** add a web route.
 - **If a new game's classes vanish in production CSS,** check the `@source` in `globals.css` covers where those classes are authored.

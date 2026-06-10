@@ -85,7 +85,18 @@ first; it is the canonical guide and this prompt mirrors it.
    socket's `connect`, `make_move` on a move, and `leave_room` on cleanup (unmount);
    render the board from the `game_state` event (the server emits exactly one per
    move). On cleanup remove your listeners with `socket.off(...)` only - never
-   `socket.disconnect()` (that would kill the shared chat lane). Register it in
+   `socket.disconnect()` (that would kill the shared chat lane).
+   **Compose the shared GameStage kit** for the board chrome instead of hand-rolling
+   layout/animation - import it from the package internals via relative paths
+   (`../../stage/*`, as the tic-tac-toe client does): `GameStage` (the layout frame,
+   with `dock` / `status` / `connection` / `notice` / `error` / `footer` slots),
+   `PlayerDock` (the per-seat bar with its sliding turn ring; pass a `renderRoleBadge`
+   for your role glyph), `TurnBanner` (the animated `label`/`tone` status line),
+   `PiecePop` (the spring pop-in for a placed piece - set `animate={false}` for marks
+   already present at first render so server-hydrated state doesn't re-pop), and
+   `ReplayDock` (the replay toolbar + caption, rendered in the `footer` slot for
+   finished games). The kit lives in `packages/games-client/src/stage/`, animates via
+   `motion/react`, and honours reduced motion. Register the board in
    `packages/games-client/src/registry.ts` (`REGISTRY`) using the imported slug
    constant as the key. `REGISTRY` is typed `Record<GameType, …>` - a missing
    entry is a **compile error**, not a runtime surprise.

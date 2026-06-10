@@ -76,20 +76,33 @@ client), `userId`, the **shared** `socket`, `connected`, `initialGame`, and
 `initialMoves`. It does **not** open its own socket connection; it rides the same
 Socket.IO connection the chat lane uses, passed down as a prop.
 
+The board **composes the shared GameStage kit** (`packages/games-client/src/stage/`,
+see [games-client.md](../architecture/games-client.md)) for its chrome rather than
+hand-rolling it: a `GameStage` frame wraps a `PlayerDock` (`dock` slot), a
+`TurnBanner` (`status` slot), a `ConnectionDot` (`connection` slot), the 3×3 grid
+(`children`), and either the `ReplayDock` or a "Moves logged" line (`footer` slot).
+
 - **Live play** (status `waiting`/`active`): the board emits `join_room` on the
   shared socket, then listens for `game_state` and `game_error`.
   Tapping an empty cell emits `make_move` with `{ gameId, moveData: { row, col } }`
   (only when it is your turn and the socket is connected). It emits `leave_room`
-  on cleanup. A `StatusDot` reflects `connected`.
-- **Replay** (status `completed`/`abandoned`): live socket wiring is skipped and a
-  `ReplayToolbar` lets you scrub the game. `buildStateAtStep` replays
+  on cleanup. A `ConnectionDot` reflects `connected`. The `TurnBanner` shows
+  "Your move" (tone `self`), "Waiting for {name}…", "Waiting for an opponent…", or
+  "Spectating" depending on seat and turn.
+- **Replay** (status `completed`/`abandoned`): live socket wiring is skipped and the
+  kit's `ReplayDock` lets you scrub the game. `buildStateAtStep` replays
   `initialMoves` (sorted by `moveNumber`) up to the chosen step to reconstruct the
   board. Arrow keys step prev/next and Space toggles autoplay (`REPLAY_MS` = 850ms
-  per step).
+  per step). The `TurnBanner` shows the result ("You won" / "{name} won" / "It's a
+  draw", tone `result`).
 - **Marks** render as themed, hand-authored SVG (`TttMark`, `marks.tsx`) rather
   than plain text - a chunky outlined ✕ and ◯ recoloured from theme tokens (✕ =
   `--primary`, ◯ = `--muted-foreground`, each outlined with a darker shade of its
-  own colour, so it reads in light and dark). An empty cell shows a faint ghost of
+  own colour, so it reads in light and dark). Each placed mark **pops in** via the
+  kit's `PiecePop` (a spring scale/opacity in), except marks already on the board at
+  first render (tracked by `initialFilledRef`) - so server-hydrated state appears
+  instantly and only *new* moves animate. Once the user touches a replay control
+  (`replayTouchedRef`), replayed marks pop too. An empty cell shows a faint ghost of
   *your* mark on hover while it is your turn. A shared sheen gradient
   (`TttMarkDefs`) is rendered once per board.
 - **Winning line** - when the game ends with a winner, a strike-through line
@@ -105,13 +118,16 @@ Socket.IO connection the chat lane uses, passed down as a prop.
   board component eagerly (not via `React.lazy`), so opening a finished game shows
   its final position (marks + the static winning line) in the first paint, with no
   board-skeleton flash.
-- **Player bar** (`player-bar.tsx`) sits above the grid: each player's **avatar**
-  + username + their mark, with the active player's chip highlighted (whose turn
-  it is). Avatars render through a games-client `Character`
+- **Player dock** - the kit's `PlayerDock` (`packages/games-client/src/stage/player-dock.tsx`)
+  sits above the grid: each player's **avatar** + username + their mark (drawn via the
+  board's `renderRoleBadge`), with a **sliding turn ring** (`motion` `layoutId`) that
+  springs between seats on a turn change and a "Your turn"/"Their turn" sub-label on
+  the active seat. Avatars render through a games-client `Character`
   (`packages/games-client/src/ui/character.tsx`, DiceBear avataaars) from the
-  `avatar` now carried on each player - the player payload was extended end-to-end
+  `avatar` carried on each player - the player payload was extended end-to-end
   (`getPlayers` left-joins `user_profile`; `avatar?: AvatarConfig | null` added to
-  the shared `GamePlayer` type, `gamePlayerSchema`, and `GameClientProps`).
+  the shared `GamePlayer` type, `gamePlayerSchema`, and `GameClientProps`). The old
+  per-game `player-bar.tsx` was deleted in favour of this shared dock.
 - **Replay controls** use `react-icons/fa6` (`FaBackwardStep`, `FaChevronLeft`,
   `FaPlay`/`FaPause`, `FaChevronRight`, `FaForwardStep`); the ✕/◯ glyphs are the
   one hand-authored decorative SVG, the same raw-SVG exception the playing-cards
@@ -143,7 +159,9 @@ Socket.IO connection the chat lane uses, passed down as a prop.
 
 A loading placeholder, `TicTacToeSkeleton`
 (`packages/games-client/src/games/tic-tac-toe/skeleton.tsx`), is registered in
-`SKELETON_REGISTRY` and renders as the board's `<Suspense>` fallback.
+`SKELETON_REGISTRY` and renders as the board's `<Suspense>` fallback. It mirrors
+the new layout: the two-seat dock, the status row (banner + connection dot), the
+3×3 grid, and the footer line.
 
 ## Game-over & rematch
 

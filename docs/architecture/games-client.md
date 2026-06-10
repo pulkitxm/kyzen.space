@@ -15,18 +15,18 @@ A second key idea is **resolution by `type` string**. The web app has a single d
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/games-client/src/index.ts` | Public package surface: re-exports `getGameClient`, `getGameSkeleton`, `DefaultGameSkeleton`, `SkeletonBox`, the `GameClientProps` type, the playing-card primitives (`PlayingCard`, `CardBack`, `Joker` + their prop types), and the game-audio API (`getGameAudioEngine`, `useGameAudio`, `clampVolume`/`stepVolume`/`shouldPlayMusic`, `SfxKey`/`SfxSources` - see [audio.md](./audio.md)). |
+| `packages/games-client/src/index.ts` | Public package surface: re-exports `getGameClient`, `getGameSkeleton`, `DefaultGameSkeleton`, `SkeletonBox`, the `GameClientProps` type, the **GameStage kit** (`GameStage`, `PlayerDock` + `StagePlayer`, `TurnBanner` + `TurnBannerTone`, `PiecePop`, `ReplayDock`, `ConnectionDot`), the playing-card primitives (`PlayingCard`, `CardBack`, `Joker` + their prop types), and the game-audio API (`getGameAudioEngine`, `useGameAudio`, `clampVolume`/`stepVolume`/`shouldPlayMusic`, `SfxKey`/`SfxSources` - see [audio.md](./audio.md)). |
+| `packages/games-client/src/stage/` | The **GameStage kit** - the shared, framework-agnostic board-chrome primitives every board composes (see ["The GameStage kit"](#the-gamestage-kit) below): `game-stage.tsx` (`GameStage` layout frame), `player-dock.tsx` (`PlayerDock` per-seat bar with a sliding turn ring), `turn-banner.tsx` (`TurnBanner` animated status line), `feedback.tsx` (`PiecePop` spring pop-in for placed pieces), `replay-dock.tsx` (`ReplayDock` replay toolbar + caption), `connection-dot.tsx` (`ConnectionDot` online/offline indicator, the former `StatusDot`). All `"use client"`, all animate via `motion/react` and honour `prefers-reduced-motion`. |
 | `packages/games-client/src/audio/` | The jotai-free `GameAudioEngine` (file-based Web Audio SFX + a streamed, crossfaded music track; no synthesis) and the `useGameAudio()` hook. Consumed by the boards (SFX) and by `apps/web`'s audio bridge (sources/volume/mute/active). |
 | `packages/games-client/src/types.ts` | `GameClientProps` - the contract every board component receives (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`). |
 | `packages/games-client/src/registry.ts` | Two registries keyed by the typed `GameType` from `@gamelobby/shared`: `REGISTRY` (board components - `ComponentType<GameClientProps>`, currently the statically-imported `TicTacToeGameClient`) and `SKELETON_REGISTRY` (eager skeleton components). `getGameClient(type)` returns the board (`null` for unknown types); `getGameSkeleton(type)` returns the skeleton, falling back to `DefaultGameSkeleton`. |
 | `packages/games-client/src/skeletons.tsx` | `SkeletonBox` (a pulse-animated placeholder primitive) and `DefaultGameSkeleton` (the generic board placeholder). No `"use client"` - pure markup, so it renders in both server and client trees. |
-| `packages/games-client/src/games/tic-tac-toe/client.tsx` | A concrete board: reuses the shared socket from props, emits `join_room`/`make_move`/`leave_room`, listens for `game_state`/`game_error`, derives `canMove`, fires SFX via `useGameAudio()`, and renders a replay scrubber for finished games. Composes the sibling modules below (`PlayerBar`, `TttMark`/`TttMarkDefs`, `WinStrike`, `findWinningLine`). |
+| `packages/games-client/src/games/tic-tac-toe/client.tsx` | A concrete board: reuses the shared socket from props, emits `join_room`/`make_move`/`leave_room`, listens for `game_state`/`game_error`, derives `canMove`, fires SFX via `useGameAudio()`, and renders a replay scrubber for finished games. **Composes the GameStage kit** (`GameStage` frame + `PlayerDock` dock + `TurnBanner` status + `PiecePop` per-mark + `ReplayDock` footer) plus its game-specific siblings below (`TttMark`/`TttMarkDefs`, `WinStrike`, `findWinningLine`). |
 | `packages/games-client/src/games/tic-tac-toe/marks.tsx` | `TttMark` (the X/O SVG glyph, themed via `currentColor`) and `TttMarkDefs` (a hidden `<defs>` holding the shared `ttt-mark-sheen` gradient). Decorative art, so it stays inline SVG, not `react-icons`. |
-| `packages/games-client/src/games/tic-tac-toe/player-bar.tsx` | `PlayerBar` - the two-seat header row: each seat shows a DiceBear `<Character>` avatar, the player's mark + name, and a turn indicator; non-self avatars become a button that calls `onViewProfile`. |
 | `packages/games-client/src/games/tic-tac-toe/win-strike.tsx` | `WinStrike` - the animated winning-line stroke, drawn with `motion.line` (Framer Motion) so the line draws itself in on a win. |
 | `packages/games-client/src/games/tic-tac-toe/winning-line.ts` | `WINNING_LINES` (the eight triples) and `findWinningLine(board)` - the pure helper the board uses to highlight a win. |
-| `packages/games-client/src/ui/character.tsx` | `<Character>` - renders a DiceBear avataaars data-URI `<img>` from an `AvatarConfig` (falling back to a seeded config), used by `PlayerBar`. |
-| `packages/games-client/src/games/tic-tac-toe/skeleton.tsx` | `TicTacToeSkeleton` - a prop-less placeholder that mirrors the board (status dot, 3×3 grid, footer line) so the loading state matches the eventual UI. |
+| `packages/games-client/src/ui/character.tsx` | `<Character>` - renders a DiceBear avataaars data-URI `<img>` from an `AvatarConfig` (falling back to a seeded config), used by `PlayerDock`. |
+| `packages/games-client/src/games/tic-tac-toe/skeleton.tsx` | `TicTacToeSkeleton` - a prop-less placeholder that mirrors the new dock + status-row + 3×3 grid + footer layout so the loading state matches the eventual UI. |
 | `packages/games-client/package.json` | Declares `motion`, `react`, `react-dom`, `react-icons`, `socket.io-client` as **peer** deps (provided by the host web app), not bundled. |
 
 Consumed on the web side by:
@@ -69,12 +69,62 @@ export {
 } from "./playing-cards/playing-card";
 export { getGameClient, getGameSkeleton } from "./registry";
 export { DefaultGameSkeleton, SkeletonBox } from "./skeletons";
+export { ConnectionDot } from "./stage/connection-dot";
+export { PiecePop } from "./stage/feedback";
+export { GameStage } from "./stage/game-stage";
+export { PlayerDock, type StagePlayer } from "./stage/player-dock";
+export { ReplayDock } from "./stage/replay-dock";
+export { TurnBanner, type TurnBannerTone } from "./stage/turn-banner";
 export type { GameClientProps } from "./types";
 ```
 
 (`packages/games-client/src/index.ts:1`)
 
-That is the entire public API. Everything else - the per-game boards, the replay toolbar, the socket plumbing - is an implementation detail reached only through these helpers.
+That is the public API. Besides the registry getters, the audio engine, and the playing-card primitives, it now also exports the **GameStage kit** - the shared board-chrome primitives below. Everything else - the per-game boards, the socket plumbing - stays an implementation detail reached only through these helpers.
+
+### The GameStage kit
+
+Every board shares the same outer chrome: a per-seat player dock, a status line, a connection dot, an optional notice/error banner, the board itself, and a footer (replay toolbar or a move counter). Rather than re-implement that chrome (and its animations) per game, `packages/games-client/src/stage/` ships it as composable, framework-agnostic primitives a board assembles. The kit is exported from the package surface so external/future boards (or app code) can use it, and the tic-tac-toe board composes it internally via relative imports (`../../stage/*`).
+
+- **`GameStage`** (`packages/games-client/src/stage/game-stage.tsx:6`) is the layout frame. It takes named slots - `dock`, `status`, `connection` (`{ show, online }`), `notice`, `error` (a `string | null`), `children` (the board), and `footer` - and lays them out, rendering a status row (the `status` slot on the left, a `ConnectionDot` on the right) only when there's a `status` or a shown connection, and an `role="alert"` line for `error`:
+
+  ```tsx
+  const hasStatusRow = Boolean(status) || Boolean(connection?.show);
+
+  return (
+    <div className="mt-8">
+      {dock}
+      {hasStatusRow ? (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          {status ?? <span />}
+          {connection?.show ? <ConnectionDot online={connection.online} /> : null}
+        </div>
+      ) : null}
+      {notice}
+      {error ? (
+        <p role="alert" className="mb-4 text-danger text-sm">
+          {error}
+        </p>
+      ) : null}
+      {children}
+      {footer}
+    </div>
+  );
+  ```
+
+  (`packages/games-client/src/stage/game-stage.tsx:23`)
+
+- **`PlayerDock`** (`packages/games-client/src/stage/player-dock.tsx:15`) is the generalized per-seat bar. It takes `players` (`StagePlayer[]` - `userId`/`username`/`role`/optional `avatar`), the `activeRole` (string | null), `myUserId`, an optional `onViewProfile`, and an optional `renderRoleBadge(role)` the board uses to draw its own per-role glyph. The seat whose `role === activeRole` gets a **sliding turn ring**: a `motion` `m.span` with a `useId`-scoped `layoutId` that springs from one seat to another on a turn change (`{ type: "spring", duration: 0.5, bounce: 0.25 }`), collapsing to `{ duration: 0 }` under reduced motion. Non-self avatars become a button that calls `onViewProfile`.
+
+- **`TurnBanner`** (`packages/games-client/src/stage/turn-banner.tsx:14`) is the animated status line. It takes a `label` (string | null) and a `tone` (`"self" | "waiting" | "result" | "danger"`, `TurnBannerTone`) and crossfades between labels via `AnimatePresence mode="wait"` (a short opacity+`y` slide, opacity-only under reduced motion). The tone maps to a text colour class.
+
+- **`PiecePop`** (`packages/games-client/src/stage/feedback.tsx:6`) is a spring pop-in wrapper for a placed piece (`{ scale: 0.55, opacity: 0 } → { scale: 1, opacity: 1 }`, `{ type: "spring", duration: 0.35, bounce: 0.4 }`). Its `animate` prop (default `true`) lets the board **skip** the pop for marks that were already present at first render (e.g. server-hydrated state) - `skip = !animate || reduce` sets `initial={false}`.
+
+- **`ReplayDock`** (`packages/games-client/src/stage/replay-dock.tsx:15`) is the replay toolbar (first / prev / play-pause / next / last, glyphs from `react-icons/fa6`) plus a `"Position after {step} of {maxStep} moves"` caption. It is purely controlled - `step`/`maxStep`/`isPlaying` plus the five `on*` callbacks - so the board owns all replay state. (It moved here out of the tic-tac-toe client.)
+
+- **`ConnectionDot`** (`packages/games-client/src/stage/connection-dot.tsx:3`) is the online/offline indicator (a pinging dot, green when `online`), rendered by `GameStage`'s status row. This is the former `StatusDot`.
+
+The whole kit lives under `motion/react` (a peer dep) and honours `prefers-reduced-motion` via `useReducedMotion()`, so a board that composes it inherits accessible, consistent animations for free.
 
 ### Per-game loading skeletons
 
@@ -168,7 +218,7 @@ Notes that matter:
 - **`userId: string | null`** - boards must handle the signed-out viewer. Tic-tac-toe shows a "Sign in to join this table" banner instead of a connection dot.
 - **`initialGame.gameState?: unknown`** - the per-game state is deliberately untyped here. games-client is generic over all games; the *concrete* board narrows `unknown` to its own type (tic-tac-toe casts to its local `GameJson`/`TicState`). The authoritative shape lives in games-core's Zod `stateSchema`, not in this prop.
 - **`initialMoves: Record<string, unknown>[]`** - the full move log, used to drive replay of finished games. Again untyped at the boundary; the board interprets each move's `moveData` itself.
-- **`onViewProfile?`** - an optional callback the host passes so the board can open a profile popup. The web route supplies it from `useProfilePopup()` (`apps/web/app/play/[gameId]/play-client.tsx:51`); tic-tac-toe forwards it to `PlayerBar`, which wires the opponent's avatar into a button. Boards may omit it (it is optional).
+- **`onViewProfile?`** - an optional callback the host passes so the board can open a profile popup. The web route supplies it from `useProfilePopup()` (`apps/web/app/play/[gameId]/play-client.tsx:51`); tic-tac-toe forwards it straight to `PlayerDock` (the GameStage kit's per-seat bar), which wires the opponent's avatar into a button. Boards may omit it (it is optional).
 
 These `initial*` props are SSR data: the RSC route fetches them once so the board renders fully on first paint, then the board takes over live updates via the shared socket. See the walkthrough below.
 
@@ -363,7 +413,7 @@ const makeMove = useCallback(
 
 Crucially, `makeMove` does **not** mutate the board. There is no optimistic update. It fires `make_move` and waits; the board only changes when the server echoes back a `game_state`. This is what keeps client and server in lockstep and makes cheating pointless - `canMove` being `true` locally means nothing if the server's `engine.reduce` disagrees.
 
-The board *does* layer sound effects over these same interaction points via `useGameAudio()` (`packages/games-client/src/games/tic-tac-toe/client.tsx:212`): hovering a playable cell calls `audio.playHover()` and clicking one calls `audio.playTouch()` *before* emitting (`:489`/`:493`), an applied opponent move plays `playTouch` (`:375`), a game ending plays `playWin()`/`playDraw()` (`:361`/`:360`), and replay autoplay/step plays `playTouch` (`:244`/`:395`). SFX are purely presentational - they never touch board state, so the no-optimistic-update invariant still holds. See [audio.md](./audio.md).
+The board *does* layer sound effects over these same interaction points via `useGameAudio()` (`packages/games-client/src/games/tic-tac-toe/client.tsx:112`): hovering a playable cell calls `audio.playHover()` and clicking one calls `audio.playTouch()` *before* emitting (`:404`/`:408`), an applied opponent move plays `playTouch` (`:308`), a game ending plays `playWin()`/`playDraw()` (`:294`/`:293`), and replay autoplay/step plays `playTouch` (`:144`/`:331`). SFX are purely presentational - they never touch board state, so the no-optimistic-update invariant still holds. See [audio.md](./audio.md).
 
 ## Data-flow walkthrough: from page load to a confirmed move
 
@@ -415,17 +465,17 @@ Net: **user click → `make_move` over socket → server Zod-validates + `engine
 
 When a game's status is `completed` or `abandoned`, the board flips from "live, socket-driven" to "offline replay scrubber". The same component handles both; it just selects a different state source.
 
-The mode flags and initial scrub position:
+The mode flags and initial scrub position (derived from the shared `isGameLive`/`isGameOver` guards in `@gamelobby/shared/types`):
 
 ```tsx
-const isLive = game.status === "waiting" || game.status === "active";
+const isLive = isGameLive(game.status);
 
-const isPast = game.status === "completed" || game.status === "abandoned";
+const isPast = isGameOver(game.status);
 ```
 
-(`packages/games-client/src/games/tic-tac-toe/client.tsx`)
+(`packages/games-client/src/games/tic-tac-toe/client.tsx:122`)
 
-`replayStep` starts at the end if the game was already finished on load (`pastInitially ? initialMoves.length : 0`, `packages/games-client/src/games/tic-tac-toe/client.tsx`). Because `liveSocketKey` is `null` once `isLive` is false, **no socket is opened for finished games** - replay is entirely client-side from the move log.
+`replayStep` starts at the end if the game was already finished on load (`pastInitially ? initialMoves.length : 0`, `packages/games-client/src/games/tic-tac-toe/client.tsx:114`). Because `liveSocketKey` is `null` once `isLive` is false, **no socket is opened for finished games** - replay is entirely client-side from the move log.
 
 The board reconstructs the position at any step by folding moves over an empty board - note it deliberately re-derives state rather than trusting any stored snapshot, sorting by `moveNumber` and applying each player's `role`:
 
@@ -467,7 +517,7 @@ const state = isPast ? replayState : liveState;
 
 (`packages/games-client/src/games/tic-tac-toe/client.tsx`)
 
-The rest of replay is UI sugar: a `<ReplayToolbar>` with first/prev/play/next/last buttons whose glyphs come from `react-icons/fa6` (`FaBackwardStep`/`FaChevronLeft`/`FaPlay`/`FaPause`/`FaChevronRight`/`FaForwardStep`) rather than hand-written `<svg>`, per the repo icon convention (`packages/games-client/src/games/tic-tac-toe/client.tsx:18`), an autoplay interval of `REPLAY_MS` (850ms) that advances `replayStep` and stops at the end (`packages/games-client/src/games/tic-tac-toe/client.tsx`), and keyboard shortcuts (←/→/Space) that are ignored while focus is in an input/textarea/contenteditable (`packages/games-client/src/games/tic-tac-toe/client.tsx`). There's also a transition effect: when a game flips from live to finished *during* the session, it jumps the scrubber to the last move and stops autoplay (`packages/games-client/src/games/tic-tac-toe/client.tsx`).
+The rest of replay is UI sugar: the **`ReplayDock`** from the GameStage kit (`packages/games-client/src/stage/replay-dock.tsx`), rendered in `GameStage`'s `footer` slot, with first/prev/play/next/last buttons whose glyphs come from `react-icons/fa6` (`FaBackwardStep`/`FaChevronLeft`/`FaPlay`/`FaPause`/`FaChevronRight`/`FaForwardStep`) rather than hand-written `<svg>`, per the repo icon convention; an autoplay interval of `REPLAY_MS` (850ms) that advances `replayStep` and stops at the end (`packages/games-client/src/games/tic-tac-toe/client.tsx:136`); and keyboard shortcuts (←/→/Space) that are ignored while focus is in an input/textarea/contenteditable (`packages/games-client/src/games/tic-tac-toe/client.tsx:355`). There's also a transition effect: when a game flips from live to finished *during* the session, it jumps the scrubber to the last move and stops autoplay (`packages/games-client/src/games/tic-tac-toe/client.tsx:150`). The board owns every replay-control callback (`goFirst`/`goPrev`/`goNext`/`goLast`/`toggleReplayPlay`) and passes them to `ReplayDock`; the first time the user touches a control it flips a `replayTouchedRef` so that *thereafter* replayed marks pop in via `PiecePop` (live/already-present marks don't re-pop).
 
 ## Gotchas, invariants & conventions
 
