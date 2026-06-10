@@ -23,7 +23,8 @@ This doc covers the **schema/contract half** of games-core: the `GameDefinition`
 | `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>`, `Outcome`, `ReduceResult`, `StepResult`, `Seat`, `MoveContext` - the behavioral contract a `GameDefinition` references. Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/code.ts` | The **public game room code**: `GAME_CODE_ALPHABET`/`GAME_CODE_LENGTH`, `generateGameCode`, `normalizeGameCode`, `isGameCode`, and `gameCodeSchema` (normalizes then validates a 6-char Crockford-base32 code). The code is the public game id; the UUID `game.id` stays internal. Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/types/games/wire.ts` | Shared **wire/socket** Zod schemas: `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, the matchmaking-lane `clientQueueJoinSchema`/`clientQueueLeaveSchema`, `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, the server→client `Server*Payload` types (`ServerGameStatePayload`, `ServerGameOverPayload`, `ServerErrorPayload`, `ServerMatchFoundPayload`), and the pure status helpers `isGameOver`/`isGameLive`/`resolveWinnerUsername`. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`). Exported via `@gamelobby/shared/types`. |
-| `packages/shared/src/types/games/categories.ts` | `GameCategoryDef` type and the `GameCategoryId` union (`GAME_CATEGORIES` ids). Both re-exported via the `types/games` barrel (`index.ts:1-4`). |
+| `packages/shared/src/types/games/categories.ts` | `GameCategoryDef` default interface and the `GameCategoryId` union (`GAME_CATEGORIES` ids). Both re-exported via the `types/games` barrel (`index.ts:1-4`). |
+| `packages/shared/src/types/games/series.ts` | **Best-of-N "series" wire DTOs** (the rematch flow): `seriesScoreEntrySchema`/`seriesScoreSchema`, `seriesGameSummarySchema`, and `seriesDetailSchema` (+ inferred `SeriesScore`/`SeriesDetail`/…). What `GET /api/games/:gameId/series` returns. Exported via `@gamelobby/shared/types`. |
 | `packages/shared/src/constants/categories.ts` | The static `GAME_CATEGORIES` list used to group games in the lobby. Exported via `@gamelobby/shared/constants`. |
 | `packages/shared/src/types/games/tic-tac-toe/schemas.ts` | Per-game `stateSchema` / `moveSchema` / `configSchema`, each `.strict()`, with TS types derived via `z.infer`. The slug constant lives in `constants/games.ts`, not here. Exported via `@gamelobby/shared/types`. |
 | `packages/games-core/src/registry.ts` | Derives `getDefinition`/`getEngine`/`hasEngine`/`listGameMeta`/`getCategoryGroups`/`listGameTypes`/`listDefinitions` from the single `GAMES` array. `hasEngine(type: string): type is GameType` is a type guard; `listGameTypes(): GameType[]` returns the narrowed list; `listDefinitions(): GameDefinition[]` returns the array itself. |
@@ -236,6 +237,21 @@ export type ServerMatchFoundPayload = {
 ```
 
 These name the `game_state`, `game_over`, `game_error`, and `match_found` socket events. `ServerGameStatePayload` carries the full serialized `game` plus *either* `moves` (the entire history, sent on join via `emitFullState`) *or* a single `move` delta (the one new move, sent after each `make_move`); the client appends `move` when present, otherwise replaces its move list from `moves`. The handler builds a `ServerGameStatePayload` literally typed (`apps/server/src/realtime/turn-based.ts:26`, `:170`) so the compiler verifies the broadcast matches the contract the client expects. `ServerMatchFoundPayload` is the transient `match_found` emit the matchmaking lane sends to both paired players (`apps/server/src/realtime/matchmaking.ts:89`); it carries only the `gameId` (the public room code) the client navigates to. `wire.ts` also exports the pure helpers `isGameOver`/`isGameLive` (status predicates) and `resolveWinnerUsername` (maps a winner user id to a username against a players list), used by both ends to classify a game without re-deriving the rules.
+
+### Series wire DTOs (`series.ts`)
+
+The rematch flow strings consecutive games together into a **best-of-N series** (a `seriesId` shared by every game in the run). `packages/shared/src/types/games/series.ts` defines the Zod schemas for the series read model the client renders in the game-over overlay:
+
+```ts
+export const seriesDetailSchema = z.object({
+  seriesId: z.string(),
+  gameType: gameTypeSchema,
+  score: seriesScoreSchema,
+  games: z.array(seriesGameSummarySchema),
+});
+```
+
+`seriesScoreSchema` carries per-player `entries` (`{ userId, username, wins, avatar? }`) plus running `draws`/`completedGames`/`totalGames` tallies; `seriesGameSummarySchema` is one row per game in the run (`gameId`, `gameNumber`, `status`, `winner`, `winnerUsername`, `completedAt`). Like the other wire schemas, the TS types are `z.infer`-derived (`SeriesDetail`, `SeriesScore`, `SeriesGameSummary`, `SeriesScoreEntry`), and `gameType` is validated with `gameTypeSchema`. The server *produces* a `SeriesDetail` via `serializeSeries` (`apps/server/src/api/serialize.ts:30`), which sets each summary's `gameId` to `g.code` (the public room code) and resolves `winnerUsername` with `resolveWinnerUsername`; it is returned by `GET /api/games/:gameId/series` (`apps/server/src/api/routes/games.ts:9`) and consumed by the web overlay (`apps/web/app/play/[gameId]/game-over-overlay.tsx:109`). These schemas are re-exported through the `types/games` barrel (`packages/shared/src/types/games/index.ts:28-37`).
 
 ## Per-game schemas and the `.strict()` discipline
 

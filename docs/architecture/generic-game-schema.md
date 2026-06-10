@@ -10,9 +10,9 @@ If you want to know how the Drizzle declarations look, see [`database-schema.md`
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/database/src/schema.ts:100` | `game` table declaration (`id` UUID PK + public `code`) |
-| `packages/database/src/schema.ts:135` | `move` table declaration |
-| `packages/database/src/schema.ts:150` | `game_player` table declaration |
+| `packages/database/src/schema.ts:103` | `game` table declaration (`id` UUID PK + public `code`) |
+| `packages/database/src/schema.ts:138` | `move` table declaration |
+| `packages/database/src/schema.ts:153` | `game_player` table declaration |
 | `packages/shared/src/types/games/definition.ts` | `GameDefinition<S,I,C>` - the self-describing game unit |
 | `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>` - the `reduce` contract |
 | `packages/shared/src/types/games/tic-tac-toe/schemas.ts` | The Zod schemas that own tic-tac-toe's blob shapes |
@@ -203,7 +203,7 @@ game row (updated)
 
 ### Phase 4 - Bob replies `{1,0}` then `{2,1}`; Alice completes the top row and wins
 
-Play alternates `X, O, X, O, X`: Bob takes `{1,0}` (move 2), Alice `{0,1}` (move 3), Bob `{2,1}` (move 4), and Alice closes the top row with `{0,2}` (move 5). On that last move `reduce` returns a `ReduceResult` whose `outcome` is `{ status: "completed", winnerRole: "X", draw: false }` (the `Outcome` shape from `packages/shared/src/types/games/engine.ts:1` - a *role* string, **not** a user id). `finalize` (`turn-based.ts:74`) maps `winnerRole` → the winning `user_id`, writes it to `game.winner`, flips `status` to `"completed"`, sets `completedAt`, and bumps each player's stats.
+Play alternates `X, O, X, O, X`: Bob takes `{1,0}` (move 2), Alice `{0,1}` (move 3), Bob `{2,1}` (move 4), and Alice closes the top row with `{0,2}` (move 5). On that last move `reduce` returns a `ReduceResult` whose `outcome` is `{ status: "completed", winnerRole: "X", draw: false }` (the `Outcome` shape from `packages/shared/src/types/games/engine.ts:1` - a *role* string, **not** a user id). `finalize` (`turn-based.ts:78`) maps `winnerRole` → the winning `user_id`, writes it to `game.winner`, flips `status` to `"completed"`, sets `completedAt`, and bumps each player's stats.
 
 ```
 game row (final)
@@ -319,7 +319,7 @@ client emits make_move { gameId, moveData }
   → if outcome.status === "completed": finalize       (turn-based.ts:168)
       set winner, status "completed", bump stats
 
-server broadcasts one game_state { game, move } to room (turn-based.ts:170)
+server broadcasts one game_state { game, move } to room (turn-based.ts:174)
 ```
 
 ## Gotchas & invariants

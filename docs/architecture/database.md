@@ -78,7 +78,7 @@ Repositories also **validate their inputs** with the Zod schemas exported from `
 
 ### `GameRecord` and the seat join
 
-The single most important repository type is `GameRecord`. It is now declared once in `@gamelobby/shared/types` (`packages/shared/src/types/db/index.ts:222`) and re-exported by `@gamelobby/database`:
+The single most important repository type is `GameRecord`. It is now declared once in `@gamelobby/shared/types` (`packages/shared/src/types/db/index.ts:224`) and re-exported by `@gamelobby/database`:
 
 ```ts
 export type GameRecord = Omit<GameRow, "gameType"> & {
@@ -167,11 +167,11 @@ It then fetches `limit + 1` rows ordered `desc(createdAt), desc(id)`, uses the e
 
 ### Raw SQL fragments stay inside repositories
 
-Repositories occasionally need a SQL expression Drizzle's builder doesn't model - but it's always the `sql` *template tag*, which parameterizes inputs (no string concatenation), and it never leaks past the repository. Examples: the per-game max move number, `nextMoveNumber` (`games.ts:201`) uses `` sql<number>`coalesce(max(${move.moveNumber}), 0)` ``; case-insensitive username lookups in `profiles.getProfileByUsername` (`profiles.ts:42`) use `` sql`lower(${userProfile.username}) = lower(${username})` ``; and `notifications.resolveByRequestId` (`notifications.ts:110`) matches a JSONB field with `` sql`${notification.payload} ->> 'requestId' = ${requestId}` ``. The takeaway: "no raw SQL in routes" doesn't mean "no SQL anywhere" - it means the SQL is *encapsulated* behind a typed repository function.
+Repositories occasionally need a SQL expression Drizzle's builder doesn't model - but it's always the `sql` *template tag*, which parameterizes inputs (no string concatenation), and it never leaks past the repository. Examples: the per-game max move number, `nextMoveNumber` (`games.ts:201`) uses `` sql<number>`coalesce(max(${move.moveNumber}), 0)` ``; case-insensitive username lookups in `profiles.getProfileByUsername` (`profiles.ts:52`) use `` sql`lower(${userProfile.username}) = lower(${username})` ``; and `notifications.resolveByRequestId` (`notifications.ts:110`) matches a JSONB field with `` sql`${notification.payload} ->> 'requestId' = ${requestId}` ``. The takeaway: "no raw SQL in routes" doesn't mean "no SQL anywhere" - it means the SQL is *encapsulated* behind a typed repository function.
 
 ### `profiles.bumpStats` - read-modify-write of JSONB
 
-`bumpStats` (`profiles.ts:153`) is a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime `finalize` helper when a game completes (`apps/server/src/realtime/turn-based.ts:99`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice - but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
+`bumpStats` (`profiles.ts:170`) is a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime `finalize` helper when a game completes (`apps/server/src/realtime/turn-based.ts:99`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice - but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
 
 ## Data-flow walkthrough: persisting a move
 
@@ -183,7 +183,7 @@ This is the database layer's busiest path, and where the "client is never truste
 4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`games.ts:201`) returns `max(moveNumber) + 1` - keyed on the internal UUID `gameRow.id`, since `move.game_id` FKs the UUID. The `move_game_number_uq` constraint is the backstop if two moves race to the same number.
 5. **Append the move.** `games.addMove(...)` (`games.ts:209`) inserts the validated move into the append-only `move` table.
 6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:165`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
-7. **Finalize on game over.** If the engine's outcome is `completed`, `finalize` (`turn-based.ts:78`) calls `games.updateGame` again (status / `completedAt` / `winner`) and `profiles.bumpStats` (`profiles.ts:153`) once per seat.
+7. **Finalize on game over.** If the engine's outcome is `completed`, `finalize` (`turn-based.ts:78`) calls `games.updateGame` again (status / `completedAt` / `winner`) and `profiles.bumpStats` (`profiles.ts:170`) once per seat.
 
 In arrows:
 
@@ -198,18 +198,19 @@ Notice that no SQL appears anywhere in `turn-based.ts` - only `games.*` and `pro
 ## Gotchas, invariants & conventions
 
 - **Never write SQL outside `packages/database/src/repositories/*`.** Routes and realtime handlers import the namespaces from `@gamelobby/database` and call functions. If you need a new query, add a repository function - don't reach for `db` in a route.
-- **`GameRecord` always carries `players`; `GameRow` never does.** Seats live in `game_player`. `getGameById` / `getGameByCode` / `getSeriesGames` / `findLiveGameInConversation` / `createGame` / `updateGame` return the assembled `GameRecord`; `gamesForUser` (`games.ts:174`) returns bare `GameRow[]` (a list view that doesn't need seats).
+- **`GameRecord` always carries `players`; `GameRow` never does.** Seats live in `game_player`. `getGameById` / `getGameByCode` / `getSeriesGames` / `findLiveGameInConversation` / `createGame` / `updateGame` return the assembled `GameRecord`; `gamesForUser` (`games.ts:179`) returns bare `GameRow[]` (a list view that doesn't need seats).
 - **Resolve games by code from the wire, by id internally.** The realtime lane and `GET /api/games/:gameId` hold the public room **code**, so they call `getGameByCode(code)` (`games.ts:100`); writes (`addMove` / `updateGame` / `listMoves` / `seatPlayer`) all take the internal UUID `gameRow.id`. `createGame` retries on a `game_code_uq` collision before giving up with `Failed to allocate a unique game code` once it exhausts `GAME_CODE_MAX_ATTEMPTS` (`games.ts:18`).
 - **`seatPlayer` is idempotent.** It inserts the `game_player` row with `ON CONFLICT (game_id, user_id) DO NOTHING` and returns a `boolean` - `true` if the seat was written, `false` if that `(game_id, user_id)` was already seated (`games.ts:146`). This absorbs a duplicate/concurrent `join_room` for the same user without raising `game_player_uq`; the realtime driver branches on the result rather than blindly re-activating the game (see [realtime](./realtime.md)).
 - **At most one live game per `(conversation, gameType)`.** `findLiveGameInConversation` (`games.ts:125`) is the read behind that invariant; the create/rematch services short-circuit to its result instead of inserting a duplicate. A series of every game in a rematch chain is read flat via `getSeriesGames` (`games.ts:111`) keyed on the shared `seriesId`.
 - **Cursors are opaque and tolerant.** `decodeCursor` returns `null` (rather than throwing) on a malformed or non-base64 cursor (`cursor.ts:7`); callers then simply page from the start. Keyset pagination relies on the composite `createdAt`-leading indexes - keep them if you add new paginated lists.
-- **`bumpStats` is read-modify-write on JSONB** (`profiles.ts:153`), not an atomic increment. Fine for the current serialized call site in the move handler; be careful if you ever bump stats from concurrent paths.
+- **`bumpStats` is read-modify-write on JSONB** (`profiles.ts:170`), not an atomic increment. Fine for the current serialized call site in the move handler; be careful if you ever bump stats from concurrent paths.
 - **`DB_LATENCY_MS` is dev-only.** Forced to 0 in production by `resolveDbLatencyMs` (`latency.ts:63`), and resolved inside the package (`client.ts:9`).
 - **JSONB blobs are untrusted until parsed.** `game_state` / `config` / `move_data` are `unknown` by design; validity is owned by the games' Zod schemas (see [`database-schema.md`](./database-schema.md)) and enforced at the realtime boundary (`turn-based.ts:149`). Treat any `gameState` you read as untrusted until `stateSchema.safeParse`'d.
 - **No comments in code.** Per the repo-wide rule, the only comments you'll find in this layer are the `biome-ignore` directives on the `or(...)!` non-null assertions in the two paginated repositories.
 
 ## Where to go next
 
+- [`./README.md`](./README.md) - the architecture index and reading order, the map of every subsystem doc.
 - [`./shared.md`](./shared.md) - `@gamelobby/shared`, the package this layer imports for its row types, domain types, and the Zod input schemas the repositories validate against.
 - [`./database-schema.md`](./database-schema.md) - the table definitions, the generic JSONB game schema, and how Drizzle models it (the shapes this layer reads and writes).
 - [`./games-core-schemas.md`](./games-core-schemas.md) - the Zod `stateSchema` / `moveSchema` / `configSchema` that own the shape of the JSONB this layer stores.

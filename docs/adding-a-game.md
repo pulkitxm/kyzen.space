@@ -211,10 +211,12 @@ These already work for every game - do not duplicate them:
 - **In-chat card** - `app/chat/[handle]/game-card-message.tsx` renders the live
   card for any game.
 - **Realtime** - the turn-based handlers (`apps/server/src/realtime/turn-based.ts`,
-  `handleJoinRoom`/`handleMakeMove`) serve any turn-based engine; they are wired to
-  the `join_room`/`make_move` socket events via `registerGameEvent` in
-  `realtime/socket-util.ts`. Write a new handler module and register it there
-  **only** for a genuinely different `mode` (e.g. realtime `step`-based games).
+  `handleJoinRoom`/`handleMakeMove`) serve any turn-based engine; they are bound to
+  the `join_room`/`make_move` socket events in `realtime/index.ts` via the
+  `registerGameEvent` helper (defined in `realtime/socket-util.ts`), which validates
+  the payload envelope before calling the handler. Write a new handler module and
+  wire it up there **only** for a genuinely different `mode` (e.g. realtime
+  `step`-based games).
 - **Database** - the generic `game` (+ `config` JSONB), `move`, and `game_player`
   tables in `@gamelobby/database` (`packages/database/src/schema.ts`) store every
   game. Never add a per-game table; the engine owns the typed shape and Zod

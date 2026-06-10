@@ -158,7 +158,7 @@ Card markup is assembled as `defs()` + `frame()` + (per card) body, then id-pref
 
 | Function | Draws |
 | --- | --- |
-| `defs()` (`:61`) | All gradients/filters/patterns/clips: `card`, `vignette`, `goldFoil`, `gold`, `robe`/`robeDark`, `backField`, `backPat`, `diaper`, `emboss`, `gild`, `grain`, `cardClip`, `topClip`. |
+| `defs()` (`:61`) | Every gradient/filter/pattern/clip the art reuses: the themeable `goldFoil`/`gold`/`robe`/`robeDark`/`backField`/`backPat`/`diaper` (built from `--pc-*`), the fixed-palette `card`/`vignette`/`panel`/`hair`/`skin`/`cream`/`flower`/`steel`, the `emboss`/`gild`/`grain` filters, and the `cardClip`/`topClip` clip paths. |
 | `frame()` (`:93`) | Cream face + the gold border rules (no shadow). |
 | `panel(suit)` (`:104`) | The central rounded "window" behind court figures. |
 | `indices(rank, suit)` (via `indexContent`) | The two diagonal corner labels (rank glyph + small pip). |

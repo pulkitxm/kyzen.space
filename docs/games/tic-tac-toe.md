@@ -94,7 +94,7 @@ Socket.IO connection the chat lane uses, passed down as a prop.
   (`TttMarkDefs`) is rendered once per board.
 - **Winning line** - when the game ends with a winner, a strike-through line
   (`WinStrike`, an absolute SVG overlay on the grid) is drawn through the three
-  winning cells in the winner's colour. The draw is a `motion.line` spring
+  winning cells in the winner's colour. The draw is an `m.line` spring
   (`pathLength` 0 → 1, from `motion/react`) that plays **once**, and only on a
   *transition* into the won state - a live win, or a replay reaching the deciding
   move. A game opened already-finished renders the line **statically**

@@ -60,7 +60,7 @@ tutorial's duration is the sum of its **chapters** - the labeled
 `{ label, durationInFrames }` beats each `timeline.ts` exports - so the
 `chapters.txt` timestamps can never drift from the video. `bun run export`
 renders every manifest entry to `out/<type>/tutorial.mp4` and writes a
-YouTube-style `out/<type>/chapters.txt` (`0:00 Intro`, `0:11 The goal`, …);
+YouTube-style `out/<type>/chapters.txt` (`0:00 Intro`, `0:04 The goal`, …);
 `manifest.ts` stays free of React imports so the export script can read it
 without loading compositions.
 
