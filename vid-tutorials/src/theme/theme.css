@@ -1,0 +1,95 @@
+.vt-theme[data-mode="light"] {
+  --primary: color-mix(in srgb, var(--v) 78%, var(--d));
+  --primary-dark: var(--d);
+  --primary-hover: color-mix(in srgb, var(--v) 64%, var(--d));
+  --primary-foreground: #ffffff;
+
+  --success: #1f8a5b;
+  --success-foreground: #ffffff;
+  --warning: #c98a1e;
+  --warning-foreground: #2a1c05;
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
+
+  --background: color-mix(in srgb, var(--v) 4%, #fbfbfc);
+  --foreground: #1b1f27;
+
+  --surface: color-mix(in srgb, var(--v) 5%, #ffffff);
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+  --surface-hover: color-mix(in srgb, var(--v) 9%, #ffffff);
+
+  --card: #ffffff;
+  --card-foreground: #1b1f27;
+
+  --muted-foreground: #5b6472;
+
+  --border: color-mix(in srgb, var(--v) 14%, #e3e6eb);
+  --ring: var(--v);
+
+  --banner-from: color-mix(in srgb, var(--v) 10%, white);
+  --banner-via: color-mix(in srgb, var(--v) 35%, white);
+  --banner-to: var(--v);
+  --banner-fade: color-mix(in srgb, white 92%, transparent);
+  --banner-curve: var(--surface);
+
+  --accent-warm: color-mix(in srgb, var(--v) 82%, var(--d));
+  --page-ambient: color-mix(in srgb, var(--v) 8%, transparent);
+  --success-border: color-mix(in srgb, #1f8a5b 42%, transparent);
+  --success-bg: color-mix(in srgb, #1f8a5b 10%, transparent);
+  --success-label-bg: color-mix(in srgb, var(--v) 16%, transparent);
+  --success-label-text: var(--d);
+
+  --pattern-ink: color-mix(in srgb, #11151c 88%, var(--v));
+  --pattern-opacity: 0.09;
+
+  color-scheme: light;
+}
+
+.vt-theme[data-mode="dark"] {
+  --primary: var(--v);
+  --primary-dark: var(--d);
+  --primary-hover: color-mix(in srgb, var(--v) 85%, white);
+  --primary-foreground: #f7f9fd;
+
+  --success: #3fae7c;
+  --success-foreground: #06231a;
+  --warning: #e0a93b;
+  --warning-foreground: #2a1c05;
+  --danger: #f0607e;
+  --danger-foreground: #1a0510;
+
+  --background: var(--d);
+  --foreground: #eef1f8;
+
+  --surface: color-mix(in srgb, var(--d) 84%, var(--v));
+  --surface-raised: color-mix(in srgb, var(--d) 72%, var(--v));
+  --surface-overlay: color-mix(in srgb, var(--d) 70%, var(--v));
+  --surface-hover: color-mix(in srgb, var(--d) 76%, var(--v));
+
+  --card: color-mix(in srgb, var(--d) 78%, var(--v));
+  --card-foreground: #eef1f8;
+
+  --muted-foreground: color-mix(in srgb, #eef1f8 62%, var(--v));
+
+  --border: color-mix(in srgb, #ffffff 13%, transparent);
+  --ring: var(--v);
+
+  --banner-from: var(--d);
+  --banner-via: color-mix(in srgb, var(--d) 45%, var(--v));
+  --banner-to: var(--v);
+  --banner-fade: color-mix(in srgb, var(--d) 92%, transparent);
+  --banner-curve: var(--surface);
+
+  --accent-warm: var(--v);
+  --page-ambient: color-mix(in srgb, var(--v) 16%, transparent);
+  --success-border: color-mix(in srgb, #3fae7c 42%, transparent);
+  --success-bg: color-mix(in srgb, #3fae7c 14%, transparent);
+  --success-label-bg: color-mix(in srgb, var(--v) 22%, transparent);
+  --success-label-text: #eef1f8;
+
+  --pattern-ink: color-mix(in srgb, #ffffff 62%, var(--v));
+  --pattern-opacity: 0.1;
+
+  color-scheme: dark;
+}

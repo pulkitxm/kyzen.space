@@ -1,0 +1,28 @@
+{
+  "name": "@gamelobby/vid-tutorials",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio --port=3100",
+    "render": "remotion render",
+    "still": "remotion still",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gamelobby/shared": "workspace:*",
+    "@remotion/cli": "^4.0.0",
+    "@remotion/google-fonts": "^4.0.0",
+    "@remotion/media": "^4.0.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-icons": "^5.6.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

@@ -3,7 +3,8 @@
   "ignoreBinaries": ["cloc"],
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.{mjs,ts}"]
+      "entry": ["scripts/*.{mjs,ts}"],
+      "ignore": [".claude/**"]
     },
     "apps/server": {
       "entry": ["tests/**/*.test.ts", "integration/**/*.test.ts"],
@@ -14,6 +15,9 @@
     },
     "packages/database": {
       "ignore": ["src/drift-guard.ts"]
+    },
+    "vid-tutorials": {
+      "entry": ["src/index.ts", "remotion.config.ts"]
     }
   }
 }

@@ -126,6 +126,10 @@ A game spans **three packages** - strict Zod schemas + types in `shared`, the en
 3. Add the `"use client"` board to `packages/games-client/src/games/<type>/client.tsx` and register it by `type` in `src/registry.ts`. Optionally add a `skeleton.tsx` placeholder and register it in `SKELETON_REGISTRY` (otherwise `getGameSkeleton` falls back to `DefaultGameSkeleton`).
 4. The conformance suite (`packages/games-core/tests/conformance.test.ts`) covers it automatically; add a focused engine test, and per-game schema tests in `packages/shared/tests/`.
 
+### Game video tutorials (`vid-tutorials/`)
+
+`vid-tutorials/` is a Remotion workspace rendering one short animated **tutorial video per game** (30-90s, 1920x1080 @ 30fps; a scene ends ~1s after its last animation settles, and scene changes are fade-out-then-cut - never crossfades that blend two scenes). The **composition id is the game's type slug**, so Remotion Studio (`cd vid-tutorials && bun run studio`) serves each tutorial at `http://localhost:3100/<type>`; `bun run render <type> out/<type>.mp4` renders it (`out/` is gitignored). Videos use the **app's theme** - `<ThemeRoot>` seeds `--d`/`--v` from `THEMES`/`DEFAULT_THEME` in `@gamelobby/shared/constants` and `src/theme/theme.css` derives the same tokens as `globals.css` - and play the **game's own bg music** via `<TutorialMusic>` (Remotion's `publicDir` points at `apps/web/public`, so `sounds/`, `games/`, and `patterns/` assets are shared, never copied). To build one, give the **`game-tutorial-builder`** agent (`.claude/agents/game-tutorial-builder.md`) a markdown rules brief (canonically `docs/games/<type>.md`); conventions live in the **`game-tutorial-videos`** skill (`.claude/skills/game-tutorial-videos/SKILL.md`) on top of the vendored **`remotion-best-practices`** skill. Inside Remotion, animate only with `useCurrentFrame()` + `interpolate()`/`spring()` - CSS animations/transitions and `motion/react` are forbidden there. See **`docs/video-tutorials.md`**.
+
 ## Keep docs and agents in sync
 
 **A change is not done until the relevant docs and agents reflect it.** Code and prose drift apart silently, so update them in the same change:
@@ -133,6 +137,7 @@ A game spans **three packages** - strict Zod schemas + types in `shared`, the en
 - **Subsystem/behavior change** → the matching page under `docs/architecture/*` (e.g. `realtime.md`, `database.md`, `web.md`).
 - **Game-authoring flow change** → `docs/adding-a-game.md` **and** `.claude/agents/game-builder.md`.
 - **New or changed game** → its `docs/games/<type>.md`.
+- **Tutorial-video flow change** → `docs/video-tutorials.md`, the `game-tutorial-videos` skill, **and** `.claude/agents/game-tutorial-builder.md`.
 - **Convention change** (style, tooling, structure) → this file (`CLAUDE.md`) **and** `AGENTS.md`.
 
 Start from `docs/architecture/README.md` (the architecture index) and `docs/architecture/testing.md` (the test guide) to find the right page. Use the **`docs-maintainer`** agent (`.claude/agents/docs-maintainer.md`) to audit/re-sync docs against the code or to author a new doc in the house style.
