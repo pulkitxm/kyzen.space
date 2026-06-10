@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import * as realClient from "../src/client";
 import { INVITE_TOKEN_LENGTH } from "../src/invite-token";
 
 let insertedValues: Record<string, unknown> | null = null;
@@ -32,11 +33,8 @@ const db = {
 };
 
 mock.module("../src/client", () => ({
+  ...realClient,
   db,
-  client: {},
-  schema: {},
-  createDb: () => ({ db, client: {} }),
-  ping: async () => {},
 }));
 
 const { create, getByToken } = await import("../src/repositories/invites");

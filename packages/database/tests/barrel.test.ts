@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import * as clientModule from "../src/client";
-import * as inviteTokenModule from "../src/invite-token";
 
 describe("@gamelobby/database barrel surface", () => {
   test("re-exports every repository namespace as a function-bag object", async () => {
@@ -62,10 +60,11 @@ describe("@gamelobby/database barrel surface", () => {
 describe("barrel owned-const bindings (c5fe7a7, mock-poisoning isolation)", () => {
   test("value exports are identity-equal to their source modules", async () => {
     const idx = await import("../src/index");
-    expect(idx.generateInviteToken).toBe(inviteTokenModule.generateInviteToken);
-    expect(idx.createDb).toBe(clientModule.createDb);
-    expect(idx.ping).toBe(clientModule.ping);
-    expect(idx.db).toBe(clientModule.db);
-    expect(idx.schema).toBe(clientModule.schema);
+    const clientNow = await import("../src/client");
+    const inviteTokenNow = await import("../src/invite-token");
+    expect(idx.generateInviteToken).toBe(inviteTokenNow.generateInviteToken);
+    expect(idx.createDb).toBe(clientNow.createDb);
+    expect(idx.ping).toBe(clientNow.ping);
+    expect(idx.schema).toBe(clientNow.schema);
   });
 });

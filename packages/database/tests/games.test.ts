@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 import type { CreateGameInput } from "@gamelobby/shared/types";
+import * as realClient from "../src/client";
 
 type Behavior =
   | "ok"
@@ -92,11 +93,8 @@ const db = {
 };
 
 mock.module("../src/client", () => ({
+  ...realClient,
   db,
-  client: {},
-  schema: {},
-  createDb: () => ({ db, client: {} }),
-  ping: async () => {},
 }));
 
 const { createGame } = await import("../src/repositories/games");
