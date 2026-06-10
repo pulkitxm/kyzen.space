@@ -88,6 +88,7 @@ jobs:
             ws.onerror = () => { clearTimeout(timer); console.error("ws handshake failed"); process.exit(1); };
           '
       - name: Health probe is published through the redis adapter
+        working-directory: apps/server
         run: |
           bun -e '
             const { Redis } = await import("ioredis");
