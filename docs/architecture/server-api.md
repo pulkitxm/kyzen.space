@@ -16,7 +16,7 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 
 | Path | Responsibility |
 | --- | --- |
-| `apps/server/src/index.ts` | Process entry: Express + CORS + `/health`, forwards `/api/*` to Hono via `getRequestListener`, attaches Socket.IO to the same HTTP server, installs crash handlers. |
+| `apps/server/src/index.ts` | Process entry: Express + CORS + `/health` (DB + Redis readiness), forwards `/api/*` to Hono via `getRequestListener`, attaches Socket.IO to the same HTTP server, installs crash handlers. |
 | `apps/server/src/env.ts` | Reads/validates env vars into a frozen `env` object; `googleConfigured()` gate for OAuth. |
 | `apps/server/src/api/index.ts` | The Hono app: `basePath("/api")`, request-logger middleware, mounts Better Auth + one router per feature, global `onError`. |
 | `apps/server/src/api/middleware/logger.ts` | Per-request pino child logger with a request id; logs method/path/status/duration at the right level. |
@@ -50,6 +50,7 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 | `apps/server/src/realtime/index.ts` | `attachRealtime`: builds the Socket.IO server, auth middleware, and the `join_room`/`make_move` game lane. |
 | `apps/server/src/realtime/io.ts` | Module-level `io` singleton (`setIO`/`getIO`) so services can emit without an `io` parameter. |
 | `apps/server/src/realtime/rooms.ts` | Room-name helpers (`gameRoom`/`convRoom`/`userRoom`) + `emitTo*`. |
+| `apps/server/src/realtime/health.ts` | `runHealthProbe`: broadcasts a nonce-carrying `health_probe` event into the no-member `health:probe` room and verifies the publish lands on Redis (a one-shot subscriber watches the adapter channel for the nonce); returns `ok`/`off` (no Redis configured)/`error`. |
 
 ## How the process is assembled (`index.ts`)
 
@@ -65,8 +66,24 @@ server.use(
   }),
 );
 
-server.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "gamelobby-server" });
+server.get("/health", async (_req, res) => {
+  const db = await withTimeout(ping(), HEALTH_CHECK_TIMEOUT_MS)
+    .then(() => "ok" as const)
+    .catch((err) => {
+      logger.warn({ err }, "health check: db ping failed");
+      return "error" as const;
+    });
+  const redis = await withTimeout(redisStatus(), HEALTH_CHECK_TIMEOUT_MS).catch(
+    (err) => {
+      logger.warn({ err }, "health check: redis status failed");
+      return "error" as const;
+    },
+  );
+  const probe = await runHealthProbe(HEALTH_CHECK_TIMEOUT_MS);
+  const ok = db === "ok" && redis !== "error" && probe !== "error";
+  res
+    .status(ok ? 200 : 503)
+    .json({ ok, service: "gamelobby-server", db, redis, probe });
 });
 
 const honoListener = getRequestListener(honoApp.fetch);
@@ -75,12 +92,12 @@ server.all(/^\/api(\/.*)?$/, (req, res) => {
 });
 ```
 
-Things to notice (`apps/server/src/index.ts:10`):
+Things to notice (`apps/server/src/index.ts:16`):
 
-- **Express is the outer shell.** It owns CORS (`apps/server/src/index.ts:12`) with `credentials: true` so the browser will send the Better Auth session cookie cross-origin (`apps/server/src/env.ts:37` supplies `env.webUrl`). It serves `/health` directly (`apps/server/src/index.ts:19`) - a cheap liveness check that does not touch the DB.
-- **Hono is mounted as a sub-application, not as Express middleware.** `getRequestListener(honoApp.fetch)` (`apps/server/src/index.ts:23`) adapts Hono's web-standard `fetch` handler into a Node `(req, res)` listener via `@hono/node-server`. Every request whose path matches `^/api(/.*)?$` is forwarded to Hono (`apps/server/src/index.ts:24`). Why this split? Hono gives us a clean web-standard `Request`/`Response` model (which Better Auth's `handler(c.req.raw)` consumes directly) while Express remains the boring, battle-tested HTTP front door. The two never fight over the same path because Express only delegates `/api/*`.
-- **Socket.IO rides the *same* Node HTTP server.** `createServer(server)` wraps the Express app into a raw `http.Server` (`apps/server/src/index.ts:28`), and `attachRealtime(httpServer)` (`apps/server/src/index.ts:30`) attaches Socket.IO to it. That is why REST and WebSocket share one port (`env.port`, default 4000) and one cookie: the socket handshake carries the same Better Auth cookie the REST calls do.
-- **Listen + crash safety.** The server binds `env.port`/`env.host` (`apps/server/src/index.ts:37`) and logs readiness. A `once("error")` handler exits on bind failure, and process-level `unhandledRejection`/`uncaughtException` handlers (`apps/server/src/index.ts:44`) log and (for uncaught exceptions) hard-exit so a supervisor can restart cleanly.
+- **Express is the outer shell.** It owns CORS (`apps/server/src/index.ts:18`) with `credentials: true` so the browser will send the Better Auth session cookie cross-origin (`apps/server/src/env.ts:37` supplies `env.webUrl`). It serves `/health` directly (`apps/server/src/index.ts:25`) - a readiness check, not just liveness. It pings Postgres via `ping()` from `@gamelobby/database` (a `select 1` through the Drizzle client, keeping all SQL inside the database package) and reports the realtime Redis status via `redisStatus()` (`apps/server/src/realtime/redis.ts:33`): `ok` when the adapter's pub connection answers `PING`, `off` when no `REDIS_URL` is configured (healthy by design - Redis is optional), `error` otherwise. Each check is capped at 2s by `withTimeout` (`apps/server/src/lib/with-timeout.ts`) and failures are logged at `warn`. The handler also runs `runHealthProbe()` (`apps/server/src/realtime/health.ts`): it emits a nonce-carrying `health_probe` event into the `health:probe` room, which no client ever joins - users receive nothing, but with the Redis adapter attached the broadcast is published to Redis, and a one-shot subscriber (a `duplicate()` of the adapter's pub connection, torn down in `finally`) watches the adapter's room channel (`socket.io#/#health:probe#`) until the nonce shows up. That proves the Socket.IO emit -> redis-adapter -> Redis `PUBLISH` pipeline from inside the process on every check. `probe` is `ok` (publish observed), `off` (no `REDIS_URL` - the event is still emitted locally, nothing to verify), or `error` (subscribe failed or the nonce never appeared within the timeout). The endpoint answers `200` with `{ ok, service, db, redis, probe }` when ready, `503` when the DB is unreachable, a configured Redis stops answering, or the probe publish is never observed.
+- **Hono is mounted as a sub-application, not as Express middleware.** `getRequestListener(honoApp.fetch)` (`apps/server/src/index.ts:45`) adapts Hono's web-standard `fetch` handler into a Node `(req, res)` listener via `@hono/node-server`. Every request whose path matches `^/api(/.*)?$` is forwarded to Hono (`apps/server/src/index.ts:46`). Why this split? Hono gives us a clean web-standard `Request`/`Response` model (which Better Auth's `handler(c.req.raw)` consumes directly) while Express remains the boring, battle-tested HTTP front door. The two never fight over the same path because Express only delegates `/api/*`.
+- **Socket.IO rides the *same* Node HTTP server.** `createServer(server)` wraps the Express app into a raw `http.Server` (`apps/server/src/index.ts:50`), and `attachRealtime(httpServer)` (`apps/server/src/index.ts:52`) attaches Socket.IO to it. That is why REST and WebSocket share one port (`env.port`, default 4000) and one cookie: the socket handshake carries the same Better Auth cookie the REST calls do.
+- **Listen + crash safety.** The server binds `env.port`/`env.host` (`apps/server/src/index.ts:59`) and logs readiness. A `once("error")` handler exits on bind failure, and process-level `unhandledRejection`/`uncaughtException` handlers (`apps/server/src/index.ts:66`) log and (for uncaught exceptions) hard-exit so a supervisor can restart cleanly.
 
 ### Environment (`env.ts`)
 
@@ -261,7 +278,7 @@ The division of labor:
 
 - **Services (`chat/*`) own the business rules** and any side effects (DB writes, socket emits, notifications). For example `createDm` (`apps/server/src/chat/conversations-service.ts:28`) enforces "you can only DM friends" (`fail("You can only message friends", 403)`), creates-or-gets the DM, and *fans the new conversation out over the socket* to both members before returning a DTO. The route knows none of this.
 
-- **Repositories (imported as namespaces like `conversations`, `friends`, `games` from `@gamelobby/database`)** are the only code that touches Drizzle/SQL. Services call `conversations.getOrCreateDm(...)`, `friends.areFriends(...)`, etc. The repository layer is re-exported from `packages/database/src/index.ts` (`export * as games from "./repositories/games"` and friends, `packages/database/src/index.ts:31`).
+- **Repositories (imported as namespaces like `conversations`, `friends`, `games` from `@gamelobby/database`)** are the only code that touches Drizzle/SQL. Services call `conversations.getOrCreateDm(...)`, `friends.areFriends(...)`, etc. The repository layer is re-exported from `packages/database/src/index.ts` (`export * as games from "./repositories/games"` and friends, `packages/database/src/index.ts:45`).
 
 Why a hand-rolled `Result` type instead of throwing? Three reasons. (1) **The HTTP status is part of the domain answer** - "not your request" is a 403, "already friends" is a 409 - and encoding it in the return value keeps that decision next to the rule that produced it. (2) **The same service is called from two transports**: `createGameInConversation` is invoked from the REST route (`apps/server/src/api/routes/conversations.ts:139`) *and* from a socket handler (`apps/server/src/realtime/games-in-chat.ts:15`); a thrown exception would have to be caught and re-mapped in two places, whereas a `ServiceResult` is just inspected with `if (!res.ok)`. (3) **Expected failures stay off the exception path**, so the global `onError` boundary is reserved for genuinely unexpected bugs.
 
@@ -375,7 +392,7 @@ Identity edits share the same pure-helper discipline. The format/normalize/reser
 A concrete trace from HTTP request to broadcast, showing every layer:
 
 1. Browser `POST /api/conversations/<uuid>/messages` with `{ body: "hi" }` and the session cookie.
-2. Express CORS + the `/api/*` regex forward it to Hono - `apps/server/src/index.ts:24`.
+2. Express CORS + the `/api/*` regex forward it to Hono - `apps/server/src/index.ts:46`.
 3. `requestLogger` mints a request id and attaches the child logger - `apps/server/src/api/middleware/logger.ts:13`.
 4. `conversationsRouter`'s `requireAuth` middleware reads the Better Auth session from the cookie and stashes `userId` on the context - `apps/server/src/api/middleware/auth.ts`. (`401` if absent.)
 5. Hono matches the `POST /:id/messages` handler, which reads `c.get("userId")` - `apps/server/src/api/routes/conversations.ts`.
@@ -392,7 +409,7 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 
 ## Gotchas, invariants & conventions
 
-- **`/api` prefix lives in two places that must agree.** Express forwards `^/api(/.*)?$` (`apps/server/src/index.ts:24`) and Hono declares `basePath("/api")` (`apps/server/src/api/index.ts:18`). Route files use *un-prefixed* paths (`.get("/")`, `.get("/:id")`) - the prefix is added by the basePath, not by the router.
+- **`/api` prefix lives in two places that must agree.** Express forwards `^/api(/.*)?$` (`apps/server/src/index.ts:46`) and Hono declares `basePath("/api")` (`apps/server/src/api/index.ts:18`). Route files use *un-prefixed* paths (`.get("/")`, `.get("/:id")`) - the prefix is added by the basePath, not by the router.
 - **Auth is `requireAuth` middleware, applied per router.** Fully-authed routers call `.use("*", requireAuth)` once at the top (so any route added to them is guarded by default); `profiles` opts in per-route on `/me*` and leaves its public routes open; `games` is public. A *new* router is only protected if it applies the middleware - declaring `Hono<AuthEnv>` types `c.get("userId")` as `string`, but the runtime guarantee comes from the `.use`/per-route `requireAuth`, so the two must go together.
 - **Better Auth owns `/api/auth/*` entirely.** Don't add routes under that prefix - `authApp` (`apps/server/src/api/index.ts`) swallows all methods/paths there. To read the session elsewhere, go through `requireAuth` (or `getSession` directly, as `account` does for session management), never re-implement cookie parsing.
 - **`fail()`'s status is the HTTP status.** The route does `c.json({ error: res.error }, res.status)` verbatim, so a service returning the wrong `ErrorStatus` produces the wrong HTTP code. Statuses are constrained to the `ErrorStatus` union (`apps/server/src/chat/result.ts:1`) - you can't return a 418.

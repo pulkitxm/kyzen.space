@@ -1,0 +1,128 @@
+name: Smoke
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  boot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/gamelobby
+      REDIS_URL: redis://localhost:6379
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gamelobby
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - run: bun install --frozen-lockfile
+      - name: Provide env
+        run: |
+          cp .env.example .env
+          echo "REDIS_URL=redis://localhost:6379" >> .env
+      - name: Apply database schema
+        run: bun run db:push -- --force
+      - name: Build all workspaces
+        run: bun run build
+      - name: Start server and web in the background
+        run: |
+          (cd apps/server && bun run start > /tmp/server.log 2>&1 &)
+          (cd apps/web && bun run start > /tmp/web.log 2>&1 &)
+      - name: Wait for both apps to come up
+        run: |
+          wait_for() {
+            name="$1"
+            url="$2"
+            i=0
+            while [ "$i" -lt 90 ]; do
+              if curl -fsS -o /dev/null "$url"; then
+                echo "$name is up"
+                return 0
+              fi
+              i=$((i + 1))
+              sleep 1
+            done
+            echo "::error::$name never became ready at $url"
+            return 1
+          }
+          wait_for "server" "http://localhost:4000/health"
+          wait_for "web" "http://localhost:3000/"
+      - name: Realtime websocket handshake succeeds
+        run: |
+          bun -e '
+            const ws = new WebSocket("ws://localhost:4000/socket.io/?EIO=4&transport=websocket");
+            const timer = setTimeout(() => { console.error("ws timeout"); process.exit(1); }, 8000);
+            ws.onopen = () => { clearTimeout(timer); console.log("ws handshake ok"); process.exit(0); };
+            ws.onerror = () => { clearTimeout(timer); console.error("ws handshake failed"); process.exit(1); };
+          '
+      - name: Health probe is published through the redis adapter
+        run: |
+          bun -e '
+            const { Redis } = await import("ioredis");
+            const sub = new Redis("redis://localhost:6379");
+            const seen = [];
+            sub.on("pmessage", (_pattern, channel) => { seen.push(channel); });
+            await sub.psubscribe("socket.io#*");
+            const res = await fetch("http://localhost:4000/health");
+            const body = await res.json();
+            if (body.probe !== "ok") {
+              console.error("health did not verify its probe round-trip:", JSON.stringify(body));
+              process.exit(1);
+            }
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            sub.disconnect();
+            const hit = seen.find((channel) => channel.includes("health:probe"));
+            if (!hit) {
+              console.error("no health_probe publish observed on redis; saw:", JSON.stringify(seen));
+              process.exit(1);
+            }
+            console.log("health probe observed on redis channel:", hit);
+            process.exit(0);
+          '
+      - name: Homepage renders HTML
+        run: |
+          html=$(curl -fsS http://localhost:3000/)
+          if ! printf "%s" "$html" | grep -qi "<html"; then
+            echo "::error::Homepage did not return an HTML document."
+            exit 1
+          fi
+          echo "Homepage returned HTML ($(printf "%s" "$html" | wc -c) bytes)."
+      - name: Dump app logs on failure
+        if: failure()
+        run: |
+          echo "===== apps/server log (tail) ====="
+          tail -n 150 /tmp/server.log || true
+          echo "===== apps/web log (tail) ====="
+          tail -n 150 /tmp/web.log || true

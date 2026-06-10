@@ -34,7 +34,7 @@ The reason this matters - and the single most important idea in the whole subsys
 
 ## Setup: `attachRealtime`
 
-`apps/server/src/index.ts` creates a Node HTTP server around the Express/Hono app and hands it to `attachRealtime` (`apps/server/src/index.ts:30`). Everything in this doc hangs off that one call.
+`apps/server/src/index.ts` creates a Node HTTP server around the Express/Hono app and hands it to `attachRealtime` (`apps/server/src/index.ts:52`). Everything in this doc hangs off that one call.
 
 ```ts
 export function attachRealtime(httpServer: HTTPServer): IOServer {
@@ -471,7 +471,7 @@ export function attachRedisAdapter(io: IOServer): void {
   const sub = pub.duplicate();
 ```
 
-`apps/server/src/realtime/redis.ts:9`. With no `REDIS_URL` the app runs single-node and the adapter is a no-op. With one set, `@socket.io/redis-adapter` is installed so that an `emitToGame`/`emitToConv`/`emitToUser` on **any** node reaches sockets connected to **every** node. Nothing in the handlers changes - they always call the same room helpers - which is the entire reason the room abstraction exists.
+`apps/server/src/realtime/redis.ts:11`. With no `REDIS_URL` the app runs single-node and the adapter is a no-op. The module keeps the pub connection in a module-level `pubClient` and exposes `redisStatus()` (`apps/server/src/realtime/redis.ts:33`) plus `getRedisPubClient()` (`apps/server/src/realtime/redis.ts:29`), which the `/health` readiness check uses to report `ok`/`off`/`error` (see [server-api.md](./server-api.md)). `/health` also runs `runHealthProbe()` (`apps/server/src/realtime/health.ts`), broadcasting a nonce-carrying `health_probe` event into the `health:probe` room - no client joins that room, so users receive nothing, but the adapter publishes the broadcast to Redis, and the probe verifies that round-trip itself: a one-shot subscriber (a `duplicate()` of `pubClient`) watches the adapter's room channel (`socket.io#/#health:probe#`) until the probe's nonce appears, so a broken emit-to-Redis pipeline turns `/health` into a `503`. The `smoke.yml` workflow additionally observes the same publish externally with a raw `PSUBSCRIBE socket.io#*`, and `apps/server/integration/health-probe-redis.test.ts` exercises the round-trip against a real Redis. With one set, `@socket.io/redis-adapter` is installed so that an `emitToGame`/`emitToConv`/`emitToUser` on **any** node reaches sockets connected to **every** node. Nothing in the handlers changes - they always call the same room helpers - which is the entire reason the room abstraction exists.
 
 **Multiple nodes need sticky sessions.** The adapter fans out broadcasts but does **not** share the Socket.IO handshake session. The default transport opens with HTTP long-polling - several separate HTTP requests - before upgrading to WebSocket, and the session created on the first request lives in that one node's memory. A load balancer that round-robins those requests across nodes yields `"Session ID unknown"` errors and an endless reconnect loop. Pin each client to one node with session affinity (sticky sessions keyed on the `io` cookie or client IP), or force `transports: ["websocket"]` on the client so there is no polling phase to pin - at the cost of the long-polling fallback that some proxies require.
 

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { resolveDbLatencyMs, withLatency } from "./latency";
@@ -21,3 +22,7 @@ const singleton = createDb(process.env.DATABASE_URL ?? "", defaultLatencyMs());
 export const client = singleton.client;
 export const db = singleton.db;
 export type DB = typeof db;
+
+export async function ping(): Promise<void> {
+  await db.execute(sql`select 1`);
+}
