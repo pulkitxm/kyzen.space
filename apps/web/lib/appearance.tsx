@@ -8,8 +8,8 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
-  useState,
 } from "react";
 
 import { clientFetch } from "@/lib/api-client";
@@ -84,6 +84,19 @@ const GlassContext = createContext<GlassContextValue>({
   setGlass: () => {},
 });
 
+type AppearanceState = {
+  palette: ThemeId;
+  pattern: PatternId;
+  glass: GlassMode;
+};
+
+function appearanceReducer(
+  prev: AppearanceState,
+  patch: Partial<AppearanceState>,
+): AppearanceState {
+  return { ...prev, ...patch };
+}
+
 export function AppearanceProvider({
   children,
   initialPalette,
@@ -100,9 +113,14 @@ export function AppearanceProvider({
   signedIn: boolean;
 }) {
   const { theme: mode, setTheme: setMode } = useTheme();
-  const [palette, setPaletteState] = useState<ThemeId>(initialPalette);
-  const [pattern, setPatternState] = useState<PatternId>(initialPattern);
-  const [glass, setGlassState] = useState<GlassMode>(initialGlass);
+  const [{ palette, pattern, glass }, dispatch] = useReducer(
+    appearanceReducer,
+    {
+      palette: initialPalette,
+      pattern: initialPattern,
+      glass: initialGlass,
+    },
+  );
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", palette);
@@ -130,15 +148,17 @@ export function AppearanceProvider({
     }
 
     try {
+      const stored: Partial<AppearanceState> = {};
       const storedPalette = localStorage.getItem(PALETTE_STORAGE_KEY);
       if (storedPalette && isValidTheme(storedPalette))
-        setPaletteState(storedPalette);
+        stored.palette = storedPalette;
       const storedPattern = localStorage.getItem(PATTERN_STORAGE_KEY);
       if (storedPattern && isValidPattern(storedPattern))
-        setPatternState(storedPattern);
+        stored.pattern = storedPattern;
       const storedGlass = localStorage.getItem(GLASS_STORAGE_KEY);
       if (storedGlass && isValidGlassMode(storedGlass))
-        setGlassState(storedGlass);
+        stored.glass = storedGlass;
+      if (Object.keys(stored).length > 0) dispatch(stored);
     } catch {}
   }, [
     signedIn,
@@ -152,7 +172,7 @@ export function AppearanceProvider({
 
   const setPalette = useCallback(
     (id: ThemeId) => {
-      setPaletteState(id);
+      dispatch({ palette: id });
       try {
         localStorage.setItem(PALETTE_STORAGE_KEY, id);
       } catch {}
@@ -163,7 +183,7 @@ export function AppearanceProvider({
 
   const setPattern = useCallback(
     (id: PatternId) => {
-      setPatternState(id);
+      dispatch({ pattern: id });
       try {
         localStorage.setItem(PATTERN_STORAGE_KEY, id);
       } catch {}
@@ -174,7 +194,7 @@ export function AppearanceProvider({
 
   const setGlass = useCallback(
     (id: GlassMode) => {
-      setGlassState(id);
+      dispatch({ glass: id });
       try {
         localStorage.setItem(GLASS_STORAGE_KEY, id);
       } catch {}
