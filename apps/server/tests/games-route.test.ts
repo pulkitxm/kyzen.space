@@ -12,6 +12,20 @@ let moves: any[] = [];
 let seriesGames: any[] = [];
 const lookupArgs: string[] = [];
 const seriesLookupArgs: string[] = [];
+// biome-ignore lint/suspicious/noExplicitAny: test live-games store
+let liveGames: any[] = [];
+const liveLookupArgs: string[] = [];
+
+type Session = {
+  user: { id: string; name: string | null; email: string | null };
+} | null;
+let currentSession: Session = null;
+
+mock.module("../src/auth", () => ({
+  getAuth: () => ({
+    api: { getSession: async () => currentSession },
+  }),
+}));
 
 mock.module("@gamelobby/database", () => ({
   games: {
@@ -24,6 +38,10 @@ mock.module("@gamelobby/database", () => ({
     getSeriesGames: async (seriesId: string) => {
       seriesLookupArgs.push(seriesId);
       return seriesGames;
+    },
+    liveGamesForUser: async (userId: string) => {
+      liveLookupArgs.push(userId);
+      return liveGames;
     },
   },
   profiles: {},
@@ -71,8 +89,34 @@ beforeEach(() => {
   found = null;
   moves = [];
   seriesGames = [];
+  liveGames = [];
+  currentSession = null;
   lookupArgs.length = 0;
   seriesLookupArgs.length = 0;
+  liveLookupArgs.length = 0;
+});
+
+describe("GET /api/games/mine", () => {
+  test("401s when unauthenticated without a DB lookup", async () => {
+    const res = await gamesRouter.request("/mine");
+    expect(res.status).toBe(401);
+    expect(liveLookupArgs).toHaveLength(0);
+  });
+
+  test("returns the signed-in user's live games serialized by code", async () => {
+    currentSession = {
+      user: { id: "u1", name: "Alice", email: null },
+    };
+    liveGames = [record(), record({ code: "AAAAAA", status: "waiting" })];
+    const res = await gamesRouter.request("/mine");
+    expect(res.status).toBe(200);
+    expect(liveLookupArgs).toEqual(["u1"]);
+    const body = (await res.json()) as {
+      games: { id: string; status: string }[];
+    };
+    expect(body.games.map((g) => g.id)).toEqual([CODE, "AAAAAA"]);
+    expect(body.games.map((g) => g.status)).toEqual(["active", "waiting"]);
+  });
 });
 
 describe("GET /api/games/:gameId", () => {

@@ -6,6 +6,7 @@ import type {
   ServerMatchFoundPayload,
 } from "@gamelobby/shared/types";
 import { useAtom } from "jotai";
+import { m, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { FaLink, FaMagnifyingGlass, FaXmark } from "react-icons/fa6";
@@ -26,6 +27,7 @@ export function GameLobby({
 }) {
   const router = useRouter();
   const { socket } = useSocket();
+  const reduceMotion = useReducedMotion();
   const [matchmaking, setMatchmaking] = useAtom(matchmakingAtom);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -80,8 +82,10 @@ export function GameLobby({
     socket?.emit("game:queue_leave", { gameType: meta.type });
   }, [socket, meta.type, setMatchmaking]);
 
+  const tap = reduceMotion ? undefined : { scale: 0.98 };
+
   return (
-    <div className="mt-8 max-w-sm space-y-6">
+    <div className="mt-6 space-y-4">
       {configFields.length > 0 ? (
         <div className="space-y-4">
           {configFields.map((field) => (
@@ -95,19 +99,21 @@ export function GameLobby({
         </div>
       ) : null}
 
-      <button
+      <m.button
         type="button"
+        whileTap={tap}
         onClick={() => (userId ? setOpen(true) : router.push("/auth"))}
-        className="w-full rounded-xl bg-primary px-4 py-3 font-medium text-primary-foreground text-sm shadow outline-none transition hover:opacity-90"
+        className="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground text-sm shadow outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised"
       >
         Play with a friend
-      </button>
+      </m.button>
 
-      <button
+      <m.button
         type="button"
+        whileTap={tap}
         onClick={inviteByLink}
         disabled={inviteStatus === "busy"}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 py-3 font-medium text-card-foreground text-sm outline-none transition hover:bg-surface-overlay disabled:pointer-events-none disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 py-3 font-medium text-card-foreground text-sm outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
       >
         <FaLink size={16} className="shrink-0" aria-hidden="true" />
         {inviteStatus === "busy"
@@ -117,16 +123,30 @@ export function GameLobby({
             : inviteStatus === "error"
               ? "Couldn't create link"
               : "Invite a friend (link)"}
-      </button>
+      </m.button>
 
       {searching ? (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-raised px-4 py-3">
-          <span className="flex items-center gap-2 text-card-foreground text-sm">
-            <FaMagnifyingGlass
-              size={16}
-              className="animate-pulse"
-              aria-hidden="true"
-            />
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-surface-raised px-4 py-3">
+          <span className="flex items-center gap-2.5 text-card-foreground text-sm">
+            <span className="relative inline-flex size-5 items-center justify-center">
+              {reduceMotion ? null : (
+                <m.span
+                  aria-hidden
+                  className="absolute inset-0 rounded-full border border-primary/60"
+                  animate={{ scale: [0.6, 1.7], opacity: [0.7, 0] }}
+                  transition={{
+                    duration: 1.4,
+                    repeat: Number.POSITIVE_INFINITY,
+                    ease: "easeOut",
+                  }}
+                />
+              )}
+              <FaMagnifyingGlass
+                size={14}
+                className="text-primary"
+                aria-hidden="true"
+              />
+            </span>
             Searching for an opponent…
           </span>
           <button
@@ -139,15 +159,16 @@ export function GameLobby({
           </button>
         </div>
       ) : (
-        <button
+        <m.button
           type="button"
+          whileTap={tap}
           disabled={busy}
           onClick={findMatch}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 py-3 font-medium text-card-foreground text-sm outline-none transition hover:bg-surface-overlay disabled:pointer-events-none disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 py-3 font-medium text-card-foreground text-sm outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
         >
           <FaMagnifyingGlass size={16} aria-hidden="true" />
           {busy ? "Starting…" : "Find a match"}
-        </button>
+        </m.button>
       )}
 
       {open && userId ? (

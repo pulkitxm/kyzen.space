@@ -156,7 +156,17 @@ type, `listGameTypes(): GameType[]` returns the narrowed list.
    move, and `leave_room` on cleanup; render from the `game_state` event (the
    server emits exactly one per move). On unmount remove your listeners with
    `socket.off(...)` only - never
-   `socket.disconnect()` (that would kill the shared chat lane). Register the board
+   `socket.disconnect()` (that would kill the shared chat lane).
+   **Compose the shared GameStage kit** for the board chrome rather than hand-rolling
+   it - import it from the package internals via relative paths (`../../stage/*`):
+   wrap the board in `<GameStage>` (its `dock` / `status` / `connection` / `notice` /
+   `error` / `footer` slots), use `<PlayerDock>` for the per-seat bar (pass a
+   `renderRoleBadge` for your game's role glyph), `<TurnBanner label tone>` for the
+   status line, `<PiecePop>` to pop placed pieces in (skip the pop for marks already
+   present at first render), and `<ReplayDock>` in the footer for finished games. The
+   kit lives in `packages/games-client/src/stage/` and is also re-exported from the
+   package surface; it animates via `motion/react` and honours reduced motion, so you
+   get consistent, accessible chrome for free. Register the board
    in `src/registry.ts` (`REGISTRY`) using the imported slug constant as the key -
    both `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>`, so a missing
    entry is a **compile error**, not a runtime surprise.

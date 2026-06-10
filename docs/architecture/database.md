@@ -17,7 +17,7 @@ The *shape* of the tables themselves - the schema, the generic JSONB game model,
 | `packages/database/src/client.ts` | `createDb(url, latencyMs)` factory + the singleton it builds: the `postgres-js` connection pool and the Drizzle `db` instance. Re-exports `createDb`, `db`, `client`, `schema`, and the `DB` type. |
 | `packages/database/src/index.ts` | The public facade (`@gamelobby/database`): re-exports each repository as a namespace (`accountMerge`, `conversations`, `friends`, `games`, `invites`, `messages`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@gamelobby/shared/types`) and the `generateInviteToken` helper. |
 | `packages/database/src/latency.ts` | `withLatency` Proxy that injects an artificial per-query delay (`DB_LATENCY_MS`) in non-production, for exercising loading states. |
-| `packages/database/src/repositories/games.ts` | Game/move/seat CRUD; assembles `GameRecord` (the `game` row with `players` attached and `gameType` narrowed to the registry `GameType`) via `toGameRecord` and the `getGameById` / `getGameByCode` joins; `createGame` allocates the public `code` (and defaults `seriesId` to the row's own id) and retries on a `game_code_uq` collision; the series reads `getSeriesGames` / `findLiveGameInConversation`. |
+| `packages/database/src/repositories/games.ts` | Game/move/seat CRUD; assembles `GameRecord` (the `game` row with `players` attached and `gameType` narrowed to the registry `GameType`) via `toGameRecord` and the `getGameById` / `getGameByCode` joins; `createGame` allocates the public `code` (and defaults `seriesId` to the row's own id) and retries on a `game_code_uq` collision; the series reads `getSeriesGames` / `findLiveGameInConversation`; per-user list reads `gamesForUser` (bare `GameRow[]`) and `liveGamesForUser` (live-only `GameRecord[]` with seats). |
 | `packages/database/src/repositories/messages.ts` | Message insert/read/soft-delete + keyset-paginated `listMessages`. |
 | `packages/database/src/repositories/conversations.ts` | DM/group create, membership, read-state, unread counts, last-message bookkeeping. |
 | `packages/database/src/repositories/friends.ts` | Friendship requests/status keyed by a sorted `pairKey`. |
@@ -66,7 +66,7 @@ export * as profiles from "./repositories/profiles";
 
 So callers write `import { games, profiles } from "@gamelobby/database"` and then `games.getGameById(id)` / `profiles.bumpStats(...)`. There is no class, no DI container, no base "Repository" abstraction - just modules. The discipline is conventional, not enforced by types: routes and realtime handlers import these namespaces and never import Drizzle directly.
 
-Repositories also **validate their inputs** with the Zod schemas exported from `@gamelobby/shared/types` before they write: `createGame` runs `createGameInputSchema.parse(input)` (`games.ts:30`), `addMove` runs `addMoveInputSchema.parse(input)` (`games.ts:215`), `insertMessage` / `create` / `createProfile` / `updateAppearance` parse theirs the same way.
+Repositories also **validate their inputs** with the Zod schemas exported from `@gamelobby/shared/types` before they write: `createGame` runs `createGameInputSchema.parse(input)` (`games.ts:30`), `addMove` runs `addMoveInputSchema.parse(input)` (`games.ts:236`), `insertMessage` / `create` / `createProfile` / `updateAppearance` parse theirs the same way.
 
 ### `GameRecord` and the seat join
 
@@ -136,6 +136,35 @@ export async function findLiveGameInConversation(
 
 It is the data half of the **one-live-game-per-(conversation, game-type)** invariant: both `createGameInConversation` and `rematchGame` call it first and short-circuit to the existing live game rather than creating a duplicate (see [`realtime.md`](./realtime.md) and [`server-api.md`](./server-api.md)). The `computeSeriesScore` tally over `getSeriesGames`' output is a **pure** server helper (`apps/server/src/chat/series.ts`), so it is unit-testable without a database.
 
+#### Per-user list reads: `gamesForUser` and `liveGamesForUser`
+
+Two queries `innerJoin` `game_player` to list a user's games. `gamesForUser` (`games.ts:179`) returns bare `GameRow[]` (no seats) for an offset-paginated list view. `liveGamesForUser` (`games.ts:193`) is the read behind the dashboard home page's "Jump back in" strip (`GET /api/games/mine`): it filters to `status in (waiting, active)`, orders by `desc(updatedAt)`, and - unlike `gamesForUser` - assembles each row into a full `GameRecord` (seats attached) so the card can render the opponent's avatar:
+
+```ts
+export async function liveGamesForUser(
+  userId: string,
+  opts: { limit?: number } = {},
+): Promise<GameRecord[]> {
+  const rows = await db
+    .select(getTableColumns(game))
+    .from(game)
+    .innerJoin(gamePlayer, eq(gamePlayer.gameId, game.id))
+    .where(
+      and(
+        eq(gamePlayer.userId, userId),
+        inArray(game.status, ["waiting", "active"]),
+      ),
+    )
+    .orderBy(desc(game.updatedAt))
+    .limit(opts.limit ?? 10);
+  return Promise.all(
+    rows.map(async (row) => toGameRecord(row, await getPlayers(row.id))),
+  );
+}
+```
+
+(`packages/database/src/repositories/games.ts:193`). The `limit` defaults to 10.
+
 ### Keyset (cursor) pagination
 
 Two repositories paginate large feeds - messages and notifications - with **keyset pagination** rather than `OFFSET`. The cursor encodes the `(createdAt, id)` of the last row seen, base64'd (`cursor.ts:1`). `listMessages` (`messages.ts:55`) decodes that cursor and adds a "strictly older than the cursor" predicate, using `id` as a tiebreaker so messages with identical timestamps still page deterministically:
@@ -159,7 +188,7 @@ It then fetches `limit + 1` rows ordered `desc(createdAt), desc(id)`, uses the e
 
 ### Raw SQL fragments stay inside repositories
 
-Repositories occasionally need a SQL expression Drizzle's builder doesn't model - but it's always the `sql` *template tag*, which parameterizes inputs (no string concatenation), and it never leaks past the repository. Examples: the per-game max move number, `nextMoveNumber` (`games.ts:201`) uses `` sql<number>`coalesce(max(${move.moveNumber}), 0)` ``; case-insensitive username lookups in `profiles.getProfileByUsername` (`profiles.ts:42`) use `` sql`lower(${userProfile.username}) = lower(${username})` ``; and `notifications.resolveByRequestId` (`notifications.ts:110`) matches a JSONB field with `` sql`${notification.payload} ->> 'requestId' = ${requestId}` ``. The takeaway: "no raw SQL in routes" doesn't mean "no SQL anywhere" - it means the SQL is *encapsulated* behind a typed repository function.
+Repositories occasionally need a SQL expression Drizzle's builder doesn't model - but it's always the `sql` *template tag*, which parameterizes inputs (no string concatenation), and it never leaks past the repository. Examples: the per-game max move number, `nextMoveNumber` (`games.ts:222`) uses `` sql<number>`coalesce(max(${move.moveNumber}), 0)` ``; case-insensitive username lookups in `profiles.getProfileByUsername` (`profiles.ts:42`) use `` sql`lower(${userProfile.username}) = lower(${username})` ``; and `notifications.resolveByRequestId` (`notifications.ts:110`) matches a JSONB field with `` sql`${notification.payload} ->> 'requestId' = ${requestId}` ``. The takeaway: "no raw SQL in routes" doesn't mean "no SQL anywhere" - it means the SQL is *encapsulated* behind a typed repository function.
 
 ### `profiles.bumpStats` - read-modify-write of JSONB
 
@@ -172,8 +201,8 @@ This is the database layer's busiest path, and where the "client is never truste
 1. **Load the aggregate.** `games.getGameByCode(payload.gameId)` (`games.ts:100`) returns the `GameRecord` - game row + seats - resolved from the public room **code** the client sent (the wire never carries the UUID). The handler checks `status === "active"` and that the socket's `userId` is actually a seated player. The DB join is what makes the seat check possible.
 2. **Validate with the shared schemas.** `def.moveSchema.safeParse(payload.moveData)` validates the *client's* input (`turn-based.ts:147`), and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB (`turn-based.ts:149`). Both schemas come from the same `GameDefinition` the client imports. A bad move or corrupt state is rejected before any write.
 3. **Reduce - authoritatively.** `def.engine.reduce(...)` (`turn-based.ts:152`) computes the next state on the server. The client's opinion about legality is irrelevant.
-4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`games.ts:201`) returns `max(moveNumber) + 1` - keyed on the internal UUID `gameRow.id`, since `move.game_id` FKs the UUID. The `move_game_number_uq` constraint is the backstop if two moves race to the same number.
-5. **Append the move.** `games.addMove(...)` (`games.ts:209`) inserts the validated move into the append-only `move` table.
+4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`games.ts:222`) returns `max(moveNumber) + 1` - keyed on the internal UUID `gameRow.id`, since `move.game_id` FKs the UUID. The `move_game_number_uq` constraint is the backstop if two moves race to the same number.
+5. **Append the move.** `games.addMove(...)` (`games.ts:230`) inserts the validated move into the append-only `move` table.
 6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:165`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
 7. **Finalize on game over.** If the engine's outcome is `completed`, `finalize` (`turn-based.ts:78`) calls `games.updateGame` again (status / `completedAt` / `winner`) and `profiles.bumpStats` (`profiles.ts:153`) once per seat.
 
@@ -190,7 +219,7 @@ Notice that no SQL appears anywhere in `turn-based.ts` - only `games.*` and `pro
 ## Gotchas, invariants & conventions
 
 - **Never write SQL outside `packages/database/src/repositories/*`.** Routes and realtime handlers import the namespaces from `@gamelobby/database` and call functions. If you need a new query, add a repository function - don't reach for `db` in a route.
-- **`GameRecord` always carries `players`; `GameRow` never does.** Seats live in `game_player`. `getGameById` / `getGameByCode` / `getSeriesGames` / `findLiveGameInConversation` / `createGame` / `updateGame` return the assembled `GameRecord`; `gamesForUser` (`games.ts:174`) returns bare `GameRow[]` (a list view that doesn't need seats).
+- **`GameRecord` always carries `players`; `GameRow` never does.** Seats live in `game_player`. `getGameById` / `getGameByCode` / `getSeriesGames` / `findLiveGameInConversation` / `liveGamesForUser` / `createGame` / `updateGame` return the assembled `GameRecord`; `gamesForUser` (`games.ts:179`) returns bare `GameRow[]` (a list view that doesn't need seats).
 - **Resolve games by code from the wire, by id internally.** The realtime lane and `GET /api/games/:gameId` hold the public room **code**, so they call `getGameByCode(code)` (`games.ts:100`); writes (`addMove` / `updateGame` / `listMoves` / `seatPlayer`) all take the internal UUID `gameRow.id`. `createGame` retries on a `game_code_uq` collision before giving up with `Failed to allocate a unique game code` once it exhausts `GAME_CODE_MAX_ATTEMPTS` (`games.ts:18`).
 - **`seatPlayer` is idempotent.** It inserts the `game_player` row with `ON CONFLICT (game_id, user_id) DO NOTHING` and returns a `boolean` - `true` if the seat was written, `false` if that `(game_id, user_id)` was already seated (`games.ts:146`). This absorbs a duplicate/concurrent `join_room` for the same user without raising `game_player_uq`; the realtime driver branches on the result rather than blindly re-activating the game (see [realtime](./realtime.md)).
 - **At most one live game per `(conversation, gameType)`.** `findLiveGameInConversation` (`games.ts:125`) is the read behind that invariant; the create/rematch services short-circuit to its result instead of inserting a duplicate. A series of every game in a rematch chain is read flat via `getSeriesGames` (`games.ts:111`) keyed on the shared `seriesId`.

@@ -5,6 +5,7 @@ import {
   type Cell,
   isGameLive,
   isGameOver,
+  type Mark,
   type TicTacToeState as TicState,
 } from "@gamelobby/shared/types";
 import {
@@ -15,18 +16,14 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  FaBackwardStep,
-  FaChevronLeft,
-  FaChevronRight,
-  FaForwardStep,
-  FaPause,
-  FaPlay,
-} from "react-icons/fa6";
 import { useGameAudio } from "../../audio/use-game-audio";
+import { PiecePop } from "../../stage/feedback";
+import { GameStage } from "../../stage/game-stage";
+import { PlayerDock } from "../../stage/player-dock";
+import { ReplayDock } from "../../stage/replay-dock";
+import { TurnBanner, type TurnBannerTone } from "../../stage/turn-banner";
 import type { GameClientProps } from "../../types";
 import { TttMark, TttMarkDefs } from "./marks";
-import { PlayerBar } from "./player-bar";
 import { WinStrike } from "./win-strike";
 import { findWinningLine } from "./winning-line";
 
@@ -97,103 +94,6 @@ function buildStateAtStep(
     currentTurn = role === "X" ? "O" : "X";
   }
   return { board, currentTurn };
-}
-
-function ReplayToolbar({
-  step,
-  maxStep,
-  isPlaying,
-  onFirst,
-  onPrev,
-  onTogglePlay,
-  onNext,
-  onLast,
-}: {
-  step: number;
-  maxStep: number;
-  isPlaying: boolean;
-  onFirst: () => void;
-  onPrev: () => void;
-  onTogglePlay: () => void;
-  onNext: () => void;
-  onLast: () => void;
-}) {
-  const glass =
-    "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card px-3 text-card-foreground shadow-sm outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35";
-
-  return (
-    <div
-      className="mt-6 flex max-w-[320px] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-border bg-surface-overlay/60 p-2"
-      role="toolbar"
-      aria-label="Replay controls"
-    >
-      <button
-        type="button"
-        className={glass}
-        onClick={onFirst}
-        disabled={step <= 0}
-        title="First"
-      >
-        <FaBackwardStep size={20} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className={glass}
-        onClick={onPrev}
-        disabled={step <= 0}
-        title="Previous move (←)"
-      >
-        <FaChevronLeft size={20} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className={`${glass} min-w-13`}
-        onClick={onTogglePlay}
-        disabled={maxStep === 0}
-        title={isPlaying ? "Pause (Space)" : "Play (Space)"}
-      >
-        {isPlaying ? (
-          <FaPause size={20} aria-hidden="true" />
-        ) : (
-          <FaPlay size={20} aria-hidden="true" />
-        )}
-      </button>
-      <button
-        type="button"
-        className={glass}
-        onClick={onNext}
-        disabled={step >= maxStep}
-        title="Next move (→)"
-      >
-        <FaChevronRight size={20} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className={glass}
-        onClick={onLast}
-        disabled={step >= maxStep}
-        title="Last move"
-      >
-        <FaForwardStep size={20} aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-
-function StatusDot({ online }: { online: boolean }) {
-  const tone = online ? "bg-success" : "bg-danger";
-  return (
-    <output
-      className="relative inline-flex size-3 items-center justify-center"
-      aria-label={online ? "Online" : "Offline"}
-      title={online ? "Online" : "Offline"}
-    >
-      <span
-        className={`absolute inline-flex size-3 animate-ping rounded-full opacity-70 ${tone}`}
-      />
-      <span className={`relative inline-flex size-2.5 rounded-full ${tone}`} />
-    </output>
-  );
 }
 
 export function TicTacToeGameClient({
@@ -317,6 +217,15 @@ export function TicTacToeGameClient({
     myRole !== null &&
     liveState.currentTurn === myRole;
 
+  const initialFilledRef = useRef<ReadonlySet<number>>(
+    new Set(
+      ((initialGame.gameState as TicState | undefined)?.board ?? [])
+        .map((cell, idx) => (cell ? idx : -1))
+        .filter((idx) => idx >= 0),
+    ),
+  );
+  const replayTouchedRef = useRef(false);
+
   const makeMove = useCallback(
     (row: number, col: number) => {
       if (!userId || !canMove) return;
@@ -329,11 +238,33 @@ export function TicTacToeGameClient({
     [userId, canMove, gameId, socket],
   );
 
-  const winnerLabel = game.winner
-    ? game.winner === "draw"
-      ? "Draw"
-      : `Winner: ${game.players.find((p) => p.userId === game.winner)?.username ?? game.winner}`
-    : null;
+  const opponent = game.players.find((p) => p.userId !== userId) ?? null;
+
+  let bannerLabel: string | null = null;
+  let bannerTone: TurnBannerTone = "waiting";
+  if (isPast) {
+    if (game.winner === "draw") {
+      bannerLabel = "It's a draw";
+      bannerTone = "result";
+    } else if (game.winner) {
+      const name =
+        game.players.find((p) => p.userId === game.winner)?.username ??
+        game.winner;
+      bannerLabel = game.winner === userId ? "You won" : `${name} won`;
+      bannerTone = "result";
+    }
+  } else if (userId) {
+    if (game.status === "waiting") {
+      bannerLabel = "Waiting for an opponent…";
+    } else if (canMove) {
+      bannerLabel = "Your move";
+      bannerTone = "self";
+    } else if (myRole) {
+      bannerLabel = opponent ? `Waiting for ${opponent.username}…` : "Waiting…";
+    } else {
+      bannerLabel = "Spectating";
+    }
+  }
 
   const winningLine =
     game.winner && game.winner !== "draw" ? findWinningLine(state.board) : null;
@@ -376,11 +307,13 @@ export function TicTacToeGameClient({
   }, [liveFilled, isPast, myRole, liveState.currentTurn, audio]);
 
   const goFirst = useCallback(() => {
+    replayTouchedRef.current = true;
     setReplayPlaying(false);
     setReplayStep(0);
   }, []);
 
   const goPrev = useCallback(() => {
+    replayTouchedRef.current = true;
     setReplayPlaying(false);
     setReplayStep((s) => {
       const cur = Math.min(s, sortedLen);
@@ -389,6 +322,7 @@ export function TicTacToeGameClient({
   }, [sortedLen]);
 
   const goNext = useCallback(() => {
+    replayTouchedRef.current = true;
     setReplayPlaying(false);
     const cur = Math.min(replayStepRef.current, sortedLen);
     if (cur >= sortedLen) return;
@@ -397,11 +331,13 @@ export function TicTacToeGameClient({
   }, [sortedLen, audio]);
 
   const goLast = useCallback(() => {
+    replayTouchedRef.current = true;
     setReplayPlaying(false);
     setReplayStep(sortedLen);
   }, [sortedLen]);
 
   const toggleReplayPlay = useCallback(() => {
+    replayTouchedRef.current = true;
     setReplayPlaying((wasPlaying) => {
       if (wasPlaying) return false;
       setReplayStep((s) => {
@@ -445,80 +381,93 @@ export function TicTacToeGameClient({
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [isPast]);
 
-  return (
-    <div className="mt-8">
-      <TttMarkDefs />
-      <PlayerBar
-        players={game.players}
-        currentTurn={state.currentTurn}
-        myUserId={userId}
-        active={game.status === "active"}
-        onViewProfile={onViewProfile}
-      />
-      {isPast ? null : !userId ? (
-        <p className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
-          Sign in to join this table and play. Open the same link while signed
-          in as the second player to fill the match.
-        </p>
-      ) : (
-        <div className="mb-4 flex items-center">
-          <StatusDot online={Boolean(liveSocketKey) && connected} />
-        </div>
-      )}
-
-      {error ? <p className="mb-4 text-danger text-sm">{error}</p> : null}
-
-      {winnerLabel ? (
-        <p className="mb-4 font-medium text-primary text-sm">{winnerLabel}</p>
+  const board = (
+    <div className="relative grid w-fit grid-cols-3 gap-3">
+      {CELL_KEYS.map((cellKey, idx) => {
+        const row = Math.floor(idx / 3);
+        const col = idx % 3;
+        const mark = state.board[idx];
+        const playable =
+          !isPast && canMove && mark === null && game.status === "active";
+        const ghostMark = playable ? (myRole as Mark) : null;
+        const popsIn =
+          !initialFilledRef.current.has(idx) ||
+          (isPast && replayTouchedRef.current);
+        return (
+          <button
+            key={cellKey}
+            type="button"
+            disabled={!playable}
+            onMouseEnter={() => {
+              if (playable) audio.playHover();
+            }}
+            onClick={() => {
+              if (!playable) return;
+              audio.playTouch();
+              makeMove(row, col);
+            }}
+            className="group flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised outline-none transition focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-surface-overlay disabled:cursor-default sm:size-28"
+          >
+            {mark ? (
+              <PiecePop
+                animate={popsIn}
+                className="flex size-16 items-center justify-center sm:size-20"
+              >
+                <TttMark mark={mark} className="size-full" />
+              </PiecePop>
+            ) : ghostMark ? (
+              <TttMark
+                mark={ghostMark}
+                decorative
+                className="size-16 opacity-0 transition-opacity duration-150 group-hover:opacity-40 group-focus-visible:opacity-40 sm:size-20"
+              />
+            ) : null}
+          </button>
+        );
+      })}
+      {winningLine && winMark ? (
+        <WinStrike
+          line={winningLine}
+          mark={winMark}
+          animate={winState.animate}
+        />
       ) : null}
+    </div>
+  );
 
-      <div className="relative grid w-fit grid-cols-3 gap-3">
-        {CELL_KEYS.map((cellKey, idx) => {
-          const row = Math.floor(idx / 3);
-          const col = idx % 3;
-          const mark = state.board[idx];
-          const playable =
-            !isPast && canMove && mark === null && game.status === "active";
-          const ghostMark = playable ? myRole : null;
-          return (
-            <button
-              key={cellKey}
-              type="button"
-              disabled={!playable}
-              onMouseEnter={() => {
-                if (playable) audio.playHover();
-              }}
-              onClick={() => {
-                if (!playable) return;
-                audio.playTouch();
-                makeMove(row, col);
-              }}
-              className="group flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised outline-none transition focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-surface-overlay disabled:cursor-default sm:size-28"
-            >
-              {mark ? (
-                <TttMark mark={mark} className="size-16 sm:size-20" />
-              ) : ghostMark ? (
-                <TttMark
-                  mark={ghostMark}
-                  decorative
-                  className="size-16 opacity-0 transition-opacity duration-150 group-hover:opacity-40 group-focus-visible:opacity-40 sm:size-20"
-                />
-              ) : null}
-            </button>
-          );
-        })}
-        {winningLine && winMark ? (
-          <WinStrike
-            line={winningLine}
-            mark={winMark}
-            animate={winState.animate}
-          />
-        ) : null}
-      </div>
-
-      {isPast ? (
-        <>
-          <ReplayToolbar
+  return (
+    <GameStage
+      dock={
+        <PlayerDock
+          players={game.players}
+          activeRole={game.status === "active" ? state.currentTurn : null}
+          myUserId={userId}
+          onViewProfile={onViewProfile}
+          renderRoleBadge={(role) =>
+            role === "X" || role === "O" ? (
+              <TttMark mark={role} className="size-4 shrink-0" />
+            ) : null
+          }
+        />
+      }
+      status={<TurnBanner label={bannerLabel} tone={bannerTone} />}
+      connection={
+        isPast || !userId
+          ? undefined
+          : { show: true, online: Boolean(liveSocketKey) && connected }
+      }
+      notice={
+        !isPast && !userId ? (
+          <p className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
+            Sign in to join this table and play. Open the same link while signed
+            in as the second player to fill the match.
+          </p>
+        ) : null
+      }
+      error={error}
+      footer={
+        isPast ? (
+          <ReplayDock
             step={Math.min(replayStep, sortedLen)}
             maxStep={sortedLen}
             isPlaying={replayPlaying}
@@ -528,16 +477,15 @@ export function TicTacToeGameClient({
             onNext={goNext}
             onLast={goLast}
           />
-          <p className="mt-3 text-muted-foreground text-xs">
-            Position after {Math.min(replayStep, sortedLen)} of {sortedLen}{" "}
-            moves
+        ) : (
+          <p className="mt-6 text-muted-foreground text-xs">
+            Moves logged: {moves.length}
           </p>
-        </>
-      ) : (
-        <p className="mt-6 text-muted-foreground text-xs">
-          Moves logged: {moves.length}
-        </p>
-      )}
-    </div>
+        )
+      }
+    >
+      <TttMarkDefs />
+      {board}
+    </GameStage>
   );
 }

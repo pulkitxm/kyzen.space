@@ -190,6 +190,27 @@ export async function gamesForUser(
     .limit(opts.limit ?? 20);
 }
 
+export async function liveGamesForUser(
+  userId: string,
+  opts: { limit?: number } = {},
+): Promise<GameRecord[]> {
+  const rows = await db
+    .select(getTableColumns(game))
+    .from(game)
+    .innerJoin(gamePlayer, eq(gamePlayer.gameId, game.id))
+    .where(
+      and(
+        eq(gamePlayer.userId, userId),
+        inArray(game.status, ["waiting", "active"]),
+      ),
+    )
+    .orderBy(desc(game.updatedAt))
+    .limit(opts.limit ?? 10);
+  return Promise.all(
+    rows.map(async (row) => toGameRecord(row, await getPlayers(row.id))),
+  );
+}
+
 export async function listMoves(gameId: string): Promise<MoveRow[]> {
   return db
     .select()

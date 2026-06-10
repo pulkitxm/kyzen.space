@@ -2,10 +2,15 @@ import { games } from "@gamelobby/database";
 import { isGameCode } from "@gamelobby/shared/types";
 import { Hono } from "hono";
 import { computeSeriesScore } from "../../chat/series";
+import { type AuthEnv, requireAuth } from "../middleware/auth";
 import type { LoggerEnv } from "../middleware/logger";
 import { serializeGame, serializeMove, serializeSeries } from "../serialize";
 
-export const gamesRouter = new Hono<LoggerEnv>()
+export const gamesRouter = new Hono<LoggerEnv & AuthEnv>()
+  .get("/mine", requireAuth, async (c) => {
+    const rows = await games.liveGamesForUser(c.get("userId"));
+    return c.json({ games: rows.map(serializeGame) });
+  })
   .get("/:gameId/series", async (c) => {
     const code = c.req.param("gameId");
     if (!isGameCode(code)) return c.json({ error: "Not found" }, 404);
