@@ -15,6 +15,9 @@ node_modules/
 .next/
 /out/
 
+# remotion render scratch
+vid-tutorials/out/
+
 # production
 /build
 dist/

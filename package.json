@@ -4,7 +4,8 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "vid-tutorials"
   ],
   "scripts": {
     "cloc": "cloc --vcs=git --quiet --not-match-f='(bun\\.lock|package-lock\\.json|\\.snap$|_snapshot\\.json$|_journal\\.json$)'",
