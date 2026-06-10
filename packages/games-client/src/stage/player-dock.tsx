@@ -1,52 +1,63 @@
 "use client";
 
-import type { AvatarConfig, Mark } from "@gamelobby/shared/types";
-import { Character } from "../../ui/character";
-import { TttMark } from "./marks";
+import type { AvatarConfig } from "@gamelobby/shared/types";
+import { m, useReducedMotion } from "motion/react";
+import { type ReactNode, useId } from "react";
+import { Character } from "../ui/character";
 
-type BarPlayer = {
+export type StagePlayer = {
   userId: string;
   username: string;
   role: string;
   avatar?: AvatarConfig | null;
 };
 
-function asMark(role: string): Mark | null {
-  return role === "X" || role === "O" ? role : null;
-}
-
-export function PlayerBar({
+export function PlayerDock({
   players,
-  currentTurn,
+  activeRole,
   myUserId,
-  active,
   onViewProfile,
+  renderRoleBadge,
 }: {
-  players: BarPlayer[];
-  currentTurn: Mark;
+  players: StagePlayer[];
+  activeRole: string | null;
   myUserId: string | null;
-  active: boolean;
   onViewProfile?: (user: {
     username: string;
     avatar?: AvatarConfig | null;
   }) => void;
+  renderRoleBadge?: (role: string) => ReactNode;
 }) {
+  const reduce = useReducedMotion();
+  const ringId = useId();
+
   return (
     <div className="mb-5 flex items-stretch gap-3">
       {players.map((p) => {
-        const mark = asMark(p.role);
-        const isTurn = active && mark !== null && mark === currentTurn;
+        const isTurn = activeRole !== null && p.role === activeRole;
         const isMe = p.userId === myUserId;
         return (
           <div
             key={p.userId}
             className={[
-              "flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border px-3 py-2 transition",
+              "relative flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border px-3 py-2 transition-colors duration-300",
               isTurn
-                ? "border-primary/60 bg-surface-overlay shadow-sm"
+                ? "border-transparent bg-surface-overlay"
                 : "border-border bg-surface-raised",
             ].join(" ")}
           >
+            {isTurn ? (
+              <m.span
+                aria-hidden
+                layoutId={ringId}
+                transition={
+                  reduce
+                    ? { duration: 0 }
+                    : { type: "spring", duration: 0.5, bounce: 0.25 }
+                }
+                className="pointer-events-none absolute inset-0 rounded-xl shadow-sm ring-2 ring-primary/60"
+              />
+            ) : null}
             {!isMe && onViewProfile ? (
               <button
                 type="button"
@@ -75,9 +86,7 @@ export function PlayerBar({
             )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                {mark ? (
-                  <TttMark mark={mark} className="size-4 shrink-0" />
-                ) : null}
+                {renderRoleBadge ? renderRoleBadge(p.role) : null}
                 <span className="truncate font-medium text-card-foreground text-sm">
                   {p.username}
                   {isMe ? " (you)" : ""}
