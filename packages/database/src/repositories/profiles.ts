@@ -5,6 +5,7 @@ import type {
   CreateProfileInput,
   GameStat,
   GameType,
+  GlassMode,
   PatternId,
   ProfileStats,
   PublicUserRow,
@@ -130,13 +131,19 @@ export async function updateUsername(
 
 export async function updateAppearance(
   userId: string,
-  patch: { theme?: ThemeId; colorMode?: ColorMode; pattern?: PatternId },
+  patch: {
+    theme?: ThemeId;
+    colorMode?: ColorMode;
+    pattern?: PatternId;
+    glass?: GlassMode;
+  },
 ): Promise<void> {
   appearancePatchSchema.parse(patch);
   const set: {
     theme?: ThemeId;
     colorMode?: ColorMode;
     pattern?: PatternId;
+    glass?: GlassMode;
     updatedAt: Date;
   } = {
     updatedAt: new Date(),
@@ -144,6 +151,7 @@ export async function updateAppearance(
   if (patch.theme !== undefined) set.theme = patch.theme;
   if (patch.colorMode !== undefined) set.colorMode = patch.colorMode;
   if (patch.pattern !== undefined) set.pattern = patch.pattern;
+  if (patch.glass !== undefined) set.glass = patch.glass;
   await db.update(userProfile).set(set).where(eq(userProfile.userId, userId));
 }
 

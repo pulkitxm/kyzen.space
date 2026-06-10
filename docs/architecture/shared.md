@@ -26,6 +26,7 @@ This is also why the chat contract no longer has its own package: the former `@g
 | `packages/shared/src/constants/audio.ts` | `GAME_SFX_STORAGE_KEY` / `GAME_MUSIC_STORAGE_KEY`, `DEFAULT_SFX_VOLUME` / `DEFAULT_MUSIC_VOLUME`, `VOLUME_MIN` / `VOLUME_MAX` / `VOLUME_STEP` - the client-only game-audio preference keys + bounds (see [audio.md](./audio.md)). |
 | `packages/shared/src/constants/theme.ts` | `THEME_IDS`, `DEFAULT_THEME`, `COLOR_MODES`, `DEFAULT_COLOR_MODE`. |
 | `packages/shared/src/constants/pattern.ts` | `PATTERN_IDS`, `DEFAULT_PATTERN`. |
+| `packages/shared/src/constants/glass.ts` | `GLASS_MODES`, `DEFAULT_GLASS_MODE`, `GLASS_MODE_DEFS`, `GLASS_STORAGE_KEY` - the Liquid Glass appearance axis. |
 | `packages/shared/src/constants/chat-layout.ts` | The chat-layout numeric bounds (`MIN_GAME`, `MIN_CHAT`/`MAX_CHAT`/`DEFAULT_CHAT_W`, the `*_CHAT_POPOUT_*` bounds, `DEFAULT_POPOUT`). |
 | `packages/shared/src/constants/username.ts` | `USERNAME_MIN_LENGTH`/`USERNAME_MAX_LENGTH`, `USERNAME_PATTERN`, `DISPLAY_NAME_MAX_LENGTH`, `RESERVED_USERNAMES`. |
 | `packages/shared/src/constants/games.ts` | `TIC_TAC_TOE` and the canonical `GAME_TYPES` list. |
@@ -35,7 +36,7 @@ This is also why the chat contract no longer has its own package: the former `@g
 | `packages/shared/src/types/index.ts` | Barrel for all types + schemas (audio, avatar, chat, chat-layout, db, games, pattern, playing-cards, theme, username) and the re-exported `z`. |
 | `packages/shared/src/types/audio.ts` | `AudioChannelPrefs` (`{ volume, muted }`) - a plain type (no Zod) for the two client-only audio preference channels. |
 | `packages/shared/src/types/z.ts` | `export { z } from "zod"` (+ `ZodType` / `ZodTypeAny`) - the single import point for Zod. |
-| `packages/shared/src/types/theme.ts` / `pattern.ts` / `chat-layout.ts` / `username.ts` | Per-area schemas + inferred types + small guards/helpers (`isValidTheme`, `validateChatModePref`, `normalizeUsername`, …). |
+| `packages/shared/src/types/theme.ts` / `pattern.ts` / `glass.ts` / `chat-layout.ts` / `username.ts` | Per-area schemas + inferred types + small guards/helpers (`isValidTheme`, `isValidGlassMode`, `validateChatModePref`, `normalizeUsername`, …). |
 | `packages/shared/src/types/avatar.ts` | Re-exports `AvatarConfig` (and friends) from `@gamelobby/avatar`, and defines `avatarConfigSchema` (the Zod schema used to validate an avatar config on the wire). |
 | `packages/shared/src/types/playing-cards.ts` | `Suit` / `Rank` / `JokerVariant` for the playing-card renderer (see [playing-cards.md](./playing-cards.md)). |
 | `packages/shared/src/types/chat/` | The former `chat-core`: `dto.ts` (DTOs), `schemas.ts` (`gameCardMetaSchema`, `clientCreateGameInConversationSchema`, …), `socket-events.ts` (client/server payload types + `Ack`). |

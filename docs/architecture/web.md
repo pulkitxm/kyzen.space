@@ -18,7 +18,7 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | Path | Responsibility |
 | --- | --- |
 | `apps/web/app/layout.tsx` | Root Server Component; one authenticated fan-out fetch, sets `<html>` theme/pattern attrs, injects no-flash boot scripts, threads an `isAnonymous` flag, wraps everything in `Providers` + `AppShellClient`. |
-| `apps/web/app/providers.tsx` | Client wrapper: `next-themes` `ThemeProvider` (light/dark) + `AppearanceProvider` (palette/pattern). |
+| `apps/web/app/providers.tsx` | Client wrapper: `next-themes` `ThemeProvider` (light/dark) + `AppearanceProvider` (palette/pattern/glass). |
 | `apps/web/app/app-shell.tsx` | Client shell: Jotai `Provider`, `SocketProvider`, `GuestNudge`, `MergeConsent`, `ChatSocketBridge`, sidebar + `<main>`. |
 | `apps/web/app/page.tsx` | Home grid of games, rendered from `listGameMeta()`. |
 | `apps/web/app/sidebar.tsx` | The collapsible, resizable left rail rendered by `AppShellClient` (logo, nav, `SidebarSocialNav`, profile/avatar entry); persists collapsed/width via the sidebar atoms + cookie. |
@@ -45,7 +45,10 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/play/[gameId]/game-settings-panel.tsx` | Settings modal body: per-channel mute toggle + −/+ + range slider for game sound and background music. |
 | `apps/web/lib/sidebar-atoms-shared.ts` | Storage keys + `clampWidth` / `clampWidthSafe` helpers shared by the atoms and the cookie/boot-script machinery. |
 | `apps/web/lib/sidebar-prefs.ts` | `SIDEBAR_PREFS_COOKIE` + `SIDEBAR_LS_BOOT_SCRIPT` + `parseSidebarPrefsCookieValue` / `persistSidebarPrefsToCookie`: the cookie contract and the no-flash boot script the layout injects. |
-| `apps/web/lib/appearance.tsx` | `AppearanceProvider` + `usePalette`/`usePattern`/`useColorModeSetting`; persists appearance via `clientFetch` PUT. |
+| `apps/web/lib/appearance.tsx` | `AppearanceProvider` + `usePalette`/`usePattern`/`useGlassMode`/`useColorModeSetting`; persists appearance via `clientFetch` PUT. |
+| `apps/web/lib/glass.ts` | Liquid Glass shim: re-exports the shared glass catalog + `applyGlass` (sets/removes `data-glass`) + `GLASS_BOOT_SCRIPT`. |
+| `apps/web/lib/glass-lens.ts` | Pure refraction math: rounded-rect SDF + `computeLensDisplacementPixels` (the displacement map the lens filters consume). |
+| `apps/web/components/glass/liquid-glass.tsx` | `useLiquidLens` - Chromium-only progressive enhancement that builds per-size SVG displacement filters (with chromatic aberration) and applies `backdrop-filter: url(#…)` to floating surfaces. |
 | `apps/web/app/games/[gameType]/page.tsx` | The single dynamic game-lobby route; `hasEngine` gate + `getDefinition` drive `GameLobby`. |
 | `apps/web/app/games/_shared/game-lobby.tsx` | Renders the `configFields` form, the "Play with a friend" button → `ConversationPicker`, the matchmaking "Find a match" button + Searching/Cancel state (`game:queue_join` / `game:queue_leave`, navigate on `match_found`), and the "Invite a friend (link)" button (`ensureIdentity()` → `createInviteLink` → clipboard). |
 | `apps/web/lib/matchmaking-atoms.ts` | `matchmakingAtom`: a single Jotai atom holding `{ searching: gameType | null }` so the lobby's Searching/Cancel state survives a route change while a match is being found. |
@@ -71,11 +74,12 @@ The deeper *why* behind all of it: **the same engine and Zod schemas that inform
 | `apps/web/app/settings/settings-tabs.tsx` | Client sub-route nav; active tab from `usePathname()`. |
 | `apps/web/app/settings/account/page.tsx` | Account tab: identity form + email + sessions + sign-out/revoke; fetches `/api/profiles/me` to seed the identity form. |
 | `apps/web/app/settings/appearance/page.tsx` | Redirects `/settings/appearance` → `/settings/appearance/theme` (the default sub-tab). |
-| `apps/web/app/settings/appearance/{theme,doodles}/page.tsx` | Appearance sub-routes (Server Components): each resolves the session and renders `AppearanceShell` around the `ThemePicker` / `DoodlePicker`. |
+| `apps/web/app/settings/appearance/{theme,doodles,glass}/page.tsx` | Appearance sub-routes (Server Components): each resolves the session and renders `AppearanceShell` around the `ThemePicker` / `DoodlePicker` / `GlassPicker`. |
 | `apps/web/app/settings/appearance-shell.tsx` | Server shell: the Appearance card + heading + `AppearanceTabs` sub-nav, wrapping the active picker. |
-| `apps/web/app/settings/appearance-tabs.tsx` | Client `Link`-based Theme \| Doodles sub-nav; active tab from `usePathname()`. |
+| `apps/web/app/settings/appearance-tabs.tsx` | Client `Link`-based Theme \| Doodles \| Glass sub-nav; active tab from `usePathname()`. |
 | `apps/web/app/settings/account-identity-form.tsx` | Client form to edit display name + username (debounced live availability check, suggestion chips, cooldown lock). |
 | `apps/web/app/settings/theme-picker.tsx` | Hover-preview palette/color-mode picker driven by the appearance context. |
+| `apps/web/app/settings/glass-picker.tsx` | Hover-preview Liquid Glass mode picker (Off / Neutral / Tinted / Smoke) driven by the appearance context. |
 | `apps/web/next.config.ts` | `transpilePackages` for the raw-TS workspace packages (`@gamelobby/shared`, `@gamelobby/games-core`, `@gamelobby/games-client`). |
 | `apps/web/app/globals.css` | Tailwind v4 entry; `@source` so Tailwind scans games-client classes. |
 | `packages/games-client/src/registry.ts` | `getGameClient(type)` maps a game type to its board component (currently the statically-imported, SSR'd `TicTacToeGameClient`; the registry type also permits a `React.lazy` board for a heavy future game); `getGameSkeleton(type)` returns its `<Suspense>` fallback (or `DefaultGameSkeleton`). |
@@ -161,16 +165,17 @@ The layout also sets appearance state on `<html>` from the server-known profile 
   suppressHydrationWarning
   data-theme={userTheme ?? DEFAULT_THEME}
   data-pattern={userPattern ?? DEFAULT_PATTERN}
+  data-glass={userGlass && userGlass !== "off" ? userGlass : undefined}
   style={patternStyle}
   className={`${geistSans.variable} ${geistMono.variable} ${gamePaused.variable} h-full antialiased`}
 >
 ```
 
-See `apps/web/app/layout.tsx:131`. The `style={patternStyle}` writes the `--pattern-url` / `--pattern-tile` CSS vars at SSR (from `patternVars`, `apps/web/app/layout.tsx:116`) so the doodle background lands without a flash. For *signed-out* users (whose preference lives only in `localStorage`, not on the server), four inline `dangerouslySetInnerHTML` boot scripts run before first paint to apply the stored theme/pattern/sidebar prefs synchronously (`apps/web/app/layout.tsx:141`). `suppressHydrationWarning` is set because these scripts intentionally mutate the DOM before React hydrates. The cookie path (`SIDEBAR_PREFS_COOKIE`, read at `apps/web/app/layout.tsx:125`) lets the server pre-trust sidebar prefs it can read from the request.
+See `apps/web/app/layout.tsx:131`. The `style={patternStyle}` writes the `--pattern-url` / `--pattern-tile` CSS vars at SSR (from `patternVars`, `apps/web/app/layout.tsx:116`) so the doodle background lands without a flash. For *signed-out* users (whose preference lives only in `localStorage`, not on the server), five inline `dangerouslySetInnerHTML` boot scripts run before first paint to apply the stored theme/pattern/glass/sidebar prefs synchronously (`apps/web/app/layout.tsx:141`). `suppressHydrationWarning` is set because these scripts intentionally mutate the DOM before React hydrates. The cookie path (`SIDEBAR_PREFS_COOKIE`, read at `apps/web/app/layout.tsx:125`) lets the server pre-trust sidebar prefs it can read from the request.
 
 ### Provider stack
 
-`Providers` (`apps/web/app/providers.tsx`) is the outermost client boundary: `next-themes` `ThemeProvider` for light/dark (`storageKey="gl-color-mode"`, `attribute="class"`) wrapping `AppearanceProvider` for palette + doodle pattern.
+`Providers` (`apps/web/app/providers.tsx`) is the outermost client boundary: `next-themes` `ThemeProvider` for light/dark (`storageKey="gl-color-mode"`, `attribute="class"`) wrapping `AppearanceProvider` for palette + doodle pattern + liquid glass.
 
 `AppShellClient` (`apps/web/app/app-shell.tsx`) nests the runtime providers in a specific order that is worth reading top-down:
 
@@ -303,7 +308,7 @@ The clamping logic and storage keys live in `lib/sidebar-atoms-shared.ts` precis
 
 ---
 
-## Appearance: theme, palette, pattern
+## Appearance: theme, palette, pattern, glass
 
 Appearance is split across three layers, and which layer owns what is the key to understanding it:
 
@@ -312,7 +317,14 @@ Appearance is split across three layers, and which layer owns what is the key to
 - **Persistence** for signed-in users goes back to the server via `clientFetch` PUT to `/api/profiles/me/appearance` (`apps/web/lib/appearance.tsx:35`) - note this is a *client* fetch because it fires from a click handler.
 - **Catalogs & helpers** - the palette/pattern *display* tables (`THEMES` / `PATTERNS` with their color/preview data) and lookups (`getThemeDef` / `getPatternDef`) now live in `@gamelobby/shared/constants`. `apps/web/lib/themes.ts` and `apps/web/lib/patterns.ts` **re-export that shared core** - the display tables, the id catalogs, and the guards (`THEMES` / `THEME_IDS` / `DEFAULT_THEME` / `getThemeDef` / `isValidTheme` from `apps/web/lib/themes.ts:3`; `PATTERNS` / `PATTERN_IDS` / `DEFAULT_PATTERN` / `getPatternDef` / `isValidPattern` from `apps/web/lib/patterns.ts:10`) - and add only the web-only runtime shims on top: the SSR boot scripts (`PALETTE_BOOT_SCRIPT` at `apps/web/lib/themes.ts:18`, `PATTERN_BOOT_SCRIPT` at `apps/web/lib/patterns.ts:44`) plus `patternVars` / `applyPattern` (`apps/web/lib/patterns.ts:20`). So the client and server agree on the *catalog and valid set* (one source of truth in `@gamelobby/shared`) while the browser owns only the *boot-time application*. `apps/web/lib/chat-layout.ts` follows the same pattern: it re-exports the shared `ChatMode`/geometry bounds (`MIN_CHAT`, `MAX_CHAT`, `DEFAULT_POPOUT`, …) and keeps the richer client-side `ChatLayout` (minimized / `stashEdge` / `lastStashEdge` / icon) plus its clamp/normalize/persist helpers. Both the docked and popout chat surfaces share one `ChatWindowControls` cluster (`apps/web/app/play/[gameId]/chat-window-controls.tsx`) - macOS-style traffic lights where red stashes the chat to its last edge (`lastStashEdge`), yellow minimizes to the floating icon, and green toggles popout ⇄ docked.
 
-`AppearanceProvider` reconciles two sources of truth on mount (`apps/web/lib/appearance.tsx:88`): if signed in, the server-provided `initialPalette`/`initialMode` win and are written to localStorage; if signed out, the locally stored values are restored. `ThemePicker` (`apps/web/app/settings/theme-picker.tsx`) adds a hover-preview flourish - `onMouseEnter`/`onFocus` mutate `data-theme` directly for an instant preview, and `onMouseLeave`/`onBlur` restore the committed value from a ref (`apps/web/app/settings/theme-picker.tsx:43`), only persisting on actual click. The Appearance tab is split into its own server sub-routes - `/settings/appearance/theme` and `/settings/appearance/doodles` - that each resolve the session server-side and render the shared `AppearanceShell` (the card + the `Link`-based `AppearanceTabs` sub-nav) around the relevant picker; `/settings/appearance` `redirect`s to `…/theme`, mirroring how `settings/page.tsx` `redirect`s to `/settings/account`.
+`AppearanceProvider` reconciles two sources of truth on mount (`apps/web/lib/appearance.tsx:88`): if signed in, the server-provided `initialPalette`/`initialMode` win and are written to localStorage; if signed out, the locally stored values are restored. `ThemePicker` (`apps/web/app/settings/theme-picker.tsx`) adds a hover-preview flourish - `onMouseEnter`/`onFocus` mutate `data-theme` directly for an instant preview, and `onMouseLeave`/`onBlur` restore the committed value from a ref (`apps/web/app/settings/theme-picker.tsx:43`), only persisting on actual click. The Appearance tab is split into its own server sub-routes - `/settings/appearance/theme`, `/settings/appearance/doodles`, and `/settings/appearance/glass` - that each resolve the session server-side and render the shared `AppearanceShell` (the card + the `Link`-based `AppearanceTabs` sub-nav) around the relevant picker; `/settings/appearance` `redirect`s to `…/theme`, mirroring how `settings/page.tsx` `redirect`s to `/settings/account`.
+
+### Liquid Glass
+
+**Liquid Glass** is a fourth appearance axis (`GLASS_MODES = off | neutral | tinted | smoke`, default `off`), persisted like the others (`gl-glass` in localStorage, `glass` pgEnum column on `user_profile`, `PUT /api/profiles/me/appearance`). When a mode other than `off` is active, `applyGlass` (`apps/web/lib/glass.ts`) sets `data-glass="<mode>"` on `<html>` (the attribute is *absent* when off, so all glass CSS is keyed off `html[data-glass]` and costs nothing by default). The material is layered:
+
+- **CSS layer (all browsers)** - `globals.css` defines per-mode `--glass-*` variables (light/dark × neutral/tinted/smoke; `tinted` derives from the palette's `--v`) and three component classes applied statically to the shared surface primitives: `.glass-pane` (Regular material - popovers, layered popups, dialogs, settings cards, lobby cards), `.glass-pane-clear` (Clear material - secondary buttons, the game-settings gear, the chat-popout controls pill), and `.glass-sidebar` (a dark-tinted variant so the sidebar's light text stays readable in light mode). All are no-ops without `data-glass`. The material is translucent background + `backdrop-filter: blur() saturate() brightness()` + offset inset rim lights + an inner shine + layered depth shadows; `.glass-press` adds the gel press states (springy `scale(0.96)` on `:active`). `smoke` panes locally override the text/surface custom properties so nested content stays readable on dark glass. `prefers-reduced-transparency: reduce` forces solid surfaces, and an `@supports` guard raises the background to near-solid where `backdrop-filter` is unsupported.
+- **Lens layer (Chromium-only enhancement)** - `useLiquidLens` (`apps/web/components/glass/liquid-glass.tsx`) attaches real edge refraction to floating surfaces (popover content, layered-popup dialogs, the profile popup, the chat dialogs). It measures the element (ResizeObserver + `offsetWidth/Height`, transform-independent), generates a rounded-rect-SDF displacement map (`apps/web/lib/glass-lens.ts`, pure and unit-tested), builds one SVG `<filter>` per unique size in a shared hidden `<svg>` (cached, LRU-capped), runs R/G/B through `feDisplacementMap` at staggered scales for chromatic aberration, and sets `backdrop-filter: url(#gl-lens-…) blur(2px) saturate(170%)` inline. The hook gates on `data-glass` being active, a Chromium UA + `CSS.supports("backdrop-filter", "url(#…)")`, and `prefers-reduced-transparency`; everywhere else the CSS layer simply renders without refraction.
 
 ---
 

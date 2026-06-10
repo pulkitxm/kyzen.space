@@ -12,6 +12,7 @@ type Profile = {
   avatar: AvatarConfig | null;
   theme: string;
   colorMode: string;
+  glass?: string;
   usernameChangedAt: Date | null;
   createdAt: Date;
 } | null;
@@ -25,7 +26,12 @@ let cooldownDays = 30;
 const updateAvatarCalls: Array<{ userId: string; avatar: AvatarConfig }> = [];
 const updateAppearanceCalls: Array<{
   userId: string;
-  patch: { theme?: string; colorMode?: string; pattern?: string };
+  patch: {
+    theme?: string;
+    colorMode?: string;
+    pattern?: string;
+    glass?: string;
+  };
 }> = [];
 const setDisplayNameCalls: Array<{ userId: string; name: string }> = [];
 const updateUsernameCalls: Array<{ userId: string; username: string }> = [];
@@ -47,7 +53,12 @@ mock.module("@gamelobby/database", () => ({
     },
     updateAppearance: async (
       userId: string,
-      patch: { theme?: string; colorMode?: string; pattern?: string },
+      patch: {
+        theme?: string;
+        colorMode?: string;
+        pattern?: string;
+        glass?: string;
+      },
     ) => {
       updateAppearanceCalls.push({ userId, patch });
     },
@@ -163,6 +174,25 @@ describe("PUT /me/appearance", () => {
       const res = await putAppearance({ pattern: "scribbles" });
       expect(res.status).toBe(400);
       expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("rejects an invalid glass mode", async () => {
+      const res = await putAppearance({ glass: "frosted" });
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("persists a valid glass mode", async () => {
+      const res = await putAppearance({ glass: "tinted" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ glass: "tinted" });
+      expect(updateAppearanceCalls[0]?.patch).toEqual({ glass: "tinted" });
+    });
+
+    it("persists glass off", async () => {
+      const res = await putAppearance({ glass: "off" });
+      expect(res.status).toBe(200);
+      expect(updateAppearanceCalls[0]?.patch).toEqual({ glass: "off" });
     });
 
     it("persists a valid pattern", async () => {
@@ -310,6 +340,22 @@ describe("GET /me", () => {
     const res = await profilesRouter.request("/me");
     const json = (await res.json()) as { profile: { avatar: AvatarConfig } };
     expect(json.profile.avatar).toEqual(seedAvatarConfig("lonely"));
+  });
+
+  it("returns the stored glass mode", async () => {
+    currentSession = { user: { id: "user-1", name: "T", email: "t@e.com" } };
+    storedProfile = makeProfile({ glass: "smoke" });
+    const res = await profilesRouter.request("/me");
+    const json = (await res.json()) as { profile: { glass: string } };
+    expect(json.profile.glass).toBe("smoke");
+  });
+
+  it("defaults glass to off when the profile has none", async () => {
+    currentSession = { user: { id: "user-1", name: "T", email: "t@e.com" } };
+    storedProfile = makeProfile();
+    const res = await profilesRouter.request("/me");
+    const json = (await res.json()) as { profile: { glass: string } };
+    expect(json.profile.glass).toBe("off");
   });
 });
 

@@ -38,7 +38,7 @@ A Drizzle table is a `pgTable(name, columns, (t) => [constraints])` call. Each c
 Two of these carry real weight:
 
 - **`$type<…>()` is a cast, not a guard.** `status`, `seatingMode`, `kind`, `role`, etc. are stored as plain `text` narrowed to a TS union (e.g. `GameStatus`, used at `schema.ts:109`); `game_state` is `jsonb` narrowed to `unknown`. Postgres will not stop you writing an illegal value - the repository is responsible for only inserting legal ones, and a JSONB blob stays untrusted until a Zod `safeParse`.
-- **pgEnums are derived from app constants.** `app_theme` / `color_mode` / `app_pattern` (`schema.ts:39`–`41`) take their values from `THEME_IDS` / `COLOR_MODES` / `PATTERN_IDS` in `@gamelobby/shared/constants`, so the DB enum can never disagree with the app's notion of valid values. They back `userProfile.theme` / `colorMode` / `pattern`.
+- **pgEnums are derived from app constants.** `app_theme` / `color_mode` / `app_pattern` / `glass_mode` (`schema.ts:41`–`44`) take their values from `THEME_IDS` / `COLOR_MODES` / `PATTERN_IDS` / `GLASS_MODES` in `@gamelobby/shared/constants`, so the DB enum can never disagree with the app's notion of valid values. They back `userProfile.theme` / `colorMode` / `pattern` / `glass`.
 
 Unlike most Drizzle setups, the `*Row` types are **not** derived with `$inferSelect`. They are hand-written interfaces in `@gamelobby/shared/types` (`types/db/index.ts:39`+) so that `apps/web` - which never imports `@gamelobby/database` (drizzle-orm + `postgres` are server-only) - can still speak the same row shapes. `drift-guard.ts` closes the loop: a list of `Expect<Equal<typeof table.$inferSelect, XRow>>` assertions (`drift-guard.ts:43`) is a compile-time tripwire that fails `type-check` the moment a table and its hand-written row type disagree. `@gamelobby/database` then re-exports those row types so they remain the currency the data-access layer speaks.
 
@@ -101,7 +101,7 @@ The remaining tables are conventional relational shapes - one line each:
 | Table | `schema.ts` | Notes |
 | --- | --- | --- |
 | `user` / `session` / `account` / `verification` | `:43`–`98` | The shape Better Auth expects (`user` also carries `is_anonymous boolean NOT NULL DEFAULT false`, `schema.ts:51`, for guest identities); everything else FKs `user.id`. See [`auth.md`](./auth.md). |
-| `userProfile` | `:169` | One per user (`unique` FK): unique `username`, a `stats` JSONB (`ProfileStats`, column `:176`), `avatar` JSONB, the three pgEnum appearance columns, a `chatLayout` JSONB, `usernameChangedAt` (cooldown gate), `lastSeenAt` (presence). |
+| `userProfile` | `:169` | One per user (`unique` FK): unique `username`, a `stats` JSONB (`ProfileStats`, column `:176`), `avatar` JSONB, the four pgEnum appearance columns (`theme` / `colorMode` / `pattern` / `glass`), a `chatLayout` JSONB, `usernameChangedAt` (cooldown gate), `lastSeenAt` (presence). |
 | `conversation` / `conversationMember` | `:211` / `:230` | A `dm` or `group`; DMs carry a unique `dmKey`. Membership has per-member read state + a `leftAt` soft-leave; mirrors the `game_player` `unique + userId index` design. |
 | `message` | `:253` | `kind` (`text` / `game_card` / …), nullable `body`, a `metadata` JSONB, an optional `gameId` link (FK to the UUID `game.id` - but a `game_card`'s *serialized* `MessageJson.gameId` carries the game's public `code`, not this UUID; see [`chat-core.md`](./chat-core.md)), a `deletedAt` soft delete. The composite `(conversationId, createdAt)` index powers keyset pagination. |
 | `friendship` | `:188` | `requester` / `addressee` plus a sorted unique `pairKey` so direction doesn't duplicate; indexed `(addressee, status)` and `(requester, status)`. |
@@ -125,7 +125,7 @@ The remaining tables are conventional relational shapes - one line each:
 - **Move numbers are dense, unique, and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` is the double-submit backstop.
 - **`game_player` replaced an old `players` JSONB array.** One indexed row per seat is the convention (it powers `game_player_uq` and the `userId` index); don't reintroduce per-game arrays.
 - **DMs and friendships key on a *sorted* pair.** `dmKey(a, b)` and `pairKey(a, b)` both `[a, b].sort().join(":")`, so the relationship is direction-independent and the unique constraint actually prevents duplicates.
-- **pgEnums derive from app constants.** Add a theme / pattern / mode by extending the TS constant the enum is built from (`THEME_IDS` / `COLOR_MODES` / `PATTERN_IDS` in `@gamelobby/shared/constants`) - never hand-edit the enum out of sync.
+- **pgEnums derive from app constants.** Add a theme / pattern / mode by extending the TS constant the enum is built from (`THEME_IDS` / `COLOR_MODES` / `PATTERN_IDS` / `GLASS_MODES` in `@gamelobby/shared/constants`) - never hand-edit the enum out of sync.
 - **Row types are hand-written and drift-guarded.** Change a column and you must change its `*Row` type in `@gamelobby/shared/types`; `drift-guard.ts` fails `type-check` if `$inferSelect` and the hand-written type diverge.
 - **Dev DB is push-managed.** Use `db:push` (or direct SQL) for local schema/enum changes; `db:migrate` expects a baseline the push-managed DB doesn't have.
 - **No per-game tables, ever.** Adding a game is a `packages/` change; this file does not change.

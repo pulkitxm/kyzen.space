@@ -14,6 +14,7 @@ import { Providers } from "@/app/providers";
 import { serverFetchJson } from "@/lib/api-server";
 import { CHAT_LAYOUT_BOOT_SCRIPT } from "@/lib/chat-layout";
 import { getServerSession } from "@/lib/get-server-session";
+import { GLASS_BOOT_SCRIPT, type GlassMode } from "@/lib/glass";
 import {
   DEFAULT_PATTERN,
   PATTERN_BOOT_SCRIPT,
@@ -68,6 +69,7 @@ export default async function RootLayout({
   let userTheme: ThemeId | null = null;
   let userMode: ColorMode | null = null;
   let userPattern: PatternId | null = null;
+  let userGlass: GlassMode | null = null;
   let initialConversations: ConversationJson[] = [];
   let initialFriends: FriendshipJson[] = [];
   let initialIncoming: FriendshipJson[] = [];
@@ -83,6 +85,7 @@ export default async function RootLayout({
           theme: ThemeId;
           colorMode: ColorMode;
           pattern: PatternId;
+          glass: GlassMode;
         };
       }>("/api/profiles/me"),
       serverFetchJson<{ conversations: ConversationJson[] }>(
@@ -103,6 +106,7 @@ export default async function RootLayout({
     userTheme = me?.profile.theme ?? null;
     userMode = me?.profile.colorMode ?? null;
     userPattern = me?.profile.pattern ?? null;
+    userGlass = me?.profile.glass ?? null;
     initialConversations = convs?.conversations ?? [];
     initialFriends = fr?.friends ?? [];
     initialIncoming = reqs?.incoming ?? [];
@@ -133,6 +137,7 @@ export default async function RootLayout({
       suppressHydrationWarning
       data-theme={userTheme ?? DEFAULT_THEME}
       data-pattern={userPattern ?? DEFAULT_PATTERN}
+      data-glass={userGlass && userGlass !== "off" ? userGlass : undefined}
       style={patternStyle}
       className={`${geistSans.variable} ${geistMono.variable} ${gamePaused.variable} h-full antialiased`}
     >
@@ -158,12 +163,18 @@ export default async function RootLayout({
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline boot script
           dangerouslySetInnerHTML={{ __html: PATTERN_BOOT_SCRIPT }}
         />
+        <script
+          id="gl-glass-bootstrap"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline boot script
+          dangerouslySetInnerHTML={{ __html: GLASS_BOOT_SCRIPT }}
+        />
       </head>
       <body className="min-h-full text-foreground">
         <Providers
           initialPalette={userTheme}
           initialMode={userMode}
           initialPattern={userPattern}
+          initialGlass={userGlass}
           signedIn={signedIn}
         >
           <AppShellClient

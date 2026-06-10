@@ -218,7 +218,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "relative flex shrink-0 flex-col border-sidebar-border border-r bg-sidebar",
+        "glass-sidebar relative flex shrink-0 flex-col border-sidebar-border border-r bg-sidebar",
         "fixed inset-y-0 left-0 z-50 w-64 md:relative md:z-auto md:w-(--sidebar-width)",
         !mobileOpen && "hidden md:flex",
       )}

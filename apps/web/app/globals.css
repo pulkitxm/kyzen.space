@@ -249,6 +249,208 @@ html[data-pattern="none"] .app-canvas::before {
   display: none;
 }
 
+html[data-glass] {
+  --glass-blur: 14px;
+  --glass-blur-clear: 4px;
+  --glass-saturate: 170%;
+  --glass-brighten: 1.05;
+  --glass-bg: color-mix(in srgb, #ffffff 55%, transparent);
+  --glass-bg-clear: color-mix(in srgb, #ffffff 22%, transparent);
+  --glass-sidebar-bg: color-mix(in srgb, var(--d) 55%, transparent);
+  --glass-border: color-mix(in srgb, #ffffff 55%, transparent);
+  --glass-rim-hi: color-mix(in srgb, #ffffff 95%, transparent);
+  --glass-rim-lo: color-mix(in srgb, #ffffff 55%, transparent);
+  --glass-shine: color-mix(in srgb, #ffffff 30%, transparent);
+  --glass-drop: color-mix(in srgb, #0f172a 18%, transparent);
+  --glass-contact: color-mix(in srgb, #0f172a 10%, transparent);
+}
+
+html.dark[data-glass] {
+  --glass-bg: color-mix(in srgb, var(--d) 55%, transparent);
+  --glass-bg-clear: color-mix(in srgb, var(--d) 25%, transparent);
+  --glass-sidebar-bg: color-mix(in srgb, var(--d) 45%, transparent);
+  --glass-border: color-mix(in srgb, #ffffff 16%, transparent);
+  --glass-rim-hi: color-mix(in srgb, #ffffff 50%, transparent);
+  --glass-rim-lo: color-mix(in srgb, #ffffff 25%, transparent);
+  --glass-shine: color-mix(in srgb, #ffffff 8%, transparent);
+  --glass-drop: color-mix(in srgb, #000000 45%, transparent);
+  --glass-contact: color-mix(in srgb, #000000 30%, transparent);
+}
+
+html[data-glass="tinted"] {
+  --glass-bg: color-mix(
+    in srgb,
+    var(--v) 22%,
+    color-mix(in srgb, #ffffff 50%, transparent)
+  );
+  --glass-bg-clear: color-mix(
+    in srgb,
+    var(--v) 16%,
+    color-mix(in srgb, #ffffff 18%, transparent)
+  );
+  --glass-sidebar-bg: color-mix(
+    in srgb,
+    var(--v) 16%,
+    color-mix(in srgb, var(--d) 50%, transparent)
+  );
+  --glass-border: color-mix(
+    in srgb,
+    var(--v) 25%,
+    color-mix(in srgb, #ffffff 50%, transparent)
+  );
+  --glass-rim-hi: color-mix(
+    in srgb,
+    var(--v) 22%,
+    color-mix(in srgb, #ffffff 92%, transparent)
+  );
+  --glass-rim-lo: color-mix(
+    in srgb,
+    var(--v) 30%,
+    color-mix(in srgb, #ffffff 50%, transparent)
+  );
+  --glass-shine: color-mix(
+    in srgb,
+    var(--v) 35%,
+    color-mix(in srgb, #ffffff 25%, transparent)
+  );
+}
+
+html.dark[data-glass="tinted"] {
+  --glass-bg: color-mix(
+    in srgb,
+    var(--v) 25%,
+    color-mix(in srgb, var(--d) 50%, transparent)
+  );
+  --glass-bg-clear: color-mix(in srgb, var(--v) 18%, transparent);
+  --glass-sidebar-bg: color-mix(
+    in srgb,
+    var(--v) 18%,
+    color-mix(in srgb, var(--d) 42%, transparent)
+  );
+  --glass-border: color-mix(
+    in srgb,
+    var(--v) 25%,
+    color-mix(in srgb, #ffffff 18%, transparent)
+  );
+  --glass-rim-hi: color-mix(
+    in srgb,
+    var(--v) 30%,
+    color-mix(in srgb, #ffffff 50%, transparent)
+  );
+  --glass-rim-lo: color-mix(
+    in srgb,
+    var(--v) 35%,
+    color-mix(in srgb, #ffffff 25%, transparent)
+  );
+  --glass-shine: color-mix(
+    in srgb,
+    var(--v) 40%,
+    color-mix(in srgb, #ffffff 8%, transparent)
+  );
+}
+
+html[data-glass="smoke"],
+html.dark[data-glass="smoke"] {
+  --glass-bg: color-mix(in srgb, #0a0c18 50%, transparent);
+  --glass-bg-clear: color-mix(in srgb, #0a0c18 30%, transparent);
+  --glass-sidebar-bg: color-mix(in srgb, #0a0c18 55%, transparent);
+  --glass-border: color-mix(in srgb, #ffffff 14%, transparent);
+  --glass-rim-hi: color-mix(in srgb, #ffffff 40%, transparent);
+  --glass-rim-lo: color-mix(in srgb, #ffffff 18%, transparent);
+  --glass-shine: color-mix(in srgb, #ffffff 6%, transparent);
+  --glass-drop: color-mix(in srgb, #000000 50%, transparent);
+  --glass-contact: color-mix(in srgb, #000000 32%, transparent);
+}
+
+html[data-glass] .glass-pane {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur))
+    saturate(var(--glass-saturate)) brightness(var(--glass-brighten));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+    brightness(var(--glass-brighten));
+  box-shadow:
+    0 14px 34px var(--glass-drop),
+    0 3px 7px var(--glass-contact),
+    inset 2.5px 2.5px 1.5px -2px var(--glass-rim-hi),
+    inset -2.5px -2.5px 1.5px -2px var(--glass-rim-lo),
+    inset 0 0 12px var(--glass-shine);
+}
+
+html[data-glass] .glass-pane-clear {
+  background: var(--glass-bg-clear);
+  border-color: var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur-clear))
+    saturate(var(--glass-saturate)) brightness(var(--glass-brighten));
+  backdrop-filter: blur(var(--glass-blur-clear)) saturate(var(--glass-saturate))
+    brightness(var(--glass-brighten));
+  box-shadow:
+    0 3px 10px var(--glass-contact),
+    inset 1.5px 1.5px 1px -1px var(--glass-rim-hi),
+    inset -1.5px -1.5px 1px -1px var(--glass-rim-lo),
+    inset 0 0 8px var(--glass-shine);
+}
+
+html[data-glass] .glass-sidebar {
+  background: var(--glass-sidebar-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur))
+    saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+html[data-glass="smoke"] .glass-pane,
+html[data-glass="smoke"] .glass-pane-clear {
+  --foreground: #eef1f8;
+  --card-foreground: #eef1f8;
+  --muted-foreground: color-mix(in srgb, #eef1f8 66%, transparent);
+  --card: color-mix(in srgb, #12141f 60%, transparent);
+  --surface: color-mix(in srgb, #ffffff 6%, transparent);
+  --surface-raised: color-mix(in srgb, #ffffff 8%, transparent);
+  --surface-overlay: color-mix(in srgb, #ffffff 10%, transparent);
+  --surface-hover: color-mix(in srgb, #ffffff 10%, transparent);
+  --border: color-mix(in srgb, #ffffff 14%, transparent);
+  color: var(--card-foreground);
+}
+
+html[data-glass] .glass-press {
+  transition:
+    transform 0.35s cubic-bezier(0.34, 1.8, 0.5, 1),
+    box-shadow 0.2s ease,
+    background-color 0.15s ease;
+}
+
+html[data-glass] .glass-press:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html[data-glass] .glass-pane,
+  html[data-glass] .glass-pane-clear {
+    background: var(--card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: 0 8px 24px var(--glass-contact);
+  }
+  html[data-glass] .glass-sidebar {
+    background: var(--sidebar);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@supports not (
+    (backdrop-filter: blur(1px)) or
+    (-webkit-backdrop-filter: blur(1px))
+  ) {
+  html[data-glass] .glass-pane,
+  html[data-glass] .glass-pane-clear {
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+  }
+  html[data-glass] .glass-sidebar {
+    background: color-mix(in srgb, var(--sidebar) 94%, transparent);
+  }
+}
+
 @layer base {
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),

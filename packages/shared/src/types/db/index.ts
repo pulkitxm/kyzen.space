@@ -11,6 +11,7 @@ import type {
 import type { ChatMode } from "../chat-layout";
 import type { GameType } from "../games/core";
 import type { GameStatusDto, SeatingModeDto } from "../games/wire";
+import type { GlassMode } from "../glass";
 import type { PatternId } from "../pattern";
 import type { ColorMode, ThemeId } from "../theme";
 
@@ -141,6 +142,7 @@ export type UserProfileRow = {
   theme: ThemeId;
   colorMode: ColorMode;
   pattern: PatternId;
+  glass: GlassMode;
   chatLayout: { mode: ChatMode } | null;
   usernameChangedAt: Date | null;
   lastSeenAt: Date | null;

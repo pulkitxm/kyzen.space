@@ -14,6 +14,13 @@ import {
 
 import { clientFetch } from "@/lib/api-client";
 import {
+  applyGlass,
+  DEFAULT_GLASS_MODE,
+  GLASS_STORAGE_KEY,
+  type GlassMode,
+  isValidGlassMode,
+} from "@/lib/glass";
+import {
   applyPattern,
   DEFAULT_PATTERN,
   isValidPattern,
@@ -29,7 +36,12 @@ import {
 } from "@/lib/themes";
 
 function persistAppearance(
-  patch: { theme?: ThemeId; colorMode?: ColorMode; pattern?: PatternId },
+  patch: {
+    theme?: ThemeId;
+    colorMode?: ColorMode;
+    pattern?: PatternId;
+    glass?: GlassMode;
+  },
   signedIn: boolean,
 ) {
   if (!signedIn) return;
@@ -62,22 +74,35 @@ const PatternContext = createContext<PatternContextValue>({
   setPattern: () => {},
 });
 
+interface GlassContextValue {
+  glass: GlassMode;
+  setGlass: (id: GlassMode) => void;
+}
+
+const GlassContext = createContext<GlassContextValue>({
+  glass: DEFAULT_GLASS_MODE,
+  setGlass: () => {},
+});
+
 export function AppearanceProvider({
   children,
   initialPalette,
   initialMode,
   initialPattern,
+  initialGlass,
   signedIn,
 }: {
   children: ReactNode;
   initialPalette: ThemeId;
   initialMode: ColorMode | null;
   initialPattern: PatternId;
+  initialGlass: GlassMode;
   signedIn: boolean;
 }) {
   const { theme: mode, setTheme: setMode } = useTheme();
   const [palette, setPaletteState] = useState<ThemeId>(initialPalette);
   const [pattern, setPatternState] = useState<PatternId>(initialPattern);
+  const [glass, setGlassState] = useState<GlassMode>(initialGlass);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", palette);
@@ -85,6 +110,9 @@ export function AppearanceProvider({
   useEffect(() => {
     applyPattern(document.documentElement, pattern);
   }, [pattern]);
+  useEffect(() => {
+    applyGlass(document.documentElement, glass);
+  }, [glass]);
 
   const synced = useRef(false);
   useEffect(() => {
@@ -95,6 +123,7 @@ export function AppearanceProvider({
       try {
         localStorage.setItem(PALETTE_STORAGE_KEY, initialPalette);
         localStorage.setItem(PATTERN_STORAGE_KEY, initialPattern);
+        localStorage.setItem(GLASS_STORAGE_KEY, initialGlass);
       } catch {}
       if (initialMode && mode !== initialMode) setMode(initialMode);
       return;
@@ -107,8 +136,19 @@ export function AppearanceProvider({
       const storedPattern = localStorage.getItem(PATTERN_STORAGE_KEY);
       if (storedPattern && isValidPattern(storedPattern))
         setPatternState(storedPattern);
+      const storedGlass = localStorage.getItem(GLASS_STORAGE_KEY);
+      if (storedGlass && isValidGlassMode(storedGlass))
+        setGlassState(storedGlass);
     } catch {}
-  }, [signedIn, initialPalette, initialMode, initialPattern, mode, setMode]);
+  }, [
+    signedIn,
+    initialPalette,
+    initialMode,
+    initialPattern,
+    initialGlass,
+    mode,
+    setMode,
+  ]);
 
   const setPalette = useCallback(
     (id: ThemeId) => {
@@ -132,6 +172,17 @@ export function AppearanceProvider({
     [signedIn],
   );
 
+  const setGlass = useCallback(
+    (id: GlassMode) => {
+      setGlassState(id);
+      try {
+        localStorage.setItem(GLASS_STORAGE_KEY, id);
+      } catch {}
+      persistAppearance({ glass: id }, signedIn);
+    },
+    [signedIn],
+  );
+
   const paletteValue = useMemo(
     () => ({ palette, setPalette }),
     [palette, setPalette],
@@ -140,11 +191,14 @@ export function AppearanceProvider({
     () => ({ pattern, setPattern }),
     [pattern, setPattern],
   );
+  const glassValue = useMemo(() => ({ glass, setGlass }), [glass, setGlass]);
 
   return (
     <PaletteContext.Provider value={paletteValue}>
       <PatternContext.Provider value={patternValue}>
-        {children}
+        <GlassContext.Provider value={glassValue}>
+          {children}
+        </GlassContext.Provider>
       </PatternContext.Provider>
     </PaletteContext.Provider>
   );
@@ -156,6 +210,10 @@ export function usePalette(): PaletteContextValue {
 
 export function usePattern(): PatternContextValue {
   return use(PatternContext);
+}
+
+export function useGlassMode(): GlassContextValue {
+  return use(GlassContext);
 }
 
 export function useColorModeSetting(signedIn: boolean) {

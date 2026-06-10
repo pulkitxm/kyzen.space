@@ -5,6 +5,7 @@ import type { ConversationJson } from "@gamelobby/shared/types";
 import { useAtomValue, useStore } from "jotai";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLiquidLens } from "@/components/glass/liquid-glass";
 import { Button } from "@/components/ui";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
@@ -31,6 +32,7 @@ export function GroupSettingsDialog({
   const [name, setName] = useState(conversation.name ?? "");
   const [busy, setBusy] = useState(false);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const lensRef = useLiquidLens<HTMLDivElement>();
 
   if (!open) return null;
 
@@ -94,7 +96,10 @@ export function GroupSettingsDialog({
         className="absolute inset-0 bg-black/50"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-border bg-card p-4 shadow-xl">
+      <div
+        ref={lensRef}
+        className="glass-pane relative flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-border bg-card p-4 shadow-xl"
+      >
         <h2 className="mb-3 font-semibold text-lg">Group settings</h2>
 
         {isOwner ? (
