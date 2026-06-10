@@ -1,0 +1,57 @@
+name: No leftovers
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: no-leftovers-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  no-leftovers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: No console.log in app or package source
+        run: |
+          if git grep -nE "console\.log\(" -- "apps/server/src" "apps/web/app" "apps/web/components" "apps/web/lib" "packages/*/src"; then
+            echo "::error::console.log found in source. Use the pino logger on the server, or remove it. It is fine in scripts/ and tests/."
+            exit 1
+          fi
+          echo "No console.log in source."
+      - name: No debugger statements
+        run: |
+          if git grep -nE "^[[:space:]]*debugger" -- "*.ts" "*.tsx"; then
+            echo "::error::debugger statement found. Remove it before merging."
+            exit 1
+          fi
+          echo "No debugger statements."
+      - name: No focused tests
+        run: |
+          if git grep -nE "\b(test|it|describe)\.only\(" -- "*.ts" "*.tsx"; then
+            echo "::error::.only found. A focused test silently skips the rest of the suite in that file. Remove .only."
+            exit 1
+          fi
+          echo "No focused tests."
+      - name: No merge conflict markers
+        run: |
+          if git grep -nE "^(<<<<<<< |>>>>>>> )"; then
+            echo "::error::Merge conflict markers found. Resolve the conflict and remove the markers."
+            exit 1
+          fi
+          echo "No conflict markers."
+      - name: No stray .env files
+        run: |
+          stray=$(git ls-files | grep -E "(^|/)\.env" | grep -vxF -e ".env.example" -e "apps/web/.env" || true)
+          if [ -n "$stray" ]; then
+            echo "$stray"
+            echo "::error::A .env file is tracked by git. Only .env.example and the apps/web/.env symlink are allowed."
+            exit 1
+          fi
+          echo "No stray .env files."

@@ -14,8 +14,8 @@ The *shape* of the tables themselves - the schema, the generic JSONB game model,
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/database/src/client.ts` | `createDb(url, latencyMs)` factory + the singleton it builds: the `postgres-js` connection pool and the Drizzle `db` instance. Re-exports `createDb`, `db`, `client`, `schema`, and the `DB` type. |
-| `packages/database/src/index.ts` | The public facade (`@gamelobby/database`): re-exports each repository as a namespace (`accountMerge`, `conversations`, `friends`, `games`, `invites`, `messages`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@gamelobby/shared/types`) and the `generateInviteToken` helper. |
+| `packages/database/src/client.ts` | `createDb(url, latencyMs)` factory + the singleton it builds: the `postgres-js` connection pool and the Drizzle `db` instance. Also `ping()` (`select 1` over the singleton `db` - the `/health` readiness probe). Re-exports `createDb`, `db`, `client`, `schema`, `ping`, and the `DB` type. |
+| `packages/database/src/index.ts` | The public facade (`@gamelobby/database`): re-exports each repository as a namespace (`accountMerge`, `conversations`, `friends`, `games`, `invites`, `messages`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@gamelobby/shared/types`) and the `ping` / `generateInviteToken` helpers. |
 | `packages/database/src/latency.ts` | `withLatency` Proxy that injects an artificial per-query delay (`DB_LATENCY_MS`) in non-production, for exercising loading states. |
 | `packages/database/src/repositories/games.ts` | Game/move/seat CRUD; assembles `GameRecord` (the `game` row with `players` attached and `gameType` narrowed to the registry `GameType`) via `toGameRecord` and the `getGameById` / `getGameByCode` joins; `createGame` allocates the public `code` (and defaults `seriesId` to the row's own id) and retries on a `game_code_uq` collision; the series reads `getSeriesGames` / `findLiveGameInConversation`. |
 | `packages/database/src/repositories/messages.ts` | Message insert/read/soft-delete + keyset-paginated `listMessages`. |
@@ -31,7 +31,7 @@ The *shape* of the tables themselves - the schema, the generic JSONB game model,
 
 ## The connection: `client.ts`
 
-Everything starts with one pool. `createDb` (`client.ts:14`) builds a `postgres-js` client (`max: 10` connections), optionally wraps it for artificial latency, and hands it to Drizzle:
+Everything starts with one pool. `createDb` (`client.ts:15`) builds a `postgres-js` client (`max: 10` connections), optionally wraps it for artificial latency, and hands it to Drizzle:
 
 ```ts
 export function createDb(url: string, latencyMs = 0) {
@@ -45,7 +45,7 @@ export const client = singleton.client;
 export const db = singleton.db;
 ```
 
-Passing `{ schema }` (`client.ts:16`) gives Drizzle the full table catalog, which is what makes the `db.query.*` relational helpers and good inference available. The exported `db` is a **module-level singleton** built from one `createDb(...)` call (`client.ts:19`) - every repository imports the same instance (`import { db } from "../client"`), so the whole server shares one pool. The package reads its own env directly: `DATABASE_URL` (`client.ts:19`) and `DB_LATENCY_MS` (via `defaultLatencyMs()`, `client.ts:8`) - `apps/server` no longer resolves DB config for it. The `createDb` factory is also exported (`index.ts:36`) so tests can spin up an isolated instance against another URL.
+Passing `{ schema }` (`client.ts:17`) gives Drizzle the full table catalog, which is what makes the `db.query.*` relational helpers and good inference available. The exported `db` is a **module-level singleton** built from one `createDb(...)` call (`client.ts:20`) - every repository imports the same instance (`import { db } from "../client"`), so the whole server shares one pool. The package reads its own env directly: `DATABASE_URL` (`client.ts:20`) and `DB_LATENCY_MS` (via `defaultLatencyMs()`, `client.ts:9`) - `apps/server` no longer resolves DB config for it. The `createDb` factory is also exported (`index.ts:37`) so tests can spin up an isolated instance against another URL. `ping()` (`client.ts:26`) runs `select 1` through the singleton `db` - the server's `/health` readiness check calls it via the barrel, keeping all SQL inside this package.
 
 ## The repository pattern
 
@@ -56,6 +56,7 @@ export type { DB } from "./client";
 
 export const createDb = createDbImpl;
 export const db = dbImpl;
+export const ping = pingImpl;
 export const schema = schemaImpl;
 export const generateInviteToken = generateInviteTokenImpl;
 
@@ -71,7 +72,7 @@ export * as profiles from "./repositories/profiles";
 
 So callers write `import { games, profiles } from "@gamelobby/database"` and then `games.getGameById(id)` / `profiles.bumpStats(...)`. There is no class, no DI container, no base "Repository" abstraction - just modules. The discipline is conventional, not enforced by types: routes and realtime handlers import these namespaces and never import Drizzle directly.
 
-The value exports (`createDb`, `db`, `schema`, `generateInviteToken`) are deliberately **owned `const` bindings** - `index.ts` imports them under `*Impl` aliases and re-exports fresh constants - rather than `export { … } from "./client"` alias re-exports. An alias re-export shares its live binding with the source module, so when a test calls `mock.module("@gamelobby/database", …)` on an already-loaded barrel (which Bun patches in place), the patch would write *through* the alias into `./client` and `./invite-token` themselves, poisoning direct importers of those modules for the rest of the process. Owned constants confine the patch to the barrel: barrel consumers see the mock, the source modules stay real. (This is exactly what a cross-workspace `bun test` run from the repo root exercises - integration tests load the real barrel, route tests then mock it, and `packages/database/tests/invite-token.test.ts` still expects the real `generateInviteToken`.)
+The value exports (`createDb`, `db`, `ping`, `schema`, `generateInviteToken`) are deliberately **owned `const` bindings** - `index.ts` imports them under `*Impl` aliases and re-exports fresh constants - rather than `export { … } from "./client"` alias re-exports. An alias re-export shares its live binding with the source module, so when a test calls `mock.module("@gamelobby/database", …)` on an already-loaded barrel (which Bun patches in place), the patch would write *through* the alias into `./client` and `./invite-token` themselves, poisoning direct importers of those modules for the rest of the process. Owned constants confine the patch to the barrel: barrel consumers see the mock, the source modules stay real. (This is exactly what a cross-workspace `bun test` run from the repo root exercises - integration tests load the real barrel, route tests then mock it, and `packages/database/tests/invite-token.test.ts` still expects the real `generateInviteToken`.)
 
 Repositories also **validate their inputs** with the Zod schemas exported from `@gamelobby/shared/types` before they write: `createGame` runs `createGameInputSchema.parse(input)` (`games.ts:30`), `addMove` runs `addMoveInputSchema.parse(input)` (`games.ts:215`), `insertMessage` / `create` / `createProfile` / `updateAppearance` parse theirs the same way.
 
@@ -192,7 +193,7 @@ Notice that no SQL appears anywhere in `turn-based.ts` - only `games.*` and `pro
 
 ## Artificial latency: `latency.ts`
 
-`DB_LATENCY_MS` is a dev affordance for testing loading states. `withLatency` (`latency.ts:70`) is a no-op unless `ms > 0`; otherwise it returns a `Proxy` around the `postgres-js` client that delays each query by intercepting the lazy query object's `then` (`latency.ts:14`) - so the sleep happens when a query is awaited - and threads through chainable methods, `unsafe`, and transaction callbacks (`begin` / `savepoint`) so delayed queries still compose. The package resolves the delay itself: `defaultLatencyMs()` (`client.ts:8`) reads `DB_LATENCY_MS` from `process.env` and runs it through `resolveDbLatencyMs(nodeEnv, requestedMs)` (`latency.ts:63`), which **forces it to 0 in production** (returns `0` when `nodeEnv === "production"`). So you can't accidentally ship an artificial delay, and `apps/server` no longer has to compute it. New env vars like this must be added to `turbo.json` `globalEnv` or builds won't see them.
+`DB_LATENCY_MS` is a dev affordance for testing loading states. `withLatency` (`latency.ts:70`) is a no-op unless `ms > 0`; otherwise it returns a `Proxy` around the `postgres-js` client that delays each query by intercepting the lazy query object's `then` (`latency.ts:14`) - so the sleep happens when a query is awaited - and threads through chainable methods, `unsafe`, and transaction callbacks (`begin` / `savepoint`) so delayed queries still compose. The package resolves the delay itself: `defaultLatencyMs()` (`client.ts:9`) reads `DB_LATENCY_MS` from `process.env` and runs it through `resolveDbLatencyMs(nodeEnv, requestedMs)` (`latency.ts:63`), which **forces it to 0 in production** (returns `0` when `nodeEnv === "production"`). So you can't accidentally ship an artificial delay, and `apps/server` no longer has to compute it. New env vars like this must be added to `turbo.json` `globalEnv` or builds won't see them.
 
 ## Gotchas, invariants & conventions
 
@@ -203,7 +204,7 @@ Notice that no SQL appears anywhere in `turn-based.ts` - only `games.*` and `pro
 - **At most one live game per `(conversation, gameType)`.** `findLiveGameInConversation` (`games.ts:125`) is the read behind that invariant; the create/rematch services short-circuit to its result instead of inserting a duplicate. A series of every game in a rematch chain is read flat via `getSeriesGames` (`games.ts:111`) keyed on the shared `seriesId`.
 - **Cursors are opaque and tolerant.** `decodeCursor` returns `null` (rather than throwing) on a malformed or non-base64 cursor (`cursor.ts:7`); callers then simply page from the start. Keyset pagination relies on the composite `createdAt`-leading indexes - keep them if you add new paginated lists.
 - **`bumpStats` is read-modify-write on JSONB** (`profiles.ts:153`), not an atomic increment. Fine for the current serialized call site in the move handler; be careful if you ever bump stats from concurrent paths.
-- **`DB_LATENCY_MS` is dev-only.** Forced to 0 in production by `resolveDbLatencyMs` (`latency.ts:63`), and resolved inside the package (`client.ts:8`).
+- **`DB_LATENCY_MS` is dev-only.** Forced to 0 in production by `resolveDbLatencyMs` (`latency.ts:63`), and resolved inside the package (`client.ts:9`).
 - **JSONB blobs are untrusted until parsed.** `game_state` / `config` / `move_data` are `unknown` by design; validity is owned by the games' Zod schemas (see [`database-schema.md`](./database-schema.md)) and enforced at the realtime boundary (`turn-based.ts:149`). Treat any `gameState` you read as untrusted until `stateSchema.safeParse`'d.
 - **No comments in code.** Per the repo-wide rule, the only comments you'll find in this layer are the `biome-ignore` directives on the `or(...)!` non-null assertions in the two paginated repositories.
 
