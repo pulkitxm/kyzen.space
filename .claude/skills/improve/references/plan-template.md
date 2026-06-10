@@ -4,9 +4,9 @@ Every plan is written for an executor model that has **zero context**: it has no
 
 Three properties make a plan executable by a weaker model:
 
-1. **Self-contained context** — everything needed is in the file: paths, code excerpts, conventions, commands.
-2. **Verification gates** — every step ends with a command and its expected result. The executor never has to *judge* whether it succeeded.
-3. **Hard boundaries and escape hatches** — explicit out-of-scope list, and "STOP and report" conditions instead of letting the model improvise when reality doesn't match the plan.
+1. **Self-contained context** - everything needed is in the file: paths, code excerpts, conventions, commands.
+2. **Verification gates** - every step ends with a command and its expected result. The executor never has to *judge* whether it succeeded.
+3. **Hard boundaries and escape hatches** - explicit out-of-scope list, and "STOP and report" conditions instead of letting the model improvise when reality doesn't match the plan.
 
 File naming: `plans/NNN-short-slug.md`, numbered in recommended execution order.
 
@@ -15,13 +15,13 @@ File naming: `plans/NNN-short-slug.md`, numbered in recommended execution order.
 ## Template
 
 ```markdown
-# Plan NNN: <Imperative title — what will be true after this plan>
+# Plan NNN: <Imperative title - what will be true after this plan>
 
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
-> report — do not improvise. When done, update the status row for this plan
-> in `plans/README.md` — unless a reviewer dispatched you and told you they
+> report - do not improvise. When done, update the status row for this plan
+> in `plans/README.md` - unless a reviewer dispatched you and told you they
 > maintain the index.
 >
 > **Drift check (run first)**: `git diff --stat <planned-at SHA>..HEAD -- <in-scope paths>`
@@ -37,24 +37,24 @@ File naming: `plans/NNN-short-slug.md`, numbered in recommended execution order.
 - **Depends on**: plans/NNN-*.md (or "none")
 - **Category**: bug | security | perf | tests | tech-debt | migration | dx | docs | direction
 - **Planned at**: commit `<short SHA>`, <YYYY-MM-DD>
-- **Issue**: <GitHub issue URL — only when published via `--issues`; omit otherwise>
+- **Issue**: <GitHub issue URL - only when published via `--issues`; omit otherwise>
 
 ## Why this matters
 
 2–5 sentences. The problem, its concrete cost, and what improves when this
-lands. Written so the executor (and a human reviewer) understands the intent —
+lands. Written so the executor (and a human reviewer) understands the intent -
 intent is what lets a correct judgment call happen when a detail is off.
 
 ## Current state
 
-The facts the executor needs, inlined — never "as discussed" or "see audit":
+The facts the executor needs, inlined - never "as discussed" or "see audit":
 
 - The relevant files, each with one line on its role:
-  - `src/orders/api.ts` — order-list endpoint; contains the N+1 (lines 130–160)
+  - `src/orders/api.ts` - order-list endpoint; contains the N+1 (lines 130–160)
 - Excerpts of the code as it exists today (short, with `file:line` markers),
   enough that the executor can confirm it's looking at the right thing.
 - The repo conventions that apply here, with a pointer to one exemplar file:
-  "Error handling follows the Result pattern — see `src/lib/result.ts` and its
+  "Error handling follows the Result pattern - see `src/lib/result.ts` and its
   use in `src/users/api.ts:40-60`. Match it."
 
 ## Commands you will need
@@ -66,11 +66,11 @@ The facts the executor needs, inlined — never "as discussed" or "see audit":
 | Tests     | `pnpm test -- <filter>`  | all pass            |
 | Lint      | `pnpm lint`              | exit 0              |
 
-(Exact commands from this repo — verified during recon, not guessed.)
+(Exact commands from this repo - verified during recon, not guessed.)
 
 ## Suggested executor toolkit
 
-(Optional — include only when relevant skills/tools plausibly exist in the
+(Optional - include only when relevant skills/tools plausibly exist in the
 executor's environment. Skip the section otherwise.)
 
 - Skills the executor should invoke if available, and for what:
@@ -84,16 +84,16 @@ executor's environment. Skip the section otherwise.)
 - `src/orders/api.test.ts` (create)
 
 **Out of scope** (do NOT touch, even though they look related):
-- `src/orders/legacy-api.ts` — deprecated path, scheduled for deletion;
+- `src/orders/legacy-api.ts` - deprecated path, scheduled for deletion;
   changing it wastes effort and risks the v1 clients still pinned to it.
-- Any change to the public response shape — clients depend on it.
+- Any change to the public response shape - clients depend on it.
 
 ## Git workflow
 
-(Filled from recon — match the repo's observed conventions.)
+(Filled from recon - match the repo's observed conventions.)
 
 - Branch: `advisor/NNN-<slug>` (or the repo's branch-naming convention if one is evident)
-- Commit per step or per logical unit; message style: <match repo, e.g. conventional commits — include an example from `git log`>
+- Commit per step or per logical unit; message style: <match repo, e.g. conventional commits - include an example from `git log`>
 - Do NOT push or open a PR unless the operator instructed it.
 
 ## Steps
@@ -109,7 +109,7 @@ line).
 ### Step 2: ...
 
 (Each step small enough to verify independently. Order steps so the codebase
-is never broken between steps when possible — e.g. add new path, switch
+is never broken between steps when possible - e.g. add new path, switch
 callers, then remove old path.)
 
 ## Test plan
@@ -167,10 +167,10 @@ honor its STOP conditions, and update your row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001  | ...   | P1       | S      | —          | TODO   |
+| 001  | ...   | P1       | S      | -          | TODO   |
 | 002  | ...   | P1       | M      | 001        | TODO   |
 
-Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
+Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale - finding fixed independently or approach abandoned)
 
 ## Dependency notes
 
@@ -181,12 +181,12 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - <finding>: not worth doing because <one line>. (So nobody re-audits it.)
 ```
 
-## Quality bar — check before finishing each plan
+## Quality bar - check before finishing each plan
 
 - Could a model that has never seen this repo execute this with only the plan file and the repo? If any step requires knowledge from the advisor session, inline that knowledge.
 - Is every verification a command with an expected result, not a judgment ("make sure it works")?
 - Does every step name exact files and symbols, not "the relevant module"?
 - Are the STOP conditions specific to this plan's actual risks, not boilerplate?
 - Would a reviewer reading only "Why this matters" + "Done criteria" understand what they're approving?
-- No secret values anywhere in the file — locations and credential types only.
+- No secret values anywhere in the file - locations and credential types only.
 - "Planned at" SHA is filled in and the in-scope paths in the drift check match the Scope section.
