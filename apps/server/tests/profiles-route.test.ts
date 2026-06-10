@@ -21,7 +21,6 @@ let currentSession: Session = null;
 let storedProfile: Profile = null;
 let usernameTaken = false;
 let blockedUsernames = new Set<string>();
-let suggestions: string[] = ["alt_1", "alt_2"];
 let cooldownDays = 30;
 const updateAvatarCalls: Array<{ userId: string; avatar: AvatarConfig }> = [];
 const updateAppearanceCalls: Array<{
@@ -48,6 +47,7 @@ mock.module("@gamelobby/database", () => ({
     getProfileByUsername: async () => storedProfile,
     getDisplayName: async () => "Display Name",
     isUsernameTaken: async () => usernameTaken,
+    getTakenUsernames: async () => new Set<string>(),
     updateAvatar: async (userId: string, avatar: AvatarConfig) => {
       updateAvatarCalls.push({ userId, avatar });
     },
@@ -82,13 +82,10 @@ mock.module("../src/env", () => ({
     get usernameChangeCooldownDays() {
       return cooldownDays;
     },
-    notAllowedUsernames: [] as string[],
+    get notAllowedUsernames() {
+      return [...blockedUsernames];
+    },
   },
-}));
-
-mock.module("../src/username", () => ({
-  isUsernameBlocked: (normalized: string) => blockedUsernames.has(normalized),
-  suggestUsernames: async () => suggestions,
 }));
 
 const { profilesRouter } = await import("../src/api/routes/profiles");
@@ -124,7 +121,6 @@ beforeEach(() => {
   storedProfile = null;
   usernameTaken = false;
   blockedUsernames = new Set<string>();
-  suggestions = ["alt_1", "alt_2"];
   cooldownDays = 30;
   updateAvatarCalls.length = 0;
   updateAppearanceCalls.length = 0;
@@ -451,7 +447,8 @@ describe("GET /me/username-available", () => {
     };
     expect(json.available).toBe(false);
     expect(json.reason).toBe("format");
-    expect(json.suggestions).toEqual(["alt_1", "alt_2"]);
+    expect(json.suggestions.length).toBeGreaterThan(0);
+    for (const s of json.suggestions) expect(typeof s).toBe("string");
   });
 
   it("reports a reserved/blocked name", async () => {
