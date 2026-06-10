@@ -12,7 +12,6 @@ export {
   getPatternDef,
   isValidPattern,
   PATTERN_IDS,
-  PATTERN_STORAGE_KEY,
   PATTERNS,
   type PatternId,
 };

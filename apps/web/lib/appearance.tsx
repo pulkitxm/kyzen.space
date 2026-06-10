@@ -1,5 +1,6 @@
 "use client";
 
+import { useAtom, useSetAtom } from "jotai";
 import { useTheme } from "next-themes";
 import {
   createContext,
@@ -8,32 +9,19 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useReducer,
   useRef,
 } from "react";
 
 import { clientFetch } from "@/lib/api-client";
 import {
-  applyGlass,
-  DEFAULT_GLASS_MODE,
-  GLASS_STORAGE_KEY,
-  type GlassMode,
-  isValidGlassMode,
-} from "@/lib/glass";
-import {
-  applyPattern,
-  DEFAULT_PATTERN,
-  isValidPattern,
-  PATTERN_STORAGE_KEY,
-  type PatternId,
-} from "@/lib/patterns";
-import {
-  type ColorMode,
-  DEFAULT_THEME,
-  isValidTheme,
-  PALETTE_STORAGE_KEY,
-  type ThemeId,
-} from "@/lib/themes";
+  glassAtom,
+  paletteAtom,
+  patternAtom,
+  serverAppearanceAtom,
+} from "@/lib/appearance-atoms";
+import { applyGlass, DEFAULT_GLASS_MODE, type GlassMode } from "@/lib/glass";
+import { applyPattern, DEFAULT_PATTERN, type PatternId } from "@/lib/patterns";
+import { type ColorMode, DEFAULT_THEME, type ThemeId } from "@/lib/themes";
 
 function persistAppearance(
   patch: {
@@ -54,73 +42,60 @@ function persistAppearance(
   });
 }
 
-interface PaletteContextValue {
-  palette: ThemeId;
-  setPalette: (id: ThemeId) => void;
-}
-
-const PaletteContext = createContext<PaletteContextValue>({
-  palette: DEFAULT_THEME,
-  setPalette: () => {},
-});
-
-interface PatternContextValue {
-  pattern: PatternId;
-  setPattern: (id: PatternId) => void;
-}
-
-const PatternContext = createContext<PatternContextValue>({
-  pattern: DEFAULT_PATTERN,
-  setPattern: () => {},
-});
-
-interface GlassContextValue {
-  glass: GlassMode;
-  setGlass: (id: GlassMode) => void;
-}
-
-const GlassContext = createContext<GlassContextValue>({
-  glass: DEFAULT_GLASS_MODE,
-  setGlass: () => {},
-});
-
-type AppearanceState = {
-  palette: ThemeId;
-  pattern: PatternId;
-  glass: GlassMode;
-};
-
-function appearanceReducer(
-  prev: AppearanceState,
-  patch: Partial<AppearanceState>,
-): AppearanceState {
-  return { ...prev, ...patch };
-}
-
-export function AppearanceProvider({
-  children,
-  initialPalette,
-  initialMode,
-  initialPattern,
-  initialGlass,
-  signedIn,
-}: {
-  children: ReactNode;
+interface AppearanceServerState {
+  signedIn: boolean;
   initialPalette: ThemeId;
   initialMode: ColorMode | null;
   initialPattern: PatternId;
   initialGlass: GlassMode;
-  signedIn: boolean;
-}) {
-  const { theme: mode, setTheme: setMode } = useTheme();
-  const [{ palette, pattern, glass }, dispatch] = useReducer(
-    appearanceReducer,
-    {
-      palette: initialPalette,
-      pattern: initialPattern,
-      glass: initialGlass,
-    },
+}
+
+const AppearanceContext = createContext<AppearanceServerState>({
+  signedIn: false,
+  initialPalette: DEFAULT_THEME,
+  initialMode: null,
+  initialPattern: DEFAULT_PATTERN,
+  initialGlass: DEFAULT_GLASS_MODE,
+});
+
+export function AppearanceProvider({
+  children,
+  signedIn,
+  initialPalette,
+  initialMode,
+  initialPattern,
+  initialGlass,
+}: AppearanceServerState & { children: ReactNode }) {
+  const value = useMemo(
+    () => ({
+      signedIn,
+      initialPalette,
+      initialMode,
+      initialPattern,
+      initialGlass,
+    }),
+    [signedIn, initialPalette, initialMode, initialPattern, initialGlass],
   );
+  return (
+    <AppearanceContext.Provider value={value}>
+      {children}
+    </AppearanceContext.Provider>
+  );
+}
+
+export function AppearanceSync() {
+  const {
+    signedIn,
+    initialPalette,
+    initialMode,
+    initialPattern,
+    initialGlass,
+  } = use(AppearanceContext);
+  const { theme: mode, setTheme: setMode } = useTheme();
+  const [palette] = useAtom(paletteAtom);
+  const [pattern] = useAtom(patternAtom);
+  const [glass] = useAtom(glassAtom);
+  const setServerAppearance = useSetAtom(serverAppearanceAtom);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", palette);
@@ -134,32 +109,14 @@ export function AppearanceProvider({
 
   const synced = useRef(false);
   useEffect(() => {
-    if (synced.current) return;
+    if (synced.current || !signedIn) return;
     synced.current = true;
-
-    if (signedIn) {
-      try {
-        localStorage.setItem(PALETTE_STORAGE_KEY, initialPalette);
-        localStorage.setItem(PATTERN_STORAGE_KEY, initialPattern);
-        localStorage.setItem(GLASS_STORAGE_KEY, initialGlass);
-      } catch {}
-      if (initialMode && mode !== initialMode) setMode(initialMode);
-      return;
-    }
-
-    try {
-      const stored: Partial<AppearanceState> = {};
-      const storedPalette = localStorage.getItem(PALETTE_STORAGE_KEY);
-      if (storedPalette && isValidTheme(storedPalette))
-        stored.palette = storedPalette;
-      const storedPattern = localStorage.getItem(PATTERN_STORAGE_KEY);
-      if (storedPattern && isValidPattern(storedPattern))
-        stored.pattern = storedPattern;
-      const storedGlass = localStorage.getItem(GLASS_STORAGE_KEY);
-      if (storedGlass && isValidGlassMode(storedGlass))
-        stored.glass = storedGlass;
-      if (Object.keys(stored).length > 0) dispatch(stored);
-    } catch {}
+    setServerAppearance({
+      palette: initialPalette,
+      pattern: initialPattern,
+      glass: initialGlass,
+    });
+    if (initialMode && mode !== initialMode) setMode(initialMode);
   }, [
     signedIn,
     initialPalette,
@@ -168,72 +125,49 @@ export function AppearanceProvider({
     initialGlass,
     mode,
     setMode,
+    setServerAppearance,
   ]);
 
+  return null;
+}
+
+export function usePalette() {
+  const { signedIn } = use(AppearanceContext);
+  const [palette, setPaletteValue] = useAtom(paletteAtom);
   const setPalette = useCallback(
     (id: ThemeId) => {
-      dispatch({ palette: id });
-      try {
-        localStorage.setItem(PALETTE_STORAGE_KEY, id);
-      } catch {}
+      setPaletteValue(id);
       persistAppearance({ theme: id }, signedIn);
     },
-    [signedIn],
+    [setPaletteValue, signedIn],
   );
+  return { palette, setPalette };
+}
 
+export function usePattern() {
+  const { signedIn } = use(AppearanceContext);
+  const [pattern, setPatternValue] = useAtom(patternAtom);
   const setPattern = useCallback(
     (id: PatternId) => {
-      dispatch({ pattern: id });
-      try {
-        localStorage.setItem(PATTERN_STORAGE_KEY, id);
-      } catch {}
+      setPatternValue(id);
       persistAppearance({ pattern: id }, signedIn);
     },
-    [signedIn],
+    [setPatternValue, signedIn],
   );
+  return { pattern, setPattern };
+}
 
+export function useGlassMode() {
+  const { signedIn } = use(AppearanceContext);
+  const [glass, setGlassValue] = useAtom(glassAtom);
   const setGlass = useCallback(
     (id: GlassMode) => {
-      dispatch({ glass: id });
-      try {
-        localStorage.setItem(GLASS_STORAGE_KEY, id);
-      } catch {}
+      setGlassValue(id);
       persistAppearance({ glass: id }, signedIn);
     },
-    [signedIn],
+    [setGlassValue, signedIn],
   );
-
-  const paletteValue = useMemo(
-    () => ({ palette, setPalette }),
-    [palette, setPalette],
-  );
-  const patternValue = useMemo(
-    () => ({ pattern, setPattern }),
-    [pattern, setPattern],
-  );
-  const glassValue = useMemo(() => ({ glass, setGlass }), [glass, setGlass]);
-
-  return (
-    <PaletteContext.Provider value={paletteValue}>
-      <PatternContext.Provider value={patternValue}>
-        <GlassContext.Provider value={glassValue}>
-          {children}
-        </GlassContext.Provider>
-      </PatternContext.Provider>
-    </PaletteContext.Provider>
-  );
-}
-
-export function usePalette(): PaletteContextValue {
-  return use(PaletteContext);
-}
-
-export function usePattern(): PatternContextValue {
-  return use(PatternContext);
-}
-
-export function useGlassMode(): GlassContextValue {
-  return use(GlassContext);
+  return { glass, setGlass };
 }
 
 export function useColorModeSetting(signedIn: boolean) {
