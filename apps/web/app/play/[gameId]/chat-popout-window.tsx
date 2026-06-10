@@ -183,7 +183,7 @@ export function ChatPopoutWindow({
       {}
       <div
         className={cn(
-          "glass-pane-clear absolute top-3 right-3 z-10 rounded-full bg-background/80 px-2 py-1.5 backdrop-blur",
+          "absolute top-3 right-3 z-10 rounded-full bg-background/80 px-2 py-1.5 backdrop-blur",
           isPopout ? "hidden" : "hidden md:block",
         )}
       >

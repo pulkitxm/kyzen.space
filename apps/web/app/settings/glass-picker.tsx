@@ -83,10 +83,10 @@ export function GlassPicker() {
     <div>
       <h3 className="mb-3 font-medium text-foreground text-sm">Liquid Glass</h3>
       <p className="mb-3 text-muted-foreground text-sm">
-        Turns the app's surfaces into liquid glass: panes refract what's behind
-        them, catch the light along their edges, and compress when pressed.
-        Refraction needs a Chromium browser; everywhere else you still get the
-        full glass material.
+        Turns the app's popups and dialogs into liquid glass: panes refract
+        what's behind them, catch the light along their edges, and their buttons
+        compress when pressed. Refraction needs a Chromium browser; everywhere
+        else you still get the full glass material.
       </p>
       {/** biome-ignore lint/a11y/noStaticElementInteractions: hover-only preview restore on a non-interactive grid of buttons; keyboard users get the same behavior via each button's onBlur */}
       <div

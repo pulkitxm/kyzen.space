@@ -41,11 +41,9 @@ Reference: [Aave - Building glass for the web](https://aave.com/design/building-
 
 In `globals.css`, scoped under `html[data-glass]`:
 
-- Glass material variables (`--glass-bg`, `--glass-bg-clear`, `--glass-rim-hi`, `--glass-rim-lo`, `--glass-shine`, `--glass-blur`, …) with light/dark values; `html[data-glass="tinted"]` derives them from the palette (`--v`) via `color-mix`; `html[data-glass="smoke"]` uses dark bases.
-- Two component classes applied statically to shared surface primitives (no-ops while `data-glass` is absent):
-  - `.glass-pane` - Regular material: frostier body for content surfaces (cards, popovers, modals, sidebar, dropdowns, settings cards).
-  - `.glass-pane-clear` - Clear material: floating controls (buttons, segmented controls, floating toolbars).
-  - both: translucent bg, `backdrop-filter: blur(…) saturate(170%) brightness(1.05)`, rim-light inset shadows, inner shine, depth shadows.
+- Glass material variables (`--glass-bg`, `--glass-rim-hi`, `--glass-rim-lo`, `--glass-shine`, `--glass-blur`, …) with light/dark values; `html[data-glass="tinted"]` derives them from the palette (`--v`) via `color-mix`; `html[data-glass="smoke"]` uses dark bases.
+- One component class applied statically to the popup surfaces (a no-op while `data-glass` is absent):
+  - `.glass-pane` - the glass material: translucent bg, `backdrop-filter: blur(…) saturate(170%) brightness(1.05)`, rim-light inset shadows, inner shine, depth shadows.
 - `.glass-press` - gel pressure states for interactive glass.
 - `@media (prefers-reduced-transparency: reduce)` - forces solid surfaces even when enabled.
 - `@supports not (backdrop-filter: blur(1px))` - raises bg alpha to near-solid so text stays readable.
@@ -66,11 +64,13 @@ In `globals.css`, scoped under `html[data-glass]`:
 - `appearance-tabs.tsx` gains a **Glass** tab (`FaDroplet`, fa6).
 - `apps/web/app/settings/appearance/glass/page.tsx` + `glass-picker.tsx`: mode cards (Off / Neutral / Tinted / Smoke) following the theme-picker pattern - hover/focus live-preview by setting `data-glass` directly, click to commit, restore on leave; a live preview pane sits above the grid so the material is visible over the user's actual theme + doodles.
 
-### Surface mapping (initial)
+### Surface mapping (revised: popups only)
 
-- Regular: popover, layered-popup, notifications popover, profile popup, series-detail modal, chat dialogs, sidebar, settings cards, game lobby cards, chat panels.
-- Clear: button (card/ghost variants), segmented controls (color-mode switch, game toolbars), game-settings gear cluster, chat popout shell.
-- Unchanged: modal scrims (`bg-black/50`), text inputs, primary CTA buttons (affordance), game-board internals in `games-client` (game chrome only in v1), generated art/avatars.
+Scope was narrowed after implementation review: v1 applies glass to **popup surfaces only**.
+
+- Glass (`.glass-pane` + lens): the shared popover wrapper (all popovers, incl. notifications), layered-popup dialogs (all stacked modals), the profile popup, and the two bespoke chat dialogs (new group, group settings).
+- Pressure (`.glass-press`): the shared `Button` carries the class, but the CSS only activates it inside a `.glass-pane`, so press physics exist solely within glass popups.
+- Unchanged: sidebar, game lobby cards, settings cards, standalone buttons, the game-settings gear, the chat-popout controls pill, modal scrims (`bg-black/50`), text inputs, game-board internals in `games-client`, generated art/avatars.
 
 ## Data flow
 

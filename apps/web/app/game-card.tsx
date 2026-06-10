@@ -15,7 +15,7 @@ export function GameCard({
       <li>
         <Link
           href={href}
-          className="glass-pane group relative flex aspect-4/3 flex-col justify-end overflow-hidden rounded-2xl bg-card p-5 shadow-sm transition hover:bg-surface-overlay"
+          className="group relative flex aspect-4/3 flex-col justify-end overflow-hidden rounded-2xl bg-card p-5 shadow-sm transition hover:bg-surface-overlay"
         >
           <h3 className="font-semibold text-card-foreground text-lg tracking-tight">
             {game.name}

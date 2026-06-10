@@ -251,12 +251,9 @@ html[data-pattern="none"] .app-canvas::before {
 
 html[data-glass] {
   --glass-blur: 14px;
-  --glass-blur-clear: 4px;
   --glass-saturate: 170%;
   --glass-brighten: 1.05;
   --glass-bg: color-mix(in srgb, #ffffff 55%, transparent);
-  --glass-bg-clear: color-mix(in srgb, #ffffff 22%, transparent);
-  --glass-sidebar-bg: color-mix(in srgb, var(--d) 55%, transparent);
   --glass-border: color-mix(in srgb, #ffffff 55%, transparent);
   --glass-rim-hi: color-mix(in srgb, #ffffff 95%, transparent);
   --glass-rim-lo: color-mix(in srgb, #ffffff 55%, transparent);
@@ -267,8 +264,6 @@ html[data-glass] {
 
 html.dark[data-glass] {
   --glass-bg: color-mix(in srgb, var(--d) 55%, transparent);
-  --glass-bg-clear: color-mix(in srgb, var(--d) 25%, transparent);
-  --glass-sidebar-bg: color-mix(in srgb, var(--d) 45%, transparent);
   --glass-border: color-mix(in srgb, #ffffff 16%, transparent);
   --glass-rim-hi: color-mix(in srgb, #ffffff 50%, transparent);
   --glass-rim-lo: color-mix(in srgb, #ffffff 25%, transparent);
@@ -282,16 +277,6 @@ html[data-glass="tinted"] {
     in srgb,
     var(--v) 22%,
     color-mix(in srgb, #ffffff 50%, transparent)
-  );
-  --glass-bg-clear: color-mix(
-    in srgb,
-    var(--v) 16%,
-    color-mix(in srgb, #ffffff 18%, transparent)
-  );
-  --glass-sidebar-bg: color-mix(
-    in srgb,
-    var(--v) 16%,
-    color-mix(in srgb, var(--d) 50%, transparent)
   );
   --glass-border: color-mix(
     in srgb,
@@ -321,12 +306,6 @@ html.dark[data-glass="tinted"] {
     var(--v) 25%,
     color-mix(in srgb, var(--d) 50%, transparent)
   );
-  --glass-bg-clear: color-mix(in srgb, var(--v) 18%, transparent);
-  --glass-sidebar-bg: color-mix(
-    in srgb,
-    var(--v) 18%,
-    color-mix(in srgb, var(--d) 42%, transparent)
-  );
   --glass-border: color-mix(
     in srgb,
     var(--v) 25%,
@@ -352,8 +331,6 @@ html.dark[data-glass="tinted"] {
 html[data-glass="smoke"],
 html.dark[data-glass="smoke"] {
   --glass-bg: color-mix(in srgb, #0a0c18 50%, transparent);
-  --glass-bg-clear: color-mix(in srgb, #0a0c18 30%, transparent);
-  --glass-sidebar-bg: color-mix(in srgb, #0a0c18 55%, transparent);
   --glass-border: color-mix(in srgb, #ffffff 14%, transparent);
   --glass-rim-hi: color-mix(in srgb, #ffffff 40%, transparent);
   --glass-rim-lo: color-mix(in srgb, #ffffff 18%, transparent);
@@ -377,43 +354,7 @@ html[data-glass] .glass-pane {
     inset 0 0 12px var(--glass-shine);
 }
 
-html[data-glass] .glass-pane-clear {
-  background: var(--glass-bg-clear);
-  border-color: var(--glass-border);
-  -webkit-backdrop-filter: blur(var(--glass-blur-clear))
-    saturate(var(--glass-saturate)) brightness(var(--glass-brighten));
-  backdrop-filter: blur(var(--glass-blur-clear)) saturate(var(--glass-saturate))
-    brightness(var(--glass-brighten));
-  box-shadow:
-    0 3px 10px var(--glass-contact),
-    inset 1.5px 1.5px 1px -1px var(--glass-rim-hi),
-    inset -1.5px -1.5px 1px -1px var(--glass-rim-lo),
-    inset 0 0 8px var(--glass-shine);
-}
-
-html[data-glass] .glass-sidebar {
-  background: var(--glass-sidebar-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur))
-    saturate(var(--glass-saturate));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-}
-
-html[data-glass] a.glass-pane:hover,
-html[data-glass] button.glass-pane:hover {
-  background: color-mix(in srgb, var(--glass-bg) 55%, var(--surface-hover));
-}
-
-html[data-glass] a.glass-pane-clear:hover,
-html[data-glass] button.glass-pane-clear:hover {
-  background: color-mix(
-    in srgb,
-    var(--glass-bg-clear) 55%,
-    var(--surface-hover)
-  );
-}
-
-html[data-glass="smoke"] .glass-pane,
-html[data-glass="smoke"] .glass-pane-clear {
+html[data-glass="smoke"] .glass-pane {
   --foreground: #eef1f8;
   --card-foreground: #eef1f8;
   --muted-foreground: color-mix(in srgb, #eef1f8 66%, transparent);
@@ -426,7 +367,7 @@ html[data-glass="smoke"] .glass-pane-clear {
   color: var(--card-foreground);
 }
 
-html[data-glass] .glass-press {
+html[data-glass] .glass-pane .glass-press {
   transition:
     transform 0.35s cubic-bezier(0.34, 1.8, 0.5, 1),
     box-shadow 0.2s ease,
@@ -435,26 +376,19 @@ html[data-glass] .glass-press {
     border-color 0.15s ease;
 }
 
-html[data-glass] .glass-press:active {
+html[data-glass] .glass-pane .glass-press:active {
   transform: scale(0.96);
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  html[data-glass] .glass-pane,
-  html[data-glass] .glass-pane-clear {
+  html[data-glass] .glass-pane {
     background: var(--card);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     box-shadow: 0 8px 24px var(--glass-contact);
   }
-  html[data-glass="smoke"] .glass-pane,
-  html[data-glass="smoke"] .glass-pane-clear {
+  html[data-glass="smoke"] .glass-pane {
     background: #12141f;
-  }
-  html[data-glass] .glass-sidebar {
-    background: var(--sidebar);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
 }
 
@@ -462,16 +396,11 @@ html[data-glass] .glass-press:active {
     (backdrop-filter: blur(1px)) or
     (-webkit-backdrop-filter: blur(1px))
   ) {
-  html[data-glass] .glass-pane,
-  html[data-glass] .glass-pane-clear {
+  html[data-glass] .glass-pane {
     background: color-mix(in srgb, var(--card) 92%, transparent);
   }
-  html[data-glass="smoke"] .glass-pane,
-  html[data-glass="smoke"] .glass-pane-clear {
+  html[data-glass="smoke"] .glass-pane {
     background: #12141f;
-  }
-  html[data-glass] .glass-sidebar {
-    background: color-mix(in srgb, var(--sidebar) 94%, transparent);
   }
 }
 

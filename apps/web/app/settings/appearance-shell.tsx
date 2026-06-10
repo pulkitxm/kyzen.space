@@ -11,7 +11,7 @@ export function AppearanceShell({
   return (
     <section
       aria-labelledby="appearance-heading"
-      className="glass-pane rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+      className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
     >
       <div className="mb-4">
         <h2
