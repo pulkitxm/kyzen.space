@@ -1,8 +1,12 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import {
+  ANON_FRIEND_LIMIT_MESSAGE,
+  CHAT_EVENTS,
+} from "@gamelobby/shared/constants";
 import type { FriendshipJson, SearchUserJson } from "@gamelobby/shared/types";
 import { useAtomValue, useStore } from "jotai";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui";
@@ -253,6 +257,7 @@ function AddFriend() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchUserJson[]>([]);
   const [loading, setLoading] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
   const { socket } = useSocket();
 
   useEffect(() => {
@@ -288,13 +293,31 @@ function AddFriend() {
         await emitAck(socket, CHAT_EVENTS.friendRequest, {
           username: user.username,
         });
-      } catch {}
+      } catch (err) {
+        setResults((prev) =>
+          prev.map((u) =>
+            u.id === user.id ? { ...u, friendState: "none" } : u,
+          ),
+        );
+        if (err instanceof Error && err.message === ANON_FRIEND_LIMIT_MESSAGE) {
+          setLimitReached(true);
+        }
+      }
     },
     [socket],
   );
 
   return (
     <div className="flex flex-col gap-3">
+      {limitReached ? (
+        <div className="rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm">
+          {ANON_FRIEND_LIMIT_MESSAGE}{" "}
+          <Link href="/auth" className="font-medium text-primary underline">
+            Log in
+          </Link>{" "}
+          to add more.
+        </div>
+      ) : null}
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}

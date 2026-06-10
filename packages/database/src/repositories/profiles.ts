@@ -19,6 +19,15 @@ import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "../client";
 import { user, userProfile } from "../schema";
 
+export async function isAnonymousUser(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ isAnonymous: user.isAnonymous })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  return row?.isAnonymous ?? false;
+}
+
 export async function getDisplayName(userId: string): Promise<string | null> {
   const [row] = await db
     .select({ name: user.name })
