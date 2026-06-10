@@ -58,13 +58,34 @@ describe("@gamelobby/database barrel surface", () => {
 });
 
 describe("barrel owned-const bindings (c5fe7a7, mock-poisoning isolation)", () => {
-  test("value exports are identity-equal to their source modules", async () => {
-    const idx = await import("../src/index");
-    const clientNow = await import("../src/client");
-    const inviteTokenNow = await import("../src/invite-token");
-    expect(idx.generateInviteToken).toBe(inviteTokenNow.generateInviteToken);
-    expect(idx.createDb).toBe(clientNow.createDb);
-    expect(idx.ping).toBe(clientNow.ping);
-    expect(idx.schema).toBe(clientNow.schema);
+  test("value exports are identity-equal to their source modules in a pristine process", () => {
+    const src = (name: string) =>
+      JSON.stringify(
+        Bun.fileURLToPath(new URL(`../src/${name}.ts`, import.meta.url)),
+      );
+    const code = [
+      `const idx = await import(${src("index")});`,
+      `const client = await import(${src("client")});`,
+      `const inviteToken = await import(${src("invite-token")});`,
+      `const pairs = [`,
+      `  ["generateInviteToken", idx.generateInviteToken, inviteToken.generateInviteToken],`,
+      `  ["createDb", idx.createDb, client.createDb],`,
+      `  ["ping", idx.ping, client.ping],`,
+      `  ["db", idx.db, client.db],`,
+      `  ["schema", idx.schema, client.schema],`,
+      `];`,
+      `const broken = pairs.filter(([, a, b]) => a !== b).map(([k]) => k);`,
+      `if (broken.length > 0) {`,
+      `  console.error(broken.join(","));`,
+      `  process.exit(1);`,
+      `}`,
+    ].join("\n");
+    const result = Bun.spawnSync({
+      cmd: [process.execPath, "-e", code],
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    expect(new TextDecoder().decode(result.stderr).trim()).toBe("");
+    expect(result.exitCode).toBe(0);
   });
 });
