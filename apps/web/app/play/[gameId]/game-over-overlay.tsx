@@ -4,6 +4,7 @@ import { CHAT_EVENTS } from "@gamelobby/shared/constants";
 import {
   type ConversationJson,
   type GameJson,
+  isGameLive,
   isGameOver,
   type SeriesDetail,
 } from "@gamelobby/shared/types";
@@ -23,6 +24,7 @@ import {
   useSocketEvent,
 } from "@/lib/socket/socket-context";
 import { cn } from "@/lib/utils";
+import { ConfettiBurst } from "./confetti-burst";
 
 function outcomeLabel(game: GameJson, userId: string): string {
   if (game.status === "abandoned") return "Game abandoned";
@@ -38,12 +40,14 @@ function PlayersRow({ game }: { game: GameJson }) {
         const won = game.winner === p.userId;
         return (
           <div key={p.userId} className="flex flex-col items-center gap-1">
-            <div
+            <m.div
               className={cn(
                 "rounded-full",
                 won &&
                   "ring-2 ring-amber-500 ring-offset-2 ring-offset-surface-raised",
               )}
+              animate={won ? { scale: [1, 1.12, 1] } : undefined}
+              transition={{ delay: 0.25, duration: 0.45, ease: "easeInOut" }}
             >
               <Character
                 config={p.avatar ?? null}
@@ -51,7 +55,7 @@ function PlayersRow({ game }: { game: GameJson }) {
                 size={56}
                 className="rounded-full border-2 border-card bg-surface-overlay"
               />
-            </div>
+            </m.div>
             <span className="max-w-24 truncate text-sm">{p.username}</span>
             {won ? (
               <FaTrophy
@@ -82,6 +86,7 @@ export function GameOverOverlay({
   const { socket } = useSocket();
   const { openLayer, layers } = useLayeredPopup();
   const cardRef = useRef<HTMLDivElement>(null);
+  const wasLiveAtMountRef = useRef(isGameLive(initialGame.status));
   const [game, setGame] = useState<GameJson>(initialGame);
   const [open, setOpen] = useState(() => isGameOver(initialGame.status));
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
@@ -161,15 +166,28 @@ export function GameOverOverlay({
           {open && isGameOver(game.status) ? (
             <m.div
               ref={cardRef}
-              className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"
-              initial={{ opacity: 0, y: 8, scale: 0.97 }}
+              className="pointer-events-auto relative w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.97 }}
-              transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.18 }}
+              transition={{ type: "spring", duration: 0.35, bounce: 0.3 }}
             >
-              <h2 className="mb-4 text-center font-bold text-xl">
+              {game.winner === userId && wasLiveAtMountRef.current ? (
+                <ConfettiBurst />
+              ) : null}
+              <m.h2
+                className="mb-4 text-center font-bold text-xl"
+                initial={{ opacity: 0, y: 6, scale: 0.94 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{
+                  delay: 0.08,
+                  type: "spring",
+                  duration: 0.4,
+                  bounce: 0.4,
+                }}
+              >
                 {outcomeLabel(game, userId)}
-              </h2>
+              </m.h2>
               <div className="mb-4">
                 {showSeries && detail ? (
                   <SeriesScoreboard score={detail.score} />
