@@ -45,15 +45,20 @@ export const client = singleton.client;
 export const db = singleton.db;
 ```
 
-Passing `{ schema }` (`client.ts:16`) gives Drizzle the full table catalog, which is what makes the `db.query.*` relational helpers and good inference available. The exported `db` is a **module-level singleton** built from one `createDb(...)` call (`client.ts:19`) - every repository imports the same instance (`import { db } from "../client"`), so the whole server shares one pool. The package reads its own env directly: `DATABASE_URL` (`client.ts:19`) and `DB_LATENCY_MS` (via `defaultLatencyMs()`, `client.ts:8`) - `apps/server` no longer resolves DB config for it. The `createDb` factory is also exported (`index.ts:26`) so tests can spin up an isolated instance against another URL.
+Passing `{ schema }` (`client.ts:16`) gives Drizzle the full table catalog, which is what makes the `db.query.*` relational helpers and good inference available. The exported `db` is a **module-level singleton** built from one `createDb(...)` call (`client.ts:19`) - every repository imports the same instance (`import { db } from "../client"`), so the whole server shares one pool. The package reads its own env directly: `DATABASE_URL` (`client.ts:19`) and `DB_LATENCY_MS` (via `defaultLatencyMs()`, `client.ts:8`) - `apps/server` no longer resolves DB config for it. The `createDb` factory is also exported (`index.ts:36`) so tests can spin up an isolated instance against another URL.
 
 ## The repository pattern
 
 Every repository is a module of async functions over the shared `db`, exported wholesale as a namespace by `index.ts`:
 
 ```ts
-export { createDb, type DB, db, schema } from "./client";
-export { generateInviteToken } from "./invite-token";
+export type { DB } from "./client";
+
+export const createDb = createDbImpl;
+export const db = dbImpl;
+export const schema = schemaImpl;
+export const generateInviteToken = generateInviteTokenImpl;
+
 export * as accountMerge from "./repositories/account-merge";
 export * as conversations from "./repositories/conversations";
 export * as friends from "./repositories/friends";
@@ -65,6 +70,8 @@ export * as profiles from "./repositories/profiles";
 ```
 
 So callers write `import { games, profiles } from "@gamelobby/database"` and then `games.getGameById(id)` / `profiles.bumpStats(...)`. There is no class, no DI container, no base "Repository" abstraction - just modules. The discipline is conventional, not enforced by types: routes and realtime handlers import these namespaces and never import Drizzle directly.
+
+The value exports (`createDb`, `db`, `schema`, `generateInviteToken`) are deliberately **owned `const` bindings** - `index.ts` imports them under `*Impl` aliases and re-exports fresh constants - rather than `export { … } from "./client"` alias re-exports. An alias re-export shares its live binding with the source module, so when a test calls `mock.module("@gamelobby/database", …)` on an already-loaded barrel (which Bun patches in place), the patch would write *through* the alias into `./client` and `./invite-token` themselves, poisoning direct importers of those modules for the rest of the process. Owned constants confine the patch to the barrel: barrel consumers see the mock, the source modules stay real. (This is exactly what a cross-workspace `bun test` run from the repo root exercises - integration tests load the real barrel, route tests then mock it, and `packages/database/tests/invite-token.test.ts` still expects the real `generateInviteToken`.)
 
 Repositories also **validate their inputs** with the Zod schemas exported from `@gamelobby/shared/types` before they write: `createGame` runs `createGameInputSchema.parse(input)` (`games.ts:30`), `addMove` runs `addMoveInputSchema.parse(input)` (`games.ts:215`), `insertMessage` / `create` / `createProfile` / `updateAppearance` parse theirs the same way.
 
