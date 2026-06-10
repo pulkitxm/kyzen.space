@@ -26,6 +26,11 @@ const GUIDES = [
     slug: "Adding-a-Game",
     title: "Adding a Game",
   },
+  {
+    src: "docs/video-tutorials.md",
+    slug: "Video-Tutorials",
+    title: "Video Tutorials",
+  },
 ];
 
 const SMALL = new Set([

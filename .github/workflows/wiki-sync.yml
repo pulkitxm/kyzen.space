@@ -7,6 +7,7 @@ on:
       - "docs/architecture/**"
       - "docs/games/**"
       - "docs/adding-a-game.md"
+      - "docs/video-tutorials.md"
       - "scripts/sync-wiki.mjs"
       - ".github/workflows/wiki-sync.yml"
   workflow_dispatch:
