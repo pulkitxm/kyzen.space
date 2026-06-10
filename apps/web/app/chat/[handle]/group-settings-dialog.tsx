@@ -5,6 +5,7 @@ import type { ConversationJson } from "@gamelobby/shared/types";
 import { useAtomValue, useStore } from "jotai";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { Button } from "@/components/ui";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
@@ -91,10 +92,10 @@ export function GroupSettingsDialog({
       <button
         type="button"
         aria-label="Close"
-        className="absolute inset-0 bg-black/50"
+        className="glass-scrim absolute inset-0 bg-black/50"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-border bg-card p-4 shadow-xl">
+      <GlassPane className="relative flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-border bg-card p-4 shadow-xl">
         <h2 className="mb-3 font-semibold text-lg">Group settings</h2>
 
         {isOwner ? (
@@ -155,8 +156,8 @@ export function GroupSettingsDialog({
                     <div
                       className={
                         p?.online
-                          ? "truncate text-emerald-500 text-xs"
-                          : "truncate text-muted-foreground text-xs"
+                          ? "min-h-4 truncate text-emerald-500 text-xs"
+                          : "min-h-4 truncate text-muted-foreground text-xs"
                       }
                     >
                       {presenceLabel(p)}
@@ -240,7 +241,7 @@ export function GroupSettingsDialog({
             Done
           </Button>
         </div>
-      </div>
+      </GlassPane>
     </div>
   );
 }

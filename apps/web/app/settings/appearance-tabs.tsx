@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FaPalette, FaShapes } from "react-icons/fa6";
+import { FaDroplet, FaPalette, FaShapes } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/settings/appearance/theme", label: "Theme", Icon: FaPalette },
   { href: "/settings/appearance/doodles", label: "Doodles", Icon: FaShapes },
+  { href: "/settings/appearance/glass", label: "Glass", Icon: FaDroplet },
 ] as const;
 
 export function AppearanceTabs() {

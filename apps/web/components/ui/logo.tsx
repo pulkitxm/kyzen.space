@@ -32,14 +32,8 @@ function LogoMark({ className }: { className?: string }) {
           y2="58"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" style={{ stopColor: "var(--color-primary)" }} />
-          <stop
-            offset="1"
-            style={{
-              stopColor:
-                "color-mix(in srgb, var(--color-primary) 72%, var(--color-primary-dark))",
-            }}
-          />
+          <stop offset="0" style={{ stopColor: "var(--logo-mark)" }} />
+          <stop offset="1" style={{ stopColor: "var(--logo-mark-deep)" }} />
         </linearGradient>
       </defs>
       <rect
@@ -61,7 +55,7 @@ function LogoMark({ className }: { className?: string }) {
         <line x1="26" y1="20" x2="16" y2="30" />
       </g>
       <circle
-        className="text-warning"
+        className="text-logo-ring"
         cx="43"
         cy="25"
         r="6"
@@ -77,8 +71,8 @@ function LogoWordmark() {
   return (
     <span className="font-extrabold leading-none tracking-tight">
       Game
-      <span className="text-primary">Lobby</span>
-      <span className="font-semibold text-muted-foreground">.space</span>
+      <span className="text-logo-mark">Lobby</span>
+      <span className="font-semibold opacity-60">.space</span>
     </span>
   );
 }

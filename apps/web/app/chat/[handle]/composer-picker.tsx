@@ -4,6 +4,7 @@ import type { GifJson } from "@gamelobby/shared/types";
 import { useAtom } from "jotai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaRegFaceSmile } from "react-icons/fa6";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { recentEmojisAtom } from "@/lib/chat/atoms";
 import { type EmojiGroup, loadEmojiGroups } from "@/lib/chat/emoji";
 import { useGifResults } from "@/lib/chat/use-gif-results";
@@ -242,7 +243,7 @@ export function ComposerPicker({
   };
 
   return (
-    <div className="flex h-128 w-104 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+    <GlassPane className="flex h-128 w-104 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
       <input
         ref={searchRef}
         value={q}
@@ -340,6 +341,6 @@ export function ComposerPicker({
           </button>
         </div>
       ) : null}
-    </div>
+    </GlassPane>
   );
 }

@@ -7,6 +7,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FaCheck, FaXmark } from "react-icons/fa6";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { Button } from "@/components/ui/button";
 import { clientFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -311,12 +312,12 @@ function UsernameField({
 
       {confirmOpen ? (
         <div
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4"
+          className="glass-scrim fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4"
           role="alertdialog"
           aria-modal="true"
           aria-label="Confirm username change"
         >
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
+          <GlassPane className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
             <h3 className="font-semibold text-base text-card-foreground">
               Change username?
             </h3>
@@ -339,7 +340,7 @@ function UsernameField({
                 Change username
               </Button>
             </div>
-          </div>
+          </GlassPane>
         </div>
       ) : null}
     </div>

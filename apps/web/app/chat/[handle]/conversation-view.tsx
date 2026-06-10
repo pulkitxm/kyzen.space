@@ -149,8 +149,8 @@ export function ConversationView({
               <div
                 className={
                   otherPresence?.online
-                    ? "truncate text-emerald-500 text-xs"
-                    : "truncate text-muted-foreground text-xs"
+                    ? "min-h-4 truncate text-emerald-500 text-xs"
+                    : "min-h-4 truncate text-muted-foreground text-xs"
                 }
               >
                 {subtitle}

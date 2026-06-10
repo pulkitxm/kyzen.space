@@ -1,8 +1,10 @@
 import {
   COLOR_MODES,
   DEFAULT_COLOR_MODE,
+  DEFAULT_GLASS_MODE,
   DEFAULT_PATTERN,
   DEFAULT_THEME,
+  GLASS_MODES,
   PATTERN_IDS,
   THEME_IDS,
 } from "@gamelobby/shared/constants";
@@ -39,6 +41,7 @@ import {
 export const themeEnum = pgEnum("app_theme", THEME_IDS);
 export const colorModeEnum = pgEnum("color_mode", COLOR_MODES);
 export const patternEnum = pgEnum("app_pattern", PATTERN_IDS);
+export const glassEnum = pgEnum("glass_mode", GLASS_MODES);
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -178,6 +181,7 @@ export const userProfile = pgTable("user_profile", {
   theme: themeEnum("theme").notNull().default(DEFAULT_THEME),
   colorMode: colorModeEnum("color_mode").notNull().default(DEFAULT_COLOR_MODE),
   pattern: patternEnum("pattern").notNull().default(DEFAULT_PATTERN),
+  glass: glassEnum("glass").notNull().default(DEFAULT_GLASS_MODE),
   chatLayout: jsonb("chat_layout").$type<{ mode: ChatMode } | null>(),
   usernameChangedAt: timestamp("username_changed_at"),
   lastSeenAt: timestamp("last_seen_at"),

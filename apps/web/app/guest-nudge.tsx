@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { FaGoogle, FaXmark } from "react-icons/fa6";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { authClient } from "@/lib/auth-client";
 import {
   decideGuestNudge,
@@ -10,29 +11,42 @@ import {
   GUEST_SNOOZE_MS,
 } from "@/lib/guest-nudge";
 
+let cachedDecision: { show: boolean; markSeen: boolean } | null = null;
+
+function readDecision() {
+  cachedDecision ??= decideGuestNudge({
+    isAnonymous: true,
+    seen: localStorage.getItem(GUEST_SEEN_KEY),
+    snoozedUntil: Number(localStorage.getItem(GUEST_SNOOZE_KEY) ?? 0),
+    now: Date.now(),
+  });
+  return cachedDecision;
+}
+
 export function GuestNudge() {
-  const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const show = useSyncExternalStore(
+    () => () => {},
+    () => readDecision().show,
+    () => false,
+  );
+
   useEffect(() => {
-    const decision = decideGuestNudge({
-      isAnonymous: true,
-      seen: localStorage.getItem(GUEST_SEEN_KEY),
-      snoozedUntil: Number(localStorage.getItem(GUEST_SNOOZE_KEY) ?? 0),
-      now: Date.now(),
-    });
-    if (decision.markSeen) {
+    if (readDecision().markSeen) {
       localStorage.setItem(GUEST_SEEN_KEY, String(Date.now()));
     }
-    if (decision.show) setOpen(true);
   }, []);
+
+  const open = show && !dismissed;
 
   const dismiss = useCallback(() => {
     localStorage.setItem(
       GUEST_SNOOZE_KEY,
       String(Date.now() + GUEST_SNOOZE_MS),
     );
-    setOpen(false);
+    setDismissed(true);
   }, []);
 
   const signIn = useCallback(async () => {
@@ -55,9 +69,9 @@ export function GuestNudge() {
         type="button"
         aria-label="Dismiss"
         onClick={dismiss}
-        className="absolute inset-0 bg-black/40"
+        className="glass-scrim absolute inset-0 bg-black/40"
       />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
+      <GlassPane className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
         <button
           type="button"
           aria-label="Close"
@@ -89,7 +103,7 @@ export function GuestNudge() {
         >
           Maybe later
         </button>
-      </div>
+      </GlassPane>
     </div>
   );
 }

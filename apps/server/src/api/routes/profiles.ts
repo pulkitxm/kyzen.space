@@ -2,14 +2,17 @@ import { seedAvatarConfig, validateAvatarConfig } from "@gamelobby/avatar";
 import { games, profiles } from "@gamelobby/database";
 import {
   DEFAULT_COLOR_MODE,
+  DEFAULT_GLASS_MODE,
   DEFAULT_PATTERN,
   DEFAULT_THEME,
   DISPLAY_NAME_MAX_LENGTH,
 } from "@gamelobby/shared/constants";
 import {
   type ColorMode,
+  type GlassMode,
   isReservedUsername,
   isValidColorMode,
+  isValidGlassMode,
   isValidPattern,
   isValidTheme,
   isValidUsernameFormat,
@@ -76,6 +79,7 @@ export const profilesRouter = new Hono<AuthEnv>()
         theme: profile.theme ?? DEFAULT_THEME,
         colorMode: profile.colorMode ?? DEFAULT_COLOR_MODE,
         pattern: profile.pattern ?? DEFAULT_PATTERN,
+        glass: profile.glass ?? DEFAULT_GLASS_MODE,
         chatLayout: profile.chatLayout ?? null,
         usernameEditableAt: editableAt ? editableAt.toISOString() : null,
         usernameChangeCooldownDays: env.usernameChangeCooldownDays,
@@ -96,11 +100,13 @@ export const profilesRouter = new Hono<AuthEnv>()
       theme?: unknown;
       colorMode?: unknown;
       pattern?: unknown;
+      glass?: unknown;
     };
     const patch: {
       theme?: ThemeId;
       colorMode?: ColorMode;
       pattern?: PatternId;
+      glass?: GlassMode;
     } = {};
 
     if (raw.theme !== undefined) {
@@ -118,10 +124,16 @@ export const profilesRouter = new Hono<AuthEnv>()
         return c.json({ error: "Invalid pattern" }, 400);
       patch.pattern = raw.pattern;
     }
+    if (raw.glass !== undefined) {
+      if (!isValidGlassMode(raw.glass))
+        return c.json({ error: "Invalid glass" }, 400);
+      patch.glass = raw.glass;
+    }
     if (
       patch.theme === undefined &&
       patch.colorMode === undefined &&
-      patch.pattern === undefined
+      patch.pattern === undefined &&
+      patch.glass === undefined
     )
       return c.json({ error: "Nothing to update" }, 400);
 

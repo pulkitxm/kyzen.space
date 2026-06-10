@@ -21,8 +21,8 @@ export function AppearanceShell({
           Appearance
         </h2>
         <p className="mt-0.5 text-muted-foreground text-sm">
-          Switch between Theme and Doodles. Hover an option to preview it live
-          and click to apply.
+          Switch between Theme, Doodles, and Glass. Hover an option to preview
+          it live and click to apply.
           {signedIn
             ? " Your choices are saved to your account."
             : " Sign in to save your choices across devices."}

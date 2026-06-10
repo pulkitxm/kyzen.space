@@ -5,6 +5,7 @@ import type { ConversationJson, GameType } from "@gamelobby/shared/types";
 import { useAtomValue } from "jotai";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
 import { conversationsAtom, friendsAtom } from "@/lib/chat/atoms";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
@@ -81,10 +82,10 @@ export function ConversationPicker({
       <button
         type="button"
         aria-label="Close"
-        className="absolute inset-0 bg-black/50"
+        className="glass-scrim absolute inset-0 bg-black/50"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-border bg-card p-4 shadow-xl">
+      <GlassPane className="relative flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-border bg-card p-4 shadow-xl">
         {group ? (
           <>
             <button
@@ -205,7 +206,7 @@ export function ConversationPicker({
             </div>
           </>
         )}
-      </div>
+      </GlassPane>
     </div>
   );
 }

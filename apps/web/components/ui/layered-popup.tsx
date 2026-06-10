@@ -5,6 +5,7 @@ import { AnimatePresence, m } from "motion/react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaXmark } from "react-icons/fa6";
+import { GlassMotionPane } from "@/components/glass/glass-pane";
 import {
   closeAllAtom,
   closeLayerAtom,
@@ -84,13 +85,13 @@ export function LayeredPopupHost() {
               tabIndex={-1}
               disabled={layer.persistent}
               onClick={() => !layer.persistent && closeLayer(layerNumber)}
-              className="absolute inset-0 bg-black/50 disabled:cursor-default"
+              className="glass-scrim absolute inset-0 bg-black/50 disabled:cursor-default"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
             />
-            <m.div
+            <GlassMotionPane
               role="dialog"
               aria-modal="true"
               className={cn(
@@ -125,7 +126,7 @@ export function LayeredPopupHost() {
                   {renderNode(layer.footer, api)}
                 </div>
               )}
-            </m.div>
+            </GlassMotionPane>
           </m.div>
         );
       })}

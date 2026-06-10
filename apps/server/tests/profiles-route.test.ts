@@ -12,6 +12,7 @@ type Profile = {
   avatar: AvatarConfig | null;
   theme: string;
   colorMode: string;
+  glass?: string;
   usernameChangedAt: Date | null;
   createdAt: Date;
 } | null;
@@ -20,12 +21,16 @@ let currentSession: Session = null;
 let storedProfile: Profile = null;
 let usernameTaken = false;
 let blockedUsernames = new Set<string>();
-let suggestions: string[] = ["alt_1", "alt_2"];
 let cooldownDays = 30;
 const updateAvatarCalls: Array<{ userId: string; avatar: AvatarConfig }> = [];
 const updateAppearanceCalls: Array<{
   userId: string;
-  patch: { theme?: string; colorMode?: string; pattern?: string };
+  patch: {
+    theme?: string;
+    colorMode?: string;
+    pattern?: string;
+    glass?: string;
+  };
 }> = [];
 const setDisplayNameCalls: Array<{ userId: string; name: string }> = [];
 const updateUsernameCalls: Array<{ userId: string; username: string }> = [];
@@ -42,12 +47,18 @@ mock.module("@gamelobby/database", () => ({
     getProfileByUsername: async () => storedProfile,
     getDisplayName: async () => "Display Name",
     isUsernameTaken: async () => usernameTaken,
+    getTakenUsernames: async () => new Set<string>(),
     updateAvatar: async (userId: string, avatar: AvatarConfig) => {
       updateAvatarCalls.push({ userId, avatar });
     },
     updateAppearance: async (
       userId: string,
-      patch: { theme?: string; colorMode?: string; pattern?: string },
+      patch: {
+        theme?: string;
+        colorMode?: string;
+        pattern?: string;
+        glass?: string;
+      },
     ) => {
       updateAppearanceCalls.push({ userId, patch });
     },
@@ -71,13 +82,10 @@ mock.module("../src/env", () => ({
     get usernameChangeCooldownDays() {
       return cooldownDays;
     },
-    notAllowedUsernames: [] as string[],
+    get notAllowedUsernames() {
+      return [...blockedUsernames];
+    },
   },
-}));
-
-mock.module("../src/username", () => ({
-  isUsernameBlocked: (normalized: string) => blockedUsernames.has(normalized),
-  suggestUsernames: async () => suggestions,
 }));
 
 const { profilesRouter } = await import("../src/api/routes/profiles");
@@ -113,7 +121,6 @@ beforeEach(() => {
   storedProfile = null;
   usernameTaken = false;
   blockedUsernames = new Set<string>();
-  suggestions = ["alt_1", "alt_2"];
   cooldownDays = 30;
   updateAvatarCalls.length = 0;
   updateAppearanceCalls.length = 0;
@@ -163,6 +170,25 @@ describe("PUT /me/appearance", () => {
       const res = await putAppearance({ pattern: "scribbles" });
       expect(res.status).toBe(400);
       expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("rejects an invalid glass mode", async () => {
+      const res = await putAppearance({ glass: "frosted" });
+      expect(res.status).toBe(400);
+      expect(updateAppearanceCalls).toHaveLength(0);
+    });
+
+    it("persists a valid glass mode", async () => {
+      const res = await putAppearance({ glass: "tinted" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ glass: "tinted" });
+      expect(updateAppearanceCalls[0]?.patch).toEqual({ glass: "tinted" });
+    });
+
+    it("persists glass off", async () => {
+      const res = await putAppearance({ glass: "off" });
+      expect(res.status).toBe(200);
+      expect(updateAppearanceCalls[0]?.patch).toEqual({ glass: "off" });
     });
 
     it("persists a valid pattern", async () => {
@@ -311,6 +337,22 @@ describe("GET /me", () => {
     const json = (await res.json()) as { profile: { avatar: AvatarConfig } };
     expect(json.profile.avatar).toEqual(seedAvatarConfig("lonely"));
   });
+
+  it("returns the stored glass mode", async () => {
+    currentSession = { user: { id: "user-1", name: "T", email: "t@e.com" } };
+    storedProfile = makeProfile({ glass: "smoke" });
+    const res = await profilesRouter.request("/me");
+    const json = (await res.json()) as { profile: { glass: string } };
+    expect(json.profile.glass).toBe("smoke");
+  });
+
+  it("defaults glass to off when the profile has none", async () => {
+    currentSession = { user: { id: "user-1", name: "T", email: "t@e.com" } };
+    storedProfile = makeProfile();
+    const res = await profilesRouter.request("/me");
+    const json = (await res.json()) as { profile: { glass: string } };
+    expect(json.profile.glass).toBe("off");
+  });
 });
 
 function authed(userId = "user-1", over: Partial<NonNullable<Profile>> = {}) {
@@ -405,7 +447,8 @@ describe("GET /me/username-available", () => {
     };
     expect(json.available).toBe(false);
     expect(json.reason).toBe("format");
-    expect(json.suggestions).toEqual(["alt_1", "alt_2"]);
+    expect(json.suggestions.length).toBeGreaterThan(0);
+    for (const s of json.suggestions) expect(typeof s).toBe("string");
   });
 
   it("reports a reserved/blocked name", async () => {

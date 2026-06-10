@@ -57,6 +57,13 @@
       "when": 1780313157823,
       "tag": "0007_secret_maximus",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781075576184,
+      "tag": "0008_liquid_glass",
+      "breakpoints": true
     }
   ]
 }

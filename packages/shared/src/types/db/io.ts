@@ -6,6 +6,7 @@ import {
   gameStatusSchema,
   seatingModeSchema,
 } from "../games/wire";
+import { glassModeSchema } from "../glass";
 import { patternIdSchema } from "../pattern";
 import { colorModeSchema, themeIdSchema } from "../theme";
 
@@ -82,5 +83,6 @@ export const appearancePatchSchema = z
     theme: themeIdSchema.optional(),
     colorMode: colorModeSchema.optional(),
     pattern: patternIdSchema.optional(),
+    glass: glassModeSchema.optional(),
   })
   .strict();

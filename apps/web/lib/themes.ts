@@ -4,7 +4,6 @@ export {
   COLOR_MODES,
   DEFAULT_COLOR_MODE,
   DEFAULT_THEME,
-  PALETTE_STORAGE_KEY,
   THEME_IDS,
   THEMES,
 } from "@gamelobby/shared/constants";

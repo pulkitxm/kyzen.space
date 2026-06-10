@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import { useGlassPaneRef } from "@/components/glass/glass-pane";
 import {
   type ChatMode,
   clampGeometry,
@@ -41,6 +42,7 @@ export function ChatPopoutWindow({
 }) {
   const geomRef = useRef(geometry);
   geomRef.current = geometry;
+  const paneRef = useGlassPaneRef<HTMLDivElement>();
 
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
@@ -140,13 +142,14 @@ export function ChatPopoutWindow({
 
   return (
     <div
+      ref={isPopout ? paneRef : undefined}
       style={style}
       className={cn(
         "min-h-0 flex-col bg-background",
         minimized
           ? "hidden"
           : isPopout
-            ? "fixed z-50 flex rounded-xl border border-border shadow-2xl"
+            ? "glass-pane fixed z-50 flex overflow-hidden rounded-xl border border-border shadow-2xl"
             : cn(
                 "relative border-border max-md:w-full! md:shrink-0 md:border-l",
                 mountedVisible ? "flex" : "hidden md:flex",

@@ -4,6 +4,7 @@ export * from "./categories";
 export * from "./chat";
 export * from "./chat-layout";
 export * from "./games";
+export * from "./glass";
 export * from "./pattern";
 export * from "./playing-cards";
 export * from "./theme";

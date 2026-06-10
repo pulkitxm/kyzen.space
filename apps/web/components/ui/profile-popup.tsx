@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaRegCalendar, FaRegMessage, FaXmark } from "react-icons/fa6";
+import { GlassMotionPane } from "@/components/glass/glass-pane";
 import { Button } from "@/components/ui/button";
 import { Character } from "@/components/ui/character";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -163,12 +164,12 @@ export function ProfilePopupHost() {
         aria-label="Close"
         tabIndex={-1}
         onClick={close}
-        className="absolute inset-0 bg-black/50"
+        className="glass-scrim absolute inset-0 bg-black/50"
         initial={false}
         animate={{ opacity: open ? 1 : 0 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
       />
-      <m.div
+      <GlassMotionPane
         role="dialog"
         aria-modal="true"
         className="relative w-full max-w-sm rounded-2xl border border-border bg-card p-4 shadow-xl"
@@ -202,7 +203,7 @@ export function ProfilePopupHost() {
             </Button>
           </div>
         ) : null}
-      </m.div>
+      </GlassMotionPane>
     </div>,
     document.body,
   );

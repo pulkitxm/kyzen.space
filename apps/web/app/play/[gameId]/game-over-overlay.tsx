@@ -7,12 +7,13 @@ import {
   isGameOver,
   type SeriesDetail,
 } from "@gamelobby/shared/types";
-import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
+import { AnimatePresence, domAnimation, LazyMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FaTrophy } from "react-icons/fa6";
 import { SeriesDetailModal } from "@/components/games/series-detail-modal";
 import { SeriesScoreboard } from "@/components/games/series-scoreboard";
+import { GlassMotionPane } from "@/components/glass/glass-pane";
 import { Button, Character } from "@/components/ui";
 import { clientFetchJson } from "@/lib/api-client";
 import { conversationHref } from "@/lib/chat/conversation-href";
@@ -159,7 +160,7 @@ export function GameOverOverlay({
       <LazyMotion features={domAnimation}>
         <AnimatePresence>
           {open && isGameOver(game.status) ? (
-            <m.div
+            <GlassMotionPane
               ref={cardRef}
               className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"
               initial={{ opacity: 0, y: 8, scale: 0.97 }}
@@ -216,7 +217,7 @@ export function GameOverOverlay({
                   Close
                 </Button>
               </div>
-            </m.div>
+            </GlassMotionPane>
           ) : null}
         </AnimatePresence>
       </LazyMotion>

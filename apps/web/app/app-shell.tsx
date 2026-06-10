@@ -16,6 +16,7 @@ import { MergeConsent } from "@/app/merge-consent";
 import { Sidebar } from "@/app/sidebar";
 import { TooltipProvider } from "@/app/ui/tooltip";
 import { LayeredPopupHost, ProfilePopupHost } from "@/components/ui";
+import { AppearanceSync } from "@/lib/appearance";
 import type { SidebarPrefs } from "@/lib/sidebar-prefs";
 import { SocketProvider } from "@/lib/socket/socket-context";
 import { useScrollRestoration } from "@/lib/use-scroll-restoration";
@@ -62,6 +63,7 @@ export function AppShellClient({
   return (
     <TooltipProvider delayDuration={300}>
       <Provider>
+        <AppearanceSync />
         <SocketProvider enabled={signedIn}>
           {isAnonymous ? <GuestNudge /> : null}
           <MergeConsent enabled={signedIn && !isAnonymous} />
