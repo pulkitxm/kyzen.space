@@ -1,5 +1,5 @@
-export const LENS_BEZEL = 34;
-export const LENS_CURVE = 1.6;
+const LENS_BEZEL = 34;
+const LENS_CURVE = 1.6;
 export const LENS_SCALE_R = 72;
 export const LENS_SCALE_G = 64;
 export const LENS_SCALE_B = 56;

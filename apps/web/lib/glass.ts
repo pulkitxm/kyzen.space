@@ -6,7 +6,6 @@ export {
   GLASS_MODE_DEFS,
   GLASS_MODES,
   GLASS_STORAGE_KEY,
-  getGlassModeDef,
 } from "@gamelobby/shared/constants";
 export {
   type GlassMode,
