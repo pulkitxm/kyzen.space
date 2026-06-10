@@ -17,7 +17,7 @@
       "ignore": ["src/drift-guard.ts"]
     },
     "vid-tutorials": {
-      "entry": ["src/index.ts", "remotion.config.ts"]
+      "entry": ["src/index.ts", "remotion.config.ts", "scripts/*.ts"]
     }
   }
 }

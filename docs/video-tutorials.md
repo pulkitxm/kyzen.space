@@ -14,6 +14,7 @@ screen together.
 ```bash
 cd vid-tutorials
 bun run studio                          # Remotion Studio at http://localhost:3100
+bun run export                          # every tutorial -> out/<type>/tutorial.mp4 + chapters.txt
 bun run render tic-tac-toe out/tic-tac-toe.mp4
 bun run still tic-tac-toe out/frame.png --frame=120
 bun run type-check
@@ -29,6 +30,8 @@ committed.
 ```text
 vid-tutorials/
   remotion.config.ts        entry point; publicDir -> apps/web/public
+  scripts/
+    export-tutorials.ts     bun run export: out/<type>/tutorial.mp4 + chapters.txt
   src/
     index.ts                registerRoot
     root.tsx                maps the TUTORIALS registry to <Composition>s
@@ -42,14 +45,24 @@ vid-tutorials/
       fonts.ts              Geist via @remotion/google-fonts
       pattern-backdrop.tsx  <PatternBackdrop> - the app's doodle-tile backdrop
     tutorials/
-      registry.tsx          TUTORIALS: one entry per game (id = type slug)
+      manifest.ts           data-only list: id, title, chapters (no React)
+      registry.tsx          maps manifest entries to composition components
       <type>/
         composition.tsx     the per-game composition
+        timeline.ts         scene frame counts + labeled chapters
+        styles.css          static style blocks as classes
         scenes/             one file per scene
 ```
 
 `root.tsx` registers every `TUTORIALS` entry as a 1920x1080 / 30 fps
-`<Composition>`; per-game code never registers compositions itself.
+`<Composition>`; per-game code never registers compositions itself. A
+tutorial's duration is the sum of its **chapters** - the labeled
+`{ label, durationInFrames }` beats each `timeline.ts` exports - so the
+`chapters.txt` timestamps can never drift from the video. `bun run export`
+renders every manifest entry to `out/<type>/tutorial.mp4` and writes a
+YouTube-style `out/<type>/chapters.txt` (`0:00 Intro`, `0:11 The goal`, …);
+`manifest.ts` stays free of React imports so the export script can read it
+without loading compositions.
 
 ## Theme - the app's tokens, not new ones
 

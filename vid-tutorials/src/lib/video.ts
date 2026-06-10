@@ -11,3 +11,8 @@ export const MAX_TUTORIAL_SECONDS = 90;
 export function sec(seconds: number): number {
   return Math.round(seconds * FPS);
 }
+
+export type TutorialChapter = {
+  label: string;
+  durationInFrames: number;
+};

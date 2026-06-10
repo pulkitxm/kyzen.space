@@ -63,8 +63,14 @@ on-brand motion graphics over the game's own background music.
    - Animate every key element: `useCurrentFrame()` + `interpolate()` /
      `spring()` only, clamped; never CSS transitions/animations, never
      `motion/react`.
-3. **Register** the tutorial in `vid-tutorials/src/tutorials/registry.tsx`
-   (id = the shared slug constant, `durationInFrames` via `sec()`).
+3. **Register** the tutorial: export a labeled chapter list (one
+   `{ label, durationInFrames }` per scene - labels become the public
+   `chapters.txt` timestamps) from `<type>/timeline.ts`, add
+   `{ id, title, chapters }` to `TUTORIAL_MANIFEST` in
+   `vid-tutorials/src/tutorials/manifest.ts` (id = the shared slug constant;
+   no React imports in that file), and map the component by id in
+   `COMPONENTS` in `registry.tsx`. The duration is derived from the chapter
+   sum.
 4. **Music**: confirm `apps/web/public/sounds/<type>-bg.ogg` exists (see
    `apps/web/lib/audio/music-sources.ts`). If the game has no track, omit
    `<TutorialMusic>` and flag it prominently in your report - never borrow
@@ -76,13 +82,15 @@ on-brand motion graphics over the game's own background music.
 bun run type-check
 bunx remotion compositions src/index.ts
 bun run still <type> out/<type>-scene<i>.png --frame=<mid-scene frame>
-bun run render <type> out/<type>.mp4
+bun run export
 ```
 
 - Render one still per scene and **view each image**: check text is inside
   safe margins, contrast is readable, nothing overlaps, theme colors (not
   hardcoded ones) are in use.
-- The full render must succeed with audio and match the registered duration.
+- The export must succeed with audio, match the chapter-sum duration, and
+  write `out/<type>/tutorial.mp4` + `out/<type>/chapters.txt` with sensible
+  chapter timestamps.
 - From the repo root run `bun run check` and
   `bun run strip-comments -- --check` - both must pass. Comments are forbidden
   in every code file; write self-documenting code.

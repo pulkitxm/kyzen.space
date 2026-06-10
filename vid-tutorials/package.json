@@ -7,6 +7,7 @@
     "studio": "remotion studio --port=3100",
     "render": "remotion render",
     "still": "remotion still",
+    "export": "bun scripts/export-tutorials.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

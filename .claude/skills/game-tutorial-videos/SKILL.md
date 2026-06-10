@@ -22,6 +22,8 @@ covers only what is specific to this repo.
 ```
 vid-tutorials/
   remotion.config.ts        entry point + publicDir (-> apps/web/public)
+  scripts/
+    export-tutorials.ts     bun run export -> out/<type>/tutorial.mp4 + chapters.txt
   src/
     index.ts                registerRoot
     root.tsx                maps TUTORIALS -> <Composition>
@@ -35,30 +37,33 @@ vid-tutorials/
       fonts.ts              fontSans (Geist via @remotion/google-fonts)
       pattern-backdrop.tsx  <PatternBackdrop> app-style doodle backdrop
     tutorials/
-      registry.tsx          TUTORIALS array (one entry per game)
+      manifest.ts           data-only list: id, title, chapters (no React)
+      registry.tsx          maps manifest entries to composition components
       <type>/               one folder per game tutorial
         composition.tsx     the composition component
+        timeline.ts         scene frame counts + labeled chapters
         styles.css          static style blocks as classes (imported here)
         scenes/             one file per scene
 ```
 
 ## Registering a tutorial
 
-Add an entry to `TUTORIALS` in `src/tutorials/registry.tsx`. The `id` must be
-the game's type-slug constant from `@gamelobby/shared/constants` (e.g.
-`TIC_TAC_TOE`), and `durationInFrames` should be computed with `sec()`:
+1. Export an ordered **chapter list** from `src/tutorials/<type>/timeline.ts`:
+   one `{ label, durationInFrames }` per scene/beat (`TutorialChapter` from
+   `src/lib/video.ts`). The labels are public - they become the timestamps in
+   the exported `chapters.txt` - so name the game's main parts ("Intro",
+   "The goal", "Winning", "The draw", …).
+2. Add `{ id, title, chapters }` to `TUTORIAL_MANIFEST` in
+   `src/tutorials/manifest.ts`. The `id` must be the game's type-slug
+   constant from `@gamelobby/shared/constants` (e.g. `TIC_TAC_TOE`). Keep
+   this file free of React imports - the export script loads it directly.
+3. Map the composition component by id in `COMPONENTS` in
+   `src/tutorials/registry.tsx`.
 
-```tsx
-{
-  id: TIC_TAC_TOE,
-  title: "How to play Tic-tac-toe",
-  durationInFrames: sec(60),
-  component: TicTacToeTutorial,
-}
-```
-
-`root.tsx` turns each entry into a `<Composition>` at 1920x1080 / 30 fps - do
-not register compositions anywhere else or change those dimensions per game.
+A tutorial's `durationInFrames` is **derived from the chapter sum**, so
+chapters can never drift from the video. `root.tsx` turns each entry into a
+`<Composition>` at 1920x1080 / 30 fps - do not register compositions anywhere
+else or change those dimensions per game.
 
 ## Theme - always the app's tokens
 
@@ -154,7 +159,7 @@ instead of substituting another game's music.
 bun run type-check
 bunx remotion compositions src/index.ts        # registry sanity: id appears
 bun run still <type> out/<type>-still.png --frame=<n>
-bun run render <type> out/<type>.mp4
+bun run export                                 # out/<type>/tutorial.mp4 + chapters.txt
 ```
 
 Render at least one still per scene (pick mid-scene frames) and **look at
