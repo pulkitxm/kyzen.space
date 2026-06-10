@@ -97,7 +97,7 @@ Key decisions:
 
 - **`baseURL: env.betterAuthUrl`** (default `http://localhost:4000`, `apps/server/src/env.ts:36`) - Better Auth lives on the **server**, not the web app. The browser hits `${NEXT_PUBLIC_API_URL}/api/auth/...`, and the OAuth callback URI is `[server URL]/api/auth/callback/google` (the sign-in page literally tells you this at `apps/web/app/auth/page.tsx:50`).
 - **`trustedOrigins: [env.webUrl]`** - only the Next.js origin (default `http://localhost:3000`) is allowed to drive auth flows, which is the CSRF/redirect allowlist.
-- **`drizzleAdapter(db, { provider: "pg", schema })`** - `db` and `schema` are imported from `@gamelobby/database` (`apps/server/src/auth.ts:1`), so the adapter persists users/sessions/accounts into the very same Postgres + Drizzle singleton the rest of the server uses (`packages/database/src/client.ts:19`). No separate auth store.
+- **`drizzleAdapter(db, { provider: "pg", schema })`** - `db` and `schema` are imported from `@gamelobby/database` (`apps/server/src/auth.ts:1`), so the adapter persists users/sessions/accounts into the very same Postgres + Drizzle singleton the rest of the server uses (`packages/database/src/client.ts:20`). No separate auth store.
 - **`plugins: [anonymous({ … })]`** (`apps/server/src/auth.ts:17`) enables guest play. `signIn.anonymous` inserts a real `user` row with `isAnonymous = true` and a throwaway email; `generateName: () => generateGuestName()` (`apps/server/src/guest-name.ts:3`) sets the display name to `Guest-<random6>`, and `disableDeleteAnonymousUser: true` stops Better Auth from auto-deleting that row when the guest later links a real account - the guest's history (profile, games, messages) must survive the upgrade. The **`onLinkAccount` hook** (`apps/server/src/auth.ts:21`) fires when a guest signs in with Google: it does **not** migrate any data, it only records a *pending* merge via `accountMerge.recordPending(anonymousUser.user.id, newUser.user.id)` (`packages/database/src/repositories/account-merge.ts:30`), and the failure is caught and logged so a recorder hiccup never blocks the link. The actual data migration is **consent-gated** and runs later, only when the now-real user explicitly confirms (or discards) the merge via the `/api/account/merge/*` endpoints - see "The account-merge flow" below.
 - **`socialProviders`** is conditional on `googleConfigured()` (`apps/server/src/env.ts:58`), which returns `true` only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Without them the object is `{}` and Google sign-in is unavailable, but the **guest button still works** (the anonymous plugin needs no external credentials), and the UI degrades gracefully (see below).
 
@@ -187,7 +187,7 @@ Better Auth ships a fixed schema contract; the Drizzle adapter expects tables wh
 - **`account`** (`:73`) - links a `user` to an external provider login: `providerId` (`"google"`), `accountId` (the Google subject id), the OAuth `accessToken`/`refreshToken`/`idToken`, and a nullable `password` column reserved for the future email/password provider. One row per linked provider; a guest has no `account` row until they link one.
 - **`verification`** (`:91`) - `identifier`/`value`/`expiresAt` rows used for verification/reset tokens (unused by the Google-only flow today, but required by the contract).
 
-The adapter is wired in one line - `drizzleAdapter(db, { provider: "pg", schema })` (`apps/server/src/auth.ts:16`) - where `db` and `schema` are imported from `@gamelobby/database` (`apps/server/src/auth.ts:1`), backed by the singleton in `packages/database/src/client.ts:19`. Because the same `db` instance is shared, auth writes go through the same connection pool (and the same optional `DB_LATENCY_MS` latency wrapper, applied inside the database package) as everything else.
+The adapter is wired in one line - `drizzleAdapter(db, { provider: "pg", schema })` (`apps/server/src/auth.ts:16`) - where `db` and `schema` are imported from `@gamelobby/database` (`apps/server/src/auth.ts:1`), backed by the singleton in `packages/database/src/client.ts:20`. Because the same `db` instance is shared, auth writes go through the same connection pool (and the same optional `DB_LATENCY_MS` latency wrapper, applied inside the database package) as everything else.
 
 ## Mounting `/api/auth/*`
 
@@ -205,7 +205,7 @@ export const app = new Hono<LoggerEnv>()
 
 So `GET /api/auth/get-session`, `POST /api/auth/sign-in/social`, `GET /api/auth/callback/google`, `POST /api/auth/sign-out`, etc. are all handled by Better Auth - the app never enumerates them. `c.req.raw` is the underlying `Request`, which is exactly what `handler` wants.
 
-How the request reaches Hono in the first place: the top-level server is Express, and a single regex route forwards `/api/*` into the Hono app via `@hono/node-server`'s `getRequestListener` (`apps/server/src/index.ts:23`). CORS is configured at the Express layer with `origin: env.webUrl, credentials: true` (`apps/server/src/index.ts:12`) so the browser is allowed to send the session cookie cross-origin.
+How the request reaches Hono in the first place: the top-level server is Express, and a single regex route forwards `/api/*` into the Hono app via `@hono/node-server`'s `getRequestListener` (`apps/server/src/index.ts:45`). CORS is configured at the Express layer with `origin: env.webUrl, credentials: true` (`apps/server/src/index.ts:18`) so the browser is allowed to send the session cookie cross-origin.
 
 ## How routes read the session (REST)
 
@@ -333,7 +333,7 @@ The web dialog calls `confirmMerge(id)` / `discardMerge(id)` (`apps/web/lib/acco
 - **Two web fetch paths, two env vars.** RSC uses `serverFetch` (`API_URL`, forwards `next/headers` cookies, `cache: "no-store"`); the browser uses `clientFetch` (`NEXT_PUBLIC_API_URL`, `credentials: "include"`). Use the server path inside RSCs and the client path inside `"use client"` components - they read the cookie from different places.
 - **Auth-dependent pages set `export const dynamic = "force-dynamic"`** (e.g. `apps/web/app/auth/page.tsx:14`, `apps/web/app/settings/account/page.tsx:24`) because they depend on per-request cookies and must not be statically cached.
 - **`getServerSession`/`getAccountSessions` are `react.cache`-wrapped** so the layout and a page in the same render share one network round-trip; don't reach for module-level memoization.
-- **Cookies cross origins only because CORS allows it.** Both the Express HTTP layer (`apps/server/src/index.ts:12`) and the Socket.IO server (`apps/server/src/realtime/index.ts:32`) set `origin: env.webUrl, credentials: true`; the client mirrors this with `credentials: "include"` / `withCredentials: true`. Change the web origin and you must update `WEB_URL`.
+- **Cookies cross origins only because CORS allows it.** Both the Express HTTP layer (`apps/server/src/index.ts:18`) and the Socket.IO server (`apps/server/src/realtime/index.ts:32`) set `origin: env.webUrl, credentials: true`; the client mirrors this with `credentials: "include"` / `withCredentials: true`. Change the web origin and you must update `WEB_URL`.
 
 ## Where to go next
 

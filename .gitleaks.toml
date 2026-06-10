@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Files that only ever contain placeholder values"
+paths = ['''\.env\.example$''']

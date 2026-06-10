@@ -27,6 +27,7 @@ export type {
 import {
   createDb as createDbImpl,
   db as dbImpl,
+  ping as pingImpl,
   schema as schemaImpl,
 } from "./client";
 import { generateInviteToken as generateInviteTokenImpl } from "./invite-token";
@@ -35,6 +36,7 @@ export type { DB } from "./client";
 
 export const createDb = createDbImpl;
 export const db = dbImpl;
+export const ping = pingImpl;
 export const schema = schemaImpl;
 export const generateInviteToken = generateInviteTokenImpl;
 export * as accountMerge from "./repositories/account-merge";
