@@ -1,3 +1,11 @@
+.vt-pattern-backdrop {
+  background-color: var(--pattern-ink);
+  opacity: var(--pattern-opacity);
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  pointer-events: none;
+}
+
 .vt-theme[data-mode="light"] {
   --primary: color-mix(in srgb, var(--v) 78%, var(--d));
   --primary-dark: var(--d);

@@ -72,19 +72,8 @@ export function OutroScene() {
         Ready to play?
       </div>
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 26,
-          padding: "30px 64px",
-          borderRadius: 999,
-          backgroundColor: "var(--primary)",
-          color: "var(--primary-foreground)",
-          fontSize: 46,
-          fontWeight: 700,
-          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.35)",
-          transform: `scale(${ctaPop * pulse})`,
-        }}
+        className="ttt-cta"
+        style={{ transform: `scale(${ctaPop * pulse})` }}
       >
         <FaPlay size={38} aria-hidden="true" />
         Play Tic-tac-toe on GameLobby

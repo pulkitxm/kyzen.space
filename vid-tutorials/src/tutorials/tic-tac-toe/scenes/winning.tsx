@@ -56,19 +56,8 @@ export function WinningScene() {
           glowAt={LINE_AT + 10}
         />
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 20,
-            padding: "20px 48px",
-            borderRadius: 999,
-            backgroundColor: "var(--primary)",
-            color: "var(--primary-foreground)",
-            fontSize: 44,
-            fontWeight: 800,
-            boxShadow: "0 16px 48px rgba(0, 0, 0, 0.35)",
-            transform: `scale(${bannerPop})`,
-          }}
+          className="ttt-win-banner"
+          style={{ transform: `scale(${bannerPop})` }}
         >
           <FaTrophy size={40} aria-hidden="true" />X wins!
         </div>

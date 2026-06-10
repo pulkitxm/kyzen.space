@@ -16,16 +16,12 @@ export const PatternBackdrop = ({
   const maskSize = `${tile}px ${tile}px`;
   return (
     <AbsoluteFill
+      className="vt-pattern-backdrop"
       style={{
-        backgroundColor: "var(--pattern-ink)",
-        opacity: "var(--pattern-opacity)" as CSSProperties["opacity"],
         WebkitMaskImage: maskUrl,
         maskImage: maskUrl,
-        WebkitMaskRepeat: "repeat",
-        maskRepeat: "repeat",
         WebkitMaskSize: maskSize,
-        maskSize: maskSize,
-        pointerEvents: "none",
+        maskSize,
         ...style,
       }}
     />

@@ -1,3 +1,4 @@
+import "./styles.css";
 import { AbsoluteFill, interpolate, Series, useCurrentFrame } from "remotion";
 import { SceneShell } from "../../lib/scene-shell";
 import { TutorialMusic } from "../../lib/tutorial-music";

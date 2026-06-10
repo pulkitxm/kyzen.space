@@ -27,27 +27,16 @@ function TurnPill() {
   const position = flip(MOVE_ONE) - flip(MOVE_TWO) + flip(MOVE_THREE);
   return (
     <div
+      className="ttt-turn-pill"
       style={{
-        position: "relative",
-        display: "flex",
-        padding: 10,
-        borderRadius: 999,
-        backgroundColor: "var(--surface-raised)",
-        border: "2px solid var(--border)",
         opacity: pillIn,
         transform: `translateY(${(1 - pillIn) * 26}px)`,
       }}
     >
       <div
+        className="ttt-turn-active"
         style={{
-          position: "absolute",
-          top: 10,
-          left: 10,
           width: SEGMENT_WIDTH,
-          height: "calc(100% - 20px)",
-          borderRadius: 999,
-          backgroundColor: "var(--surface-overlay)",
-          border: "2px solid var(--border)",
           transform: `translateX(${position * SEGMENT_WIDTH}px)`,
         }}
       />
@@ -56,16 +45,9 @@ function TurnPill() {
         return (
           <div
             key={mark}
+            className="ttt-turn-segment"
             style={{
-              position: "relative",
               width: SEGMENT_WIDTH,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 16,
-              padding: "16px 0",
-              fontSize: 32,
-              fontWeight: 700,
               opacity: 0.4 + active * 0.6,
             }}
           >

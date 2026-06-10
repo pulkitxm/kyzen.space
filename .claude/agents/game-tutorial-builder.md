@@ -56,6 +56,10 @@ on-brand motion graphics over the game's own background music.
    - `scenes/` - one file per scene. Re-create the game's look (board, marks,
      colors) with simple shapes styled by the theme CSS variables - do not
      import from `@gamelobby/games-client` (it expects sockets/props).
+   - `styles.css` - static style blocks as classes (React Doctor warns on
+     inline styles with 8+ properties); keep frame-driven values inline.
+     Helper functions/types go in non-component modules, and array/object
+     default props are hoisted to module constants.
    - Animate every key element: `useCurrentFrame()` + `interpolate()` /
      `spring()` only, clamped; never CSS transitions/animations, never
      `motion/react`.

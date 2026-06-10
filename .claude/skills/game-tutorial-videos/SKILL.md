@@ -38,6 +38,7 @@ vid-tutorials/
       registry.tsx          TUTORIALS array (one entry per game)
       <type>/               one folder per game tutorial
         composition.tsx     the composition component
+        styles.css          static style blocks as classes (imported here)
         scenes/             one file per scene
 ```
 
@@ -137,6 +138,12 @@ instead of substituting another game's music.
 
 - **No comments** in any file (CI gate) - `bun run strip-comments -- --check`.
 - Biome formatting/linting - `bun run check` (or `bun run fix`).
+- **React Doctor reviews PRs** and warns on inline styles with 8+ properties,
+  non-component exports from component files, and `[]`/`{}` default props.
+  Put a scene's static style block in the tutorial's `styles.css` as a class
+  (keep frame-driven values like `opacity`/`transform` inline), keep helper
+  functions/types in non-component modules (e.g. `palette.ts`), and hoist
+  array/object default props to module constants.
 - No `zod` and no new deps without checking the shared-package rules in
   `CLAUDE.md`; types/constants shared with the app come from
   `@gamelobby/shared`.

@@ -6,7 +6,8 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { MarkGlyph, markColor, type TutorialMark } from "./marks";
+import { MarkGlyph } from "./marks";
+import { markColor, type TutorialMark } from "./palette";
 
 export type BoardCell = { mark: TutorialMark; at: number } | null;
 
@@ -24,6 +25,10 @@ export type BoardGhost = {
 };
 
 const ENTRANCE = Easing.bezier(0.16, 1, 0.3, 1);
+
+const NO_GHOSTS: readonly BoardGhost[] = [];
+
+const NO_GLOW_CELLS: readonly number[] = [];
 
 function cellCenter(index: number, cellSize: number, gap: number) {
   return {
@@ -88,8 +93,8 @@ export function Board({
   buildStart = 0,
   buildStagger = 0,
   win,
-  ghosts = [],
-  glowCells = [],
+  ghosts = NO_GHOSTS,
+  glowCells = NO_GLOW_CELLS,
   glowAt = 0,
   dimAt,
   style,
@@ -127,8 +132,17 @@ export function Board({
         });
   const glowPulse = glowIn * (0.75 + 0.25 * Math.sin((frame - glowAt) / 8));
   const glowColor = `color-mix(in srgb, ${markColor(win?.mark ?? "X")} 55%, transparent)`;
+  const radiusVar = { "--ttt-cell-radius": `${radius}px` } as CSSProperties;
   return (
-    <div style={{ position: "relative", width: size, height: size, ...style }}>
+    <div
+      style={{
+        position: "relative",
+        width: size,
+        height: size,
+        ...radiusVar,
+        ...style,
+      }}
+    >
       {cells.map((cell, index) => {
         const col = index % 3;
         const row = Math.floor(index / 3);
@@ -163,18 +177,12 @@ export function Board({
         return (
           <div
             key={cellKey}
+            className="ttt-cell"
             style={{
-              position: "absolute",
               left: col * (cellSize + gap),
               top: row * (cellSize + gap),
               width: cellSize,
               height: cellSize,
-              borderRadius: radius,
-              backgroundColor: "var(--surface-raised)",
-              border: "2px solid var(--border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
               opacity: cellIn * dim,
               transform: `scale(${0.7 + cellIn * 0.3})`,
               boxShadow: glowing

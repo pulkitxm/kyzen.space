@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
-
-export type TutorialMark = "X" | "O";
+import { markColor, type TutorialMark } from "./palette";
 
 const STROKE = "color-mix(in srgb, currentColor 62%, #0a0e14)";
 
@@ -9,10 +8,6 @@ const X_POINTS =
 
 const O_PATH =
   "M16,50 a34,34 0 1,0 68,0 a34,34 0 1,0 -68,0 Z M35,50 a15,15 0 1,1 30,0 a15,15 0 1,1 -30,0 Z";
-
-export function markColor(mark: TutorialMark): string {
-  return mark === "X" ? "var(--primary)" : "var(--muted-foreground)";
-}
 
 export function MarkGlyph({
   mark,

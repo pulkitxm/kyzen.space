@@ -9,7 +9,8 @@ import {
 } from "remotion";
 import { Board } from "../board";
 import { Heading } from "../heading";
-import { MarkGlyph, type TutorialMark } from "../marks";
+import { MarkGlyph } from "../marks";
+import type { TutorialMark } from "../palette";
 
 const ENTRANCE = Easing.bezier(0.16, 1, 0.3, 1);
 
@@ -54,33 +55,13 @@ function PlayerChip({
         transform: `translateX(${(1 - slideIn) * 90 * fromDirection}px)`,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 22,
-          padding: "40px 56px",
-          borderRadius: 28,
-          backgroundColor: "var(--card)",
-          border: "2px solid var(--border)",
-          boxShadow: "0 16px 48px rgba(0, 0, 0, 0.3)",
-        }}
-      >
+      <div className="ttt-player-card">
         <MarkGlyph mark={mark} size={104} />
         <div style={{ fontSize: 36, fontWeight: 700 }}>Player {mark}</div>
       </div>
       <div
+        className="ttt-first-badge"
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "12px 28px",
-          borderRadius: 999,
-          backgroundColor: "var(--primary)",
-          color: "var(--primary-foreground)",
-          fontSize: 28,
-          fontWeight: 700,
           transform: `scale(${badgePop})`,
           visibility: badge ? "visible" : "hidden",
         }}

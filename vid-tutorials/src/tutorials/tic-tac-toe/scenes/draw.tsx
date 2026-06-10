@@ -66,20 +66,8 @@ export function DrawScene() {
             }}
           >
             <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 22,
-                padding: "24px 52px",
-                borderRadius: 999,
-                backgroundColor: "var(--card)",
-                border: "2px solid var(--border)",
-                color: "var(--foreground)",
-                fontSize: 46,
-                fontWeight: 800,
-                boxShadow: "0 20px 64px rgba(0, 0, 0, 0.45)",
-                transform: `scale(${badgePop})`,
-              }}
+              className="ttt-draw-badge"
+              style={{ transform: `scale(${badgePop})` }}
             >
               <FaHandshake
                 size={48}

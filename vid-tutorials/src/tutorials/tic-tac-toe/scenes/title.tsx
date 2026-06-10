@@ -76,17 +76,8 @@ export function TitleScene() {
         The classic three-in-a-row duel
       </div>
       <div
+        className="ttt-title-chip"
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 18,
-          padding: "16px 36px",
-          borderRadius: 999,
-          backgroundColor: "var(--surface-raised)",
-          border: "2px solid var(--border)",
-          fontSize: 31,
-          fontWeight: 600,
-          color: "var(--foreground)",
           opacity: chipIn,
           transform: `translateY(${(1 - chipIn) * 24}px)`,
         }}
