@@ -68,7 +68,7 @@ In `globals.css`, scoped under `html[data-glass]`:
 
 Scope was narrowed after implementation review: v1 applies glass to **popup surfaces only**.
 
-- Glass (`.glass-pane` + lens): the shared popover wrapper (all popovers, incl. notifications), layered-popup dialogs (all stacked modals), the profile popup, and the two bespoke chat dialogs (new group, group settings).
+- Glass (`.glass-pane` + lens): the shared popover wrapper (all popovers, incl. notifications), layered-popup dialogs (all stacked modals), the profile popup, the two bespoke chat dialogs (new group, group settings), and the game-over overlay on the play page.
 - Pressure (`.glass-press`): the shared `Button` carries the class, but the CSS only activates it inside a `.glass-pane`, so press physics exist solely within glass popups.
 - Unchanged: sidebar, game lobby cards, settings cards, standalone buttons, the game-settings gear, the chat-popout controls pill, modal scrims (`bg-black/50`), text inputs, game-board internals in `games-client`, generated art/avatars.
 
