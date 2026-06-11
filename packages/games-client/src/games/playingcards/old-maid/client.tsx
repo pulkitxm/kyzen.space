@@ -107,7 +107,7 @@ async function fetchOldMaidPlayerStats(
 }
 
 const CARD_BASE =
-  "old-maid-card old-maid-card-slot old-maid-card-enter relative shrink-0 overflow-hidden rounded-xl drop-shadow-xl transition-transform duration-200 ease-out hover:-translate-y-4 hover:rotate-0 hover:drop-shadow-2xl";
+  "old-maid-card old-maid-card-slot old-maid-card-enter relative shrink-0 cursor-default select-none overflow-hidden rounded-xl drop-shadow-xl transition-transform duration-200 ease-out hover:-translate-y-4 hover:rotate-0 hover:drop-shadow-2xl";
 const OPPONENT_CARD_SHELL = `${CARD_BASE} h-36 w-24 sm:h-44 sm:w-28`;
 const PLAYER_CARD_SHELL = `${CARD_BASE} h-44 w-32 sm:h-52 sm:w-36`;
 const PICK_FLIGHT_MS = 980;
@@ -505,7 +505,7 @@ function DrawCardButton({
       type="button"
       disabled={disabled}
       onClick={(event) => onPick(index, event.currentTarget)}
-      className={`${OPPONENT_CARD_SHELL} group outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-default disabled:opacity-75 disabled:hover:translate-y-0 disabled:hover:rotate-(--card-rotation) ${
+      className={`${OPPONENT_CARD_SHELL} group outline-none focus-visible:ring-2 focus-visible:ring-white enabled:cursor-pointer disabled:cursor-default disabled:hover:translate-y-0 disabled:hover:rotate-(--card-rotation) ${
         hidden ? "invisible" : ""
       }`}
       style={fanStyle(index, total)}

@@ -270,6 +270,12 @@ body {
   transition: filter 0.65s ease-out;
 }
 
+.old-maid-card svg,
+.old-maid-card svg * {
+  pointer-events: none;
+  user-select: none;
+}
+
 .old-maid-table {
   background:
     radial-gradient(
