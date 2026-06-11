@@ -22,7 +22,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
-import { FaLayerGroup, FaShuffle, FaUserCheck } from "react-icons/fa6";
+import { FaHandPointer, FaShuffle, FaUserCheck } from "react-icons/fa6";
 import {
   CardBack,
   Joker,
@@ -107,11 +107,42 @@ async function fetchOldMaidPlayerStats(
 }
 
 const CARD_BASE =
-  "old-maid-card old-maid-card-slot old-maid-card-enter relative shrink-0 overflow-hidden rounded-xl drop-shadow-xl transition duration-200 ease-out hover:-translate-y-4 hover:rotate-0 hover:drop-shadow-2xl";
+  "old-maid-card old-maid-card-slot old-maid-card-enter relative shrink-0 overflow-hidden rounded-xl drop-shadow-xl transition-transform duration-200 ease-out hover:-translate-y-4 hover:rotate-0 hover:drop-shadow-2xl";
 const OPPONENT_CARD_SHELL = `${CARD_BASE} h-36 w-24 sm:h-44 sm:w-28`;
 const PLAYER_CARD_SHELL = `${CARD_BASE} h-44 w-32 sm:h-52 sm:w-36`;
 const PICK_FLIGHT_MS = 980;
 const DISCARD_FLIGHT_MS = 920;
+const DRAW_GLOW_FADE_MS = 650;
+
+function useDrawTargetGlow(active: boolean): {
+  drawTargetClass: string;
+  drawLeavingClass: string;
+} {
+  const [glow, setGlow] = useState(active);
+  const [leaving, setLeaving] = useState(false);
+  const glowRef = useRef(active);
+  glowRef.current = glow;
+
+  useEffect(() => {
+    if (active) {
+      setLeaving(false);
+      setGlow(true);
+      return;
+    }
+    if (!glowRef.current) return;
+    setLeaving(true);
+    const id = window.setTimeout(() => {
+      setGlow(false);
+      setLeaving(false);
+    }, DRAW_GLOW_FADE_MS);
+    return () => window.clearTimeout(id);
+  }, [active]);
+
+  return {
+    drawTargetClass: glow ? "old-maid-draw-target" : "",
+    drawLeavingClass: leaving ? "old-maid-draw-target-leaving" : "",
+  };
+}
 
 function emptyState(): OldMaidState {
   return {
@@ -536,7 +567,7 @@ function DiscardPile({ pairs }: { pairs: OldMaidDiscardedPair[] }) {
   );
 }
 
-function TurnBanner({
+function TurnCue({
   players,
   currentTurn,
   myRole,
@@ -547,23 +578,38 @@ function TurnBanner({
   myRole: OldMaidRole | null;
   handOrderPending: OldMaidRole | null;
 }) {
-  const mine = handOrderPending === myRole;
-  const picking = !handOrderPending && currentTurn === myRole;
-  const tone = mine
-    ? "border-amber-300/80 bg-amber-500/20 text-amber-50"
-    : picking
-      ? "border-primary/80 bg-primary/25 text-primary-foreground"
-      : "border-white/20 bg-black/30 text-white/85";
+  const arranging = handOrderPending !== null;
+  const activeRole = arranging ? handOrderPending : currentTurn;
+  const isMine = myRole !== null && activeRole === myRole;
+  const activeName = roleName(players, activeRole);
+  const pickTargetUp = !arranging && isMine;
 
-  const label = mine
-    ? `${roleName(players, myRole)} — shuffle or keep order`
-    : `${roleName(players, currentTurn)} is picking a card`;
+  if (arranging) {
+    return (
+      <div
+        className="old-maid-turn-cue old-maid-turn-cue-arrange"
+        aria-live="polite"
+      >
+        <FaShuffle className="old-maid-turn-cue-icon" aria-hidden="true" />
+        <span className="old-maid-turn-cue-name">{activeName}</span>
+        <span className="old-maid-turn-cue-action">arranges</span>
+      </div>
+    );
+  }
 
   return (
     <div
-      className={`mb-3 flex items-center justify-center rounded-full border px-5 py-2 font-medium text-sm ${tone}`}
+      className={`old-maid-turn-cue ${isMine ? "old-maid-turn-cue-mine" : "old-maid-turn-cue-theirs"}`}
+      aria-live="polite"
     >
-      {label}
+      <FaHandPointer
+        className={`old-maid-turn-cue-icon ${pickTargetUp ? "old-maid-turn-cue-icon-up" : "old-maid-turn-cue-icon-down"}`}
+        aria-hidden="true"
+      />
+      <span className="old-maid-turn-cue-name">{activeName}</span>
+      <span className="old-maid-turn-cue-action">
+        {isMine ? "pick a card" : "is choosing"}
+      </span>
     </div>
   );
 }
@@ -1320,28 +1366,37 @@ export function OldMaidGameClient({
     ],
   );
 
+  const activeRole = state.handOrderPending ?? state.currentTurn;
+  const opponentActive =
+    otherRole !== null && activeRole === otherRole && !state.loserRole;
+  const playerActive =
+    myRole !== null && activeRole === myRole && !state.loserRole;
+  const opponentDrawTarget =
+    canDraw && otherRole !== null && state.currentTurn === myRole;
+  const playerDrawTarget =
+    myRole !== null &&
+    state.currentTurn === otherRole &&
+    state.handOrderPending === null &&
+    game.status === "active" &&
+    !state.loserRole;
+  const opponentGlow = useDrawTargetGlow(opponentDrawTarget);
+  const playerGlow = useDrawTargetGlow(playerDrawTarget);
+
   const tableContent = (
     <>
-      <header className="flex flex-wrap items-center justify-between gap-2 border-white/10 border-b px-4 py-3 text-white/90">
-        <div className="flex items-center gap-2">
-          <FaShuffle size={18} aria-hidden="true" />
-          <h2 className="font-semibold text-base">
-            {roleName(game.players, otherRole)}
-          </h2>
-          <span className="text-sm text-white/60">
-            {otherHand.length} cards
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-white/70">
-          <FaLayerGroup size={16} aria-hidden="true" />
-          <span>{state.discardedPairs.length} pairs discarded</span>
-        </div>
+      <header
+        className={`flex flex-wrap items-center gap-2 border-white/10 border-b px-4 py-3 text-white/90 ${opponentActive ? "old-maid-seat-active old-maid-seat-top" : ""}`}
+      >
+        <h2 className="font-semibold text-base">
+          {roleName(game.players, otherRole)}
+        </h2>
+        <span className="text-sm text-white/60">{otherHand.length} cards</span>
       </header>
 
       <FanHand
         ref={opponentFanRef}
         cardCount={otherHand.length}
-        className={`old-maid-fan old-maid-opponent-fan w-full ${shufflingRole === otherRole ? "old-maid-shuffle-active" : ""}`}
+        className={`old-maid-fan old-maid-opponent-fan w-full ${shufflingRole === otherRole ? "old-maid-shuffle-active" : ""} ${opponentGlow.drawTargetClass} ${opponentGlow.drawLeavingClass} ${state.handOrderPending === otherRole ? "old-maid-arrange-active" : ""}`}
       >
         {otherHand.length > 0 ? (
           otherHand.map((card, index) => (
@@ -1396,22 +1451,23 @@ export function OldMaidGameClient({
             <p className="text-amber-100 text-xs">
               New card is last — shuffle or keep order
             </p>
-          ) : canDraw ? (
-            <p className="text-primary-foreground/80 text-xs">
-              Your turn — pick a card
-            </p>
-          ) : (
-            <p className="text-white/60 text-xs">
-              {roleName(game.players, state.currentTurn)} picks next
-            </p>
-          )}
+          ) : null}
         </aside>
       </div>
+
+      <header
+        className={`flex flex-wrap items-center gap-2 border-white/10 border-t px-4 py-3 text-white/90 ${playerActive ? "old-maid-seat-active old-maid-seat-bottom" : ""}`}
+      >
+        <h2 className="font-semibold text-base">
+          {roleName(game.players, myRole)}
+        </h2>
+        <span className="text-sm text-white/60">{myHand.length} cards</span>
+      </header>
 
       <FanHand
         ref={playerFanRef}
         cardCount={landingTotal}
-        className={`old-maid-fan old-maid-player-fan w-full ${shufflingRole === myRole ? "old-maid-shuffle-active" : ""}`}
+        className={`old-maid-fan old-maid-player-fan w-full ${shufflingRole === myRole ? "old-maid-shuffle-active" : ""} ${playerGlow.drawTargetClass} ${playerGlow.drawLeavingClass} ${state.handOrderPending === myRole ? "old-maid-arrange-active" : ""}`}
       >
         {myHand.length > 0 ? (
           myHand.map((card, index) => (
@@ -1462,15 +1518,6 @@ export function OldMaidGameClient({
 
       {error ? <p className="mb-3 text-danger text-sm">{error}</p> : null}
 
-      {!isPast && game.status === "active" ? (
-        <TurnBanner
-          currentTurn={state.currentTurn}
-          handOrderPending={state.handOrderPending}
-          myRole={myRole}
-          players={game.players}
-        />
-      ) : null}
-
       {pickFlight ? (
         <FlyingCardOverlay
           durationMs={PICK_FLIGHT_MS}
@@ -1514,6 +1561,15 @@ export function OldMaidGameClient({
         ) : (
           tableContent
         )}
+
+        {!isPast && game.status === "active" && !state.loserRole ? (
+          <TurnCue
+            currentTurn={state.currentTurn}
+            handOrderPending={state.handOrderPending}
+            myRole={myRole}
+            players={game.players}
+          />
+        ) : null}
 
         {canArrangeHand && !(isPast && showResult) ? (
           <div className="absolute right-4 bottom-4 z-20 flex gap-2">
