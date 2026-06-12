@@ -18,6 +18,7 @@ import {
 import { handlePresenceConnect, handlePresenceDisconnect } from "./presence";
 import { startPresenceHeartbeats } from "./presence-heartbeat";
 import { attachRedisAdapter } from "./redis";
+import { attachRoomHandlers } from "./room-events";
 import { leaveGameRoom } from "./rooms";
 import { registerGameEvent } from "./socket-util";
 import { handleJoinRoom, handleMakeMove } from "./turn-based";
@@ -65,6 +66,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
     attachTypingHandlers(io, socket);
     attachGameChatHandlers(io, socket);
     attachMatchmakingHandlers(io, socket);
+    attachRoomHandlers(socket);
     void handlePresenceConnect(io, socket);
 
     registerGameEvent(socket, slog, "join_room", clientJoinRoomSchema, (data) =>
