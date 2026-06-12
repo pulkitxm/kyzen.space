@@ -1,7 +1,7 @@
-export const FIRST_TURN_MS = 15_000;
-export const BASE_MS = 5_000;
-export const MIN_MS = 1_000;
-export const ABORT_AT_STRIKES = 3;
+const FIRST_TURN_MS = 15_000;
+const BASE_MS = 5_000;
+const MIN_MS = 1_000;
+const ABORT_AT_STRIKES = 3;
 
 export function turnLimitMs(p: {
   isFirstTurn: boolean;
