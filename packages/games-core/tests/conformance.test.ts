@@ -100,5 +100,23 @@ for (const def of GAMES) {
       expect(typeof def.meta.coverImage).toBe("string");
       expect(def.meta.coverImage.startsWith("/games/")).toBe(true);
     });
+
+    test("tutorialVideo, when set, is a /games/ path", () => {
+      if (def.meta.tutorialVideo === undefined) return;
+      expect(typeof def.meta.tutorialVideo).toBe("string");
+      expect(def.meta.tutorialVideo.startsWith("/games/")).toBe(true);
+    });
+
+    test("turn-based engine provides a legal autoMove", () => {
+      if (def.engine.mode !== "turn-based" || !def.engine.autoMove) return;
+      const state = def.engine.createInitialState(minSeats(def));
+      const role = def.engine.roles[0];
+      if (role === undefined) throw new Error("engine must declare a role");
+      const move = def.engine.autoMove(state, role);
+      expect(def.moveSchema.safeParse(move).success).toBe(true);
+      if (def.engine.reduce) {
+        expect(def.engine.reduce(state, { role }, move).ok).toBe(true);
+      }
+    });
   });
 }

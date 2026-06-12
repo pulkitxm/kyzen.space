@@ -95,4 +95,13 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
     };
     return { ok: true, state: nextState, outcome: outcomeFor(nextState) };
   },
+
+  autoMove(state, _role): TicTacToeMove {
+    const empties: number[] = [];
+    for (let i = 0; i < state.board.length; i++) {
+      if (state.board[i] === null) empties.push(i);
+    }
+    const pick = empties[Math.floor(Math.random() * empties.length)] ?? 0;
+    return { row: Math.floor(pick / 3), col: pick % 3 };
+  },
 };

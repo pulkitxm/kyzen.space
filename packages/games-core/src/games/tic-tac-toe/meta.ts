@@ -7,4 +7,5 @@ export const ticTacToeMeta: GameMeta = {
   description: "Classic 3×3 board. Get three in a row to win.",
   categoryId: GAME_CATEGORIES.BOARD_CLASSICS.id,
   coverImage: "/games/tic-tac-toe-cover.png",
+  tutorialVideo: "/games/tic-tac-toe-tutorial.mp4",
 };
