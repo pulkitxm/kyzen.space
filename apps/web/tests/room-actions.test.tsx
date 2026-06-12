@@ -5,10 +5,6 @@ mock.module("next/navigation", () => ({
   useRouter: () => ({ push: () => {}, replace: () => {} }),
 }));
 
-mock.module("@/lib/auth/ensure-identity", () => ({
-  ensureIdentity: async () => {},
-}));
-
 mock.module("@/lib/socket/socket-context", () => ({
   socketStatusAtom: { debugLabel: "socketStatus" },
   SocketProvider: ({ children }: { children: unknown }) => children,
