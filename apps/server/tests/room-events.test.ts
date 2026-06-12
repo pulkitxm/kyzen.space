@@ -3,14 +3,46 @@ import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
 
 const CODE = "K7P2QX";
 
-// biome-ignore lint/suspicious/noExplicitAny: test control
-let createImpl: any = async () => ({ ok: true, value: { code: CODE } });
-// biome-ignore lint/suspicious/noExplicitAny: test control
-let joinImpl: any = async () => ({ ok: true, code: CODE });
+type Player = { userId: string; username: string; role: string };
+type GameRec = {
+  id: string;
+  code: string;
+  gameType: string;
+  status: string;
+  conversationId: string | null;
+  seatingMode: "open" | "challenge" | null;
+  challengedUserId: string | null;
+  players: Player[];
+};
 
-mock.module("../src/realtime/rooms-service", () => ({
-  createStandaloneGame: (...args: unknown[]) => createImpl(...args),
-  validateJoinByCode: (...args: unknown[]) => joinImpl(...args),
+let current: GameRec | null = null;
+let profile: { username: string } | null = { username: "alice" };
+let createGameCalled = false;
+
+const games = {
+  // biome-ignore lint/suspicious/noExplicitAny: test stub
+  createGame: async (input: any) => {
+    createGameCalled = true;
+    return { ...input, id: "g1", code: CODE };
+  },
+  getGameByCode: async () => current,
+  getGameById: async () => current,
+};
+const profiles = {
+  getProfileByUserId: async () => profile,
+};
+
+mock.module("@gamelobby/database", () => ({
+  games,
+  profiles,
+  accountMerge: {},
+  conversations: {},
+  friends: {},
+  messages: { getGameCardByGameId: async () => null },
+  notifications: {},
+  db: {},
+  schema: {},
+  createDb: () => ({ db: {}, client: {} }),
 }));
 
 const { attachRoomHandlers } = await import("../src/realtime/room-events");
@@ -26,16 +58,31 @@ function fakeSocket(userId: string) {
   return { socket, handlers };
 }
 
-async function invoke(handler: Handler | undefined, payload: unknown) {
+function invoke(handler: Handler | undefined, payload: unknown) {
   return new Promise<unknown>((resolve) => {
     handler?.(payload, resolve);
-    setTimeout(() => resolve(undefined), 50);
+    setTimeout(() => resolve(undefined), 100);
   });
 }
 
+function room(over: Partial<GameRec> = {}): GameRec {
+  return {
+    id: "g1",
+    code: CODE,
+    gameType: TIC_TAC_TOE,
+    status: "waiting",
+    conversationId: null,
+    seatingMode: "open",
+    challengedUserId: null,
+    players: [{ userId: "u1", username: "alice", role: "X" }],
+    ...over,
+  };
+}
+
 beforeEach(() => {
-  createImpl = async () => ({ ok: true, value: { code: CODE } });
-  joinImpl = async () => ({ ok: true, code: CODE });
+  current = null;
+  profile = { username: "alice" };
+  createGameCalled = false;
 });
 
 describe("room:create", () => {
@@ -47,14 +94,10 @@ describe("room:create", () => {
       gameType: TIC_TAC_TOE,
     });
     expect(res).toEqual({ ok: true, code: CODE });
+    expect(createGameCalled).toBe(true);
   });
 
-  test("acks an error for an invalid payload without calling the service", async () => {
-    let called = false;
-    createImpl = async () => {
-      called = true;
-      return { ok: true, value: { code: CODE } };
-    };
+  test("acks an error for an invalid payload without creating a game", async () => {
     const { socket, handlers } = fakeSocket("u1");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
     attachRoomHandlers(socket as any);
@@ -62,23 +105,24 @@ describe("room:create", () => {
       ok: boolean;
     };
     expect(res.ok).toBe(false);
-    expect(called).toBe(false);
+    expect(createGameCalled).toBe(false);
   });
 
   test("propagates a service failure", async () => {
-    createImpl = async () => ({ ok: false, error: "Unsupported game type" });
+    profile = null;
     const { socket, handlers } = fakeSocket("u1");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
     attachRoomHandlers(socket as any);
-    const res = await invoke(handlers.get("room:create"), {
+    const res = (await invoke(handlers.get("room:create"), {
       gameType: TIC_TAC_TOE,
-    });
-    expect(res).toEqual({ ok: false, error: "Unsupported game type" });
+    })) as { ok: boolean };
+    expect(res.ok).toBe(false);
   });
 });
 
 describe("room:join", () => {
-  test("acks the validated result", async () => {
+  test("acks ok for a joinable room", async () => {
+    current = room();
     const { socket, handlers } = fakeSocket("u2");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
     attachRoomHandlers(socket as any);
@@ -95,7 +139,12 @@ describe("room:join", () => {
   });
 
   test("passes through a typed join error", async () => {
-    joinImpl = async () => ({ ok: false, error: "full" });
+    current = room({
+      players: [
+        { userId: "u1", username: "alice", role: "X" },
+        { userId: "u3", username: "bob", role: "O" },
+      ],
+    });
     const { socket, handlers } = fakeSocket("u2");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
     attachRoomHandlers(socket as any);

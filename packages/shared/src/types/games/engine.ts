@@ -25,6 +25,8 @@ export interface GameEngine<State, Input> {
 
   autoMove?(state: State, role: string): Input;
 
+  currentRole?(state: State): string | null;
+
   step?(
     state: State,
     inputs: Map<string, Input>,

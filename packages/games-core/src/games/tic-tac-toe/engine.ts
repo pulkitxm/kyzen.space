@@ -104,4 +104,8 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
     const pick = empties[Math.floor(Math.random() * empties.length)] ?? 0;
     return { row: Math.floor(pick / 3), col: pick % 3 };
   },
+
+  currentRole(state): string | null {
+    return isTerminal(state) ? null : state.currentTurn;
+  },
 };

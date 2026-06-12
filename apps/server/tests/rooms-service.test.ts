@@ -26,6 +26,7 @@ const games = {
     return { ...input, id: "g1", code: CODE };
   },
   getGameByCode: async () => current,
+  getGameById: async () => current,
 };
 const profiles = {
   getProfileByUserId: async () => profile,
@@ -37,7 +38,7 @@ mock.module("@gamelobby/database", () => ({
   accountMerge: {},
   conversations: {},
   friends: {},
-  messages: {},
+  messages: { getGameCardByGameId: async () => null },
   notifications: {},
   db: {},
   schema: {},
