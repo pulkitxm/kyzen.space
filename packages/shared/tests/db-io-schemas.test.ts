@@ -4,7 +4,6 @@ import {
   addMoveInputSchema,
   appearancePatchSchema,
   createGameInputSchema,
-  createGameInviteInputSchema,
   createMessageInputSchema,
   createNotificationInputSchema,
   createProfileInputSchema,
@@ -283,65 +282,6 @@ describe("createProfileInputSchema", () => {
         avatar: null,
       }).success,
     ).toBe(true);
-  });
-});
-
-describe("createGameInviteInputSchema", () => {
-  const base = {
-    inviterUserId: "u1",
-    gameType: TIC_TAC_TOE,
-    token: "abcdef",
-    expiresAt: new Date("2030-01-01T00:00:00.000Z"),
-  };
-
-  test("accepts a full-length token with a Date expiry", () => {
-    expect(createGameInviteInputSchema.safeParse(base).success).toBe(true);
-  });
-
-  test("rejects an empty inviterUserId (.min(1))", () => {
-    expect(
-      createGameInviteInputSchema.safeParse({ ...base, inviterUserId: "" })
-        .success,
-    ).toBe(false);
-  });
-
-  test("rejects an empty token (.min(1))", () => {
-    expect(
-      createGameInviteInputSchema.safeParse({ ...base, token: "" }).success,
-    ).toBe(false);
-  });
-
-  test("rejects an unknown game type", () => {
-    expect(
-      createGameInviteInputSchema.safeParse({ ...base, gameType: "chess" })
-        .success,
-    ).toBe(false);
-  });
-
-  test("rejects a non-Date expiresAt (z.date refinement)", () => {
-    expect(
-      createGameInviteInputSchema.safeParse({
-        ...base,
-        expiresAt: "2030-01-01T00:00:00.000Z",
-      }).success,
-    ).toBe(false);
-    expect(
-      createGameInviteInputSchema.safeParse({
-        ...base,
-        expiresAt: 1893456000000,
-      }).success,
-    ).toBe(false);
-  });
-
-  test("accepts a null seatingMode but rejects an invalid one", () => {
-    expect(
-      createGameInviteInputSchema.safeParse({ ...base, seatingMode: null })
-        .success,
-    ).toBe(true);
-    expect(
-      createGameInviteInputSchema.safeParse({ ...base, seatingMode: "ranked" })
-        .success,
-    ).toBe(false);
   });
 });
 

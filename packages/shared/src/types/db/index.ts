@@ -210,17 +210,6 @@ export type NotificationRow = {
   createdAt: Date;
 };
 
-export type GameInviteRow = {
-  id: string;
-  token: string;
-  inviterUserId: string;
-  gameType: string;
-  config: unknown;
-  seatingMode: SeatingMode | null;
-  expiresAt: Date;
-  createdAt: Date;
-};
-
 export type GameRecord = Omit<GameRow, "gameType"> & {
   gameType: GameType;
   players: GamePlayer[];
@@ -263,15 +252,6 @@ export type CreateProfileInput = {
   userId: string;
   username: string;
   avatar?: AvatarConfig | null;
-};
-
-export type CreateGameInviteInput = {
-  inviterUserId: string;
-  gameType: GameType;
-  token: string;
-  config?: unknown;
-  seatingMode?: SeatingMode | null;
-  expiresAt: Date;
 };
 
 export type PublicUserRow = {

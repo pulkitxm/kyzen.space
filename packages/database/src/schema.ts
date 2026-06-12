@@ -320,22 +320,3 @@ export const accountMerge = pgTable(
     index("account_merge_target_status_idx").on(t.targetUserId, t.status),
   ],
 );
-
-export const gameInvite = pgTable(
-  "game_invite",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    token: text("token").notNull().unique("game_invite_token_uq"),
-    inviterUserId: text("inviter_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    gameType: text("game_type").notNull(),
-    config: jsonb("config").$type<unknown>(),
-    seatingMode: text("seating_mode").$type<SeatingMode>(),
-    expiresAt: timestamp("expires_at")
-      .$defaultFn(() => new Date(Date.now() + 24 * 60 * 60 * 1000))
-      .notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (t) => [index("game_invite_inviter_idx").on(t.inviterUserId)],
-);
