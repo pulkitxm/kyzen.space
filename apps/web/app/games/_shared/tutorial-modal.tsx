@@ -33,7 +33,6 @@ export function TutorialModal({
           "play",
           "progress",
           "current-time",
-          "mute",
           "volume",
           "fullscreen",
         ],
@@ -62,7 +61,7 @@ export function TutorialModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
           onClick={onClose}
         >
           <m.div
@@ -70,32 +69,29 @@ export function TutorialModal({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.96, opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-surface-raised shadow-xl"
+            className="relative w-full max-w-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-border border-b px-4 py-3">
-              <span className="font-medium text-card-foreground text-sm">
-                {title} tutorial
-              </span>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close tutorial"
-                className="rounded-lg p-1.5 text-muted-foreground outline-none transition hover:bg-surface-overlay"
-              >
-                <FaXmark size={18} aria-hidden="true" />
-              </button>
-            </div>
-            {/* biome-ignore lint/a11y/useMediaCaption: gameplay tutorial has no spoken dialogue track */}
-            <video
-              ref={videoRef}
-              aria-label={`${title} tutorial video`}
-              className="w-full"
-              playsInline
-              controls
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close tutorial"
+              className="absolute -top-12 right-0 rounded-full p-2 text-white/70 outline-none transition hover:bg-white/10 hover:text-white"
             >
-              <source src={src} type="video/mp4" />
-            </video>
+              <FaXmark size={20} aria-hidden="true" />
+            </button>
+            <div className="overflow-hidden rounded-2xl bg-black shadow-2xl">
+              {/* biome-ignore lint/a11y/useMediaCaption: gameplay tutorial has no spoken dialogue track */}
+              <video
+                ref={videoRef}
+                aria-label={`${title} tutorial video`}
+                className="w-full"
+                playsInline
+                controls
+              >
+                <source src={src} type="video/mp4" />
+              </video>
+            </div>
           </m.div>
         </m.div>
       ) : null}

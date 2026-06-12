@@ -107,6 +107,15 @@ for (const def of GAMES) {
       expect(def.meta.tutorialVideo.startsWith("/games/")).toBe(true);
     });
 
+    test("howToPlay, when set, is a non-empty list of non-empty steps", () => {
+      if (def.meta.howToPlay === undefined) return;
+      expect(def.meta.howToPlay.length).toBeGreaterThan(0);
+      for (const step of def.meta.howToPlay) {
+        expect(typeof step).toBe("string");
+        expect(step.trim().length).toBeGreaterThan(0);
+      }
+    });
+
     test("turn-based engine provides a legal autoMove", () => {
       if (def.engine.mode !== "turn-based" || !def.engine.autoMove) return;
       const state = def.engine.createInitialState(minSeats(def));

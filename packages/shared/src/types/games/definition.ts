@@ -10,6 +10,7 @@ export interface GameMeta {
   categoryId: GameCategoryId;
   coverImage?: string;
   tutorialVideo?: string;
+  howToPlay?: string[];
 }
 
 export type ConfigFieldType = "select" | "number" | "toggle";

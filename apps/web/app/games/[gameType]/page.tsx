@@ -1,9 +1,10 @@
 import { getDefinition, hasEngine } from "@gamelobby/games-core";
+import { GAME_CATEGORIES } from "@gamelobby/shared/constants";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { HowToPlay } from "@/app/games/_shared/how-to-play";
 import { RoomActions } from "@/app/games/_shared/room-actions";
-import { TutorialButton } from "@/app/games/_shared/tutorial-button";
 
 export const metadata: Metadata = {
   title: "Play",
@@ -21,34 +22,43 @@ export default async function GamePage({
   if (!hasEngine(gameType)) notFound();
 
   const { meta } = getDefinition(gameType);
+  const category = Object.values(GAME_CATEGORIES).find(
+    (c) => c.id === meta.categoryId,
+  );
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-6 px-5 py-10 text-center">
-      <div className="space-y-1">
-        <h1 className="font-bold text-3xl text-foreground tracking-tight">
-          {meta.name}
-        </h1>
-        <p className="text-muted-foreground text-sm">{meta.description}</p>
-      </div>
+    <div className="mx-auto w-full max-w-5xl px-5 py-10 lg:px-8 lg:py-14">
+      {category ? (
+        <p className="font-semibold text-primary text-sm uppercase tracking-[0.25em]">
+          {category.label}
+        </p>
+      ) : null}
+      <h1 className="mt-3 font-bold text-5xl text-foreground tracking-tight sm:text-6xl">
+        {meta.name}
+      </h1>
+      <p className="mt-4 max-w-xl text-base text-muted-foreground">
+        {meta.description} Play a quick match or set up a room with friends.
+      </p>
 
-      {meta.coverImage ? (
-        <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-border shadow-md">
-          <Image
-            src={meta.coverImage}
-            alt={meta.name}
-            fill
-            sizes="(max-width: 448px) 100vw, 448px"
-            className="object-cover"
-            priority
-          />
+      <div className="mt-10 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
+        <div className="flex flex-col gap-6">
+          {meta.coverImage ? (
+            <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-border shadow-md">
+              <Image
+                src={meta.coverImage}
+                alt={meta.name}
+                fill
+                sizes="(max-width: 1024px) 100vw, 600px"
+                className="object-cover"
+                priority
+              />
+            </div>
+          ) : null}
+          <RoomActions meta={meta} />
         </div>
-      ) : null}
 
-      {meta.tutorialVideo ? (
-        <TutorialButton src={meta.tutorialVideo} title={meta.name} />
-      ) : null}
-
-      <RoomActions meta={meta} />
+        <HowToPlay meta={meta} />
+      </div>
     </div>
   );
 }

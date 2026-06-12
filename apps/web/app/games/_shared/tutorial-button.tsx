@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FaCirclePlay } from "react-icons/fa6";
+import { FaPlay } from "react-icons/fa6";
 import { TutorialModal } from "./tutorial-modal";
 
 export function TutorialButton({ src, title }: { src: string; title: string }) {
@@ -12,9 +12,9 @@ export function TutorialButton({ src, title }: { src: string; title: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-full px-3 py-1.5 font-medium text-muted-foreground text-sm outline-none transition hover:bg-surface-overlay hover:text-card-foreground"
+        className="flex w-full items-center justify-center gap-2.5 rounded-2xl border-2 border-primary/70 px-4 py-3 font-semibold text-primary text-sm outline-none ring-1 ring-primary/30 ring-offset-2 ring-offset-surface-raised transition hover:bg-primary/10"
       >
-        <FaCirclePlay size={16} aria-hidden="true" />
+        <FaPlay size={12} aria-hidden="true" />
         Watch tutorial
       </button>
       <TutorialModal

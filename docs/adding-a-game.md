@@ -50,11 +50,15 @@ export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
 ```
 
 - `meta` - `type` (a `GameType`, not `string`), `name`, `description`,
-  `categoryId`, an optional `coverImage`, and an optional `tutorialVideo`. Both
-  image and video are `/games/...` paths under `apps/web/public/`; the game page
-  renders the cover and, when `tutorialVideo` is set, a "Watch tutorial" button
-  that opens a Plyr modal over the local mp4 (tic-tac-toe sets
-  `tutorialVideo: "/games/tic-tac-toe-tutorial.mp4"`, `meta.ts:10`).
+  `categoryId`, an optional `coverImage`, an optional `tutorialVideo`, and an
+  optional `howToPlay`. Image and video are `/games/...` paths under
+  `apps/web/public/`; the game page renders the cover and, beside it (the
+  right column on desktop, stacked below on mobile), a "How to play" panel
+  showing the `howToPlay` steps with - when `tutorialVideo` is set - a "Watch
+  tutorial" button that opens a Plyr modal over the local mp4 (tic-tac-toe
+  sets `tutorialVideo: "/games/tic-tac-toe-tutorial.mp4"`, `meta.ts:10`).
+  `howToPlay` is 3-5 short player-facing steps (plain strings, no markdown);
+  the conformance suite rejects an empty list or blank steps.
 - `engine` - `mode`, `roles`, `min`/`maxPlayers`, `createInitialState`,
   `reduce`/`step`, and the two optional turn-timer hooks `currentRole` and
   `autoMove` (see below).
@@ -222,11 +226,14 @@ type, `listGameTypes(): GameType[]` returns the narrowed list.
 These already work for every game - do not duplicate them:
 
 - **Game page** - `apps/web/app/games/[gameType]/page.tsx` renders the game's
-  name, cover image, an optional "Watch tutorial" button (only when
-  `meta.tutorialVideo` is set), and `app/games/_shared/room-actions.tsx` - the
-  **Play / Create / Join** buttons. Play routes to `/play/find/<type>`
-  (matchmaking), Create to `/play/new/<type>` (which emits `room:create`), and
-  Join validates a code via the `room:join` socket ack. Any `configFields` the
+  category eyebrow, name, description, cover image,
+  `app/games/_shared/room-actions.tsx` - the
+  **Play now / Create room / Join by code** buttons - and the `HowToPlay`
+  panel (`app/games/_shared/how-to-play.tsx`): the `meta.howToPlay` steps plus
+  a "Watch tutorial" button (only when `meta.tutorialVideo` is set). Play now
+  routes to `/play/find/<type>` (matchmaking), Create room to
+  `/play/new/<type>` (which emits `room:create`), and Join by code validates a
+  code via the `room:join` socket ack. Any `configFields` the
   game declares are read off the `GameDefinition`; you add nothing here. The URL
   stays `/games/<type>`; the legacy `/games/<type>/<id>` redirects to
   `/play/<code>` (the game's short public room code, which is `GameJson.id`).
