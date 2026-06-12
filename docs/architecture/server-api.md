@@ -27,8 +27,6 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 | `apps/server/src/api/routes/conversations.ts` | The largest router: list/create DMs & groups, messages, read receipts, members, rename, and `POST /:id/games`. Resolution for friendly URLs: `GET /with/:username` (→ DM) and `GET /group/:name` (→ group, member-gated). Group names are unique (enforced on create + rename in `conversations-service.ts`), so a name resolves to one group; `GET /:id` remains for internal id fetches. |
 | `apps/server/src/api/routes/friends.ts` | Friends list, pending requests, user search with friend-state, send/accept/decline/remove. |
 | `apps/server/src/api/routes/games.ts` | The two game REST reads: `GET /:gameId` (serialized game + its moves) and `GET /:gameId/series` (the rematch series via `serializeSeries` + `computeSeriesScore`). |
-| `apps/server/src/api/routes/invite.ts` | Invite links (guest identity, Phase 3): authed `POST /invite` (mint a link), public `GET /invite/:token` (privacy-safe peek), and public `POST /invite/:token/accept` (mints an anonymous session when the opener is logged out, then joins). |
-| `apps/server/src/chat/invite-service.ts` | `createInvite` / `peekInvite` / `acceptInvite`: token minting + TTL, the uniform unknown/expired response, the self-invite no-op, the per-inviter accept rate limit, and the privacy-safe `{ username, avatar }` inviter projection. |
 | `apps/server/src/api/routes/gifs.ts` | Proxy to the Klipy GIF provider: trending + search, with limit/offset clamping. |
 | `apps/server/src/api/routes/messages.ts` | `DELETE /:id` (soft-delete a message). |
 | `apps/server/src/api/routes/notifications.ts` | List / unread-count / mark-read / read-all. |
@@ -125,7 +123,6 @@ export const app = new Hono<LoggerEnv>()
   .route("/conversations", conversationsRouter)
   .route("/messages", messagesRouter)
   .route("/notifications", notificationsRouter)
-  .route("/invite", inviteRouter)
   .route("/gifs", gifsRouter);
 ```
 
@@ -188,23 +185,6 @@ The account router additionally owns the anon-to-real account merge (guest ident
 - **`POST /api/account/merge/:id/discard`** runs `accountMerge.deleteAnonUserData` then marks the row `discarded`.
 
 Both mutating routes assert `c.get("userId") === row.targetUserId` and return **403** otherwise (a user can only act on a merge targeting their own account), **404** when the row is missing, and **409** when it is already resolved (the merge is idempotent - only a `pending` row is actionable). The anon id is only ever supplied by the server's own `onLinkAccount` recorder, never by the client.
-
-### Invite links (`routes/invite.ts` + `chat/invite-service.ts`)
-
-The invite router (`apps/server/src/api/routes/invite.ts`) backs the share-a-link flow (guest identity, Phase 3) with three endpoints - **one authed, two public** - each delegating to `invite-service.ts`:
-
-- **`POST /api/invite`** (`requireAuth`, `invite.ts:13`) mints a link. It narrows the client `gameType` with `gameTypeSchema.safeParse` (`400 Invalid game type` on a miss), then calls `createInvite({ inviterUserId, gameType, config })` (`invite-service.ts:45`) which generates a 43-char base64url token (`generateInviteToken`), persists a `game_invite` row with a 24h TTL, and returns `{ token, url }` where `url` is `${env.webUrl}/invite/<token>` (`invite-service.ts:60`).
-- **`GET /api/invite/:token`** (**public**, `invite.ts:26`) is the privacy-safe **peek**: `peekInvite(token)` (`invite-service.ts:64`) loads the row and, on an unknown **or** expired token, returns the **identical** `{ gameType: null, inviter: null, expired: true }` - so the response is not an enumeration oracle (you can't tell "never existed" from "expired"). For a live invite it returns `{ gameType, inviter: { username, avatar }, expired: false }` - only the inviter's **username and avatar**, never their email or user id.
-- **`POST /api/invite/:token/accept`** (**public**, `invite.ts:30`) joins the opener to the game. If the request carries a logged-in Better Auth session it uses that user id; otherwise it mints an **anonymous** session server-side via `auth.api.signInAnonymous({ headers, returnHeaders: true })` and appends each minted `Set-Cookie` to the response (`invite.ts:39`) - so a brand-new visitor gets a guest identity in one round trip (see [auth.md](./auth.md)). It then calls `acceptInvite(token, accepterUserId)`.
-
-`acceptInvite` (`invite-service.ts:79`) encodes the safety rules:
-
-- **Unknown / expired** → `fail("Invite not found or expired", 404)` (`invite-service.ts:90`), the same uniform answer as the peek.
-- **Self-invite no-op** → if the accepter is the inviter, it returns `ok({ gameId: null, selfInvite: true, inviter })` without creating a game (`invite-service.ts:99`), so an inviter opening their own link doesn't spawn a useless game against themselves.
-- **Per-inviter rate limit** → a sliding 60s window allows at most `ACCEPT_MAX_PER_WINDOW = 20` accepts per inviter (`acceptAllowed`, `invite-service.ts:31`); exceeding it returns `fail("Too many invites accepted, try again shortly", 409)`. This bounds how fast one shared link can fan out games.
-- Otherwise it `getOrCreateDm`s the inviter↔accepter conversation, spawns a `challenge`-seated game through the shared `createGameInConversation` service (so it inherits the one-live guard and config validation), `notify`s the inviter with a `game_invite` notification, and returns `ok({ gameId, selfInvite: false, inviter })`.
-
-The token itself is **not** the 6-char `game.code` - it is a long random secret minted by `generateInviteToken` and validated for minimum length by the `invites` repository (see [database.md](./database.md)). Because the accept route is public and can mint a session, it lives outside `requireAuth`; the peek is public so an unauthenticated opener can render the inviter's name before deciding to join.
 
 `readJson(c)` (`apps/server/src/api/auth-context.ts`) is the body helper: it `try/catch`-parses the JSON body and returns `null` on failure or a non-object, so routes write `const body = await readJson(c)` and then defensively pull fields. `isUuid(value)` (`apps/server/src/lib/uuid.ts`) is the shared UUID guard used by the conversation routes; the **game** route and the realtime game lane instead validate the public room **code** with `isGameCode` (`@gamelobby/shared/types`).
 
@@ -423,7 +403,6 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 - **Logs redact secrets.** The pino config (`apps/server/src/logger.ts:8`) redacts cookies/auth headers/`*.token`/`*.secret`. Don't log raw request headers expecting to see the session - it's `[redacted]`.
 - **`game_card` status is computed at read time.** It's merged in by `withGameCardStatus`/`enrichGameCardMeta` during assembly, not stored on the message row. When a game ends, push the updated card with `broadcastGameCard` (`apps/server/src/chat/game-card-broadcast.ts:7`).
 - **GIF and profile-config validation are intentionally allow-list based.** Reject unknown themes/patterns/layouts with `400`; clamp GIF limits; never pass user strings straight to the provider or DB.
-- **Invite peek/accept give a uniform "unknown-or-expired" answer.** Both `peekInvite` and `acceptInvite` collapse "no such token" and "expired token" into the same response so neither leaks whether a token ever existed. The peek returns only `{ username, avatar }` of the inviter (never email/id), the accept is a self-invite no-op for the inviter, and accepts are rate-limited per inviter. The accept route is public *because* it can mint an anonymous session for a logged-out opener; don't put it behind `requireAuth`.
 
 ## Where to go next
 

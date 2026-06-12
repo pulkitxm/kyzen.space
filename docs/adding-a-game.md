@@ -50,9 +50,14 @@ export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
 ```
 
 - `meta` - `type` (a `GameType`, not `string`), `name`, `description`,
-  `categoryId`, and an optional `coverImage`.
-- `engine` - `mode`, `roles`, `min`/`maxPlayers`, `createInitialState`, and
-  `reduce`/`step`.
+  `categoryId`, an optional `coverImage`, and an optional `tutorialVideo`. Both
+  image and video are `/games/...` paths under `apps/web/public/`; the game page
+  renders the cover and, when `tutorialVideo` is set, a "Watch tutorial" button
+  that opens a Plyr modal over the local mp4 (tic-tac-toe sets
+  `tutorialVideo: "/games/tic-tac-toe-tutorial.mp4"`, `meta.ts:10`).
+- `engine` - `mode`, `roles`, `min`/`maxPlayers`, `createInitialState`,
+  `reduce`/`step`, and the two optional turn-timer hooks `currentRole` and
+  `autoMove` (see below).
 - `stateSchema` validates the `game_state` JSONB; `moveSchema` validates
   `move_data` JSONB **and** the `make_move` payload; `configSchema` validates the
   `config` JSONB **and** the lobby setup form.
@@ -71,6 +76,30 @@ schemas are the guardrails that make that JSON safe and strongly typed:
   (turns, legality, terminal state) in the engine's `reduce`/`step`. The
   turn-based handler validates `moveSchema` and `stateSchema` before calling the
   engine.
+
+### Optional turn-timer hooks: `currentRole` and `autoMove`
+
+The server runs a per-player turn clock (`apps/server/src/realtime/turn-timer.ts`)
+on every `active` turn-based game. A game opts into it by implementing two optional
+`GameEngine` methods (`packages/shared/src/types/games/engine.ts:26`); a game that
+implements neither simply has no clock.
+
+```ts
+autoMove?(state: State, role: string): Input;
+
+currentRole?(state: State): string | null;
+```
+
+- `currentRole(state)` tells the timer **whose turn it is** (the role on the
+  clock), or `null` when the game is terminal. Tic-tac-toe returns
+  `state.currentTurn` unless the board is won/full (`engine.ts:108`).
+- `autoMove(state, role)` returns a **random legal move** for `role`. When a
+  player's deadline passes, the timer plays this move through the same
+  `moveSchema` → `engine.reduce` → persist → broadcast path (flagged
+  `auto: true`). Tic-tac-toe picks a random empty cell (`engine.ts:99`).
+
+The mechanism is generic; the move is game-specific. See [realtime.md](architecture/realtime.md)
+for the strike/abort schedule the timer enforces on top of these hooks.
 
 ## Worked example: tic-tac-toe
 
@@ -192,14 +221,18 @@ type, `listGameTypes(): GameType[]` returns the narrowed list.
 
 These already work for every game - do not duplicate them:
 
-- **Lobby** - `apps/web/app/games/[gameType]/page.tsx` + `app/games/_shared/game-lobby.tsx`
-  render the catalog-driven lobby and the `configFields` form. The URL stays
-  `/games/<type>`; the legacy `/games/<type>/<id>` redirects to `/play/<code>`
-  (the game's short public room code, which is `GameJson.id`).
-- **"Play with…" flow** - `app/games/components/conversation-picker.tsx` and
-  `app/chat/[handle]/game-launcher.tsx` (both take a `gameType`; the picker also
-  takes an optional `config`) create a game in a conversation via the `game:create_in_conversation`
-  socket event.
+- **Game page** - `apps/web/app/games/[gameType]/page.tsx` renders the game's
+  name, cover image, an optional "Watch tutorial" button (only when
+  `meta.tutorialVideo` is set), and `app/games/_shared/room-actions.tsx` - the
+  **Play / Create / Join** buttons. Play routes to `/play/find/<type>`
+  (matchmaking), Create to `/play/new/<type>` (which emits `room:create`), and
+  Join validates a code via the `room:join` socket ack. Any `configFields` the
+  game declares are read off the `GameDefinition`; you add nothing here. The URL
+  stays `/games/<type>`; the legacy `/games/<type>/<id>` redirects to
+  `/play/<code>` (the game's short public room code, which is `GameJson.id`).
+- **Friend-challenge flow** - `app/chat/[handle]/game-launcher.tsx` (takes a
+  `gameType`) creates a game in a conversation via the
+  `game:create_in_conversation` socket event from the chat surface.
 - **Play view** - `app/play/[gameId]/page.tsx` (the `[gameId]` segment is the
   game's public room code) loads the game by code and renders the registered
   client via `getGameClient(type)` inside `<Suspense>`, with

@@ -15,7 +15,7 @@ The *shape* of the tables themselves - the schema, the generic JSONB game model,
 | Path | Responsibility |
 | --- | --- |
 | `packages/database/src/client.ts` | `createDb(url, latencyMs)` factory + the singleton it builds: the `postgres-js` connection pool and the Drizzle `db` instance. Also `ping()` (`select 1` over the singleton `db` - the `/health` readiness probe). Re-exports `createDb`, `db`, `client`, `schema`, `ping`, and the `DB` type. |
-| `packages/database/src/index.ts` | The public facade (`@gamelobby/database`): re-exports each repository as a namespace (`accountMerge`, `conversations`, `friends`, `games`, `invites`, `messages`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@gamelobby/shared/types`) and the `ping` / `generateInviteToken` helpers. |
+| `packages/database/src/index.ts` | The public facade (`@gamelobby/database`): re-exports each repository as a namespace (`accountMerge`, `conversations`, `friends`, `games`, `messages`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@gamelobby/shared/types`) and the `ping` helper. |
 | `packages/database/src/latency.ts` | `withLatency` Proxy that injects an artificial per-query delay (`DB_LATENCY_MS`) in non-production, for exercising loading states. |
 | `packages/database/src/repositories/games.ts` | Game/move/seat CRUD; assembles `GameRecord` (the `game` row with `players` attached and `gameType` narrowed to the registry `GameType`) via `toGameRecord` and the `getGameById` / `getGameByCode` joins; `createGame` allocates the public `code` (and defaults `seriesId` to the row's own id) and retries on a `game_code_uq` collision; the series reads `getSeriesGames` / `findLiveGameInConversation`. |
 | `packages/database/src/repositories/messages.ts` | Message insert/read/soft-delete + keyset-paginated `listMessages`. |
@@ -24,7 +24,6 @@ The *shape* of the tables themselves - the schema, the generic JSONB game model,
 | `packages/database/src/repositories/notifications.ts` | Notification create/list (keyset-paginated)/mark-read/resolve. |
 | `packages/database/src/repositories/profiles.ts` | `user_profile` reads/writes: username, avatar, appearance, chat layout, and per-game stats. |
 | `packages/database/src/repositories/account-merge.ts` | The anon-to-real merge layer (guest identity, Phase 1): `recordPending` / `getById` / `getPendingForTarget` / `markResolved`, the privacy-safe `summarizeAnonAccount` (counts only), `deleteAnonUserData` (discard - deletes the anon user plus its FK-less seats/moves, preserving games shared with a real opponent), and the `mergeAccounts(anonId, targetId)` transaction that re-points every row keyed on the anon id, collapsing self-references (self-friendship, self-DM, self-play seat) and summing `user_profile.stats` per gameType. |
-| `packages/database/src/repositories/invites.ts` | Invite-link layer (guest identity, Phase 3): `create` / `getByToken` for the `game_invite` table, validating input with `createGameInviteInputSchema` and rejecting tokens shorter than `INVITE_TOKEN_LENGTH`. The token itself is minted by `packages/database/src/invite-token.ts` (`generateInviteToken` - a 43-char base64url string from `crypto.randomBytes(32)`, deliberately not the 6-char `game.code`). |
 | `packages/database/src/repositories/cursor.ts` | `encodeCursor` / `decodeCursor` - the opaque base64 `(createdAt, id)` cursor used by keyset pagination. |
 
 > `packages/database/src/schema.ts`, `src/migrate.ts`, `src/drift-guard.ts`, and the root `drizzle.config.ts` - the table definitions and migrations - are covered in [`database-schema.md`](./database-schema.md).
@@ -58,13 +57,10 @@ export const createDb = createDbImpl;
 export const db = dbImpl;
 export const ping = pingImpl;
 export const schema = schemaImpl;
-export const generateInviteToken = generateInviteTokenImpl;
-
 export * as accountMerge from "./repositories/account-merge";
 export * as conversations from "./repositories/conversations";
 export * as friends from "./repositories/friends";
 export * as games from "./repositories/games";
-export * as invites from "./repositories/invites";
 export * as messages from "./repositories/messages";
 export * as notifications from "./repositories/notifications";
 export * as profiles from "./repositories/profiles";
@@ -72,7 +68,7 @@ export * as profiles from "./repositories/profiles";
 
 So callers write `import { games, profiles } from "@gamelobby/database"` and then `games.getGameById(id)` / `profiles.bumpStats(...)`. There is no class, no DI container, no base "Repository" abstraction - just modules. The discipline is conventional, not enforced by types: routes and realtime handlers import these namespaces and never import Drizzle directly.
 
-The value exports (`createDb`, `db`, `ping`, `schema`, `generateInviteToken`) are deliberately **owned `const` bindings** - `index.ts` imports them under `*Impl` aliases and re-exports fresh constants - rather than `export { … } from "./client"` alias re-exports. An alias re-export shares its live binding with the source module, so when a test calls `mock.module("@gamelobby/database", …)` on an already-loaded barrel (which Bun patches in place), the patch would write *through* the alias into `./client` and `./invite-token` themselves, poisoning direct importers of those modules for the rest of the process. Owned constants confine the patch to the barrel: barrel consumers see the mock, the source modules stay real. (This is exactly what a cross-workspace `bun test` run from the repo root exercises - integration tests load the real barrel, route tests then mock it, and `packages/database/tests/invite-token.test.ts` still expects the real `generateInviteToken`.)
+The value exports (`createDb`, `db`, `ping`, `schema`) are deliberately **owned `const` bindings** - `index.ts` imports them under `*Impl` aliases and re-exports fresh constants - rather than `export { … } from "./client"` alias re-exports. An alias re-export shares its live binding with the source module, so when a test calls `mock.module("@gamelobby/database", …)` on an already-loaded barrel (which Bun patches in place), the patch would write *through* the alias into `./client` itself, poisoning direct importers of that module for the rest of the process. Owned constants confine the patch to the barrel: barrel consumers see the mock, the source modules stay real. (This is exactly what a cross-workspace `bun test` run from the repo root exercises - integration tests load the real barrel, then route tests mock it.)
 
 Repositories also **validate their inputs** with the Zod schemas exported from `@gamelobby/shared/types` before they write: `createGame` runs `createGameInputSchema.parse(input)` (`games.ts:30`), `addMove` runs `addMoveInputSchema.parse(input)` (`games.ts:215`), `insertMessage` / `create` / `createProfile` / `updateAppearance` parse theirs the same way.
 
@@ -171,19 +167,19 @@ Repositories occasionally need a SQL expression Drizzle's builder doesn't model 
 
 ### `profiles.bumpStats` - read-modify-write of JSONB
 
-`bumpStats` (`profiles.ts:170`) is a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime `finalize` helper when a game completes (`apps/server/src/realtime/turn-based.ts:99`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice - but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
+`bumpStats` (`profiles.ts:170`) is a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime `finalize` helper when a game completes (`apps/server/src/realtime/turn-based.ts:142`) and from `abortGame` when a timed-out game ends by forfeit (`turn-based.ts:213`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice - but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
 
 ## Data-flow walkthrough: persisting a move
 
-This is the database layer's busiest path, and where the "client is never trusted" insight becomes concrete. A player taps the board, the client emits `make_move`, and the server's turn-based handler `handleMakeMove` runs (`apps/server/src/realtime/turn-based.ts:129`):
+This is the database layer's busiest path, and where the "client is never trusted" insight becomes concrete. A player taps the board, the client emits `make_move`, and the server's turn-based handler `handleMakeMove` runs (`apps/server/src/realtime/turn-based.ts:297`):
 
 1. **Load the aggregate.** `games.getGameByCode(payload.gameId)` (`games.ts:100`) returns the `GameRecord` - game row + seats - resolved from the public room **code** the client sent (the wire never carries the UUID). The handler checks `status === "active"` and that the socket's `userId` is actually a seated player. The DB join is what makes the seat check possible.
-2. **Validate with the shared schemas.** `def.moveSchema.safeParse(payload.moveData)` validates the *client's* input (`turn-based.ts:147`), and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB (`turn-based.ts:149`). Both schemas come from the same `GameDefinition` the client imports. A bad move or corrupt state is rejected before any write.
-3. **Reduce - authoritatively.** `def.engine.reduce(...)` (`turn-based.ts:152`) computes the next state on the server. The client's opinion about legality is irrelevant.
+2. **Validate with the shared schemas.** `def.moveSchema.safeParse(payload.moveData)` validates the *client's* input (`turn-based.ts:315`), and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB (`turn-based.ts:317`). Both schemas come from the same `GameDefinition` the client imports. A bad move or corrupt state is rejected before any write.
+3. **Reduce - authoritatively.** `def.engine.reduce(...)` (`turn-based.ts:320`) computes the next state on the server. The client's opinion about legality is irrelevant.
 4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`games.ts:201`) returns `max(moveNumber) + 1` - keyed on the internal UUID `gameRow.id`, since `move.game_id` FKs the UUID. The `move_game_number_uq` constraint is the backstop if two moves race to the same number.
 5. **Append the move.** `games.addMove(...)` (`games.ts:209`) inserts the validated move into the append-only `move` table.
-6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:165`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`.
-7. **Finalize on game over.** If the engine's outcome is `completed`, `finalize` (`turn-based.ts:78`) calls `games.updateGame` again (status / `completedAt` / `winner`) and `profiles.bumpStats` (`profiles.ts:170`) once per seat.
+6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:165`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`. The shared `applyMove` helper (`turn-based.ts:152`) runs the same persist path for both real and timer auto-moves.
+7. **Finalize on game over.** If the engine's outcome is `completed`, `finalize` (`turn-based.ts:123`) calls `games.updateGame` again (status / `completedAt` / `winner`) and `profiles.bumpStats` (`profiles.ts:170`) once per seat.
 
 In arrows:
 
@@ -202,10 +198,11 @@ Notice that no SQL appears anywhere in `turn-based.ts` - only `games.*` and `pro
 - **Resolve games by code from the wire, by id internally.** The realtime lane and `GET /api/games/:gameId` hold the public room **code**, so they call `getGameByCode(code)` (`games.ts:100`); writes (`addMove` / `updateGame` / `listMoves` / `seatPlayer`) all take the internal UUID `gameRow.id`. `createGame` retries on a `game_code_uq` collision before giving up with `Failed to allocate a unique game code` once it exhausts `GAME_CODE_MAX_ATTEMPTS` (`games.ts:18`).
 - **`seatPlayer` is idempotent.** It inserts the `game_player` row with `ON CONFLICT (game_id, user_id) DO NOTHING` and returns a `boolean` - `true` if the seat was written, `false` if that `(game_id, user_id)` was already seated (`games.ts:146`). This absorbs a duplicate/concurrent `join_room` for the same user without raising `game_player_uq`; the realtime driver branches on the result rather than blindly re-activating the game (see [realtime](./realtime.md)).
 - **At most one live game per `(conversation, gameType)`.** `findLiveGameInConversation` (`games.ts:125`) is the read behind that invariant; the create/rematch services short-circuit to its result instead of inserting a duplicate. A series of every game in a rematch chain is read flat via `getSeriesGames` (`games.ts:111`) keyed on the shared `seriesId`.
+- **`game.status` is free text, so terminal statuses need no migration.** The `status` column is `text("status").$type<GameStatus>()` (`schema.ts:112`), not a `pgEnum`, so the turn-timer's terminal `"aborted"` status - added to `gameStatusSchema` (`packages/shared/src/types/games/wire.ts:6`) and folded into `isGameOver` (`wire.ts:136`) - persists with no schema change. The turn-timer's per-player strike counts and `turnDeadline` are kept **in-memory only** (`apps/server/src/realtime/turn-timer.ts`); there is no `consecutive_timeouts` column. See [`realtime.md`](./realtime.md).
 - **Cursors are opaque and tolerant.** `decodeCursor` returns `null` (rather than throwing) on a malformed or non-base64 cursor (`cursor.ts:7`); callers then simply page from the start. Keyset pagination relies on the composite `createdAt`-leading indexes - keep them if you add new paginated lists.
 - **`bumpStats` is read-modify-write on JSONB** (`profiles.ts:170`), not an atomic increment. Fine for the current serialized call site in the move handler; be careful if you ever bump stats from concurrent paths.
 - **`DB_LATENCY_MS` is dev-only.** Forced to 0 in production by `resolveDbLatencyMs` (`latency.ts:63`), and resolved inside the package (`client.ts:9`).
-- **JSONB blobs are untrusted until parsed.** `game_state` / `config` / `move_data` are `unknown` by design; validity is owned by the games' Zod schemas (see [`database-schema.md`](./database-schema.md)) and enforced at the realtime boundary (`turn-based.ts:149`). Treat any `gameState` you read as untrusted until `stateSchema.safeParse`'d.
+- **JSONB blobs are untrusted until parsed.** `game_state` / `config` / `move_data` are `unknown` by design; validity is owned by the games' Zod schemas (see [`database-schema.md`](./database-schema.md)) and enforced at the realtime boundary (`turn-based.ts:317`). Treat any `gameState` you read as untrusted until `stateSchema.safeParse`'d.
 - **No comments in code.** Per the repo-wide rule, the only comments you'll find in this layer are the `biome-ignore` directives on the `or(...)!` non-null assertions in the two paginated repositories.
 
 ## Where to go next
