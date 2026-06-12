@@ -112,6 +112,35 @@ Full-bleed, seamless, centered. Top → bottom: **name → cover image → tutor
 ### 6.4 Asset
 - The tutorial render is `vid-tutorials/scripts/tutorial.mp4` (~11 MB). Copied into `apps/web/public/games/`. (An 11 MB committed asset is acceptable next to the existing cover PNG; optimization is a later concern.)
 
+### 6.5 Turn timer, auto-move & auto-abort (server-authoritative)
+
+Lives entirely in the game websocket lane (`turn-based.ts` / realtime). The server alone enforces timing; the client only renders a countdown synced to a server-provided `turnDeadline`. (A client-trusted clock would be trivially cheatable.)
+
+**Per-player, independent clocks.** Each seat tracks `consecutiveTimeouts` (strikes), reset to 0 by any real move.
+- A seat's **first turn**: 15s.
+- Every later turn: **`5 − strikes` seconds** (strikes 0 → 5s, 1 → 4s, 2 → 3s).
+- **Real move** → clear that seat's strikes (next turn back to 5s).
+- **Timeout** (deadline passes with no move) → increment that seat's strikes, apply the engine auto-move, advance the turn. When strikes reach **3**, that seat is **aborted** instead of getting a 4th reduced turn.
+- A continuously-AFK seat therefore runs **15 → 4 → 3 → abort**. A seat that keeps responding stays at **15 → 5 → 5 → 5 …**, completely independent of the opponent.
+
+**Auto-move (mechanism generic, move game-specific).** The `GameEngine` interface gains `autoMove(state, role): Move`, returning a random *legal* move. Tic-tac-toe → a random empty cell with the current player's mark. The timeout handler runs the auto-move through the normal `moveSchema` validate → `engine.reduce` → persist → broadcast path; auto-moves are flagged (`auto: true`) in `move_data`.
+
+**Abort outcome** (terminal status `aborted`):
+- Opponent **was responding** (opponent `strikes === 0`) → opponent **wins by forfeit** (`status: "aborted"`, `winnerRole = opponent`).
+- Opponent **is also mid-AFK** (opponent `strikes > 0`) → `status: "aborted"`, **no winner**.
+- So the room only "aborts with no winner" when neither side is responding.
+
+**Scheduling & state.**
+- The realtime layer keeps an in-memory per-game scheduler (one pending deadline per active game). On `active`, on every move, and after each timeout auto-move, it recomputes `turnDeadline = now + limit(currentSeat)` and (re)schedules the fire.
+- The broadcast `game_state` carries `turnDeadline` (+ per-seat strikes) so the board can render the countdown ring (below).
+- `turnDeadline` + strikes are persisted (`game_player.consecutive_timeouts`, plus a deadline on the game/state-meta) so a reconnecting board recovers the live countdown and a restarted node can reconcile overdue turns.
+
+**Client display — avatar countdown ring (no number).** The timer is never shown as a numeral. Each player's profile picture (in the board's `player-bar.tsx`) is wrapped by a **circular progress ring/outline**. At the start of the active seat's turn the ring is **full (100%)** and **depletes linearly to 0%** as `turnDeadline` approaches, then **animates out**. The ring is driven by the server `turnDeadline`: the client computes `remaining = turnDeadline − now` and animates the ring's stroke from its current fraction down to 0 over `remaining` ms with **linear** easing; a new turn resets it to 100%. The ring is shown around **whichever seat is on the clock** (the current turn). It is a generated radial indicator — an SVG stroke arc (`stroke-dasharray`/`stroke-dashoffset`), which is a decorative indicator, not an icon, so a raw `<svg>` is acceptable here (the react-icons rule covers icons, not generated progress art). Linear (not eased) so the depletion reads as a true clock.
+
+**Status enum.** Add `aborted` to `gameStatusSchema` and the Drizzle `pgEnum` (applied via `db:push`, per the push-managed dev DB); `isGameOver` includes it.
+
+**Known limitation (noted, not solved in v1).** In-memory timers assume one server node owns a game's clock; multi-node durability (redis-backed deadlines + a sweeper, or per-room node affinity) is future hardening — the persisted `turnDeadline` is what lets a restarted node catch overdue turns.
+
 ## 7. Error handling
 
 - **Join:** client normalizes/validates the code; server ack returns typed errors (`not_found` / `full` / `already_started` / `finished`) shown inline. Navigation only on success → no 404 on a typo.
