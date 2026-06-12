@@ -3,7 +3,7 @@
 **Type slug:** `tic-tac-toe`
 **Category:** `board-classics`
 
-> Classic 3×3 board. Get three in a row to win.
+> Classic 3×3 board. Line up three in a row to win.
 
 ## How to play
 
@@ -12,6 +12,10 @@ turns alternate. On your turn you place your mark in one empty cell. The first
 player to line up three of their marks in a row (horizontally, vertically, or
 diagonally) wins. If all nine cells fill up with no such line, the game is a
 draw.
+
+A four-step player-facing summary of these rules lives in `meta.howToPlay`
+(`packages/games-core/src/games/tic-tac-toe/meta.ts`) and renders in the game
+page's "How to play" card.
 
 ## Players and roles
 

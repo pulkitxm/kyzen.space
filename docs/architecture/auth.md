@@ -297,7 +297,7 @@ click → authClient.signIn.social (auth-client.ts) → POST /api/auth/sign-in/s
 
 **The guest flow is the same trace with one shortcut.** "Continue as a guest" (`apps/web/app/auth/guest-button.tsx`) calls `ensureIdentity()` (`apps/web/lib/auth/ensure-identity.ts:3`), which does `authClient.signIn.anonymous()` instead of `signIn.social` - there is no OAuth round-trip, so steps 1-4 collapse into a single `POST /api/auth/sign-in/anonymous` that inserts the `user` (`isAnonymous = true`) + `session` rows. The same `user.create.after` provisioning hook (step 5, now with `skipGenderDetection: true`), cookie set (step 6), RSC read (step 7), and socket connect (step 8) all run identically. From the socket and REST layers' perspective a guest is indistinguishable from a Google user.
 
-**A guest is also minted lazily on the game page.** The **Play / Create / Join** actions (`apps/web/app/games/_shared/room-actions.tsx`) each call `ensureIdentity()` before doing anything, so a logged-out visitor who clicks one is signed in as a guest in the same gesture - no login wall. `ensureIdentity()` is a no-op when a session already exists, so it never re-mints for an existing guest or Google user. See [`web.md`](./web.md) for the room-action flow.
+**A guest is also minted lazily on the game page.** The **Play now / Create room / Join by code** actions (`apps/web/app/games/_shared/room-actions.tsx`) each call `ensureIdentity()` before doing anything, so a logged-out visitor who clicks one is signed in as a guest in the same gesture - no login wall. `ensureIdentity()` is a no-op when a session already exists, so it never re-mints for an existing guest or Google user. See [`web.md`](./web.md) for the room-action flow.
 
 ## Sign-out & session management flow
 

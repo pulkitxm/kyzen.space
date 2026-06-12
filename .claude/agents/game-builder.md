@@ -71,6 +71,9 @@ first; it is the canonical guide and this prompt mirrors it.
        `@gamelobby/shared/types`. Enforce game *rules* only; `reduce` may
        `safeParse` the move with `moveSchema` for defense-in-depth.
      - `meta.ts` - the `GameMeta`; import the slug from `@gamelobby/shared/constants`.
+       Include `howToPlay`: 3-5 short player-facing steps (plain strings, no
+       markdown) shown in the game page's "How to play" card; the conformance
+       suite rejects an empty list or blank steps.
      - `index.ts` - assemble the `GameDefinition` (engine + meta + the shared schemas).
    Then append the definition to the single array in
    `packages/games-core/src/games/index.ts` and export the engine from

@@ -89,7 +89,7 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
   }, [code, router, socket]);
 
   return (
-    <div className="w-full max-w-sm space-y-3">
+    <div className="w-full space-y-3">
       <button
         type="button"
         onClick={play}
@@ -97,8 +97,12 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-4 font-semibold text-base text-primary-foreground shadow-lg outline-none transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
       >
         <FaPlay size={16} aria-hidden="true" />
-        {busy === "play" ? "Finding a match..." : "Play"}
+        {busy === "play" ? "Finding a match..." : "Play now"}
       </button>
+
+      <p className="pt-2 font-semibold text-muted-foreground text-xs uppercase tracking-[0.25em]">
+        Play with friends
+      </p>
 
       <div className="grid grid-cols-2 gap-3">
         <button
@@ -108,7 +112,7 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
           className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-surface-raised px-4 py-3 font-medium text-card-foreground text-sm outline-none transition hover:bg-surface-overlay disabled:pointer-events-none disabled:opacity-60"
         >
           <FaPlus size={14} aria-hidden="true" />
-          {busy === "create" ? "Creating..." : "Create"}
+          {busy === "create" ? "Creating..." : "Create room"}
         </button>
         <button
           type="button"
@@ -120,7 +124,7 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
           className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-surface-raised px-4 py-3 font-medium text-card-foreground text-sm outline-none transition hover:bg-surface-overlay disabled:pointer-events-none disabled:opacity-60"
         >
           <FaArrowRightToBracket size={14} aria-hidden="true" />
-          Join
+          Join by code
         </button>
       </div>
 

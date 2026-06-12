@@ -463,3 +463,10 @@ html[data-glass] .glass-pane.glass-press:active {
 @utility gear-shift {
   transform: translateX(var(--gear-shift, 0px));
 }
+
+.plyr {
+  --plyr-color-main: var(--v);
+  --plyr-control-radius: 8px;
+  --plyr-tooltip-background: var(--surface-overlay);
+  --plyr-tooltip-color: var(--card-foreground);
+}
