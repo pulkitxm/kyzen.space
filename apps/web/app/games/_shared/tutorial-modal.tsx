@@ -19,6 +19,8 @@ export function TutorialModal({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<PlyrType | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -47,11 +49,11 @@ export function TutorialModal({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <AnimatePresence>
@@ -86,7 +88,13 @@ export function TutorialModal({
               </button>
             </div>
             {/* biome-ignore lint/a11y/useMediaCaption: gameplay tutorial has no spoken dialogue track */}
-            <video ref={videoRef} className="w-full" playsInline controls>
+            <video
+              ref={videoRef}
+              aria-label={`${title} tutorial video`}
+              className="w-full"
+              playsInline
+              controls
+            >
               <source src={src} type="video/mp4" />
             </video>
           </m.div>
