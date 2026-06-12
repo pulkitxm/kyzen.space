@@ -89,12 +89,7 @@ describe("room socket schemas", () => {
   });
 
   test("joinByCodeErrorSchema enumerates the failure reasons", () => {
-    for (const reason of [
-      "not_found",
-      "full",
-      "already_started",
-      "finished",
-    ]) {
+    for (const reason of ["not_found", "full", "already_started", "finished"]) {
       expect(joinByCodeErrorSchema.safeParse(reason).success).toBe(true);
     }
     expect(joinByCodeErrorSchema.safeParse("nope").success).toBe(false);

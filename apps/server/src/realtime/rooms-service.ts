@@ -56,7 +56,8 @@ export async function validateJoinByCode(input: {
   }
 
   if (isGameOver(gameRow.status)) return { ok: false, error: "finished" };
-  if (gameRow.status === "active") return { ok: false, error: "already_started" };
+  if (gameRow.status === "active")
+    return { ok: false, error: "already_started" };
 
   if (!hasEngine(gameRow.gameType)) return { ok: false, error: "not_found" };
   const { engine } = getDefinition(gameRow.gameType);

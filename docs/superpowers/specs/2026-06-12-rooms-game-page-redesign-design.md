@@ -1,4 +1,4 @@
-# Rooms + Game-Page Redesign — Design Spec
+# Rooms + Game-Page Redesign - Design Spec
 
 Date: 2026-06-12
 Status: Approved direction; pending spec review
@@ -7,11 +7,11 @@ Status: Approved direction; pending spec review
 
 Reframe every multiplayer game session as a **"Room"**, redesign the per-game page around three actions (**Play / Create / Join**), add a self-hosted **tutorial video**, mint **anonymous accounts lazily** (only on action), and **delete the invite-token system end-to-end**.
 
-The "very long ID" the user disliked was the 43-char invite token — not the 6-char game code, which is already friendly and shareable. This work removes the token middle-man and gives codes a first-class Create/Join UI.
+The "very long ID" the user disliked was the 43-char invite token - not the 6-char game code, which is already friendly and shareable. This work removes the token middle-man and gives codes a first-class Create/Join UI.
 
 ## 2. Core principle: a Room *is* a Game (UI naming over existing mechanics)
 
-A **Room** is surfaced in the product/UI as a room, but **internally it remains a `game` row** — no table rename, no new `room` table, no `room_type` column. Behavior is identical to today. The three room kinds map onto fields the `game` row already has:
+A **Room** is surfaced in the product/UI as a room, but **internally it remains a `game` row** - no table rename, no new `room` table, no `room_type` column. Behavior is identical to today. The three room kinds map onto fields the `game` row already has:
 
 | Room kind (product) | Internal representation |
 | --- | --- |
@@ -21,14 +21,14 @@ A **Room** is surfaced in the product/UI as a room, but **internally it remains 
 
 The 6-char game code (`code.ts`, alphabet excludes I/L/O, typo-tolerant `normalizeGameCode`) **is** the room code. The play page (`/play/{code}`) **is** the room.
 
-**Anonymous-user access.** Play, Create, and Join all work for anonymous (guest) users: `ensureIdentity()` mints an anonymous account on click, and the socket handshake + `requireAuth` accept anonymous sessions (they only require a `user.id`). No login wall on any of the three actions. Only **Friend invite** effectively needs a registered identity, since it requires a friends list (anonymous users start with none) — and that lives in the chat surface, not the game page.
+**Anonymous-user access.** Play, Create, and Join all work for anonymous (guest) users: `ensureIdentity()` mints an anonymous account on click, and the socket handshake + `requireAuth` accept anonymous sessions (they only require a `user.id`). No login wall on any of the three actions. Only **Friend invite** effectively needs a registered identity, since it requires a friends list (anonymous users start with none) - and that lives in the chat surface, not the game page.
 
 ## 3. Non-goals
 
 - No DB table rename; no new room table; no `room_type` column. (Confirmed: "show it as a room but internally create a game.")
 - Untouched: game rules/engines, the chat product, the `vid-tutorials/` Remotion system, MMR/skill matching, queue persistence across restarts, multiplayer beyond 2 seats.
 
-## 4. The new game page — `/games/[gameType]`
+## 4. The new game page - `/games/[gameType]`
 
 Full-bleed, seamless, centered. Top → bottom: **name → cover image → tutorial → buttons**.
 
@@ -75,7 +75,7 @@ Full-bleed, seamless, centered. Top → bottom: **name → cover image → tutor
    Waiting for your opponent...    (pulsing)
         Room code:  A2K9P7
      [ Copy code ]   [ Copy link ]
-   Share the code — they tap Join.
+   Share the code - they tap Join.
 ```
 
 ### Join (enter a code)
@@ -100,7 +100,7 @@ Full-bleed, seamless, centered. Top → bottom: **name → cover image → tutor
   - `room:create` → ack `{ code }`.
   - `room:join` (by code) → validates a waiting/open game by code; ack `{ code }` or `{ error }`. Authoritative seating still happens via the existing `join_room` → `ensureSeated`.
 - Unchanged: matchmaking (`game:queue_join` / `game:queue_leave` / `match_found`), `join_room`, `make_move`.
-- **Invite removal:** delete `chat/invite-service.ts`, `api/routes/invite.ts` (and unmount it from the Hono router), `repositories/invites.ts`, `invite-token.ts`; drop the `gameInvite` table (schema + a drop migration). The anon sign-in inside invite-accept becomes redundant — the client's `ensureIdentity()` covers it.
+- **Invite removal:** delete `chat/invite-service.ts`, `api/routes/invite.ts` (and unmount it from the Hono router), `repositories/invites.ts`, `invite-token.ts`; drop the `gameInvite` table (schema + a drop migration). The anon sign-in inside invite-accept becomes redundant - the client's `ensureIdentity()` covers it.
 
 ### 6.3 Web (`apps/web`)
 - **Game page** `app/games/[gameType]/page.tsx`: redesigned full-bleed layout rendering name + cover image + tutorial button + a new `RoomActions` client component. (The current page does not render name/image; that moves here.)
@@ -137,11 +137,11 @@ Lives entirely in the game websocket lane (`turn-based.ts` / realtime). The serv
 - The broadcast `game_state` carries `turnDeadline` (+ per-seat strikes) so the board can render the countdown ring (below).
 - `turnDeadline` + strikes are persisted (`game_player.consecutive_timeouts`, plus a deadline on the game/state-meta) so a reconnecting board recovers the live countdown and a restarted node can reconcile overdue turns.
 
-**Client display — avatar countdown ring (no number).** The timer is never shown as a numeral. Each player's profile picture (in the board's `player-bar.tsx`) is wrapped by a **circular progress ring/outline**. At the start of the active seat's turn the ring is **full (100%)** and **depletes linearly to 0%** as `turnDeadline` approaches, then **animates out**. The ring is driven by the server `turnDeadline`: the client computes `remaining = turnDeadline − now` and animates the ring's stroke from its current fraction down to 0 over `remaining` ms with **linear** easing; a new turn resets it to 100%. The ring is shown around **whichever seat is on the clock** (the current turn). It is a generated radial indicator — an SVG stroke arc (`stroke-dasharray`/`stroke-dashoffset`), which is a decorative indicator, not an icon, so a raw `<svg>` is acceptable here (the react-icons rule covers icons, not generated progress art). Linear (not eased) so the depletion reads as a true clock.
+**Client display - avatar countdown ring (no number).** The timer is never shown as a numeral. Each player's profile picture (in the board's `player-bar.tsx`) is wrapped by a **circular progress ring/outline**. At the start of the active seat's turn the ring is **full (100%)** and **depletes linearly to 0%** as `turnDeadline` approaches, then **animates out**. The ring is driven by the server `turnDeadline`: the client computes `remaining = turnDeadline − now` and animates the ring's stroke from its current fraction down to 0 over `remaining` ms with **linear** easing; a new turn resets it to 100%. The ring is shown around **whichever seat is on the clock** (the current turn). It is a generated radial indicator - an SVG stroke arc (`stroke-dasharray`/`stroke-dashoffset`), which is a decorative indicator, not an icon, so a raw `<svg>` is acceptable here (the react-icons rule covers icons, not generated progress art). Linear (not eased) so the depletion reads as a true clock.
 
 **Status enum.** Add `aborted` to `gameStatusSchema` and the Drizzle `pgEnum` (applied via `db:push`, per the push-managed dev DB); `isGameOver` includes it.
 
-**Known limitation (noted, not solved in v1).** In-memory timers assume one server node owns a game's clock; multi-node durability (redis-backed deadlines + a sweeper, or per-room node affinity) is future hardening — the persisted `turnDeadline` is what lets a restarted node catch overdue turns.
+**Known limitation (noted, not solved in v1).** In-memory timers assume one server node owns a game's clock; multi-node durability (redis-backed deadlines + a sweeper, or per-room node affinity) is future hardening - the persisted `turnDeadline` is what lets a restarted node catch overdue turns.
 
 ## 7. Error handling
 
@@ -155,14 +155,14 @@ Lives entirely in the game websocket lane (`turn-based.ts` / realtime). The serv
 - **Server:** handler tests for `room:create` (creates a standalone open game; null conversation; no announce/notify) and `room:join` (each typed error). Remove invite tests. Matchmaking tests unchanged (Play behavior is unchanged).
 - **Shared:** `tutorialVideo` on `GameMeta`; create/join wire-schema tests.
 - **Web:** `RoomActions` (ensureIdentity invoked; navigation targets), Join validation + error states, searching screen (queue_join emitted, match_found navigates), waiting overlay (`waiting → active` dismiss), tutorial modal mounts Plyr on click.
-- **Structural suites:** unaffected — `tutorialVideo` is optional, like `coverImage`.
+- **Structural suites:** unaffected - `tutorialVideo` is optional, like `coverImage`.
 
 ## 9. Docs to update (house "keep docs in sync" rule)
 
-- `docs/architecture/realtime.md` — `room:create` / `room:join` events.
-- `docs/architecture/web.md` — new game page, searching route, waiting overlay, Plyr tutorial.
-- `docs/architecture/database.md` — `gameInvite` dropped.
-- `docs/adding-a-game.md` — `tutorialVideo` meta field (+ cover image guidance).
+- `docs/architecture/realtime.md` - `room:create` / `room:join` events.
+- `docs/architecture/web.md` - new game page, searching route, waiting overlay, Plyr tutorial.
+- `docs/architecture/database.md` - `gameInvite` dropped.
+- `docs/adding-a-game.md` - `tutorialVideo` meta field (+ cover image guidance).
 - Remove invite references repo-wide; note the change in the matchmaking spec doc.
 
 ## 10. Deliberate decisions
@@ -177,7 +177,7 @@ Lives entirely in the game websocket lane (`turn-based.ts` / realtime). The serv
 ## 11. Risks / open items
 
 - 11 MB video committed to the repo.
-- Plyr ↔ React 19 / Next 16 compatibility — verify; fall back to wrapping vanilla `plyr` if the React wrapper lags.
+- Plyr ↔ React 19 / Next 16 compatibility - verify; fall back to wrapping vanilla `plyr` if the React wrapper lags.
 - Removing the game page's friend/invite buttons must not orphan code (the knip dead-code CI gate). Friend challenges remain via the chat `game-launcher`; any now-unused lobby/picker code is deleted in the same change.
 - No new top-level route segment is added (`/play/find` lives under the already-reserved `play`), so `RESERVED_USERNAMES` needs no change.
 

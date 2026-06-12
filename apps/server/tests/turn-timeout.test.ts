@@ -117,9 +117,9 @@ describe("onTurnTimeout - auto-move", () => {
     expect(current.gameState.currentTurn).toBe("O");
     expect(turnTimers.strikes(UUID, "X")).toBe(1);
     const stateEmit = emits.find((e) => e.event === "game_state");
-    expect((stateEmit?.payload as { move?: { auto?: boolean } }).move?.auto).toBe(
-      true,
-    );
+    expect(
+      (stateEmit?.payload as { move?: { auto?: boolean } }).move?.auto,
+    ).toBe(true);
   });
 });
 

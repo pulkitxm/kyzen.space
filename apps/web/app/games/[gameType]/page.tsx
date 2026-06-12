@@ -1,19 +1,18 @@
 import { getDefinition, hasEngine } from "@gamelobby/games-core";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
-import { GameLobby } from "@/app/games/_shared/game-lobby";
-import { PageContainer, PageHeader } from "@/components/ui/page";
-import { getServerSession } from "@/lib/get-server-session";
+import { RoomActions } from "@/app/games/_shared/room-actions";
+import { TutorialButton } from "@/app/games/_shared/tutorial-button";
 
 export const metadata: Metadata = {
-  title: "Game lobby",
-  description: "Pick a friend or group chat to start a multiplayer game with.",
+  title: "Play",
+  description: "Start a game, create a room, or join one with a code.",
 };
 
 export const dynamic = "force-dynamic";
 
-export default async function GameLobbyPage({
+export default async function GamePage({
   params,
 }: {
   params: Promise<{ gameType: string }>;
@@ -21,31 +20,35 @@ export default async function GameLobbyPage({
   const { gameType } = await params;
   if (!hasEngine(gameType)) notFound();
 
-  const def = getDefinition(gameType);
-  const session = await getServerSession();
+  const { meta } = getDefinition(gameType);
 
   return (
-    <PageContainer>
-      <PageHeader
-        title={def.meta.name}
-        description="Games happen inside your chats - pick a friend or group to play with."
-      />
+    <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-6 px-5 py-10 text-center">
+      <div className="space-y-1">
+        <h1 className="font-bold text-3xl text-foreground tracking-tight">
+          {meta.name}
+        </h1>
+        <p className="text-muted-foreground text-sm">{meta.description}</p>
+      </div>
 
-      <GameLobby
-        meta={def.meta}
-        configFields={def.configFields ?? []}
-        userId={session?.user?.id ?? null}
-      />
+      {meta.coverImage ? (
+        <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-border shadow-md">
+          <Image
+            src={meta.coverImage}
+            alt={meta.name}
+            fill
+            sizes="(max-width: 448px) 100vw, 448px"
+            className="object-cover"
+            priority
+          />
+        </div>
+      ) : null}
 
-      <p className="mt-6 max-w-md text-muted-foreground text-sm">
-        Starting a game posts a game card into that conversation and opens it
-        side-by-side with the chat. You can also start one from the game button
-        in any conversation, or jump straight to{" "}
-        <Link href="/chat" className="text-primary hover:underline">
-          your chats
-        </Link>
-        .
-      </p>
-    </PageContainer>
+      {meta.tutorialVideo ? (
+        <TutorialButton src={meta.tutorialVideo} title={meta.name} />
+      ) : null}
+
+      <RoomActions meta={meta} />
+    </div>
   );
 }

@@ -100,12 +100,7 @@ export class TurnTimerManager {
     return this.games.get(gameId)?.deadline ?? null;
   }
 
-  arm(
-    gameId: string,
-    role: string,
-    limitMs: number,
-    onFire: () => void,
-  ): void {
+  arm(gameId: string, role: string, limitMs: number, onFire: () => void): void {
     const timer = this.game(gameId);
     if (timer.handle) this.deps.clearTimer(timer.handle);
     this.seat(gameId, role).started = true;

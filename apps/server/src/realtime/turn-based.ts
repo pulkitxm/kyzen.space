@@ -230,7 +230,7 @@ async function abortGame(
 
 async function onTurnTimeout(io: IOServer, gameId: string): Promise<void> {
   const gameRow = await games.getGameById(gameId);
-  if (!gameRow || gameRow.status !== "active") {
+  if (gameRow?.status !== "active") {
     turnTimers.clear(gameId);
     return;
   }
@@ -252,7 +252,11 @@ async function onTurnTimeout(io: IOServer, gameId: string): Promise<void> {
       ? turnTimers.strikes(gameId, opponent.role)
       : 0;
     const outcome = abortOutcome({ opponentStrikes });
-    await abortGame(io, gameRow, outcome.winner === "opponent" ? opponent : null);
+    await abortGame(
+      io,
+      gameRow,
+      outcome.winner === "opponent" ? opponent : null,
+    );
     return;
   }
 

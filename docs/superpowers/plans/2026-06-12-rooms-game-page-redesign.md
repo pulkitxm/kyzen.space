@@ -1,4 +1,4 @@
-# Rooms + Game-Page Redesign — Implementation Plan
+# Rooms + Game-Page Redesign - Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -10,53 +10,53 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-12-rooms-game-page-redesign-design.md`
 
-**Conventions (hard gates — CI fails otherwise):** No code comments (`bun run strip-comments -- --check`). No em dashes (U+2014). No dead code (knip). Icons from `react-icons/fa6` (a radial progress ring is generated art → raw `<svg>` OK). `zod` only in `@gamelobby/shared`. `apps/web` never imports `@gamelobby/database`. Run `bun run type-check` + `bun run check` + `bun test` before every commit batch.
+**Conventions (hard gates - CI fails otherwise):** No code comments (`bun run strip-comments -- --check`). No em dashes (U+2014). No dead code (knip). Icons from `react-icons/fa6` (a radial progress ring is generated art → raw `<svg>` OK). `zod` only in `@gamelobby/shared`. `apps/web` never imports `@gamelobby/database`. Run `bun run type-check` + `bun run check` + `bun test` before every commit batch.
 
 ---
 
 ## File Structure
 
 **Shared (`packages/shared/src/types/games/`)**
-- `definition.ts` (modify) — add `tutorialVideo?` to `GameMeta`.
-- `engine.ts` (modify) — add `autoMove?` to `GameEngine`.
-- `wire.ts` (modify) — `aborted` status; `turnDeadline` + per-player `timeoutStrikes` on `GameJson`/`gamePlayerSchema`; `auto` flag on `moveJsonSchema`; `clientCreateRoomSchema`, `clientJoinByCodeSchema`, `ServerRoomCreatedPayload`, `ServerJoinByCodeResult`; extend `isGameOver`.
+- `definition.ts` (modify) - add `tutorialVideo?` to `GameMeta`.
+- `engine.ts` (modify) - add `autoMove?` to `GameEngine`.
+- `wire.ts` (modify) - `aborted` status; `turnDeadline` + per-player `timeoutStrikes` on `GameJson`/`gamePlayerSchema`; `auto` flag on `moveJsonSchema`; `clientCreateRoomSchema`, `clientJoinByCodeSchema`, `ServerRoomCreatedPayload`, `ServerJoinByCodeResult`; extend `isGameOver`.
 
 **games-core (`packages/games-core/src/games/tic-tac-toe/`)**
-- `engine.ts` (modify) — implement `autoMove`.
-- `meta.ts` (modify) — `tutorialVideo: "/games/tic-tac-toe-tutorial.mp4"`.
-- `packages/games-core/tests/conformance.test.ts` (modify) — assert `autoMove` exists + returns a legal move; assert `tutorialVideo` path shape when set.
+- `engine.ts` (modify) - implement `autoMove`.
+- `meta.ts` (modify) - `tutorialVideo: "/games/tic-tac-toe-tutorial.mp4"`.
+- `packages/games-core/tests/conformance.test.ts` (modify) - assert `autoMove` exists + returns a legal move; assert `tutorialVideo` path shape when set.
 
 **Server (`apps/server/src/`)**
-- `realtime/rooms-service.ts` (create) — `createStandaloneGame`, `validateJoinByCode` (pure-ish service).
-- `realtime/room-events.ts` (create) — `attachRoomHandlers` (`room:create`, `room:join`).
-- `realtime/turn-timer.ts` (create) — pure timer math (`turnLimitMs`, `nextStrike`, `abortOutcome`) + the in-memory scheduler.
-- `realtime/turn-based.ts` (modify) — call scheduler on join/move/timeout; reset strikes on move.
-- `realtime/index.ts` (modify) — register room handlers; cancel timers on disconnect/leave.
-- `chat/games-in-chat-service.ts` (modify) — extract shared create so standalone reuses it.
+- `realtime/rooms-service.ts` (create) - `createStandaloneGame`, `validateJoinByCode` (pure-ish service).
+- `realtime/room-events.ts` (create) - `attachRoomHandlers` (`room:create`, `room:join`).
+- `realtime/turn-timer.ts` (create) - pure timer math (`turnLimitMs`, `nextStrike`, `abortOutcome`) + the in-memory scheduler.
+- `realtime/turn-based.ts` (modify) - call scheduler on join/move/timeout; reset strikes on move.
+- `realtime/index.ts` (modify) - register room handlers; cancel timers on disconnect/leave.
+- `chat/games-in-chat-service.ts` (modify) - extract shared create so standalone reuses it.
 - DELETE: `chat/invite-service.ts`, `api/routes/invite.ts`, `packages/database/src/repositories/invites.ts`, `packages/database/src/invite-token.ts`; unmount invite route in `api/index.ts`; drop `gameInvite` from `packages/database/src/schema.ts` + migration.
 
 **Web (`apps/web/`)**
-- `app/games/[gameType]/page.tsx` (modify) — full-bleed layout: name + image + tutorial + `RoomActions`.
-- `app/games/_shared/game-lobby.tsx` → replace with `app/games/_shared/room-actions.tsx` (create) — Play / Create / Join.
-- `app/games/_shared/tutorial-modal.tsx` (create) — Plyr.
-- `app/play/find/[gameType]/page.tsx` + `find-client.tsx` (create) — searching screen.
-- `app/play/[gameId]/waiting-overlay.tsx` (create) + `play-client.tsx` (modify) — waiting overlay.
-- `packages/games-client/src/games/tic-tac-toe/player-bar.tsx` (modify) + `packages/games-client/src/components/countdown-ring.tsx` (create) — avatar ring.
+- `app/games/[gameType]/page.tsx` (modify) - full-bleed layout: name + image + tutorial + `RoomActions`.
+- `app/games/_shared/game-lobby.tsx` → replace with `app/games/_shared/room-actions.tsx` (create) - Play / Create / Join.
+- `app/games/_shared/tutorial-modal.tsx` (create) - Plyr.
+- `app/play/find/[gameType]/page.tsx` + `find-client.tsx` (create) - searching screen.
+- `app/play/[gameId]/waiting-overlay.tsx` (create) + `play-client.tsx` (modify) - waiting overlay.
+- `packages/games-client/src/games/tic-tac-toe/player-bar.tsx` (modify) + `packages/games-client/src/components/countdown-ring.tsx` (create) - avatar ring.
 - DELETE: `app/invite/[token]/*`, `lib/invite-client.ts`, `app/games/components/conversation-picker.tsx` (if orphaned).
-- `package.json` (modify) — add `plyr`.
+- `package.json` (modify) - add `plyr`.
 - `public/games/tic-tac-toe-tutorial.mp4` (create, copied asset).
 
 **Docs:** `docs/architecture/realtime.md`, `web.md`, `database.md`, `docs/adding-a-game.md`.
 
 ---
 
-## Phase 1 — Shared types (foundation)
+## Phase 1 - Shared types (foundation)
 
 ### Task 1.1: `tutorialVideo` on GameMeta
 
 **Files:** Modify `packages/shared/src/types/games/definition.ts`; Test `packages/shared/tests/game-meta.test.ts`
 
-- [ ] **Step 1: Failing test** — assert a `GameMeta` object accepts an optional `tutorialVideo` string (type-level + runtime passthrough). Since `GameMeta` is an interface, test via a small `isTutorialPath` helper we add too. Simpler: add the field, and rely on Task 1.6 conformance test. Mark this task as a type-only change; verify with `type-check`.
+- [ ] **Step 1: Failing test** - assert a `GameMeta` object accepts an optional `tutorialVideo` string (type-level + runtime passthrough). Since `GameMeta` is an interface, test via a small `isTutorialPath` helper we add too. Simpler: add the field, and rely on Task 1.6 conformance test. Mark this task as a type-only change; verify with `type-check`.
 - [ ] **Step 2:** Add `tutorialVideo?: string;` after `coverImage?` in `GameMeta`.
 - [ ] **Step 3:** `bun run type-check` passes.
 - [ ] **Step 4: Commit** `feat(shared): add optional tutorialVideo to GameMeta`.
@@ -91,7 +91,7 @@ describe("aborted status", () => {
 
 **Files:** Modify `wire.ts`; Test `packages/shared/tests/wire-timer.test.ts`
 
-- [ ] **Step 1: Failing test** — `gameJsonSchema` accepts `turnDeadline: number|null`; `gamePlayerSchema` accepts `timeoutStrikes: number`; `moveJsonSchema` accepts `auto: boolean`.
+- [ ] **Step 1: Failing test** - `gameJsonSchema` accepts `turnDeadline: number|null`; `gamePlayerSchema` accepts `timeoutStrikes: number`; `moveJsonSchema` accepts `auto: boolean`.
 ```ts
 import { gameJsonSchema, gamePlayerSchema, moveJsonSchema } from "../src/types/games/wire";
 // build minimal valid objects incl. turnDeadline / timeoutStrikes / auto, expect success
@@ -152,7 +152,7 @@ export type ServerJoinByCodeResult =
 
 ---
 
-## Phase 2 — games-core: auto-move
+## Phase 2 - games-core: auto-move
 
 ### Task 2.1: tic-tac-toe `autoMove`
 
@@ -203,7 +203,7 @@ test("autoMove picks among only empty cells", () => {
 
 ---
 
-## Phase 3 — Server: standalone rooms (Create / Join)
+## Phase 3 - Server: standalone rooms (Create / Join)
 
 ### Task 3.1: `createStandaloneGame` + `validateJoinByCode`
 
@@ -218,14 +218,14 @@ test("autoMove picks among only empty cells", () => {
 
 **Files:** Create `apps/server/src/realtime/room-events.ts`; Modify `apps/server/src/realtime/index.ts`; Test `apps/server/tests/room-events.test.ts`
 
-- [ ] **Step 1: Failing test** — `attachRoomHandlers` registers `room:create` (ack `{ ok:true, code }`) and `room:join` (ack `{ ok:true, code }` or `{ ok:false, error }`). Mock the service. Simulate a fake socket capturing `.on` handlers + ack callbacks.
+- [ ] **Step 1: Failing test** - `attachRoomHandlers` registers `room:create` (ack `{ ok:true, code }`) and `room:join` (ack `{ ok:true, code }` or `{ ok:false, error }`). Mock the service. Simulate a fake socket capturing `.on` handlers + ack callbacks.
 - [ ] **Step 2:** Implement using `register`/`ackErr` from `socket-util.ts` and a simple per-socket rate limiter (e.g. token bucket: max 10 `room:create`/60s). `room:create` parses with `clientCreateRoomSchema`, calls `createStandaloneGame(socket.data.userId, …)`, acks `{ ok:true, code }` or `ackErr`. `room:join` parses with `clientJoinByCodeSchema`, calls `validateJoinByCode`, acks the result directly.
 - [ ] **Step 3:** In `index.ts` add `attachRoomHandlers(io, socket)` in the connection block.
 - [ ] **Step 4:** Run → PASS. Type-check + check. Commit `feat(server): room:create and room:join socket events with rate limiting`.
 
 ---
 
-## Phase 4 — Server: turn timer, auto-move, auto-abort
+## Phase 4 - Server: turn timer, auto-move, auto-abort
 
 ### Task 4.1: pure timer math
 
@@ -286,7 +286,7 @@ export function abortOutcome(p: { opponentStrikes: number }):
 
 ---
 
-## Phase 5 — Invite removal (end-to-end)
+## Phase 5 - Invite removal (end-to-end)
 
 ### Task 5.1: server + DB
 
@@ -306,7 +306,7 @@ export function abortOutcome(p: { opponentStrikes: number }):
 
 ---
 
-## Phase 6 — Web: game page redesign + tutorial
+## Phase 6 - Web: game page redesign + tutorial
 
 ### Task 6.1: Plyr dep + asset + meta
 
@@ -326,9 +326,9 @@ export function abortOutcome(p: { opponentStrikes: number }):
 
 ### Task 6.3 + 6.4: page layout + RoomActions
 
-**Files:** Modify `apps/web/app/games/[gameType]/page.tsx`; Create `apps/web/app/games/_shared/room-actions.tsx`; Delete `app/games/_shared/game-lobby.tsx`; conditionally delete `conversation-picker.tsx` (if now orphaned — check `chat/[handle]/game-launcher.tsx` still owns the in-chat picker; if it imported the same component, keep it).
+**Files:** Modify `apps/web/app/games/[gameType]/page.tsx`; Create `apps/web/app/games/_shared/room-actions.tsx`; Delete `app/games/_shared/game-lobby.tsx`; conditionally delete `conversation-picker.tsx` (if now orphaned - check `chat/[handle]/game-launcher.tsx` still owns the in-chat picker; if it imported the same component, keep it).
 
-- [ ] **Step 1:** Read the current `page.tsx` to see how it fetches `def`, `session`, and renders the header. Rebuild the layout: centered, full-height column — `meta.name`, `meta.description`, a `next/image` cover (`meta.coverImage`), a "Watch tutorial" button (only if `meta.tutorialVideo`) that opens `TutorialModal`, then `<RoomActions meta configFields />`.
+- [ ] **Step 1:** Read the current `page.tsx` to see how it fetches `def`, `session`, and renders the header. Rebuild the layout: centered, full-height column - `meta.name`, `meta.description`, a `next/image` cover (`meta.coverImage`), a "Watch tutorial" button (only if `meta.tutorialVideo`) that opens `TutorialModal`, then `<RoomActions meta configFields />`.
 - [ ] **Step 2:** `RoomActions` (`"use client"`): keeps `config` state + `ConfigFieldRow` (moved from game-lobby). Buttons:
   - **Play** (primary, full width): `await ensureIdentity(); router.push(\`/play/find/${meta.type}\`)`.
   - **Create** + **Join** in a `grid grid-cols-2 gap-3` (50/50). Create opens an inline config panel → `emitAck("room:create", { gameType, config })` → `router.push(\`/play/${res.code}\`)`. Join opens a code input → client `normalizeGameCode`/`isGameCode` → `emitAck("room:join", { code })`; on `{ ok:true }` push `/play/{code}`, on `{ ok:false }` show the mapped error string.
@@ -338,7 +338,7 @@ export function abortOutcome(p: { opponentStrikes: number }):
 
 ---
 
-## Phase 7 — Web: searching screen + waiting overlay
+## Phase 7 - Web: searching screen + waiting overlay
 
 ### Task 7.1: `/play/find/[gameType]`
 
@@ -357,7 +357,7 @@ export function abortOutcome(p: { opponentStrikes: number }):
 
 ---
 
-## Phase 8 — Web: avatar countdown ring
+## Phase 8 - Web: avatar countdown ring
 
 ### Task 8.1: CountdownRing component
 
@@ -375,7 +375,7 @@ export function abortOutcome(p: { opponentStrikes: number }):
 
 ---
 
-## Phase 9 — Lazy anon final wiring
+## Phase 9 - Lazy anon final wiring
 
 ### Task 9.1
 
@@ -383,7 +383,7 @@ export function abortOutcome(p: { opponentStrikes: number }):
 
 ---
 
-## Phase 10 — Docs sync
+## Phase 10 - Docs sync
 
 ### Task 10.1
 
@@ -393,16 +393,16 @@ export function abortOutcome(p: { opponentStrikes: number }):
 
 ---
 
-## Phase 11 — Verify, PR, CI
+## Phase 11 - Verify, PR, CI
 
 ### Task 11.1: full local gate
 
-- [ ] `bun run type-check` — clean.
-- [ ] `bun run check` — clean (biome).
-- [ ] `bun run strip-comments -- --check` — no offenders.
-- [ ] `bun run test` — all pass.
-- [ ] `bunx knip` (or the repo's knip script) — no dead code.
-- [ ] Grep for em dashes (U+2014) in changed files — none.
+- [ ] `bun run type-check` - clean.
+- [ ] `bun run check` - clean (biome).
+- [ ] `bun run strip-comments -- --check` - no offenders.
+- [ ] `bun run test` - all pass.
+- [ ] `bunx knip` (or the repo's knip script) - no dead code.
+- [ ] Grep for em dashes (U+2014) in changed files - none.
 
 ### Task 11.2: PR
 

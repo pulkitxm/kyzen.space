@@ -22,6 +22,7 @@ import { socketStatusAtom, useSocket } from "@/lib/socket/socket-context";
 import { GameChatSplit } from "./game-chat-split";
 import { GameOverOverlay } from "./game-over-overlay";
 import { GameSettingsGear } from "./game-settings-gear";
+import { WaitingForOpponentOverlay } from "./waiting-overlay";
 
 export function PlayClient({
   gameId,
@@ -90,12 +91,15 @@ export function PlayClient({
   );
 
   const overlay = (
-    <GameOverOverlay
-      gameId={gameId}
-      userId={userId}
-      initialGame={initialGame}
-      conversation={conversation}
-    />
+    <>
+      <WaitingForOpponentOverlay gameId={gameId} initialGame={initialGame} />
+      <GameOverOverlay
+        gameId={gameId}
+        userId={userId}
+        initialGame={initialGame}
+        conversation={conversation}
+      />
+    </>
   );
 
   if (!conversation) {
