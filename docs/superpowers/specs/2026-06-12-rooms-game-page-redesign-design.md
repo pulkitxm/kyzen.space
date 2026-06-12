@@ -21,6 +21,8 @@ A **Room** is surfaced in the product/UI as a room, but **internally it remains 
 
 The 6-char game code (`code.ts`, alphabet excludes I/L/O, typo-tolerant `normalizeGameCode`) **is** the room code. The play page (`/play/{code}`) **is** the room.
 
+**Anonymous-user access.** Play, Create, and Join all work for anonymous (guest) users: `ensureIdentity()` mints an anonymous account on click, and the socket handshake + `requireAuth` accept anonymous sessions (they only require a `user.id`). No login wall on any of the three actions. Only **Friend invite** effectively needs a registered identity, since it requires a friends list (anonymous users start with none) — and that lives in the chat surface, not the game page.
+
 ## 3. Non-goals
 
 - No DB table rename; no new room table; no `room_type` column. (Confirmed: "show it as a room but internally create a game.")
