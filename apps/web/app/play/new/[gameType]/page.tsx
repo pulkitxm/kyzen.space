@@ -1,6 +1,12 @@
 import { getDefinition, hasEngine } from "@gamelobby/games-core";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { NewClient } from "./new-client";
+
+export const metadata: Metadata = {
+  title: "Creating a room",
+  description: "Setting up your private room.",
+};
 
 export const dynamic = "force-dynamic";
 

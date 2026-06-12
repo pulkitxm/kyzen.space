@@ -1,6 +1,12 @@
 import { getDefinition, hasEngine } from "@gamelobby/games-core";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { FindClient } from "./find-client";
+
+export const metadata: Metadata = {
+  title: "Finding a match",
+  description: "Matching you with an opponent.",
+};
 
 export const dynamic = "force-dynamic";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 export function CountdownRing({
   deadline,
@@ -17,29 +17,17 @@ export function CountdownRing({
 }) {
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const [offset, setOffset] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const rafRef = useRef<number | null>(null);
+  const circleRef = useRef<SVGCircleElement>(null);
 
   useEffect(() => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    if (!active || deadline === null) {
-      setDuration(0);
-      setOffset(0);
-      return;
-    }
+    const el = circleRef.current;
+    if (!el || !active || deadline === null) return;
     const remaining = Math.max(deadline - Date.now(), 0);
-    setDuration(0);
-    setOffset(0);
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = requestAnimationFrame(() => {
-        setDuration(remaining);
-        setOffset(circumference);
-      });
-    });
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
+    el.style.transition = "none";
+    el.style.strokeDashoffset = "0";
+    void el.getBoundingClientRect();
+    el.style.transition = `stroke-dashoffset ${remaining}ms linear`;
+    el.style.strokeDashoffset = `${circumference}`;
   }, [deadline, active, circumference]);
 
   const showRing = active && deadline !== null;
@@ -64,6 +52,7 @@ export function CountdownRing({
             strokeWidth={stroke}
           />
           <circle
+            ref={circleRef}
             cx={size / 2}
             cy={size / 2}
             r={radius}
@@ -72,8 +61,7 @@ export function CountdownRing({
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            style={{ transition: `stroke-dashoffset ${duration}ms linear` }}
+            strokeDashoffset={circumference}
           />
         </svg>
       ) : null}

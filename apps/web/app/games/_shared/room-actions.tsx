@@ -133,13 +133,7 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
             transition={{ duration: 0.18 }}
             className="overflow-hidden"
           >
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void join();
-              }}
-              className="space-y-2 rounded-2xl border border-border bg-surface-raised p-3"
-            >
+            <div className="space-y-2 rounded-2xl border border-border bg-surface-raised p-3">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-card-foreground text-sm">
                   Enter a room code
@@ -157,6 +151,10 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
                 <input
                   value={code}
                   onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void join();
+                  }}
+                  aria-label="Room code"
                   placeholder="A2K9P7"
                   maxLength={6}
                   autoComplete="off"
@@ -165,7 +163,8 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-center font-mono text-card-foreground text-lg uppercase tracking-[0.3em] outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => void join()}
                   disabled={busy === "join" || code.length === 0}
                   className="shrink-0 rounded-lg bg-primary px-4 font-medium text-primary-foreground text-sm outline-none transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
                 >
@@ -175,7 +174,7 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
               {joinError ? (
                 <p className="text-destructive text-xs">{joinError}</p>
               ) : null}
-            </form>
+            </div>
           </m.div>
         ) : null}
       </AnimatePresence>
