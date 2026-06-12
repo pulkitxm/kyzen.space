@@ -43,7 +43,7 @@ export function FindClient({
     socket.emit("game:queue_join", { gameType });
     setMatchmaking({ searching: gameType });
     return () => {
-      if (!matchedRef.current) socket.emit("game:queue_leave", { gameType });
+      socket.emit("game:queue_leave", { gameType });
       setMatchmaking({ searching: null });
     };
   }, [socket, gameType, setMatchmaking]);

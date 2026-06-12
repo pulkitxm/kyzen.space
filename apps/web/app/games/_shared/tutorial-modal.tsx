@@ -18,16 +18,16 @@ export function TutorialModal({
   onClose: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const playerRef = useRef<PlyrType | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    let player: PlyrType | null = null;
     void import("plyr").then((mod) => {
       if (cancelled || !videoRef.current) return;
-      playerRef.current = new mod.default(videoRef.current, {
+      player = new mod.default(videoRef.current, {
         controls: [
           "play-large",
           "play",
@@ -41,8 +41,7 @@ export function TutorialModal({
     });
     return () => {
       cancelled = true;
-      playerRef.current?.destroy();
-      playerRef.current = null;
+      player?.destroy();
     };
   }, [open]);
 

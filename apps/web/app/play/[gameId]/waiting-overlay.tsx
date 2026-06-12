@@ -2,7 +2,7 @@
 
 import type { GameJson } from "@gamelobby/shared/types";
 import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { FaCheck, FaRegCopy, FaUserCheck } from "react-icons/fa6";
 import { useSocketEvent } from "@/lib/socket/socket-context";
 
@@ -16,7 +16,6 @@ export function WaitingForOpponentOverlay({
   const [game, setGame] = useState<GameJson>(initialGame);
   const [justJoined, setJustJoined] = useState(false);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
-  const joinTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
     setGame((prev) => {
@@ -26,18 +25,16 @@ export function WaitingForOpponentOverlay({
         payload.game.players.length >= 2
       ) {
         setJustJoined(true);
-        if (joinTimer.current) clearTimeout(joinTimer.current);
-        joinTimer.current = setTimeout(() => setJustJoined(false), 1500);
       }
       return payload.game;
     });
   });
 
   useEffect(() => {
-    return () => {
-      if (joinTimer.current) clearTimeout(joinTimer.current);
-    };
-  }, []);
+    if (!justJoined) return;
+    const timer = setTimeout(() => setJustJoined(false), 1500);
+    return () => clearTimeout(timer);
+  }, [justJoined]);
 
   const waiting = game.status === "waiting" && game.players.length < 2;
   const open = waiting || justJoined;
