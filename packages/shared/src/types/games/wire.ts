@@ -8,6 +8,7 @@ export const gameStatusSchema = z.enum([
   "active",
   "completed",
   "abandoned",
+  "aborted",
 ]);
 export type GameStatusDto = z.infer<typeof gameStatusSchema>;
 
@@ -20,6 +21,7 @@ export const gamePlayerSchema = z
     username: z.string().min(1),
     role: z.string().min(1),
     avatar: avatarConfigSchema.nullable().optional(),
+    timeoutStrikes: z.number().int().nonnegative().optional(),
   })
   .strict();
 export type GamePlayerDto = z.infer<typeof gamePlayerSchema>;
@@ -59,6 +61,34 @@ export type ServerMatchFoundPayload = {
   gameId: string;
 };
 
+export const clientCreateRoomSchema = z
+  .object({
+    gameType: gameTypeSchema,
+    config: z.unknown().optional(),
+  })
+  .strict();
+export type ClientCreateRoom = z.infer<typeof clientCreateRoomSchema>;
+
+export const clientJoinByCodeSchema = z
+  .object({
+    code: gameCodeSchema,
+  })
+  .strict();
+export type ClientJoinByCode = z.infer<typeof clientJoinByCodeSchema>;
+
+export const joinByCodeErrorSchema = z.enum([
+  "not_found",
+  "full",
+  "already_started",
+  "finished",
+]);
+export type JoinByCodeError = z.infer<typeof joinByCodeErrorSchema>;
+
+export type ServerRoomCreatedPayload = { ok: true; code: string };
+export type ServerJoinByCodeResult =
+  | { ok: true; code: string }
+  | { ok: false; error: JoinByCodeError };
+
 export const gameJsonSchema = z.object({
   id: z.string(),
   gameType: gameTypeSchema,
@@ -74,6 +104,7 @@ export const gameJsonSchema = z.object({
   completedAt: z.string().nullable().optional(),
   createdAt: z.string().nullable().optional(),
   updatedAt: z.string().nullable().optional(),
+  turnDeadline: z.number().nullable().optional(),
 });
 export type GameJson = z.infer<typeof gameJsonSchema>;
 
@@ -84,6 +115,7 @@ export const moveJsonSchema = z.object({
   playerId: z.string(),
   moveData: z.unknown(),
   createdAt: z.string().nullable().optional(),
+  auto: z.boolean().optional(),
 });
 export type MoveJson = z.infer<typeof moveJsonSchema>;
 
@@ -102,7 +134,9 @@ export type ServerErrorPayload = {
 };
 
 export function isGameOver(status: string): boolean {
-  return status === "completed" || status === "abandoned";
+  return (
+    status === "completed" || status === "abandoned" || status === "aborted"
+  );
 }
 
 export function isGameLive(status: string): boolean {

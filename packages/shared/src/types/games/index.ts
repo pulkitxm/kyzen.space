@@ -46,10 +46,14 @@ export {
   ticTacToeStateSchema,
 } from "./tic-tac-toe/schemas";
 export {
+  type ClientCreateRoom,
+  type ClientJoinByCode,
   type ClientJoinRoom,
   type ClientMakeMove,
   type ClientQueueJoin,
   type ClientQueueLeave,
+  clientCreateRoomSchema,
+  clientJoinByCodeSchema,
   clientJoinRoomSchema,
   clientMakeMoveSchema,
   clientQueueJoinSchema,
@@ -62,6 +66,8 @@ export {
   gameStatusSchema,
   isGameLive,
   isGameOver,
+  type JoinByCodeError,
+  joinByCodeErrorSchema,
   type MoveJson,
   moveJsonSchema,
   resolveWinnerUsername,
@@ -69,6 +75,8 @@ export {
   type ServerErrorPayload,
   type ServerGameOverPayload,
   type ServerGameStatePayload,
+  type ServerJoinByCodeResult,
   type ServerMatchFoundPayload,
+  type ServerRoomCreatedPayload,
   seatingModeSchema,
 } from "./wire";

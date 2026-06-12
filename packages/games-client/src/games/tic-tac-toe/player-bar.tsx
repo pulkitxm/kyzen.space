@@ -2,6 +2,7 @@
 
 import type { AvatarConfig, Mark } from "@gamelobby/shared/types";
 import { Character } from "../../ui/character";
+import { CountdownRing } from "../../ui/countdown-ring";
 import { TttMark } from "./marks";
 
 type BarPlayer = {
@@ -20,12 +21,14 @@ export function PlayerBar({
   currentTurn,
   myUserId,
   active,
+  turnDeadline = null,
   onViewProfile,
 }: {
   players: BarPlayer[];
   currentTurn: Mark;
   myUserId: string | null;
   active: boolean;
+  turnDeadline?: number | null;
   onViewProfile?: (user: {
     username: string;
     avatar?: AvatarConfig | null;
@@ -47,32 +50,34 @@ export function PlayerBar({
                 : "border-border bg-surface-raised",
             ].join(" ")}
           >
-            {!isMe && onViewProfile ? (
-              <button
-                type="button"
-                aria-label={`View ${p.username}'s profile`}
-                onClick={() =>
-                  onViewProfile({ username: p.username, avatar: p.avatar })
-                }
-                className="shrink-0 rounded-full outline-none transition hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
-              >
+            <CountdownRing deadline={turnDeadline} active={isTurn} size={44}>
+              {!isMe && onViewProfile ? (
+                <button
+                  type="button"
+                  aria-label={`View ${p.username}'s profile`}
+                  onClick={() =>
+                    onViewProfile({ username: p.username, avatar: p.avatar })
+                  }
+                  className="shrink-0 rounded-full outline-none transition hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Character
+                    config={p.avatar ?? null}
+                    fallbackSeed={p.username}
+                    alt={p.username}
+                    size={36}
+                    className="size-9 rounded-full"
+                  />
+                </button>
+              ) : (
                 <Character
                   config={p.avatar ?? null}
                   fallbackSeed={p.username}
                   alt={p.username}
                   size={36}
-                  className="size-9 rounded-full"
+                  className="size-9 shrink-0 rounded-full"
                 />
-              </button>
-            ) : (
-              <Character
-                config={p.avatar ?? null}
-                fallbackSeed={p.username}
-                alt={p.username}
-                size={36}
-                className="size-9 shrink-0 rounded-full"
-              />
-            )}
+              )}
+            </CountdownRing>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 {mark ? (

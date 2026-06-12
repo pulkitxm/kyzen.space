@@ -41,6 +41,7 @@ type GameJson = {
     avatar?: AvatarConfig | null;
   }[];
   gameState: TicState;
+  turnDeadline?: number | null;
 };
 
 type MoveJson = Record<string, unknown>;
@@ -453,6 +454,7 @@ export function TicTacToeGameClient({
         currentTurn={state.currentTurn}
         myUserId={userId}
         active={game.status === "active"}
+        turnDeadline={game.turnDeadline ?? null}
         onViewProfile={onViewProfile}
       />
       {isPast ? null : !userId ? (

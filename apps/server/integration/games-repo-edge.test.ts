@@ -48,7 +48,8 @@ describe.skipIf(!DB_UP)("game_player and move constraints", () => {
       });
     } catch (error) {
       threw = true;
-      expect((error as { code?: string }).code).toBe("23505");
+      const e = error as { code?: string; cause?: { code?: string } };
+      expect(e.code ?? e.cause?.code).toBe("23505");
     }
     expect(threw).toBe(true);
 

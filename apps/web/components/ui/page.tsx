@@ -14,27 +14,3 @@ export function PageContainer({
     </div>
   );
 }
-
-export function PageHeader({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="font-semibold text-2xl text-foreground tracking-tight">
-          {title}
-        </h1>
-        {description ? (
-          <p className="mt-2 text-muted-foreground text-sm">{description}</p>
-        ) : null}
-      </div>
-      {children}
-    </div>
-  );
-}

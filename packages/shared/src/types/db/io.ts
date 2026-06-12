@@ -69,15 +69,6 @@ export const createProfileInputSchema = z.object({
   avatar: z.unknown().nullable().optional(),
 });
 
-export const createGameInviteInputSchema = z.object({
-  inviterUserId: z.string().min(1),
-  gameType: gameTypeSchema,
-  token: z.string().min(1),
-  config: z.unknown().optional(),
-  seatingMode: seatingModeSchema.nullable().optional(),
-  expiresAt: z.date(),
-});
-
 export const appearancePatchSchema = z
   .object({
     theme: themeIdSchema.optional(),
