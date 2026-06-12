@@ -18,8 +18,14 @@ import { game, gamePlayer, move, userProfile } from "../schema";
 const GAME_CODE_MAX_ATTEMPTS = 5;
 
 function isGameCodeCollision(error: unknown): boolean {
-  const e = error as { code?: string; constraint_name?: string };
-  return e?.code === "23505" && e?.constraint_name === "game_code_uq";
+  const e = error as {
+    code?: string;
+    constraint_name?: string;
+    cause?: { code?: string; constraint_name?: string };
+  };
+  const code = e?.code ?? e?.cause?.code;
+  const constraint = e?.constraint_name ?? e?.cause?.constraint_name;
+  return code === "23505" && constraint === "game_code_uq";
 }
 
 function toGameRecord(row: GameRow, players: GamePlayer[]): GameRecord {
