@@ -26,6 +26,22 @@ export type {
   StepResult,
 } from "./engine";
 export {
+  fireMoveSchema,
+  placeMoveSchema,
+  type SeaBattleConfig,
+  type SeaBattleCoord,
+  type SeaBattleFireMove,
+  type SeaBattleMove,
+  type SeaBattlePlaceMove,
+  type SeaBattleRole,
+  type SeaBattleShip,
+  type SeaBattleShot,
+  type SeaBattleState,
+  seaBattleConfigSchema,
+  seaBattleMoveSchema,
+  seaBattleStateSchema,
+} from "./sea-battle/schemas";
+export {
   type SeriesDetail,
   type SeriesGameSummary,
   type SeriesScore,

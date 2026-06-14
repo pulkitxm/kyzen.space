@@ -27,6 +27,8 @@ export interface GameEngine<State, Input> {
 
   currentRole?(state: State): string | null;
 
+  viewFor?(state: State, role: string): State;
+
   step?(
     state: State,
     inputs: Map<string, Input>,

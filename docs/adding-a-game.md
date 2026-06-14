@@ -105,6 +105,42 @@ currentRole?(state: State): string | null;
 The mechanism is generic; the move is game-specific. See [realtime.md](architecture/realtime.md)
 for the strike/abort schedule the timer enforces on top of these hooks.
 
+### Optional hidden-information hook: `viewFor`
+
+If a game has **secret state** - hidden ship positions, a private hand, a
+face-down deck - implement the optional `viewFor` method
+(`packages/shared/src/types/games/engine.ts:30`); a fully-observable game omits it
+and is broadcast in full to everyone.
+
+```ts
+viewFor?(state: State, role: string): State;
+```
+
+`viewFor(state, role)` returns a **redacted copy of the state, of the same
+schema**, containing only what `role` is allowed to see (pass a non-role like `""`
+for the spectator view). Before each `game_state` broadcast the server projects the
+stored state **per recipient** through this hook and strips opponents' move
+payloads, so a player never receives data they should not have (the DB still holds
+the full truth; redaction is wire-only). The pattern, end to end:
+
+- **Keep `stateSchema` permissive about completeness.** A redacted view legitimately
+  holds fewer pieces than the truth (e.g. zero of an opponent's un-hit ships), so the
+  schema must accept partial fleets/hands. Enforce the strict rules (full fleet, legal
+  layout, secret completeness) inside `reduce` when the move is processed - not in the
+  schema.
+- **`reduce`, `currentRole`, and `autoMove` always run on the full authoritative
+  state** (the server feeds them the stored, un-redacted state); only the broadcast is
+  projected. `viewFor` must be read-only and its output must still pass `stateSchema`.
+- **Render the board from the redacted `game_state`, not the move log.** Because
+  opponent `moveData` is blanked on the wire, a hidden-information board must derive
+  everything it draws from the `game_state` it receives.
+
+On game over the server reveals the full state, so nothing stays hidden once the
+game ends. Sea Battle is the reference implementation - see
+[`docs/games/sea-battle.md`](games/sea-battle.md), its engine
+(`packages/games-core/src/games/sea-battle/engine.ts:162`), and
+[realtime.md](architecture/realtime.md#per-recipient-projection-viewfor).
+
 ## Worked example: tic-tac-toe
 
 ```

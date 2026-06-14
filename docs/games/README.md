@@ -17,3 +17,4 @@ registry, so adding a game without its doc fails the suite.
 ## Current games
 
 - [tic-tac-toe](./tic-tac-toe.md)
+- [sea-battle](./sea-battle.md)

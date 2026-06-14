@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Sea Battle">
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b3a66" />
+      <stop offset="1" stop-color="#072744" />
+    </linearGradient>
+    <linearGradient id="hull" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b9c2cc" />
+      <stop offset="1" stop-color="#6b7682" />
+    </linearGradient>
+    <radialGradient id="blast" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffe08a" />
+      <stop offset="0.45" stop-color="#ff8a3c" />
+      <stop offset="1" stop-color="#e23b2e" />
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="56" fill="url(#sea)" />
+
+  <g stroke="#9fc4e8" stroke-opacity="0.16" stroke-width="2">
+    <path d="M96 64 V448 M176 64 V448 M256 64 V448 M336 64 V448 M416 64 V448" />
+    <path d="M64 96 H448 M64 176 H448 M64 256 H448 M64 336 H448 M64 416 H448" />
+  </g>
+
+  <g stroke="#a9d4ff" stroke-opacity="0.22" stroke-width="4" fill="none" stroke-linecap="round">
+    <path d="M88 392 q22 -16 44 0 t44 0" />
+    <path d="M300 430 q22 -16 44 0 t44 0" />
+    <path d="M320 150 q22 -16 44 0 t44 0" />
+  </g>
+
+  <g transform="translate(150 300) rotate(-32)">
+    <rect x="-96" y="-26" width="192" height="52" rx="26" fill="url(#hull)" />
+    <rect x="-30" y="-16" width="84" height="32" rx="8" fill="#46535f" />
+    <rect x="-8" y="-44" width="16" height="40" rx="4" fill="#8b97a3" />
+    <circle cx="70" cy="0" r="7" fill="#2b343d" />
+  </g>
+
+  <g transform="translate(360 312)">
+    <path d="M0 -54 L13 -16 L52 -16 L20 8 L33 46 L0 22 L-33 46 L-20 8 L-52 -16 L-13 -16 Z" fill="url(#blast)" />
+    <circle cx="0" cy="0" r="10" fill="#fff3d6" />
+  </g>
+
+  <g fill="#cfe6ff" fill-opacity="0.9">
+    <circle cx="408" cy="120" r="6" />
+    <circle cx="120" cy="150" r="5" />
+    <circle cx="220" cy="430" r="5" />
+  </g>
+</svg>
