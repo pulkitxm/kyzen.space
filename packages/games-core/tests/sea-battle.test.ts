@@ -344,6 +344,273 @@ describe("sea-battle sink and win", () => {
   });
 });
 
+describe("sea-battle placement composition edges", () => {
+  const fresh = () =>
+    seaBattleEngine.createInitialState([{ role: "A" }, { role: "B" }]);
+
+  test("rejects the right count but a wrong length multiset", () => {
+    const fleet = [
+      horizontalShip(0, 0, 5),
+      horizontalShip(1, 0, 4),
+      horizontalShip(2, 0, 3),
+      horizontalShip(3, 0, 2),
+      horizontalShip(4, 0, 2),
+    ];
+    expect(fleet).toHaveLength(5);
+    const res = place(fresh(), ctxA, fleet);
+    expect(res).toBeDefined();
+    if (!res) return;
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toBe("Fleet must match the standard composition");
+    }
+  });
+
+  test("rejects too few ships", () => {
+    const res = place(fresh(), ctxA, legalFleetA().slice(0, 4));
+    expect(res?.ok).toBe(false);
+  });
+
+  test("rejects too many ships", () => {
+    const res = place(fresh(), ctxA, [
+      ...legalFleetA(),
+      horizontalShip(8, 0, 2),
+    ]);
+    expect(res?.ok).toBe(false);
+  });
+
+  test("surfaces the engine's own composition error string", () => {
+    const res = place(fresh(), ctxA, [horizontalShip(0, 0, 5)]);
+    expect(res).toBeDefined();
+    if (!res) return;
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toBe("Fleet must match the standard composition");
+    }
+  });
+
+  test("one role placing then the other completing flips to battle with currentTurn A", () => {
+    let state = fresh();
+    const b = place(state, ctxB, legalFleetB());
+    expect(b?.ok).toBe(true);
+    if (!b?.ok) return;
+    state = b.state;
+    expect(state.phase).toBe("placement");
+    expect(state.ready).toEqual({ A: false, B: true });
+    const a = place(state, ctxA, legalFleetA());
+    expect(a?.ok).toBe(true);
+    if (!a?.ok) return;
+    expect(a.state.phase).toBe("battle");
+    expect(a.state.ready).toEqual({ A: true, B: true });
+    expect(a.state.currentTurn).toBe("A");
+  });
+});
+
+describe("sea-battle reduce guard ordering and malformed input", () => {
+  test("a malformed move object returns ok:false without mutating the input", () => {
+    const state = seaBattleEngine.createInitialState([
+      { role: "A" },
+      { role: "B" },
+    ]);
+    const snapshot = JSON.parse(JSON.stringify(state));
+    const res = seaBattleEngine.reduce?.(state, ctxA, {
+      definitely: "not a move",
+    } as unknown as SeaBattleMove);
+    expect(res?.ok).toBe(false);
+    expect(state).toEqual(snapshot);
+  });
+
+  test("an empty move object returns ok:false", () => {
+    const state = seaBattleEngine.createInitialState([
+      { role: "A" },
+      { role: "B" },
+    ]);
+    const res = seaBattleEngine.reduce?.(
+      state,
+      ctxA,
+      {} as unknown as SeaBattleMove,
+    );
+    expect(res?.ok).toBe(false);
+  });
+
+  test("a non-A/B role is rejected as not a player", () => {
+    const state = bothPlaced();
+    const res = seaBattleEngine.reduce?.(
+      state,
+      { role: "spectator" },
+      { kind: "fire", row: 5, col: 0 },
+    );
+    expect(res).toBeDefined();
+    if (!res) return;
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe("Not a player in this game");
+  });
+
+  test("the terminal guard precedes the move-schema and role checks", () => {
+    let state = bothPlaced();
+    const bCells = legalFleetB().flatMap((ship) => ship.cells);
+    let missIndex = 0;
+    const misses: { row: number; col: number }[] = [];
+    for (let row = 5; row <= 9; row++) {
+      for (let col = 0; col <= 9; col++) misses.push({ row, col });
+    }
+    for (let i = 0; i < bCells.length; i++) {
+      const t = bCells[i];
+      if (!t) continue;
+      const aRes = fire(state, ctxA, t.row, t.col);
+      if (!aRes?.ok) throw new Error("fire failed");
+      state = aRes.state;
+      if (isSeaBattleTerminal(state)) break;
+      const miss = misses[missIndex++];
+      if (!miss) throw new Error("ran out of miss cells");
+      const bRes = fire(state, ctxB, miss.row, miss.col);
+      if (!bRes?.ok) throw new Error("b fire failed");
+      state = bRes.state;
+    }
+    expect(isSeaBattleTerminal(state)).toBe(true);
+    const res = seaBattleEngine.reduce?.(state, ctxA, {
+      junk: true,
+    } as unknown as SeaBattleMove);
+    expect(res).toBeDefined();
+    if (!res) return;
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe("Invalid move");
+  });
+});
+
+describe("sea-battle reduce purity", () => {
+  test("a place move does not mutate the input fleets/shots arrays", () => {
+    const state = seaBattleEngine.createInitialState([
+      { role: "A" },
+      { role: "B" },
+    ]);
+    const snapshot = JSON.parse(JSON.stringify(state));
+    const res = place(state, ctxA, legalFleetA());
+    expect(res?.ok).toBe(true);
+    if (!res?.ok) return;
+    expect(state).toEqual(snapshot);
+    expect(res.state).not.toBe(state);
+    expect(res.state.fleets).not.toBe(state.fleets);
+    expect(res.state.shots.A).not.toBe(state.shots.A);
+  });
+
+  test("a fire move does not mutate the input nested shot arrays", () => {
+    const state = bothPlaced();
+    const snapshot = JSON.parse(JSON.stringify(state));
+    const res = fire(state, ctxA, 5, 0);
+    expect(res?.ok).toBe(true);
+    if (!res?.ok) return;
+    expect(state).toEqual(snapshot);
+    expect(res.state).not.toBe(state);
+    expect(res.state.shots).not.toBe(state.shots);
+    expect(res.state.shots.B).not.toBe(state.shots.B);
+  });
+});
+
+describe("sea-battle repeat-fire rejection", () => {
+  test("re-firing an already-HIT cell is rejected and keeps the turn", () => {
+    const state = bothPlaced();
+    const hit = fire(state, ctxA, 5, 0);
+    expect(hit?.ok).toBe(true);
+    if (!hit?.ok) return;
+    expect(hit.state.shots.B[0]?.hit).toBe(true);
+    const bTurn = fire(hit.state, ctxB, 0, 9);
+    if (!bTurn?.ok) throw new Error("b fire failed");
+    const repeat = fire(bTurn.state, ctxA, 5, 0);
+    expect(repeat).toBeDefined();
+    if (!repeat) return;
+    expect(repeat.ok).toBe(false);
+    if (!repeat.ok) expect(repeat.error).toBe("You already fired at that cell");
+    expect(bTurn.state.currentTurn).toBe("A");
+  });
+
+  test("re-firing an already-MISSED cell is also rejected", () => {
+    const state = bothPlaced();
+    const miss = fire(state, ctxA, 9, 9);
+    expect(miss?.ok).toBe(true);
+    if (!miss?.ok) return;
+    expect(miss.state.shots.B[0]?.hit).toBe(false);
+    const bTurn = fire(miss.state, ctxB, 0, 9);
+    if (!bTurn?.ok) throw new Error("b fire failed");
+    const repeat = fire(bTurn.state, ctxA, 9, 9);
+    expect(repeat).toBeDefined();
+    if (!repeat) return;
+    expect(repeat.ok).toBe(false);
+    if (!repeat.ok) expect(repeat.error).toBe("You already fired at that cell");
+  });
+});
+
+describe("sea-battle post-win move rejection", () => {
+  const allMisses = (() => {
+    const cells: { row: number; col: number }[] = [];
+    for (let row = 5; row <= 9; row++) {
+      for (let col = 0; col <= 9; col++) cells.push({ row, col });
+    }
+    return cells;
+  })();
+
+  function playToWin(): SeaBattleState {
+    let state = bothPlaced();
+    const bCells = legalFleetB().flatMap((ship) => ship.cells);
+    let missIndex = 0;
+    for (let i = 0; i < bCells.length; i++) {
+      const t = bCells[i];
+      if (!t) continue;
+      const aRes = fire(state, ctxA, t.row, t.col);
+      if (!aRes?.ok) throw new Error("fire failed");
+      state = aRes.state;
+      if (isSeaBattleTerminal(state)) break;
+      const miss = allMisses[missIndex++];
+      if (!miss) throw new Error("ran out of miss cells");
+      const bRes = fire(state, ctxB, miss.row, miss.col);
+      if (!bRes?.ok) throw new Error("b fire failed");
+      state = bRes.state;
+    }
+    return state;
+  }
+
+  test("a post-win fire is rejected with Game is over", () => {
+    const state = playToWin();
+    expect(isSeaBattleTerminal(state)).toBe(true);
+    const res = fire(state, ctxB, 0, 0);
+    expect(res).toBeDefined();
+    if (!res) return;
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe("Game is over");
+  });
+
+  test("a post-win place is rejected with Game is over (terminal-before-phase)", () => {
+    const state = playToWin();
+    const res = place(state, ctxA, legalFleetA());
+    expect(res).toBeDefined();
+    if (!res) return;
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe("Game is over");
+  });
+
+  test("the winning move fires the completed outcome exactly once", () => {
+    let state = bothPlaced();
+    const bCells = legalFleetB().flatMap((ship) => ship.cells);
+    let missIndex = 0;
+    let completedCount = 0;
+    for (let i = 0; i < bCells.length; i++) {
+      const t = bCells[i];
+      if (!t) continue;
+      const aRes = fire(state, ctxA, t.row, t.col);
+      if (!aRes?.ok) throw new Error("fire failed");
+      if (aRes.outcome.status === "completed") completedCount++;
+      state = aRes.state;
+      if (isSeaBattleTerminal(state)) break;
+      const miss = allMisses[missIndex++];
+      if (!miss) throw new Error("ran out of miss cells");
+      const bRes = fire(state, ctxB, miss.row, miss.col);
+      if (!bRes?.ok) throw new Error("b fire failed");
+      state = bRes.state;
+    }
+    expect(completedCount).toBe(1);
+  });
+});
+
 describe("sea-battle autoMove", () => {
   test("placement auto-move yields a legal accepted fleet", () => {
     const state = seaBattleEngine.createInitialState([
@@ -364,6 +631,25 @@ describe("sea-battle autoMove", () => {
     const move = seaBattleEngine.autoMove?.(state, "B");
     expect(move?.kind).toBe("fire");
     const res = seaBattleEngine.reduce?.(state, ctxB, move as SeaBattleMove);
+    expect(res?.ok).toBe(true);
+  });
+
+  test("battle auto-move never targets an already-fired cell on a 99-shot board", () => {
+    const state = bothPlaced();
+    const shots: { row: number; col: number; hit: boolean }[] = [];
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 10; col++) {
+        if (row === 8 && col === 3) continue;
+        shots.push({ row, col, hit: false });
+      }
+    }
+    const nearFull: SeaBattleState = {
+      ...state,
+      shots: { A: state.shots.A, B: shots },
+    };
+    const move = seaBattleEngine.autoMove?.(nearFull, "A");
+    expect(move).toEqual({ kind: "fire", row: 8, col: 3 });
+    const res = seaBattleEngine.reduce?.(nearFull, ctxA, move as SeaBattleMove);
     expect(res?.ok).toBe(true);
   });
 });

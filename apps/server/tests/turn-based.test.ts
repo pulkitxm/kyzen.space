@@ -781,3 +781,176 @@ describe("handleMakeMove - hidden-information redaction (sea battle)", () => {
     expect(bView?.move?.moveData).toBeNull();
   });
 });
+
+function seaBattleFleetA(): SeaBattleShip[] {
+  return [
+    seaBattleShip(0, 0, 5),
+    seaBattleShip(1, 0, 4),
+    seaBattleShip(2, 0, 3),
+    seaBattleShip(3, 0, 3),
+    seaBattleShip(4, 0, 2),
+  ];
+}
+
+function seaBattleFleetB(): SeaBattleShip[] {
+  return [
+    seaBattleShip(5, 0, 5),
+    seaBattleShip(6, 0, 4),
+    seaBattleShip(7, 0, 3),
+    seaBattleShip(8, 0, 3),
+    seaBattleShip(9, 0, 2),
+  ];
+}
+
+function seaBattlePlacementState(): SeaBattleState {
+  const reduce = seaBattleEngine.reduce;
+  if (!reduce) throw new Error("sea-battle engine has no reduce");
+  const start = seaBattleEngine.createInitialState([
+    { role: "A" },
+    { role: "B" },
+  ]);
+  const a = reduce(
+    start,
+    { role: "A" },
+    {
+      kind: "place",
+      ships: seaBattleFleetA(),
+    },
+  );
+  if (!a.ok) throw new Error("A placement failed");
+  return a.state;
+}
+
+type SeaBattleStatePayload = {
+  game: { gameState: SeaBattleState; status?: string };
+  moves?: { moveData: unknown; playerId: string }[];
+};
+
+function lastSeaBattleState(emits: Emit[]): SeaBattleStatePayload | undefined {
+  const found = [...emits].reverse().find((e) => e.event === "game_state");
+  return found?.payload as SeaBattleStatePayload | undefined;
+}
+
+describe("handleJoinRoom - hidden-information redaction (sea battle)", () => {
+  function seatBattlePhase(over: Partial<GameRec> = {}) {
+    current = freshGame({
+      gameType: SEA_BATTLE,
+      status: "active",
+      gameState: seaBattleBattleState(),
+      players: [
+        { userId: "u1", username: "u1", role: "A" },
+        { userId: "u2", username: "u2", role: "B" },
+      ],
+      ...over,
+    });
+  }
+
+  test("a spectator joining a battle-phase game sees both fleets fogged", async () => {
+    seatBattlePhase();
+    const a = fakeSocket("u1");
+    const b = fakeSocket("u2");
+    const spectator = fakeSocket("u3");
+    const { io } = fakeIoSockets([a, b, spectator]);
+
+    await call(handleJoinRoom, io, spectator.socket, {
+      gameId: CODE,
+      intent: "spectate",
+    });
+
+    const view = lastSeaBattleState(spectator.emits);
+    expect(view).toBeDefined();
+    if (!view) return;
+    expect(view.game.gameState.fleets.A).toHaveLength(0);
+    expect(view.game.gameState.fleets.B).toHaveLength(0);
+  });
+
+  test("a placement-phase game does not leak a placed fleet to the opponent's socket", async () => {
+    current = freshGame({
+      gameType: SEA_BATTLE,
+      status: "active",
+      gameState: seaBattlePlacementState(),
+      players: [
+        { userId: "u1", username: "u1", role: "A" },
+        { userId: "u2", username: "u2", role: "B" },
+      ],
+    });
+    moves = [
+      {
+        id: "m1",
+        gameId: UUID,
+        moveNumber: 1,
+        playerId: "u1",
+        moveData: { kind: "place", ships: seaBattleFleetA() },
+        createdAt: new Date(),
+      },
+    ];
+    const a = fakeSocket("u1");
+    const b = fakeSocket("u2");
+    const { io } = fakeIoSockets([a, b]);
+
+    await call(handleJoinRoom, io, b.socket, { gameId: CODE });
+
+    const aView = lastSeaBattleState(a.emits);
+    const bView = lastSeaBattleState(b.emits);
+    expect(aView?.game.gameState.fleets.A).toHaveLength(5);
+    expect(bView?.game.gameState.fleets.A).toHaveLength(0);
+    expect(bView?.game.gameState.fleets.B).toHaveLength(0);
+  });
+
+  test("opponent place payloads are stripped from the moves[] array per recipient", async () => {
+    seatBattlePhase();
+    moves = [
+      {
+        id: "m1",
+        gameId: UUID,
+        moveNumber: 1,
+        playerId: "u1",
+        moveData: { kind: "place", ships: seaBattleFleetA() },
+        createdAt: new Date(),
+      },
+      {
+        id: "m2",
+        gameId: UUID,
+        moveNumber: 2,
+        playerId: "u2",
+        moveData: { kind: "place", ships: seaBattleFleetB() },
+        createdAt: new Date(),
+      },
+    ];
+    const a = fakeSocket("u1");
+    const b = fakeSocket("u2");
+    const spectator = fakeSocket("u3");
+    const { io } = fakeIoSockets([a, b, spectator]);
+
+    await call(handleJoinRoom, io, a.socket, { gameId: CODE });
+
+    const aView = lastSeaBattleState(a.emits);
+    const bView = lastSeaBattleState(b.emits);
+    const specView = lastSeaBattleState(spectator.emits);
+    expect(aView?.moves?.[0]?.moveData).toMatchObject({ kind: "place" });
+    expect(aView?.moves?.[1]?.moveData).toBeNull();
+    expect(bView?.moves?.[0]?.moveData).toBeNull();
+    expect(bView?.moves?.[1]?.moveData).toMatchObject({ kind: "place" });
+    expect(specView?.moves?.[0]?.moveData).toBeNull();
+    expect(specView?.moves?.[1]?.moveData).toBeNull();
+  });
+
+  test("a completed game reveals the full state to every socket via the room broadcast", async () => {
+    seatBattlePhase({ status: "completed", winner: "u1" });
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u3");
+
+    await call(handleJoinRoom, io, socket, {
+      gameId: CODE,
+      intent: "spectate",
+    });
+
+    const stateEmit = emits.find(
+      (e) => e.event === "game_state" && e.room === `game:${CODE}`,
+    );
+    expect(stateEmit).toBeDefined();
+    const payload = stateEmit?.payload as SeaBattleStatePayload;
+    expect(payload.game.gameState.fleets.A).toHaveLength(5);
+    expect(payload.game.gameState.fleets.B).toHaveLength(5);
+  });
+});

@@ -16,8 +16,8 @@ The reason this matters - and the single most important idea in the whole subsys
 | --- | --- |
 | `apps/server/src/realtime/index.ts` | `attachRealtime`: build the `IOServer`, attach the Redis adapter, install the handshake-cookie auth middleware, and on each connection wire every chat-lane handler plus the three game-lane listeners (`join_room`, `make_move`, `leave_room`). |
 | `apps/server/src/realtime/io.ts` | `setIO` / `getIO` singleton so non-socket code (e.g. `notify`) can emit without holding a `socket` reference. |
-| `apps/server/src/realtime/rooms.ts` | Room name helpers + emit helpers: `gameRoom`/`convRoom`/`userRoom` naming and `emitToGame`/`emitToConv`/`emitToUser`. |
-| `apps/server/src/realtime/turn-based.ts` | The two game-lane handlers: `handleJoinRoom` (seating, `turn-based.ts:274`) and `handleMakeMove` (authoritative validate → reduce → persist → finalize → broadcast, `turn-based.ts:297`), wired directly by `index.ts`; plus the turn-timer integration (`scheduleNext`, `onTurnTimeout`, `applyMove`, `abortGame`). |
+| `apps/server/src/realtime/rooms.ts` | Room name helpers + emit helpers: `gameRoom`/`convRoom`/`userRoom` naming, `emitToGame`/`emitToConv`/`emitToUser`, and `emitToGamePerSocket` (per-socket broadcast that builds a distinct payload from each socket's `userId`, used for the hidden-information `viewFor` projection). |
+| `apps/server/src/realtime/turn-based.ts` | The two game-lane handlers: `handleJoinRoom` (seating, `turn-based.ts:314`) and `handleMakeMove` (authoritative validate → reduce → persist → finalize → broadcast, `turn-based.ts:337`), wired directly by `index.ts`; plus the turn-timer integration (`scheduleNext`, `onTurnTimeout`, `applyMove`, `abortGame`) and the per-recipient broadcast helper `emitGameState` (`turn-based.ts:43`). |
 | `apps/server/src/realtime/turn-timer.ts` | The server-authoritative per-player turn clock: pure helpers (`turnLimitMs`, `decideTimeout`, `abortOutcome`) + the in-memory `TurnTimerManager` (`turnTimers` singleton) that tracks per-seat strikes and one pending deadline per active game. |
 | `apps/server/src/realtime/room-events.ts` | `attachRoomHandlers`: the two **standalone-room** lane events `room:create` / `room:join` (both rate-limited), each parsed against a shared Zod schema and delegating to `rooms-service.ts`. |
 | `apps/server/src/realtime/rooms-service.ts` | `createStandaloneGame` (conversation-less open game, host pre-seated, no game-card/notify) and `validateJoinByCode` (typed `not_found`/`full`/`already_started`/`finished` checks for a join by code). |
@@ -85,7 +85,7 @@ declare module "socket.io" {
 }
 ```
 
-The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:279`, `chat.ts:28`, `friends.ts:12`, `typing.ts:43`, `presence.ts:63`, `games-in-chat.ts:25`). A forged `userId` in a payload is simply ignored - the only `userId` that exists came from a verified session.
+The payoff: no handler ever re-reads the cookie or accepts a `userId` from the wire. `const userId = socket.data.userId` is trusted identity everywhere downstream (`turn-based.ts:342`, `chat.ts:28`, `friends.ts:12`, `typing.ts:43`, `presence.ts:63`, `games-in-chat.ts:25`). A forged `userId` in a payload is simply ignored - the only `userId` that exists came from a verified session.
 
 ### Per-connection wiring
 
@@ -250,7 +250,7 @@ export function registerGameEvent<T extends { gameId: string }>(
       }
 ```
 
-The envelope schemas are strict and tiny - `clientMakeMoveSchema` is `{ gameId: gameCodeSchema, moveData: unknown }.strict()` (`packages/shared/src/types/games/wire.ts:35`); the *contents* of `moveData` are validated later by the game-specific `moveSchema` inside `handleMakeMove`, because the envelope layer cannot know what shape a Reversi vs. a Tic-Tac-Toe move takes. `clientJoinRoomSchema` adds an optional `intent: "play" | "spectate"` (`wire.ts:27`). Both envelopes key off `gameId` - now the game's **public code** (validated and normalized by `gameCodeSchema`), not the internal UUID - not a `gameType`; the registry-typed `gameTypeSchema` (from `@kyzen/shared/types`) that validates `gameType` guards the game-card DTOs and game creation, while the handler resolves both the game (via `games.getGameByCode`, `turn-based.ts:305`) and its type from the stored `gameRow.gameType` (`turn-based.ts:312`).
+The envelope schemas are strict and tiny - `clientMakeMoveSchema` is `{ gameId: gameCodeSchema, moveData: unknown }.strict()` (`packages/shared/src/types/games/wire.ts:35`); the *contents* of `moveData` are validated later by the game-specific `moveSchema` inside `handleMakeMove`, because the envelope layer cannot know what shape a Reversi vs. a Tic-Tac-Toe move takes. `clientJoinRoomSchema` adds an optional `intent: "play" | "spectate"` (`wire.ts:27`). Both envelopes key off `gameId` - now the game's **public code** (validated and normalized by `gameCodeSchema`), not the internal UUID - not a `gameType`; the registry-typed `gameTypeSchema` (from `@kyzen/shared/types`) that validates `gameType` guards the game-card DTOs and game creation, while the handler resolves both the game (via `games.getGameByCode`, `turn-based.ts:345`) and its type from the stored `gameRow.gameType` (`turn-based.ts:352`).
 
 `join_room` and `make_move` report failures *twice*: through the ack callback (`cb?.(msg)`) for the specific caller, and as a `"game_error"` emit (`socket-util.ts:59`/`:79`). They also wrap the body in `try/catch` and log a `durationMs` on success (`socket-util.ts:66`) - the game lane's own version of the safety/observability that `register` gives the chat lane. (`leave_room` only acks; it has nothing to fail at beyond payload validation.)
 
@@ -285,7 +285,7 @@ export async function handleJoinRoom(
 }
 ```
 
-`apps/server/src/realtime/turn-based.ts:274`. The id guard is `isGameCode` from `@kyzen/shared/types` (`packages/shared/src/types/games/code.ts:20`), which normalizes then regex-checks the 6-char public room code; the game is then loaded by that code with `games.getGameByCode` (`turn-based.ts:282`), and the socket joins the `game:<code>` room (`joinGameRoom(socket, game.code)`, `turn-based.ts:291`). Joining a room is also the only way a player takes a seat. When seating a player flips a game to `active`, `scheduleNext` (`turn-based.ts:292`) arms the turn clock (see [the turn timer](#turn-timer-auto-move--auto-abort)). `ensureSeated` (`turn-based.ts:78`) decides whether this user becomes a player. The seating gate is worth reading in full:
+`apps/server/src/realtime/turn-based.ts:314`. The id guard is `isGameCode` from `@kyzen/shared/types` (`packages/shared/src/types/games/code.ts:20`), which normalizes then regex-checks the 6-char public room code; the game is then loaded by that code with `games.getGameByCode` (`turn-based.ts:322`), and the socket joins the `game:<code>` room (`joinGameRoom(socket, game.code)`, `turn-based.ts:331`). Joining a room is also the only way a player takes a seat. When seating a player flips a game to `active`, `scheduleNext` (`turn-based.ts:332`) arms the turn clock (see [the turn timer](#turn-timer-auto-move--auto-abort)). `ensureSeated` (`turn-based.ts:118`) decides whether this user becomes a player. The seating gate is worth reading in full:
 
 ```ts
 const { engine } = getDefinition(gameRow.gameType);
@@ -301,9 +301,9 @@ if (intent === "spectate" || !seatFree || challengeReserved) {
 }
 ```
 
-`apps/server/src/realtime/turn-based.ts:88`. A user is seated only if: they are not already a player, the game is still `waiting` with room under `engine.maxPlayers`, they did not ask to merely `spectate`, and - for a `challenge` game - they are the challenged user. The seat's role comes straight from the engine: `engine.roles[players.length]` (`turn-based.ts:103`, with a `biome-ignore` at `turn-based.ts:102` justifying the non-null assertion). When the new seat count reaches `engine.minPlayers` the game flips to `active` and gets a `startedAt`, and the initial state is lazily created from the engine if absent (`turn-based.ts:113`). The seat is persisted via `games.seatPlayer` into its own indexed `game_player` row (`turn-based.ts:108`).
+`apps/server/src/realtime/turn-based.ts:129`. A user is seated only if: they are not already a player, the game is still `waiting` with room under `engine.maxPlayers`, they did not ask to merely `spectate`, and - for a `challenge` game - they are the challenged user. The seat's role comes straight from the engine: `engine.roles[players.length]` (`turn-based.ts:143`, with a `biome-ignore` at `turn-based.ts:142` justifying the non-null assertion). When the new seat count reaches `engine.minPlayers` the game flips to `active` and gets a `startedAt`, and the initial state is lazily created from the engine if absent (`turn-based.ts:158`). The seat is persisted via `games.seatPlayer` into its own indexed `game_player` row (`turn-based.ts:148`).
 
-**Seating is idempotent, because `join_room` is not.** A board emits `join_room` on effect setup *and* on every socket `connect` (and the shared socket can reconnect, dev Strict-Mode double-mounts, a second tab can join), so the same user's join can arrive twice and interleave around the `await`s in `ensureSeated` - both reads would see the user as unseated and both would try to insert the same `(game_id, user_id)`. To make that safe the membership check is *not* trusted as the only guard: `games.seatPlayer` inserts with `ON CONFLICT (game_id, user_id) DO NOTHING` and returns whether a row was actually written (`games.ts:146`). When it returns `false` the user was seated by a concurrent join, so `ensureSeated` re-loads the game and returns `changed: false` instead of issuing a stale `updateGame` (`turn-based.ts:109`) - the loser of the race never surfaces the old `duplicate key value violates unique constraint "game_player_uq"` error and never double-writes.
+**Seating is idempotent, because `join_room` is not.** A board emits `join_room` on effect setup *and* on every socket `connect` (and the shared socket can reconnect, dev Strict-Mode double-mounts, a second tab can join), so the same user's join can arrive twice and interleave around the `await`s in `ensureSeated` - both reads would see the user as unseated and both would try to insert the same `(game_id, user_id)`. To make that safe the membership check is *not* trusted as the only guard: `games.seatPlayer` inserts with `ON CONFLICT (game_id, user_id) DO NOTHING` and returns whether a row was actually written (`games.ts:146`). When it returns `false` the user was seated by a concurrent join, so `ensureSeated` re-loads the game and returns `changed: false` instead of issuing a stale `updateGame` (`turn-based.ts:150`) - the loser of the race never surfaces the old `duplicate key value violates unique constraint "game_player_uq"` error and never double-writes.
 
 Whether or not seating changed, the socket joins `game:<code>` (keyed by `game.code`, the public room code) and receives the full state. `emitFullState` always sends *everything* - the serialized game plus the full move list - so a late joiner or reconnecting client gets a complete, authoritative snapshot rather than a diff:
 
@@ -314,11 +314,11 @@ async function emitFullState(io: IOServer, gameRow: GameRecord) {
     game: withTimerFields(serializeGame(gameRow), gameRow.id),
     moves: moves.map((m) => serializeMove(m, gameRow.code)),
   };
-  emitToGame(io, gameRow.code, "game_state", payload);
+  await emitGameState(io, gameRow, payload);
 }
 ```
 
-`apps/server/src/realtime/turn-based.ts:69`. The payload type is `ServerGameStatePayload` from `@kyzen/shared/types` (`packages/shared/src/types/games/wire.ts`) - again a shared contract. Every broadcast game is passed through `withTimerFields` (`turn-based.ts:31`), which stamps the live `turnDeadline` and each player's `timeoutStrikes` onto the serialized `GameJson` so the board can render the countdown ring. If a seat was taken (`changed`), `broadcastGameCard` also updates the game-card message in the originating conversation so everyone in the chat sees the new player count.
+`apps/server/src/realtime/turn-based.ts:109`. The payload type is `ServerGameStatePayload` from `@kyzen/shared/types` (`packages/shared/src/types/games/wire.ts`) - again a shared contract. Every broadcast game is passed through `withTimerFields` (`turn-based.ts:32`), which stamps the live `turnDeadline` and each player's `timeoutStrikes` onto the serialized `GameJson` so the board can render the countdown ring. The actual send goes through `emitGameState` (`turn-based.ts:43`), not a raw `emitToGame` - that helper is what applies the per-recipient hidden-information projection described in [the section below](#per-recipient-projection-viewfor); for a fully-observable game it falls through to a single `emitToGame` to the room. If a seat was taken (`changed`), `broadcastGameCard` also updates the game-card message in the originating conversation so everyone in the chat sees the new player count.
 
 ### `handleMakeMove` - the round trip
 
@@ -356,15 +356,15 @@ export async function handleMakeMove(
   if (!result.ok) return err(socket, result.error);
 ```
 
-`apps/server/src/realtime/turn-based.ts:297`. Every line is a guard, and the ordering is the design:
+`apps/server/src/realtime/turn-based.ts:337`. Every line is a guard, and the ordering is the design:
 
 1. **Identity is taken from the socket, not the payload** - `userId = socket.data.userId`, then `gameRow.players.find(p => p.userId === userId)`. There is no way for the client to claim to be another player; the player's `role` is looked up from the persisted seat, and that role is what gets passed to `reduce` as `{ role: player.role }`. A client cannot move on another seat's behalf.
 2. **The game must be `active`** and the engine must actually accept moves (`def.engine.reduce` exists) - a realtime-only engine would have no `reduce`.
 3. **The move is validated against the game-specific `def.moveSchema`** - this is the inner Zod check the envelope layer deferred. Note it validates `payload.moveData`, the `unknown` field from `clientMakeMoveSchema`.
 4. **The stored state is *also* validated** against `def.stateSchema` before being fed to the engine. This is a subtle but deliberate defense: even data already in the database is treated as untrusted (`"Corrupt game state"`), so a bad migration or manual edit cannot crash the engine.
-5. **`def.engine.reduce` is the authority.** It is a pure function from `(state, ctx, input) → ReduceResult` (defined in `packages/shared/src/types/games/engine.ts`). If the move is illegal *for this state* (wrong turn, occupied cell, etc.), it returns `{ ok: false, error }` (`turn-based.ts:325`) and we bounce the client with `result.error`. The server's verdict is final regardless of what the client's local copy of the same engine predicted.
+5. **`def.engine.reduce` is the authority.** It is a pure function from `(state, ctx, input) → ReduceResult` (defined in `packages/shared/src/types/games/engine.ts`). If the move is illegal *for this state* (wrong turn, occupied cell, etc.), it returns `{ ok: false, error }` (`turn-based.ts:365`) and we bounce the client with `result.error`. The server's verdict is final regardless of what the client's local copy of the same engine predicted.
 
-Only after all five guards pass does `handleMakeMove` hand off to the shared `applyMove` helper (`turn-based.ts:152`) - the single persist-and-broadcast path used by **both** real moves and the turn timer's auto-moves:
+Only after all five guards pass does `handleMakeMove` hand off to the shared `applyMove` helper (`turn-based.ts:192`) - the single persist-and-broadcast path used by **both** real moves and the turn timer's auto-moves:
 
 ```ts
   const moveNumber = await games.nextMoveNumber(gameRow.id);
@@ -386,7 +386,7 @@ Only after all five guards pass does `handleMakeMove` hand off to the shared `ap
     game: withTimerFields(serializeGame(updated), updated.id),
     move: opts.auto ? { ...move, auto: true } : move,
   };
-  emitToGame(io, gameRow.code, "game_state", statePayload);
+  await emitGameState(io, updated, statePayload);
 
   if (updated.status === "completed") {
     turnTimers.dispose(updated.id);
@@ -396,14 +396,67 @@ Only after all five guards pass does `handleMakeMove` hand off to the shared `ap
 }
 ```
 
-`apps/server/src/realtime/turn-based.ts:152`. The move is appended (one row in the `move` table, `moveData` stored as the **Zod-parsed** value, not the raw wire value), the new `gameState` is persisted, and `finalize` handles end-of-game. A *real* move resets that seat's timeout strikes (`!opts.auto`); an *auto* move does not (and is flagged `auto: true` on the wire). `scheduleNext` then re-arms the clock for whoever is next on the turn. `finalize` (`turn-based.ts:123`) only acts on a `completed` outcome: it resolves `winnerRole` back to a `winnerUserId` via the seat list, writes `status: "completed"` + `completedAt` + `winner` (or `"draw"`), and calls `profiles.bumpStats` once per player (`"won"` / `"lost"` / `"drawn"`).
+`apps/server/src/realtime/turn-based.ts:192`. The move is appended (one row in the `move` table, `moveData` stored as the **Zod-parsed** value, not the raw wire value), the new `gameState` is persisted, and `finalize` handles end-of-game. A *real* move resets that seat's timeout strikes (`!opts.auto`); an *auto* move does not (and is flagged `auto: true` on the wire). `scheduleNext` then re-arms the clock for whoever is next on the turn. `finalize` (`turn-based.ts:163`) only acts on a `completed` outcome: it resolves `winnerRole` back to a `winnerUserId` via the seat list, writes `status: "completed"` + `completedAt` + `winner` (or `"draw"`), and calls `profiles.bumpStats` once per player (`"won"` / `"lost"` / `"drawn"`). The single `game_state` broadcast goes through `emitGameState` (`turn-based.ts:43`), which is where the per-recipient `viewFor` projection and move-payload stripping happen (next section); the terminal `game_over` is a plain room broadcast.
 
 Then come the broadcasts - and note there are **two audiences**:
 
-- A **single `game_state`** carrying `{ game: serializeGame(updated), move: serializeMove(moveRow) }` goes to the **game room** `game:<code>` (everyone watching/playing the board) - the room is keyed by the game's public code, not the UUID. Per move the server emits the full game *plus the one new move as a delta*, not the entire move history. (`join_room` is the path that ships the full `moves[]` list, via `emitFullState`, for replay on a late join or reconnect.) There is no longer a separate `move_made` event - that was removed, along with the `ServerMoveMadePayload` type.
+- A **single `game_state`** carrying `{ game: serializeGame(updated), move: serializeMove(moveRow) }` goes to the **game room** `game:<code>` (everyone watching/playing the board) - the room is keyed by the game's public code, not the UUID. Per move the server emits the full game *plus the one new move as a delta*, not the entire move history. (`join_room` is the path that ships the full `moves[]` list, via `emitFullState`, for replay on a late join or reconnect.) Both paths route through `emitGameState`, so a hidden-information game's `game_state` is projected per recipient via `viewFor` and the opponent's `moveData` is stripped (see [Per-recipient projection](#per-recipient-projection-viewfor)). There is no longer a separate `move_made` event - that was removed, along with the `ServerMoveMadePayload` type.
 - On completion, `game_over` also goes to the game room, and `broadcastGameCard` pushes a `message_updated` event to the **originating conversation room** `conv:<conversationId>` (`apps/server/src/chat/game-card-broadcast.ts:7`), so the game card embedded in the chat updates to "completed" for people who never opened the board.
 
 This cross-lane fan-out is the bridge between the two lanes: a *game-lane* action (`make_move`) produces a *chat-lane* effect (a `message_updated` over `CHAT_EVENTS.messageUpdated`). The `game_state` payload is `ServerGameStatePayload` (`{ game; moves?; move? }`) and the completion payload is `ServerGameOverPayload`, both from `@kyzen/shared/types` (`packages/shared/src/types/games/wire.ts:122`/`:128`). The tic-tac-toe board's `game_state` handler replaces its move list from `payload.moves` when that full list is present, else appends the single `payload.move` (`packages/games-client/src/games/tic-tac-toe/client.tsx:276`).
+
+### Per-recipient projection (`viewFor`)
+
+Both `game_state` broadcasts above - the full snapshot from `emitFullState` and the per-move delta from `applyMove` - go through one helper, `emitGameState` (`apps/server/src/realtime/turn-based.ts:43`). For a **fully-observable** game it is a no-op wrapper that emits the same payload to the whole room; for a **hidden-information** game it redacts the state per recipient so no player ever receives data they should not see (an opponent's un-hit ships, another seat's hand). This is the realtime side of the optional `GameEngine.viewFor(state, role)` hook (`packages/shared/src/types/games/engine.ts:30`) - see [games-core-engine](./games-core-engine.md) and [generic-game-schema](./generic-game-schema.md#edge-cases-the-model-absorbs).
+
+```ts
+async function emitGameState(
+  io: IOServer,
+  gameRow: GameRecord,
+  payload: ServerGameStatePayload,
+): Promise<void> {
+  const def = getDefinition(gameRow.gameType);
+  const viewFor = def.engine.viewFor;
+  if (!viewFor || isGameOver(gameRow.status)) {
+    emitToGame(io, gameRow.code, "game_state", payload);
+    return;
+  }
+
+  const parsed = def.stateSchema.safeParse(payload.game.gameState);
+  const players = gameRow.players;
+
+  await emitToGamePerSocket(io, gameRow.code, "game_state", (userId) => {
+    const role = players.find((p) => p.userId === userId)?.role ?? null;
+    const gameState = parsed.success
+      ? viewFor(parsed.data, role ?? "")
+      : payload.game.gameState;
+    const next: ServerGameStatePayload = {
+      ...payload,
+      game: { ...payload.game, gameState },
+    };
+    if (payload.moves) {
+      next.moves = payload.moves.map((m) =>
+        m.playerId === userId ? m : { ...m, moveData: null },
+      );
+    }
+    if (payload.move) {
+      next.move =
+        payload.move.playerId === userId
+          ? payload.move
+          : { ...payload.move, moveData: null };
+    }
+    return next;
+  });
+}
+```
+
+`apps/server/src/realtime/turn-based.ts:43`. The decisions, in order:
+
+- **No `viewFor` or game over ⇒ one broadcast, full state.** If the engine declares no `viewFor`, or the game has already ended (`isGameOver(gameRow.status)`, `packages/shared/src/types/games/wire.ts:136`), the helper emits the unredacted payload to the whole room via `emitToGame`. Game over deliberately *reveals* the full state so both fleets/hands render in the final board. So every existing fully-observable game - tic-tac-toe included - takes the exact same single-broadcast path as before; this change is invisible to them.
+- **Otherwise, one tailored payload per connected socket.** `emitToGamePerSocket` (`apps/server/src/realtime/rooms.ts:24`) `fetchSockets()` the game room and, for each socket, reads its trusted `socket.data.userId`, maps it to a seat `role` (or `null` for a spectator), and runs `viewFor(state, role)` to build that socket's `gameState`. The stored state is `safeParse`d once up front; if it somehow fails to parse, the helper falls back to the raw `gameState` for everyone rather than crashing.
+- **Opponent move payloads are stripped.** Alongside the redacted state, any move in the payload (`payload.moves[]` on a full snapshot, or `payload.move` on a delta) that was **not** authored by this recipient has its `moveData` blanked to `null` - a player's own moves stay intact, but they never learn the exact coordinates the opponent fired at (beyond what the redacted state already reveals). Boards in a hidden-information game therefore render from the **redacted `game_state`**, not by replaying the move log.
+
+The invariants this relies on: `viewFor` must return a state that still passes `stateSchema` (so a board can parse it like any other state), and the engine's *own* board must not depend on data the projection removes. Sea Battle satisfies both - its `stateSchema` does not require a complete fleet, and its board reads only the (possibly fogged) `game_state` - see [`docs/games/sea-battle.md`](../games/sea-battle.md).
 
 ### Full data-flow walkthrough: a player makes a winning move
 
@@ -413,22 +466,24 @@ Player clicks a cell in the React board (apps/web, @kyzen/games-client)
   -> apps/server/src/realtime/index.ts:72  registerGameEvent("make_move", clientMakeMoveSchema, ...)
        clientMakeMoveSchema.safeParse(payload)            (envelope Zod, socket-util.ts:55)
          -> parse fails => cb?.("Invalid payload") + emit "game_error" and STOP
-  -> run(data) == turn-based.ts:297  handleMakeMove(io, socket, data)   (called directly, no driver)
+  -> run(data) == turn-based.ts:337  handleMakeMove(io, socket, data)   (called directly, no driver)
        userId = socket.data.userId                         (trusted identity, NOT payload)
-       games.getGameByCode(data.gameId)                    (turn-based.ts:305)
+       games.getGameByCode(data.gameId)                    (turn-based.ts:345)
        guards: game active? caller is a seated player? engine has reduce?
        def.moveSchema.safeParse(payload.moveData)          (game-specific Zod)
        def.stateSchema.safeParse(gameRow.gameState)        (stored state re-validated)
-       def.engine.reduce(state, { role }, move)            (turn-based.ts:320, AUTHORITATIVE)
+       def.engine.reduce(state, { role }, move)            (turn-based.ts:360, AUTHORITATIVE)
          -> result.ok === false  => err(socket, result.error) and STOP
-         -> result.ok === true   => applyMove(io, gameRow, player, move)   (turn-based.ts:152)
-  -> persist: games.addMove(...) + games.updateGame({ gameState })   (turn-based.ts:174)
+         -> result.ok === true   => applyMove(io, gameRow, player, move)   (turn-based.ts:192)
+  -> persist: games.addMove(...) + games.updateGame({ gameState })
   -> resetStrikes(seat) + scheduleNext(io, updated)        (re-arm the turn clock)
-  -> finalize(updated, result.outcome)                     (turn-based.ts:183)
+  -> finalize(updated, result.outcome)
        outcome.status === "completed" => updateGame(status/winner) + profiles.bumpStats x N
   -> BROADCAST A (game room):
-       emitToGame "game_state" { game, move }               -> room game:<code>  (rooms.ts:15)
-       emitToGame "game_over" { winner }                    -> room game:<code>
+       emitGameState "game_state" { game, move }            -> room game:<code>  (turn-based.ts:43)
+            viewFor projects game_state per recipient + strips opponent moveData
+            (full state on game over; plain emitToGame for fully-observable games)
+       emitToGame "game_over" { winner }                    -> room game:<code>  (rooms.ts:15)
   -> BROADCAST B (chat room):
        broadcastGameCard -> emitToConv "message_updated"    -> room conv:<convId>  (game-card-broadcast.ts:14)
   -> every board in game:<code> appends the new move to its authoritative game_state;
@@ -466,15 +521,15 @@ Every `active` turn-based game runs a **server-authoritative per-player clock**.
 
 **Two optional engine hooks make a game timer-aware** (`packages/shared/src/types/games/engine.ts:26`): `currentRole(state)` returns whose turn it is (or `null` when terminal), and `autoMove(state, role)` returns a random *legal* move for that role. A game implementing neither has no clock. Tic-tac-toe implements both (`engine.ts:99`/`:108`).
 
-**Per-player clocks with strikes.** Each seat tracks a `strikes` count (consecutive timeouts), held purely in memory in the `TurnTimerManager` (there is no DB column). `turnLimitMs` (`turn-timer.ts:6`) sets the limit: a seat's **first turn** is `FIRST_TURN_MS = 15s`; every later turn is `BASE_MS - strikes * 1000`, floored at `MIN_MS = 1s` (so strikes 0 → 5s, 1 → 4s, 2 → 3s). A **real** move clears that seat's strikes (`applyMove` calls `resetStrikes` when `!opts.auto`, `turn-based.ts:185`); an auto-move does not.
+**Per-player clocks with strikes.** Each seat tracks a `strikes` count (consecutive timeouts), held purely in memory in the `TurnTimerManager` (there is no DB column). `turnLimitMs` (`turn-timer.ts:6`) sets the limit: a seat's **first turn** is `FIRST_TURN_MS = 15s`; every later turn is `BASE_MS - strikes * 1000`, floored at `MIN_MS = 1s` (so strikes 0 → 5s, 1 → 4s, 2 → 3s). A **real** move clears that seat's strikes (`applyMove` calls `resetStrikes` when `!opts.auto`, `turn-based.ts:225`); an auto-move does not.
 
-**Scheduling.** `scheduleNext(io, gameRow)` (`turn-based.ts:50`) is called when a game goes `active` (on join) and after every move (real or auto). It resolves the current role via `currentRoleOf` (which `safeParse`s the stored state and calls `engine.currentRole`), computes the limit, and `arm`s one pending deadline per game (`turnTimers.arm`, `turn-timer.ts:103`). When the game is not `active` or has no current role, it clears the timer instead.
+**Scheduling.** `scheduleNext(io, gameRow)` (`turn-based.ts:90`) is called when a game goes `active` (on join) and after every move (real or auto). It resolves the current role via `currentRoleOf` (which `safeParse`s the stored state and calls `engine.currentRole`), computes the limit, and `arm`s one pending deadline per game (`turnTimers.arm`, `turn-timer.ts:103`). When the game is not `active` or has no current role, it clears the timer instead.
 
-**Timeout → auto-move or abort.** When a deadline fires, `onTurnTimeout` (`turn-based.ts:231`) re-loads the game, finds the role on the clock, and asks `decideTimeout` (`turn-timer.ts:18`): the seat's strike count increments, and once it would reach `ABORT_AT_STRIKES = 3` the seat is **aborted** instead of getting a fourth reduced turn; otherwise the timer plays the engine's `autoMove` through the normal `applyMove` path (validated by `moveSchema`, reduced, persisted, broadcast, flagged `auto: true`). A continuously-AFK seat therefore runs `15s → 4s → 3s → abort`; a seat that keeps responding stays at `15s → 5s → 5s → …`, independent of the opponent.
+**Timeout → auto-move or abort.** When a deadline fires, `onTurnTimeout` (`turn-based.ts:271`) re-loads the game, finds the role on the clock, and asks `decideTimeout` (`turn-timer.ts:18`): the seat's strike count increments, and once it would reach `ABORT_AT_STRIKES = 3` the seat is **aborted** instead of getting a fourth reduced turn; otherwise the timer plays the engine's `autoMove` through the normal `applyMove` path (validated by `moveSchema`, reduced, persisted, broadcast, flagged `auto: true`). A continuously-AFK seat therefore runs `15s → 4s → 3s → abort`; a seat that keeps responding stays at `15s → 5s → 5s → …`, independent of the opponent.
 
-**Abort outcome** (terminal status `aborted`, written by `abortGame`, `turn-based.ts:202`): `abortOutcome` (`turn-timer.ts:24`) makes the **responding opponent win by forfeit** when the opponent's strikes are `0` (`winner = opponent`); if the opponent is *also* mid-AFK (strikes > 0) there is **no winner**. `abortGame` writes `status: "aborted"` + `completedAt` + `winner`, bumps stats only when there is a winner, disposes the timer, and emits `game_state` + `game_over` + the game-card broadcast. `aborted` is part of `gameStatusSchema` and `isGameOver` (`packages/shared/src/types/games/wire.ts:6`/`:136`), so the game-over modal treats it like any other finish.
+**Abort outcome** (terminal status `aborted`, written by `abortGame`, `turn-based.ts:242`): `abortOutcome` (`turn-timer.ts:24`) makes the **responding opponent win by forfeit** when the opponent's strikes are `0` (`winner = opponent`); if the opponent is *also* mid-AFK (strikes > 0) there is **no winner**. `abortGame` writes `status: "aborted"` + `completedAt` + `winner`, bumps stats only when there is a winner, disposes the timer, and emits `game_state` + `game_over` + the game-card broadcast. `aborted` is part of `gameStatusSchema` and `isGameOver` (`packages/shared/src/types/games/wire.ts:6`/`:136`), so the game-over modal treats it like any other finish.
 
-**Wire fields.** Every broadcast `game_state` carries the live `turnDeadline` (a millisecond epoch, or `null`) and per-player `timeoutStrikes`, stamped by `withTimerFields` (`turn-based.ts:31`); both are optional fields on `GameJson` / `GamePlayerDto` (`wire.ts:107`/`:24`). The board's avatar **countdown ring** (`packages/games-client/src/ui/countdown-ring.tsx`) animates a depleting SVG arc from `turnDeadline - now` down to 0 with linear easing around whichever seat is on the clock (see [web.md](./web.md) and [games-client.md](./games-client.md)).
+**Wire fields.** Every broadcast `game_state` carries the live `turnDeadline` (a millisecond epoch, or `null`) and per-player `timeoutStrikes`, stamped by `withTimerFields` (`turn-based.ts:32`); both are optional fields on `GameJson` / `GamePlayerDto` (`wire.ts:107`/`:24`). The board's avatar **countdown ring** (`packages/games-client/src/ui/countdown-ring.tsx`) animates a depleting SVG arc from `turnDeadline - now` down to 0 with linear easing around whichever seat is on the clock (see [web.md](./web.md) and [games-client.md](./games-client.md)).
 
 > **Known limitation.** The strikes and the pending deadline live in one node's memory, so a multi-node deployment assumes one node owns a game's clock. The `turnDeadline` on the wire is recomputed on every broadcast, so a reconnecting board recovers the live countdown, but cross-node durability (redis-backed deadlines + a sweeper, or per-room node affinity) is future hardening.
 
@@ -482,7 +537,7 @@ Every `active` turn-based game runs a **server-authoritative per-player clock**.
 
 All multicast goes through named rooms, and the naming is centralized in `apps/server/src/realtime/rooms.ts`:
 
-- `game:<code>` - `gameRoom` (`rooms.ts:3`), joined in `joinGameRoom` (`rooms.ts:7`), left in `leaveGameRoom` (`rooms.ts:11`), targeted by `emitToGame` (`rooms.ts:15`). Board state lives here. **The room is keyed by the game's public code, not the internal UUID** - the handler joins `game.code` and emits with `emitToGame(io, gameRow.code, …)` (`turn-based.ts:291`, `:193`). (`conv:<conversationId>` and `user:<userId>` below stay UUID-keyed.)
+- `game:<code>` - `gameRoom` (`rooms.ts:3`), joined in `joinGameRoom` (`rooms.ts:7`), left in `leaveGameRoom` (`rooms.ts:11`), targeted by `emitToGame` (`rooms.ts:15`). Board state lives here. **The room is keyed by the game's public code, not the internal UUID** - the handler joins `game.code` and emits with `emitToGame(io, gameRow.code, …)` (`turn-based.ts:331`, `:237`). (`conv:<conversationId>` and `user:<userId>` below stay UUID-keyed.)
 - `conv:<conversationId>` - `convRoom` (`rooms.ts:24`), `joinConvRoom`/`leaveConvRoom` (`rooms.ts:32`), `emitToConv` (`rooms.ts:40`). Chat messages, typing, and game-card updates live here.
 - `user:<userId>` - `userRoom` (`rooms.ts:28`), `emitToUser` (`rooms.ts:49`). Per-user fan-out: notifications, presence, friend events. A user can have several sockets all in this one room (multiple tabs), which is exactly why presence reference-counts.
 
@@ -510,21 +565,22 @@ export function attachRedisAdapter(io: IOServer): void {
 
 ## Gotchas, invariants & conventions
 
-- **The client is never the authority.** The browser runs the same engine for prediction, but `make_move` is re-validated by `moveSchema`, by `stateSchema`, and finally by `engine.reduce` on the server (`turn-based.ts:320`). If the three disagree with the client, the server wins. Do not "optimize" by trusting client-supplied state.
+- **The client is never the authority.** The browser runs the same engine for prediction, but `make_move` is re-validated by `moveSchema`, by `stateSchema`, and finally by `engine.reduce` on the server (`turn-based.ts:360`). If the three disagree with the client, the server wins. Do not "optimize" by trusting client-supplied state.
 - **One socket per tab carries both lanes.** The browser opens a single authenticated Socket.IO connection in the web app's `SocketProvider`; game boards receive it as a prop (`socket` / `connected`) and emit `join_room` / `make_move` / `leave_room` over it - they do **not** call `io()` themselves. So the chat lane and the game lane always share one connection, one auth check, and one `socket.data.userId`. See [games-client](./games-client.md).
 - **Identity comes from `socket.data.userId`, never from a payload.** Set once in the `io.use` middleware (`index.ts:51`). Any handler that reads a `userId` off the wire would be a security bug.
 - **Two error/result conventions, one per lane.** Chat lane: ack callbacks shaped `{ ok, ... }` via `ack`/`ackErr`, wrapped by `register` (`socket-util.ts:26`). Game lane: a `"game_error"` emit *and* a string ack `cb?.(msg)`, wrapped by `registerGameEvent` (`socket-util.ts:46`). Follow the lane you are in.
 - **Both lanes validate inbound payloads with shared Zod schemas.** The chat lane `safeParse`s every payload against a `client*Schema` from `@kyzen/shared/types` (`clientSendMessageSchema`, `clientFriendRequestSchema`, …) - there is no longer any hand-rolled `isObj`/`str`/`strArray` coercion. The game lane does the same with `clientJoinRoomSchema` / `clientMakeMoveSchema` inside `registerGameEvent`. In the game lane there is a *second* layer: the envelope schema only guarantees `{ gameId, moveData: unknown }`; the real move shape is the game's `moveSchema`, checked inside `handleMakeMove`. Skipping either game-lane layer is a hole.
-- **The game lane keys on the public code, not the UUID.** The wire `gameId` is the game's short room **code** (validated by `gameCodeSchema`/`isGameCode`); the handler resolves it via `games.getGameByCode(...)` (`turn-based.ts:282`/`:305`) and joins/emits the `game:<code>` room. The internal UUID `game.id` is still used for DB writes and FK joins (`games.listMoves`, `games.addMove`, `games.updateGame` all take `gameRow.id`) but never appears on the wire. Conversation and user rooms remain UUID-keyed.
-- **`join_room` ships the full snapshot; `make_move` ships a delta.** `emitFullState` (`turn-based.ts:69`, fired on join) sends the entire game + full `moves[]` list, so reconnects and late joiners are correct for free. Per move, `handleMakeMove` instead emits one `game_state` carrying the full `game` plus only the single new `move`; the board appends it. The `ServerGameStatePayload` type covers both shapes (`moves?` for the full list, `move?` for the delta) - a payload carries one or the other, never both. Don't turn the join-time snapshot into a diff without a resync story.
-- **Seating happens on `join_room`, not on a separate "sit" event.** `intent: "spectate"`, a full table, or a reserved `challenge` seat all silently result in `changed: false` (`turn-based.ts:96`) - you watch instead of erroring. `room:create` / `room:join` are advisory pre-flight helpers, not authoritative seating.
+- **The game lane keys on the public code, not the UUID.** The wire `gameId` is the game's short room **code** (validated by `gameCodeSchema`/`isGameCode`); the handler resolves it via `games.getGameByCode(...)` (`turn-based.ts:322`/`:345`) and joins/emits the `game:<code>` room. The internal UUID `game.id` is still used for DB writes and FK joins (`games.listMoves`, `games.addMove`, `games.updateGame` all take `gameRow.id`) but never appears on the wire. Conversation and user rooms remain UUID-keyed.
+- **`join_room` ships the full snapshot; `make_move` ships a delta.** `emitFullState` (`turn-based.ts:109`, fired on join) sends the entire game + full `moves[]` list, so reconnects and late joiners are correct for free. Per move, `handleMakeMove` instead emits one `game_state` carrying the full `game` plus only the single new `move`; the board appends it. The `ServerGameStatePayload` type covers both shapes (`moves?` for the full list, `move?` for the delta) - a payload carries one or the other, never both. Don't turn the join-time snapshot into a diff without a resync story.
+- **Seating happens on `join_room`, not on a separate "sit" event.** `intent: "spectate"`, a full table, or a reserved `challenge` seat all silently result in `changed: false` (`turn-based.ts:136`) - you watch instead of erroring. `room:create` / `room:join` are advisory pre-flight helpers, not authoritative seating.
 - **Presence is Redis-backed; typing is still an in-process map.** Presence reads/writes go through a `PresenceStore` (`presence-store.ts`): a Redis sorted set per user (`presence:<userId>`, scored by heartbeat time) when `REDIS_URL` is set, or an in-process map for single-node dev. A per-node timer refreshes the live entries every `PRESENCE_HEARTBEAT_MS`, so a crashed node's users age out of reads within `PRESENCE_STALE_MS`. Durable last-seen lives in `user_profile.last_seen_at`, written on graceful disconnect and on a slower `PRESENCE_LASTSEEN_PERSIST_MS` timer while online. The live "went offline" push on a hard crash is not yet implemented (online reads still self-correct within the stale window). Typing (`typing.ts:11`) is still a per-node in-process map - treat it as best-effort, single-node-accurate.
 - **`notify` self-suppresses** (`notify.ts:16`) and depends on `getIO()` being set - which `attachRealtime` guarantees at boot via `setIO(io)` (`apps/server/src/realtime/index.ts:37`). Calling `notify` before `attachRealtime` would persist the row but skip the live push (`if (!io) return`).
 - **There is no driver layer.** `index.ts` calls `handleJoinRoom` / `handleMakeMove` from `turn-based.ts` directly via `registerGameEvent`; the `GameEngine` already distinguishes `mode: "turn-based" | "realtime"` (`packages/shared/src/types/games/engine.ts`), so a future realtime/tick-based engine would branch on that mode rather than reintroduce a `getDriver`-style indirection.
 - **One live game per `(conversation, gameType)`; rematch is a chat-lane event.** Both `createGameInConversation` and `rematchGame` call `games.findLiveGameInConversation` first and return the existing live game rather than creating a duplicate, so concurrent "new game" / double-Rematch clicks converge. `game:rematch` only acts on a `completed` game with a conversation, pre-seats both prior players (loser-first via `computeRematchSeating`), links the new game with `seriesId = prev.seriesId`, and emits `rematchCreated { newGameId }` to the *old* game's room.
-- **Stored state is treated as untrusted too.** `stateSchema.safeParse(gameRow.gameState)` returning failure yields `"Corrupt game state"` rather than a crash (`turn-based.ts:318`) - a deliberate guard against bad data in JSONB.
+- **Stored state is treated as untrusted too.** `stateSchema.safeParse(gameRow.gameState)` returning failure yields `"Corrupt game state"` rather than a crash - a deliberate guard against bad data in JSONB.
+- **`game_state` is projected per recipient when the engine declares `viewFor`.** Every `game_state` broadcast routes through `emitGameState` (`turn-based.ts:43`): a game with `engine.viewFor` gets a tailored payload per socket (redacted state + opponent `moveData` stripped to `null`) via `emitToGamePerSocket`; a game without it - or any game that is already over - gets a single full-state `emitToGame`. The DB always stores the full truth; redaction is a wire-only concern. Hidden-information boards must render from `game_state`, never from a (now-incomplete) move log.
 - **The turn timer is server-authoritative and in-memory.** Per-seat strikes and the pending deadline live in the `TurnTimerManager` (`turn-timer.ts`), not the DB; the client only renders a countdown synced to the `turnDeadline` on each `game_state`. A game opts in by implementing `engine.currentRole` + `engine.autoMove`; auto-moves run through the same validate/reduce/persist path as real moves, and three consecutive timeouts on a seat abort the game (`status: "aborted"`).
-- **No comments in code.** This repo enforces a strict no-comments rule; the lone comment in this subsystem is a justified `biome-ignore` at `turn-based.ts:102`.
+- **No comments in code.** This repo enforces a strict no-comments rule; the lone comment in this subsystem is a justified `biome-ignore` at `turn-based.ts:142`.
 
 ## Where to go next
 

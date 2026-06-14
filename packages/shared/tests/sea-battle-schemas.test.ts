@@ -63,9 +63,79 @@ describe("sea-battle move schema (discriminated union, strict)", () => {
     ).toBe(false);
   });
 
+  test("rejects each off-board coordinate on both axes", () => {
+    for (const bad of [-1, 10]) {
+      expect(
+        seaBattleMoveSchema.safeParse({ kind: "fire", row: bad, col: 0 })
+          .success,
+      ).toBe(false);
+      expect(
+        seaBattleMoveSchema.safeParse({ kind: "fire", row: 0, col: bad })
+          .success,
+      ).toBe(false);
+    }
+  });
+
+  test("accepts the in-bounds corners", () => {
+    expect(
+      seaBattleMoveSchema.safeParse({ kind: "fire", row: 0, col: 0 }).success,
+    ).toBe(true);
+    expect(
+      seaBattleMoveSchema.safeParse({ kind: "fire", row: 9, col: 9 }).success,
+    ).toBe(true);
+  });
+
   test("rejects non-integer fire coordinates", () => {
     expect(
       seaBattleMoveSchema.safeParse({ kind: "fire", row: 1.5, col: 0 }).success,
+    ).toBe(false);
+    expect(
+      seaBattleMoveSchema.safeParse({ kind: "fire", row: 0, col: 9.5 }).success,
+    ).toBe(false);
+  });
+
+  test("rejects NaN fire coordinates", () => {
+    expect(
+      seaBattleMoveSchema.safeParse({ kind: "fire", row: Number.NaN, col: 0 })
+        .success,
+    ).toBe(false);
+    expect(
+      seaBattleMoveSchema.safeParse({ kind: "fire", row: 0, col: Number.NaN })
+        .success,
+    ).toBe(false);
+  });
+
+  test("rejects a missing kind discriminator", () => {
+    expect(seaBattleMoveSchema.safeParse({ row: 0, col: 0 }).success).toBe(
+      false,
+    );
+  });
+
+  test("rejects an extra top-level key on a place move (strict)", () => {
+    expect(
+      seaBattleMoveSchema.safeParse({
+        kind: "place",
+        ships: FULL_FLEET,
+        cheat: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  test("rejects a place move whose ship has zero cells", () => {
+    expect(
+      seaBattleMoveSchema.safeParse({
+        kind: "place",
+        ships: [{ cells: [] }],
+      }).success,
+    ).toBe(false);
+  });
+
+  test("rejects a place move whose ship has more than five cells", () => {
+    expect(
+      seaBattleMoveSchema.safeParse({
+        kind: "place",
+        ships: [{ cells: horizontalShip(0, 0, 6).cells }],
+      }).success,
     ).toBe(false);
   });
 
@@ -144,6 +214,42 @@ describe("sea-battle state schema (strict, permissive on fleet count)", () => {
       seaBattleStateSchema.safeParse({
         ...fullState(),
         fleets: { A: FULL_FLEET, B: FULL_FLEET, C: [] },
+      }).success,
+    ).toBe(false);
+  });
+
+  test("accepts a fully-fogged spectator view (both fleets empty)", () => {
+    const fogged = {
+      ...fullState(),
+      fleets: { A: [], B: [] },
+    };
+    expect(seaBattleStateSchema.safeParse(fogged).success).toBe(true);
+  });
+
+  test("rejects an invalid currentTurn role", () => {
+    expect(
+      seaBattleStateSchema.safeParse({ ...fullState(), currentTurn: "C" })
+        .success,
+    ).toBe(false);
+  });
+
+  test("rejects an extra key on a shot (strict)", () => {
+    expect(
+      seaBattleStateSchema.safeParse({
+        ...fullState(),
+        shots: {
+          A: [{ row: 0, col: 0, hit: true, sunk: true }],
+          B: [],
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  test("rejects a missing hit flag on a shot", () => {
+    expect(
+      seaBattleStateSchema.safeParse({
+        ...fullState(),
+        shots: { A: [{ row: 0, col: 0 }], B: [] },
       }).success,
     ).toBe(false);
   });

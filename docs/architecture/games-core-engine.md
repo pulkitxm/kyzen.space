@@ -73,6 +73,12 @@ export interface GameEngine<State, Input> {
 
   reduce?(state: State, ctx: MoveContext, input: Input): ReduceResult<State>;
 
+  autoMove?(state: State, role: string): Input;
+
+  currentRole?(state: State): string | null;
+
+  viewFor?(state: State, role: string): State;
+
   step?(
     state: State,
     inputs: Map<string, Input>,
@@ -87,6 +93,8 @@ export interface GameEngine<State, Input> {
 
 - **Two static identities of a game live here**: its `type` string (the registry key, e.g. `"tic-tac-toe"`) and its seating shape (`minPlayers`, `maxPlayers`, `roles`). The server reads `roles[players.length]` to assign the next seat (`apps/server/src/realtime/turn-based.ts:58`) and compares `players.length` against `minPlayers` / `maxPlayers` to decide when a game can start or is full (`apps/server/src/realtime/turn-based.ts:45`, `:61`).
 - **`reduce` and `step` are both optional, and the `mode` field says which one to expect.** A `"turn-based"` game implements `reduce` (one player acts, state advances by one move); a `"realtime"` game would implement `step` (all queued inputs applied per tick, with `tickRate`). Today every game is turn-based, and the only server move handler is the turn-based one (`handleMakeMove`) - see [./realtime.md](./realtime.md). The conformance suite enforces the pairing (below).
+- **`autoMove` / `currentRole` are the turn-timer hooks** (both optional). `currentRole(state)` reports whose turn it is, or `null` when the game is terminal; `autoMove(state, role)` returns a random *legal* move the timer plays for an AFK seat. A game that implements neither has no clock. See [./realtime.md](./realtime.md#turn-timer-auto-move--auto-abort).
+- **`viewFor` is the optional per-recipient projection** (`engine.ts:30`) - the hidden-information hook. It maps the authoritative `State` to a *redacted* `State` of the **same schema** that one role is allowed to see. The server calls it once per connected socket before broadcasting `game_state`, so each player receives a state with the parts they should not see (e.g. an opponent's un-hit ships) removed. A `null` role is the spectator projection. An engine that omits `viewFor` broadcasts the full state to everyone - tic-tac-toe and every fully-observable game are unaffected. Sea Battle implements it (`packages/games-core/src/games/sea-battle/engine.ts:162`); see [./generic-game-schema.md](./generic-game-schema.md#edge-cases-the-model-absorbs) and [`docs/games/sea-battle.md`](../games/sea-battle.md). The contract: `viewFor` is read-only (it must not mutate `state`) and its output must still satisfy `stateSchema`, which is why a state schema that supports redaction stays permissive about completeness (e.g. it does not require a full fleet) and lets `reduce` enforce the strict rules on input instead.
 - **`State` and `Input` are generic** so each engine is precisely typed, but the registry erases them to `unknown` (more on that under "Type erasure" below).
 
 ## A concrete engine: tic-tac-toe `reduce()`
@@ -225,9 +233,13 @@ This is the design decision the whole package hinges on. There is exactly **one*
 
 ```ts
 import type { GameDefinition } from "@kyzen/shared/types";
+import { seaBattleDefinition } from "./sea-battle";
 import { ticTacToeDefinition } from "./tic-tac-toe";
 
-export const GAMES = [ticTacToeDefinition] satisfies GameDefinition[];
+export const GAMES: GameDefinition[] = [
+  ticTacToeDefinition,
+  seaBattleDefinition,
+];
 ```
 
 That's the entire file. Adding a game is appending one element to this array (after building its definition folder). No new route, endpoint, DB table, or socket event - see [./README.md](./README.md) and `docs/adding-a-game.md`. Everything downstream is **derived** from `GAMES`, so a new entry automatically appears in the lobby, gets a working move pipeline, and is covered by the conformance suite.
@@ -308,7 +320,7 @@ This is the payoff of the whole design - the same engine that informs the client
 5. **Validate the untrusted input** → `def.moveSchema.safeParse(payload.moveData)` (`:147`). Malformed ⇒ `"Invalid move"`, never reaches the engine.
 6. **Validate the stored state** → `def.stateSchema.safeParse(gameRow.gameState)` (`:149`). This both re-narrows the JSONB blob to the engine's `State` type and guards against a `"Corrupt game state"`.
 7. **Run the authoritative `reduce`** → `def.engine.reduce(parsedState.data, { role: player.role }, parsedMove.data)` (`:152`). The engine re-applies every rule (turn, occupancy, terminal) independently. `!result.ok` ⇒ the engine's own `error` string is sent straight back (`:157`).
-8. **Persist + broadcast** → on success, append the move (`:160`), `updateGame(..., { gameState: result.state })` (`:167`), then `finalize(updated, result.outcome)` maps `outcome.winnerRole` → `winnerUserId`, marks `completed`/`draw`, and bumps player stats (`:78`–`:104`). Finally it emits a single `game_state` carrying `{ game, move }` to the room (`:170`–`:174`) and, if completed, `game_over` (`:177`).
+8. **Persist + broadcast** → on success, append the move, `updateGame(..., { gameState: result.state })`, then `finalize(updated, result.outcome)` maps `outcome.winnerRole` → `winnerUserId`, marks `completed`/`draw`, and bumps player stats. Finally it emits a single `game_state` carrying `{ game, move }` to the room - through `emitGameState`, which projects the `game_state` per recipient via `engine.viewFor` (when the engine defines it) and strips the opponent's `moveData` before broadcast (full state on game over) - and, if completed, `game_over`. See [./realtime.md](./realtime.md#per-recipient-projection-viewfor).
 
 So the path is: **client `make_move` -> `turn-based.ts:129` -> `getDefinition` `turn-based.ts:144` -> `moveSchema`/`stateSchema` parse `turn-based.ts:147`/`:149` -> `engine.reduce` `turn-based.ts:152` (which itself re-runs `tic-tac-toe/engine.ts:70`) -> persist + broadcast `game_state`.** The client supplied data; the engine decided truth.
 

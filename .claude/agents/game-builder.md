@@ -70,6 +70,16 @@ first; it is the canonical guide and this prompt mirrors it.
        `@kyzen/shared/constants` and the schemas/types from
        `@kyzen/shared/types`. Enforce game *rules* only; `reduce` may
        `safeParse` the move with `moveSchema` for defense-in-depth.
+       Optional hooks (omit when not needed): `currentRole(state)` + `autoMove(state, role)`
+       opt the game into the turn-timer; `viewFor(state, role)` is the
+       **hidden-information** hook. If the game has secret state (hidden ships, a
+       private hand), implement `viewFor` to return a redacted state **of the same
+       schema** for that role (the server projects `game_state` per recipient and
+       strips opponents' moves before broadcast, revealing full state on game over).
+       Then keep `stateSchema` **permissive about completeness** (a redacted view
+       legitimately holds fewer pieces) and enforce fleet/secret-completeness inside
+       `reduce`, and have the client render from the redacted `game_state`, never the
+       move log. See `docs/adding-a-game.md` and `docs/games/sea-battle.md`.
      - `meta.ts` - the `GameMeta`; import the slug from `@kyzen/shared/constants`.
        Include `howToPlay`: 3-5 short player-facing steps (plain strings, no
        markdown) shown in the game page's "How to play" card; the conformance

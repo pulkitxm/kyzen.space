@@ -6,7 +6,7 @@ Kyzen is a [Bun](https://bun.sh) + [Turborepo](https://turbo.build) monorepo. A 
 
 ## Features
 
-- **Live games** over Socket.IO: a generic, schema-driven engine; adding a game needs no new routes, tables, or socket events.
+- **Live games** over Socket.IO: a generic, schema-driven engine; adding a game needs no new routes, tables, or socket events. Includes Tic-Tac-Toe and **Sea Battle** (Battleship), with first-class support for hidden-information games (the server projects game state per recipient, so a player never sees the opponent's secrets).
 - **Chat & social**: DMs and group conversations, friends, presence, typing indicators, and notifications, all realtime.
 - **Games in chat**: start a match from a conversation; it appears as a live game card that updates as the game progresses. When a game ends, a result modal offers a **rematch** that re-invites the same players (loser goes first) into a linked **series**, and the card shows the running series score.
 - **Auth**: Google sign-in via [Better Auth](https://better-auth.com), with a profile (username, avatar, stats, theme) provisioned on first sign-in.
