@@ -40,7 +40,12 @@ const PIPS: Record<number, [number, number][]> = {
 function DieFace({ value, color }: { value: number; color: string }) {
   const pips = (PIPS[value] ?? PIPS[1]) as [number, number][];
   return (
-    <svg viewBox="0 0 100 100" width="100%" height="100%" style={{ display: "block" }}>
+    <svg
+      viewBox="0 0 100 100"
+      width="100%"
+      height="100%"
+      style={{ display: "block" }}
+    >
       <title>Die {value}</title>
       <rect
         x="4"
@@ -156,12 +161,24 @@ function Die({
   return (
     <div className="die-container">
       <div className={cubeClasses} style={style}>
-        <div className="die-face face-1"><DieFace value={1} color={color} /></div>
-        <div className="die-face face-2"><DieFace value={2} color={color} /></div>
-        <div className="die-face face-3"><DieFace value={3} color={color} /></div>
-        <div className="die-face face-4"><DieFace value={4} color={color} /></div>
-        <div className="die-face face-5"><DieFace value={5} color={color} /></div>
-        <div className="die-face face-6"><DieFace value={6} color={color} /></div>
+        <div className="die-face face-1">
+          <DieFace value={1} color={color} />
+        </div>
+        <div className="die-face face-2">
+          <DieFace value={2} color={color} />
+        </div>
+        <div className="die-face face-3">
+          <DieFace value={3} color={color} />
+        </div>
+        <div className="die-face face-4">
+          <DieFace value={4} color={color} />
+        </div>
+        <div className="die-face face-5">
+          <DieFace value={5} color={color} />
+        </div>
+        <div className="die-face face-6">
+          <DieFace value={6} color={color} />
+        </div>
       </div>
     </div>
   );

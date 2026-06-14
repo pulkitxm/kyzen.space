@@ -510,7 +510,7 @@ export function MonopolyGameClient({
     uiPhase === "LANDING" && activePlayer ? activePlayer.position : null;
 
   return (
-    <div className="flex h-full w-full flex-col justify-start min-h-0 overflow-hidden">
+    <div className="flex h-full min-h-0 w-full flex-col justify-start overflow-hidden">
       {isPast ? null : !userId ? (
         <p className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
           Sign in to join this table and play.

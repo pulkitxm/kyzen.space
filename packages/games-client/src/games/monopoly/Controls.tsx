@@ -11,11 +11,12 @@ import type {
   Tile,
   UtilityTile,
 } from "@gamelobby/shared/types";
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
+import { FaLock, FaMinus, FaPlus, FaUnlock } from "react-icons/fa6";
 import { GROUP_COLORS, PlayerAvatar } from "./Board";
 import { Dice } from "./Dice";
 import type { DiceAnimPhase, UIPhase } from "./useGamePhase";
-import { FaPlus, FaMinus, FaLock, FaUnlock } from "react-icons/fa6";
 
 const CONTROLS_STYLE = `
 @keyframes playerPulse {
@@ -123,7 +124,9 @@ function PlayerCard({
         avatar={(player as any).avatar}
         username={player.name}
         size={24}
-        className={isActive ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : ""}
+        className={
+          isActive ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : ""
+        }
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
@@ -1088,7 +1091,9 @@ export function Controls({
                     }}
                   >
                     {/* Header: Color + Name + Badges */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 6 }}
+                    >
                       <div
                         style={{
                           width: 12,
@@ -1104,7 +1109,9 @@ export function Controls({
                           flex: 1,
                           fontSize: 11,
                           fontWeight: 700,
-                          color: op.isMortgaged ? "var(--muted-foreground)" : "var(--foreground)",
+                          color: op.isMortgaged
+                            ? "var(--muted-foreground)"
+                            : "var(--foreground)",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -1119,7 +1126,8 @@ export function Controls({
                             fontWeight: 800,
                             padding: "1px 4px",
                             borderRadius: 4,
-                            background: "color-mix(in srgb, var(--danger) 15%, transparent)",
+                            background:
+                              "color-mix(in srgb, var(--danger) 15%, transparent)",
                             color: "var(--danger)",
                             textTransform: "uppercase",
                           }}
@@ -1134,7 +1142,8 @@ export function Controls({
                               fontWeight: 800,
                               padding: "1px 4px",
                               borderRadius: 4,
-                              background: "color-mix(in srgb, var(--success) 15%, transparent)",
+                              background:
+                                "color-mix(in srgb, var(--success) 15%, transparent)",
                               color: "var(--success)",
                               textTransform: "uppercase",
                             }}
@@ -1148,56 +1157,66 @@ export function Controls({
                     {/* Actions */}
                     {isMyTurn && (
                       <div style={{ display: "flex", gap: 4 }}>
-                        {tile.type === "Property" && !op.isMortgaged && (() => {
-                          const propTile = tile as PropertyTile;
-                          const groupProps = state.board.filter(
-                            (t) => t.type === "Property" && (t as PropertyTile).group === propTile.group
-                          ) as PropertyTile[];
-                          const ownedInGroup = currentPlayer.ownedProperties.filter((o) =>
-                            groupProps.some((gp) => gp.id === o.tileId)
-                          );
-                          const ownsFullGroup = ownedInGroup.length === groupProps.length;
-                          const hasHotel = op.houses >= 5;
-                          const canAfford = currentPlayer.balance >= propTile.houseCost;
-                          const buildDisabled = !ownsFullGroup || hasHotel || !canAfford;
+                        {tile.type === "Property" &&
+                          !op.isMortgaged &&
+                          (() => {
+                            const propTile = tile as PropertyTile;
+                            const groupProps = state.board.filter(
+                              (t) =>
+                                t.type === "Property" &&
+                                (t as PropertyTile).group === propTile.group,
+                            ) as PropertyTile[];
+                            const ownedInGroup =
+                              currentPlayer.ownedProperties.filter((o) =>
+                                groupProps.some((gp) => gp.id === o.tileId),
+                              );
+                            const ownsFullGroup =
+                              ownedInGroup.length === groupProps.length;
+                            const hasHotel = op.houses >= 5;
+                            const canAfford =
+                              currentPlayer.balance >= propTile.houseCost;
+                            const buildDisabled =
+                              !ownsFullGroup || hasHotel || !canAfford;
 
-                          let buildTitle = "Build house/hotel";
-                          if (hasHotel) {
-                            buildTitle = "Already built a hotel";
-                          } else if (!ownsFullGroup) {
-                            buildTitle = `Requires owning all properties in the ${propTile.group} group (${ownedInGroup.length}/${groupProps.length})`;
-                          } else if (!canAfford) {
-                            buildTitle = `Insufficient funds (costs $${propTile.houseCost})`;
-                          }
+                            let buildTitle = "Build house/hotel";
+                            if (hasHotel) {
+                              buildTitle = "Already built a hotel";
+                            } else if (!ownsFullGroup) {
+                              buildTitle = `Requires owning all properties in the ${propTile.group} group (${ownedInGroup.length}/${groupProps.length})`;
+                            } else if (!canAfford) {
+                              buildTitle = `Insufficient funds (costs $${propTile.houseCost})`;
+                            }
 
-                          return (
-                            <>
-                              <button
-                                type="button"
-                                disabled={buildDisabled}
-                                onClick={() => confirmBuildHouse(op.tileId)}
-                                style={{
-                                  ...actionBtnStyle,
-                                  opacity: buildDisabled ? 0.5 : 1,
-                                  cursor: buildDisabled ? "not-allowed" : "pointer",
-                                }}
-                                title={buildTitle}
-                              >
-                                <FaPlus size={8} /> House
-                              </button>
-                              {op.houses > 0 && (
+                            return (
+                              <>
                                 <button
                                   type="button"
-                                  onClick={() => confirmSellHouse(op.tileId)}
-                                  style={actionBtnStyle}
-                                  title="Sell house/hotel"
+                                  disabled={buildDisabled}
+                                  onClick={() => confirmBuildHouse(op.tileId)}
+                                  style={{
+                                    ...actionBtnStyle,
+                                    opacity: buildDisabled ? 0.5 : 1,
+                                    cursor: buildDisabled
+                                      ? "not-allowed"
+                                      : "pointer",
+                                  }}
+                                  title={buildTitle}
                                 >
-                                  <FaMinus size={8} /> House
+                                  <FaPlus size={8} /> House
                                 </button>
-                              )}
-                            </>
-                          );
-                        })()}
+                                {op.houses > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => confirmSellHouse(op.tileId)}
+                                    style={actionBtnStyle}
+                                    title="Sell house/hotel"
+                                  >
+                                    <FaMinus size={8} /> House
+                                  </button>
+                                )}
+                              </>
+                            );
+                          })()}
                         <button
                           type="button"
                           disabled={!op.isMortgaged && op.houses > 0}
@@ -1210,31 +1229,38 @@ export function Controls({
                             ...actionBtnStyle,
                             color: op.isMortgaged
                               ? "var(--success)"
-                              : (!op.isMortgaged && op.houses > 0)
+                              : !op.isMortgaged && op.houses > 0
                                 ? "var(--muted-foreground)"
                                 : "var(--danger)",
                             borderColor: op.isMortgaged
                               ? "color-mix(in srgb, var(--success) 30%, transparent)"
-                              : (!op.isMortgaged && op.houses > 0)
+                              : !op.isMortgaged && op.houses > 0
                                 ? "var(--border)"
                                 : "color-mix(in srgb, var(--danger) 30%, transparent)",
                             background: op.isMortgaged
                               ? "color-mix(in srgb, var(--success) 8%, transparent)"
-                              : (!op.isMortgaged && op.houses > 0)
+                              : !op.isMortgaged && op.houses > 0
                                 ? "var(--surface)"
                                 : "color-mix(in srgb, var(--danger) 8%, transparent)",
-                            opacity: (!op.isMortgaged && op.houses > 0) ? 0.5 : 1,
-                            cursor: (!op.isMortgaged && op.houses > 0) ? "not-allowed" : "pointer",
+                            opacity: !op.isMortgaged && op.houses > 0 ? 0.5 : 1,
+                            cursor:
+                              !op.isMortgaged && op.houses > 0
+                                ? "not-allowed"
+                                : "pointer",
                           }}
                           title={
-                            (!op.isMortgaged && op.houses > 0)
+                            !op.isMortgaged && op.houses > 0
                               ? "Must sell houses before mortgaging"
                               : op.isMortgaged
                                 ? "Lift mortgage"
                                 : "Mortgage property"
                           }
                         >
-                          {op.isMortgaged ? <FaUnlock size={8} /> : <FaLock size={8} />}
+                          {op.isMortgaged ? (
+                            <FaUnlock size={8} />
+                          ) : (
+                            <FaLock size={8} />
+                          )}
                           {op.isMortgaged ? "Unmortgage" : "Mortgage"}
                         </button>
                       </div>

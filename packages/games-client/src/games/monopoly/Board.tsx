@@ -1,5 +1,8 @@
 "use client";
 
+import { avataaars } from "@dicebear/collection";
+import { createAvatar } from "@dicebear/core";
+import { seedAvatarConfig, toDicebearOptions } from "@gamelobby/avatar";
 import type {
   MonopolyMove,
   MonopolyState,
@@ -9,9 +12,6 @@ import type {
 } from "@gamelobby/shared/types";
 import type React from "react";
 import { positionToCell } from "./useGamePhase";
-import { avataaars } from "@dicebear/collection";
-import { createAvatar } from "@dicebear/core";
-import { seedAvatarConfig, toDicebearOptions } from "@gamelobby/avatar";
 
 export function PlayerAvatar({
   avatar,
@@ -173,35 +173,31 @@ function TileCell({
   }
 
   const cornerIcon =
-    tile.type === "Go"
-      ? "🚦"
-      : tile.type === "Jail"
-        ? (
-            <img
-              src="/games/monopoly/jail.png"
-              alt="Jail"
-              style={{
-                width: Math.max(28, Math.floor(cellSize * 0.65)),
-                height: Math.max(28, Math.floor(cellSize * 0.65)),
-                objectFit: "contain",
-              }}
-            />
-          )
-        : tile.type === "FreeParking"
-          ? "🅿️"
-          : tile.type === "GoToJail"
-            ? (
-                <img
-                  src="/games/monopoly/go-to-jail.png"
-                  alt="Go to Jail"
-                  style={{
-                    width: Math.max(28, Math.floor(cellSize * 0.65)),
-                    height: Math.max(28, Math.floor(cellSize * 0.65)),
-                    objectFit: "contain",
-                  }}
-                />
-              )
-            : null;
+    tile.type === "Go" ? (
+      "🚦"
+    ) : tile.type === "Jail" ? (
+      <img
+        src="/games/monopoly/jail.png"
+        alt="Jail"
+        style={{
+          width: Math.max(28, Math.floor(cellSize * 0.65)),
+          height: Math.max(28, Math.floor(cellSize * 0.65)),
+          objectFit: "contain",
+        }}
+      />
+    ) : tile.type === "FreeParking" ? (
+      "🅿️"
+    ) : tile.type === "GoToJail" ? (
+      <img
+        src="/games/monopoly/go-to-jail.png"
+        alt="Go to Jail"
+        style={{
+          width: Math.max(28, Math.floor(cellSize * 0.65)),
+          height: Math.max(28, Math.floor(cellSize * 0.65)),
+          objectFit: "contain",
+        }}
+      />
+    ) : null;
 
   const scaledPadding = Math.max(2, Math.floor(cellSize * 0.04));
   const scaledFontSize = Math.max(7, Math.floor(cellSize * 0.13));
@@ -249,7 +245,10 @@ function TileCell({
       {cornerIcon && (
         <div
           style={{
-            fontSize: typeof cornerIcon === "string" ? Math.max(12, Math.floor(cellSize * 0.23)) : undefined,
+            fontSize:
+              typeof cornerIcon === "string"
+                ? Math.max(12, Math.floor(cellSize * 0.23))
+                : undefined,
             lineHeight: 1,
             margin: "auto",
             display: "flex",
@@ -428,7 +427,11 @@ function TokensOverlay({
                 avatar={(player as any).avatar}
                 username={player.name}
                 size={cellSize * 0.45}
-                className={isCurrentPlayer ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : ""}
+                className={
+                  isCurrentPlayer
+                    ? "ring-2 ring-primary ring-offset-1 ring-offset-card"
+                    : ""
+                }
               />
             </div>
           );
@@ -730,12 +733,12 @@ export function Board({
 
   const canBuyTileId =
     state.turnPhase === "LANDED" &&
-      currentPlayer &&
-      !state.players.some((p) =>
-        p.ownedProperties.some(
-          (op) => op.tileId === state.board[currentPlayer.position]?.id,
-        ),
-      )
+    currentPlayer &&
+    !state.players.some((p) =>
+      p.ownedProperties.some(
+        (op) => op.tileId === state.board[currentPlayer.position]?.id,
+      ),
+    )
       ? state.board[currentPlayer.position]?.id
       : null;
 
