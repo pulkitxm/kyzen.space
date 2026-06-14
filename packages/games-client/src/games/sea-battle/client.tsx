@@ -144,23 +144,16 @@ function WaterGlyph() {
 }
 
 function TurnTimer({ deadline }: { deadline: number | null }) {
-  const [remaining, setRemaining] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (deadline == null) {
-      setRemaining(null);
-      return;
-    }
-    const tick = () => {
-      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setRemaining(left);
-    };
-    tick();
-    const id = window.setInterval(tick, 250);
+    if (deadline == null) return;
+    const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
   }, [deadline]);
 
-  if (remaining == null) return null;
+  if (deadline == null) return null;
+  const remaining = Math.max(0, Math.ceil((deadline - now) / 1000));
   return (
     <span className="rounded-full bg-surface-overlay px-2 py-0.5 font-mono text-xs tabular-nums">
       {remaining}s
@@ -530,18 +523,21 @@ function BattleView({
   onFire: (row: number, col: number) => void;
   onHoverPlayable: () => void;
 }) {
-  const myFleet = myRole ? state.fleets[myRole] : [];
-  const oppFleet = oppRole ? state.fleets[oppRole] : [];
-
-  const myFleetKeys = useMemo(() => shipKeys(myFleet), [myFleet]);
+  const myFleetKeys = useMemo(
+    () => shipKeys(myRole ? state.fleets[myRole] : []),
+    [state, myRole],
+  );
   const incomingMap = useMemo(() => shotMap(incomingShots), [incomingShots]);
   const myShotMap = useMemo(() => shotMap(myShots), [myShots]);
 
   const sunkOppKeys = useMemo(
-    () => shipKeys(sunkShips(oppFleet, myShots)),
-    [oppFleet, myShots],
+    () => shipKeys(sunkShips(oppRole ? state.fleets[oppRole] : [], myShots)),
+    [state, oppRole, myShots],
   );
-  const oppFleetKeys = useMemo(() => shipKeys(oppFleet), [oppFleet]);
+  const oppFleetKeys = useMemo(
+    () => shipKeys(oppRole ? state.fleets[oppRole] : []),
+    [state, oppRole],
+  );
 
   const turnLabel = isOver
     ? "Game over"
