@@ -1,4 +1,4 @@
-import type { AvatarStyle } from "@gamelobby/avatar";
+import type { AvatarStyle } from "@kyzen/avatar";
 import { getGender } from "gender-detection-from-name";
 import { env } from "../env";
 

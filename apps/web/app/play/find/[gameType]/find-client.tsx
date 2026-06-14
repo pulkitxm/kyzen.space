@@ -1,9 +1,6 @@
 "use client";
 
-import type {
-  GameType,
-  ServerMatchFoundPayload,
-} from "@gamelobby/shared/types";
+import type { GameType, ServerMatchFoundPayload } from "@kyzen/shared/types";
 import { useSetAtom } from "jotai";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";

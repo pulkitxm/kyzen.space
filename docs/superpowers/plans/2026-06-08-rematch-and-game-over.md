@@ -6,14 +6,14 @@
 
 **Architecture:** Games gain a self-referencing `seriesId` (id of the first game in the series). The server adds a `game:rematch` socket event that pre-seats both prior players with loser-first roles into a new `active` game in the same conversation; a `GET /api/games/:gameId/series` endpoint returns the series score + game list. The chat game card and a new game-over modal render a shared `SeriesScoreboard`.
 
-**Tech stack:** Bun + TypeScript monorepo, Drizzle/Postgres, Hono, Socket.IO, Next.js 16 + React 19 + Jotai + framer-motion, Zod (only in `@gamelobby/shared`).
+**Tech stack:** Bun + TypeScript monorepo, Drizzle/Postgres, Hono, Socket.IO, Next.js 16 + React 19 + Jotai + framer-motion, Zod (only in `@kyzen/shared`).
 
 **Spec:** `docs/superpowers/specs/2026-06-08-rematch-and-game-over-design.md`
 
 **Conventions (read before starting):**
 - **No comments** in any code file (`//`, `/* */`, JSDoc all forbidden; only tooling directives like `biome-ignore`). Self-documenting names only.
 - **Icons:** `react-icons/fa6` first.
-- **Zod lives only in `@gamelobby/shared`.** Elsewhere import `z` and schemas from `@gamelobby/shared/types`.
+- **Zod lives only in `@kyzen/shared`.** Elsewhere import `z` and schemas from `@kyzen/shared/types`.
 - After each task: `bun run type-check` must pass. Before committing UI: `bun run check`.
 - The dev DB is **push-managed**: apply schema changes with `bun run db:push`, never `db:migrate`.
 - Commit messages end with: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
@@ -153,7 +153,7 @@ export type SeriesGameSummary = z.infer<typeof seriesGameSummarySchema>;
 export type SeriesDetail = z.infer<typeof seriesDetailSchema>;
 ```
 
-> Verify the avatar import: `avatarConfigSchema` is exported from `@gamelobby/shared/types`. If `../avatar` does not resolve it, run `grep -rn "avatarConfigSchema" packages/shared/src/types` and import from the file that defines it.
+> Verify the avatar import: `avatarConfigSchema` is exported from `@kyzen/shared/types`. If `../avatar` does not resolve it, run `grep -rn "avatarConfigSchema" packages/shared/src/types` and import from the file that defines it.
 
 - [ ] **Step 4: Export from the games barrel**
 
@@ -498,7 +498,7 @@ export async function findLiveGameInConversation(
 }
 ```
 
-> `GameType` is already imported in this file (used by `toGameRecord`). If not, add `type GameType` to the `@gamelobby/shared/types` import.
+> `GameType` is already imported in this file (used by `toGameRecord`). If not, add `type GameType` to the `@kyzen/shared/types` import.
 
 - [ ] **Step 3: Type-check and commit**
 
@@ -526,7 +526,7 @@ Create `apps/server/tests/series.test.ts`:
 
 ```ts
 import { describe, expect, test } from "bun:test";
-import type { GameRecord } from "@gamelobby/database";
+import type { GameRecord } from "@kyzen/database";
 import { computeSeriesScore } from "../src/chat/series";
 
 function game(status: string, winner: string | null): GameRecord {
@@ -579,8 +579,8 @@ Expected: FAIL - `computeSeriesScore` not found.
 Create `apps/server/src/chat/series.ts`:
 
 ```ts
-import type { GameRecord } from "@gamelobby/database";
-import type { SeriesScore, SeriesScoreEntry } from "@gamelobby/shared/types";
+import type { GameRecord } from "@kyzen/database";
+import type { SeriesScore, SeriesScoreEntry } from "@kyzen/shared/types";
 
 export function computeSeriesScore(seriesGames: GameRecord[]): SeriesScore {
   const byUser = new Map<string, SeriesScoreEntry>();
@@ -647,8 +647,8 @@ Create `apps/server/tests/rematch-seating.test.ts`:
 
 ```ts
 import { describe, expect, test } from "bun:test";
-import type { GameRecord } from "@gamelobby/database";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import type { GameRecord } from "@kyzen/database";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { computeRematchSeating } from "../src/chat/rematch-seating";
 
 function prev(winner: string | null): GameRecord {
@@ -684,8 +684,8 @@ Expected: FAIL - `computeRematchSeating` not found.
 Create `apps/server/src/chat/rematch-seating.ts`:
 
 ```ts
-import type { GameRecord } from "@gamelobby/database";
-import { getDefinition } from "@gamelobby/games-core";
+import type { GameRecord } from "@kyzen/database";
+import { getDefinition } from "@kyzen/games-core";
 
 export function computeRematchSeating(prev: GameRecord): string[] {
   const { engine } = getDefinition(prev.gameType);
@@ -740,7 +740,7 @@ Create `apps/server/tests/rematch.test.ts`:
 
 ```ts
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 
 type AnyGame = {
   id: string;
@@ -762,7 +762,7 @@ let createInput: { players: { userId: string; role: string }[]; status?: string;
 const notifyCalls: { userId: string; type: string }[] = [];
 const sentCards: { gameId: string }[] = [];
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   conversations: {
     getMemberIds: async () => ["u1", "u2"],
   },
@@ -864,7 +864,7 @@ In `apps/server/src/chat/games-in-chat-service.ts`:
 Add imports at the top:
 
 ```ts
-import type { GameRecord } from "@gamelobby/database";
+import type { GameRecord } from "@kyzen/database";
 import { computeRematchSeating } from "./rematch-seating";
 ```
 
@@ -1042,11 +1042,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 Rewrite `apps/server/src/realtime/games-in-chat.ts` to use `io` and add the rematch handler:
 
 ```ts
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
   clientCreateGameInConversationSchema,
   clientRematchSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import {
   createGameInConversation,
@@ -1132,7 +1132,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 In `apps/server/src/chat/game-card.ts`, add `SeriesScore` to the import and `seriesScore` to the snapshot + return:
 
 ```ts
-import type { GameCardMeta, SeriesScore } from "@gamelobby/shared/types";
+import type { GameCardMeta, SeriesScore } from "@kyzen/shared/types";
 
 export type GameCardSnapshot = {
   status: string;
@@ -1222,8 +1222,8 @@ In `apps/server/src/api/serialize.ts`, add (uses the existing `iso()` helper):
 import type {
   GameRecord,
   GameType,
-} from "@gamelobby/shared/types";
-import type { SeriesDetail, SeriesScore } from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
+import type { SeriesDetail, SeriesScore } from "@kyzen/shared/types";
 
 export function serializeSeries(
   seriesId: string,
@@ -1312,8 +1312,8 @@ Create `apps/server/integration/rematch.test.ts` (mirrors `game-driver.test.ts` 
 
 ```ts
 import { afterAll, describe, expect, it } from "bun:test";
-import { games } from "@gamelobby/database";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { games } from "@kyzen/database";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import {
   createGameInConversation,
   rematchGame,
@@ -1411,7 +1411,7 @@ Create `apps/web/components/games/series-scoreboard.tsx`:
 ```tsx
 "use client";
 
-import type { SeriesScore } from "@gamelobby/shared/types";
+import type { SeriesScore } from "@kyzen/shared/types";
 import { Character } from "@/components/ui/character";
 
 export function SeriesScoreboard({ score }: { score: SeriesScore }) {
@@ -1468,7 +1468,7 @@ Create `apps/web/components/games/series-detail-modal.tsx`:
 ```tsx
 "use client";
 
-import type { SeriesDetail } from "@gamelobby/shared/types";
+import type { SeriesDetail } from "@kyzen/shared/types";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FaArrowRight } from "react-icons/fa6";
@@ -1553,8 +1553,8 @@ Create `apps/web/app/play/[gameId]/game-over-overlay.tsx`:
 ```tsx
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { GameJson, SeriesDetail } from "@gamelobby/shared/types";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { GameJson, SeriesDetail } from "@kyzen/shared/types";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -1710,7 +1710,7 @@ Render it inside the component's returned tree (it positions itself `fixed`, so 
       <GameOverOverlay gameId={gameId} userId={userId} initialGame={initialGame} />
 ```
 
-> `initialGame` in `PlayClient` is typed `GameClientProps["initialGame"]`, which is `GameJson`. If TS complains, cast or align the type via `import type { GameJson } from "@gamelobby/shared/types"`.
+> `initialGame` in `PlayClient` is typed `GameClientProps["initialGame"]`, which is `GameJson`. If TS complains, cast or align the type via `import type { GameJson } from "@kyzen/shared/types"`.
 
 - [ ] **Step 3: Type-check + lint**
 
@@ -1751,7 +1751,7 @@ In `apps/web/app/chat/[handle]/game-card-message.tsx`:
 Add imports:
 
 ```tsx
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SeriesScoreboard } from "@/components/games/series-scoreboard";

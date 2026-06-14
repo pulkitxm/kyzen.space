@@ -1,11 +1,11 @@
-import { GAME_CATEGORIES } from "@gamelobby/shared/constants";
+import { GAME_CATEGORIES } from "@kyzen/shared/constants";
 import type {
   GameCategoryDef,
   GameDefinition,
   GameEngine,
   GameMeta,
   GameType,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { GAMES } from "./games";
 
 const byType: Map<string, GameDefinition> = new Map(

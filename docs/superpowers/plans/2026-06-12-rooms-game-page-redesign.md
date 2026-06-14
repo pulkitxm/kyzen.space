@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-12-rooms-game-page-redesign-design.md`
 
-**Conventions (hard gates - CI fails otherwise):** No code comments (`bun run strip-comments -- --check`). No em dashes (U+2014). No dead code (knip). Icons from `react-icons/fa6` (a radial progress ring is generated art → raw `<svg>` OK). `zod` only in `@gamelobby/shared`. `apps/web` never imports `@gamelobby/database`. Run `bun run type-check` + `bun run check` + `bun test` before every commit batch.
+**Conventions (hard gates - CI fails otherwise):** No code comments (`bun run strip-comments -- --check`). No em dashes (U+2014). No dead code (knip). Icons from `react-icons/fa6` (a radial progress ring is generated art → raw `<svg>` OK). `zod` only in `@kyzen/shared`. `apps/web` never imports `@kyzen/database`. Run `bun run type-check` + `bun run check` + `bun test` before every commit batch.
 
 ---
 
@@ -210,7 +210,7 @@ test("autoMove picks among only empty cells", () => {
 **Files:** Create `apps/server/src/realtime/rooms-service.ts`; Modify `apps/server/src/chat/games-in-chat-service.ts` (export a reusable core if needed); Test `apps/server/tests/rooms-service.test.ts`
 
 - [ ] **Step 1:** Read `games-in-chat-service.ts` `createGameInConversation` to learn the exact `games.createGame` shape. Extract a `createSeatedGame({ userId, gameType, conversationId, seatingMode, challengedUserId, config })` if convenient, or call `games.createGame` directly in the new service. The standalone create: `conversationId: null`, `seatingMode: "open"`, host seated, status `waiting`, no `announceGame`/notifications.
-- [ ] **Step 2: Failing test** (mock `@gamelobby/database` + `@gamelobby/games-core` via `mock.module`, per `tests/setup.ts` conventions): `createStandaloneGame` returns `{ ok:true, code }` for a known engine; returns `{ ok:false }` for an unknown gameType (`hasEngine` false); calls `games.createGame` with `conversationId: null` and one seated player; never calls `messages.sendMessage`.
+- [ ] **Step 2: Failing test** (mock `@kyzen/database` + `@kyzen/games-core` via `mock.module`, per `tests/setup.ts` conventions): `createStandaloneGame` returns `{ ok:true, code }` for a known engine; returns `{ ok:false }` for an unknown gameType (`hasEngine` false); calls `games.createGame` with `conversationId: null` and one seated player; never calls `messages.sendMessage`.
 - [ ] **Step 3:** Implement `createStandaloneGame(input: { userId: string; gameType: GameType; config?: unknown }): Promise<ServiceResult<{ code: string }>>` using `hasEngine`, `configSchema.safeParse`, `engine.createInitialState`, `games.createGame`. And `validateJoinByCode(code): Promise<ServerJoinByCodeResult>`: `getGameByCode`; null → `not_found`; `status==="completed"||"abandoned"||"aborted"` → `finished`; `status==="active"` (and full) → `already_started`; players ≥ maxPlayers → `full`; else `{ ok:true, code }`.
 - [ ] **Step 4:** Run → PASS. Commit `feat(server): standalone room create + join-by-code service`.
 

@@ -4,7 +4,7 @@ import type {
   GameCardMeta,
   MemberJson,
   MessageJson,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { useStore } from "jotai";
 import { useCallback, useRef, useState } from "react";
 import { FaArrowDown } from "react-icons/fa6";

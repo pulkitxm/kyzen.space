@@ -1,6 +1,6 @@
 "use client";
 
-import type { AvatarConfig, Mark } from "@gamelobby/shared/types";
+import type { AvatarConfig, Mark } from "@kyzen/shared/types";
 import { Character } from "../../ui/character";
 import { CountdownRing } from "../../ui/countdown-ring";
 import { TttMark } from "./marks";

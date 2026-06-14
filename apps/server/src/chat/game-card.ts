@@ -2,7 +2,7 @@ import {
   type GameCardMeta,
   resolveWinnerUsername,
   type SeriesScore,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 
 export type GameCardSnapshot = {
   status: string;

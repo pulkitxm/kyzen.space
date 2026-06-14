@@ -51,7 +51,7 @@ If you want to know how the Drizzle declarations look, see [`database-schema.md`
 └────────────────────────┘          └────────────────────────────┘
 ```
 
-Every JSONB column - `game_state`, `config`, `move_data` - is declared as `jsonb(...).$type<unknown>()`. The database stores bytes; it never inspects or validates the shape. The shape contract lives entirely in the game's Zod schemas inside `@gamelobby/shared`.
+Every JSONB column - `game_state`, `config`, `move_data` - is declared as `jsonb(...).$type<unknown>()`. The database stores bytes; it never inspects or validates the shape. The shape contract lives entirely in the game's Zod schemas inside `@kyzen/shared`.
 
 ## Two ids: public `code`, internal `uuid`
 
@@ -88,7 +88,7 @@ The mapping to the database is direct:
 | `moveSchema.safeParse(payload.moveData)` result | `move.move_data` | After `reduce` accepts the move |
 | `engine.roles[seatOrder]` | `game_player.role` | Creator at creation; others on join |
 
-The engine and its Zod schemas are the same code the web client imports (`apps/web` → `@gamelobby/games-core` for the engine, `@gamelobby/shared` for the schemas + types) - the server never has a separate validation step. Zod is the single source of truth for what's a valid `game_state` or `move_data`.
+The engine and its Zod schemas are the same code the web client imports (`apps/web` → `@kyzen/games-core` for the engine, `@kyzen/shared` for the schemas + types) - the server never has a separate validation step. Zod is the single source of truth for what's a valid `game_state` or `move_data`.
 
 ## Worked example - tic-tac-toe in the database
 
@@ -337,7 +337,7 @@ server broadcasts one game_state { game, move } to room (turn-based.ts:174)
 - [`./database-schema.md`](./database-schema.md) - the Drizzle declarations for the three tables: column types, `$type<T>()` semantics, indexes, and `$inferSelect` row types.
 - [`./database.md`](./database.md) - how the repositories read and write these tables: the `GameRecord` join, keyset pagination, and the persist-a-move data flow.
 - [`./games-core-schemas.md`](./games-core-schemas.md) - `GameDefinition<S,I,C>`, the Zod `stateSchema` / `moveSchema` / `configSchema` that own the blob shapes, and the `.strict()` + `z.infer` discipline.
-- [`./shared.md`](./shared.md) - `@gamelobby/shared`, where the per-game schemas, `GameDefinition` / `GameEngine` types, and `GAME_TYPES` constant now live.
+- [`./shared.md`](./shared.md) - `@kyzen/shared`, where the per-game schemas, `GameDefinition` / `GameEngine` types, and `GAME_TYPES` constant now live.
 - [`./games-core-engine.md`](./games-core-engine.md) - the `GameEngine` contract, how `reduce` works, and the turn-based vs. realtime split.
 - [`./realtime.md`](./realtime.md) - the Socket.IO driver that orchestrates validate → reduce → persist on every move.
 - [`./README.md`](./README.md) - the architecture index.

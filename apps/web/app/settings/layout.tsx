@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { SettingsTabs } from "@/app/settings/settings-tabs";
 
 export const metadata: Metadata = {
-  title: "Settings · GameLobby",
+  title: "Settings · Kyzen",
 };
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
@@ -14,7 +14,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           Settings
         </h1>
         <p className="mt-1 text-muted-foreground text-sm">
-          Manage your account and personalize how GameLobby looks.
+          Manage your account and personalize how Kyzen looks.
         </p>
       </header>
 

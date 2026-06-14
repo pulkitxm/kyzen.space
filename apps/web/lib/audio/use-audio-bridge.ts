@@ -1,6 +1,6 @@
 "use client";
 
-import { getGameAudioEngine, type SfxSources } from "@gamelobby/games-client";
+import { getGameAudioEngine, type SfxSources } from "@kyzen/games-client";
 import { useAtomValue } from "jotai";
 import { useEffect } from "react";
 import { gameMusicAtom, gameSfxAtom } from "./atoms";

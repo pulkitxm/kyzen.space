@@ -4,13 +4,13 @@ import {
   type GameClientProps,
   getGameClient,
   getGameSkeleton,
-} from "@gamelobby/games-client";
+} from "@kyzen/games-client";
 import type {
   ConversationJson,
   GameJson,
   GameType,
   MessageJson,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { useAtomValue } from "jotai";
 import { Suspense, useMemo } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";

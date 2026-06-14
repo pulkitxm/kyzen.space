@@ -1,12 +1,8 @@
 "use client";
 
-import { clampVolume, stepVolume } from "@gamelobby/games-client";
-import {
-  VOLUME_MAX,
-  VOLUME_MIN,
-  VOLUME_STEP,
-} from "@gamelobby/shared/constants";
-import type { AudioChannelPrefs } from "@gamelobby/shared/types";
+import { clampVolume, stepVolume } from "@kyzen/games-client";
+import { VOLUME_MAX, VOLUME_MIN, VOLUME_STEP } from "@kyzen/shared/constants";
+import type { AudioChannelPrefs } from "@kyzen/shared/types";
 import { useAtom } from "jotai";
 import type { ReactNode } from "react";
 import {

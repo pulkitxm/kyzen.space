@@ -3,7 +3,7 @@ import {
   createNotificationInputSchema,
   type NotificationRow,
   type NotificationType,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "../client";
 import { notification } from "../schema";

@@ -6,7 +6,7 @@ import {
   messages,
   notifications,
   schema,
-} from "@gamelobby/database";
+} from "@kyzen/database";
 import { eq, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";

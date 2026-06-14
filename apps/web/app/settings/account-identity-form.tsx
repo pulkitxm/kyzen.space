@@ -3,7 +3,7 @@
 import {
   DISPLAY_NAME_MAX_LENGTH,
   USERNAME_PATTERN,
-} from "@gamelobby/shared/constants";
+} from "@kyzen/shared/constants";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FaCheck, FaXmark } from "react-icons/fa6";

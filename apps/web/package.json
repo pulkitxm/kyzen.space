@@ -1,5 +1,5 @@
 {
-  "name": "@gamelobby/web",
+  "name": "@kyzen/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,10 +12,10 @@
   "dependencies": {
     "@dicebear/collection": "^9.0.0",
     "@dicebear/core": "^9.0.0",
-    "@gamelobby/avatar": "workspace:*",
-    "@gamelobby/games-client": "workspace:*",
-    "@gamelobby/games-core": "workspace:*",
-    "@gamelobby/shared": "workspace:*",
+    "@kyzen/avatar": "workspace:*",
+    "@kyzen/games-client": "workspace:*",
+    "@kyzen/games-core": "workspace:*",
+    "@kyzen/shared": "workspace:*",
     "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@slidoapp/emoji-mart-data": "^1.2.4",

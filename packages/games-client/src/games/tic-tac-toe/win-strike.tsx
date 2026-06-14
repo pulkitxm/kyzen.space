@@ -1,6 +1,6 @@
 "use client";
 
-import type { Mark } from "@gamelobby/shared/types";
+import type { Mark } from "@kyzen/shared/types";
 import { m, useReducedMotion } from "motion/react";
 
 const CELL_OFFSET = 15.556;

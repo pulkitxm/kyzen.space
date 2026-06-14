@@ -1,9 +1,9 @@
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
   clientFriendRemoveSchema,
   clientFriendRequestSchema,
   clientFriendRespondSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import * as friendsService from "../chat/friends-service";
 import { ack, ackErr, register } from "./socket-util";

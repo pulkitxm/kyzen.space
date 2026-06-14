@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 
 type AnyGame = {
   id: string;
@@ -32,7 +32,7 @@ let createdConfig: unknown = null;
 const notifyCalls: { userId: string; type: string }[] = [];
 const sentCards: { gameId: string }[] = [];
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   conversations: {
     getMemberIds: async () => ["u1", "u2"],
   },

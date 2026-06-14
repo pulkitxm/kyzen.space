@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { accountMerge, db, friends, schema } from "@gamelobby/database";
+import { accountMerge, db, friends, schema } from "@kyzen/database";
 import { and, eq, or } from "drizzle-orm";
 import { createHarness, DB_UP, type TestUser } from "./harness";
 

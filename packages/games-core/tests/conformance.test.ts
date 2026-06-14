@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { GAME_CATEGORIES, GAME_TYPES } from "@gamelobby/shared/constants";
-import type { GameDefinition, Seat } from "@gamelobby/shared/types";
+import { GAME_CATEGORIES, GAME_TYPES } from "@kyzen/shared/constants";
+import type { GameDefinition, Seat } from "@kyzen/shared/types";
 import { GAMES, listGameTypes } from "../src/index";
 
 const CATEGORY_IDS = new Set<string>(

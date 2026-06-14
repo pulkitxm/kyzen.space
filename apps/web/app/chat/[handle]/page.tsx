@@ -1,4 +1,4 @@
-import type { ConversationJson, MessageJson } from "@gamelobby/shared/types";
+import type { ConversationJson, MessageJson } from "@kyzen/shared/types";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";

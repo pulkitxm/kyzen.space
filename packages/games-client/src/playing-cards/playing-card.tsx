@@ -7,8 +7,8 @@ import {
   cardLabel,
   jokerInner,
   jokerLabel,
-} from "@gamelobby/games-core";
-import type { JokerVariant, Rank, Suit } from "@gamelobby/shared/types";
+} from "@kyzen/games-core";
+import type { JokerVariant, Rank, Suit } from "@kyzen/shared/types";
 import { type CSSProperties, useId } from "react";
 
 function useIdPrefix(): string {

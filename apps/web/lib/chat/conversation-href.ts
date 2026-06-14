@@ -1,4 +1,4 @@
-import type { ConversationJson } from "@gamelobby/shared/types";
+import type { ConversationJson } from "@kyzen/shared/types";
 
 export function conversationHref(
   conversation: Pick<ConversationJson, "id" | "kind" | "name" | "members">,

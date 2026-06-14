@@ -22,7 +22,7 @@ mock.module("../src/auth", () => ({
   }),
 }));
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   accountMerge: {
     getPendingForTarget: async () => pendingRow,
     getById: async () => byId,

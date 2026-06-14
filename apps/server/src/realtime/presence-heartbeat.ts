@@ -1,4 +1,4 @@
-import * as db from "@gamelobby/database";
+import * as db from "@kyzen/database";
 import type { Server as IOServer } from "socket.io";
 import { env } from "../env";
 import { childLogger } from "../logger";

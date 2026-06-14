@@ -13,7 +13,7 @@ import type {
   UserProfileRow,
   UserRow,
   VerificationRow,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type {
   account,
   accountMerge,

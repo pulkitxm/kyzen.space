@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { db, messages, notifications, schema } from "@gamelobby/database";
+import { db, messages, notifications, schema } from "@kyzen/database";
 import { createHarness, DB_UP } from "./harness";
 
 const h = createHarness("ptb");

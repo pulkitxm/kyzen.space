@@ -1,9 +1,9 @@
-import { notifications } from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { notifications } from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import type {
   NotificationPayload,
   NotificationType,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { assembleNotification } from "../chat/assemble";
 import { getIO } from "./io";
 import { emitToUser } from "./rooms";

@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { games } from "@gamelobby/database";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { GameRecord } from "@gamelobby/shared/types";
+import { games } from "@kyzen/database";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { GameRecord } from "@kyzen/shared/types";
 import { createHarness, DB_UP, type TestUser } from "./harness";
 
 const h = createHarness("gre");

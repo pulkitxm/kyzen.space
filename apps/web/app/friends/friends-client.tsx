@@ -3,8 +3,8 @@
 import {
   ANON_FRIEND_LIMIT_MESSAGE,
   CHAT_EVENTS,
-} from "@gamelobby/shared/constants";
-import type { FriendshipJson, SearchUserJson } from "@gamelobby/shared/types";
+} from "@kyzen/shared/constants";
+import type { FriendshipJson, SearchUserJson } from "@kyzen/shared/types";
 import { useAtomValue, useStore } from "jotai";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

@@ -7,7 +7,7 @@ import type {
   MoveRow,
   NotificationRow,
   PublicUserRow,
-} from "@gamelobby/database";
+} from "@kyzen/database";
 import {
   type ConversationJson,
   type FriendshipJson,
@@ -21,7 +21,7 @@ import {
   resolveWinnerUsername,
   type SeriesDetail,
   type SeriesScore,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 
 function iso(d: Date | null | undefined): string | null {
   return d ? new Date(d).toISOString() : null;

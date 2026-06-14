@@ -2,7 +2,7 @@ import type {
   ConversationMemberRow,
   ConversationRow,
   MemberRole,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "../client";
 import { conversation, conversationMember, message } from "../schema";

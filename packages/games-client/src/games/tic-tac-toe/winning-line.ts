@@ -1,4 +1,4 @@
-import type { Cell } from "@gamelobby/shared/types";
+import type { Cell } from "@kyzen/shared/types";
 
 export const WINNING_LINES = [
   [0, 1, 2],

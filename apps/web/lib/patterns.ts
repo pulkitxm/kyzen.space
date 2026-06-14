@@ -4,8 +4,8 @@ import {
   PATTERN_IDS,
   PATTERN_STORAGE_KEY,
   PATTERNS,
-} from "@gamelobby/shared/constants";
-import { isValidPattern, type PatternId } from "@gamelobby/shared/types";
+} from "@kyzen/shared/constants";
+import { isValidPattern, type PatternId } from "@kyzen/shared/types";
 
 export {
   DEFAULT_PATTERN,

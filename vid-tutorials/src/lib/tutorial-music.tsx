@@ -1,4 +1,4 @@
-import { DEFAULT_MUSIC_VOLUME } from "@gamelobby/shared/constants";
+import { DEFAULT_MUSIC_VOLUME } from "@kyzen/shared/constants";
 import { Audio } from "@remotion/media";
 import { interpolate, staticFile, useVideoConfig } from "remotion";
 

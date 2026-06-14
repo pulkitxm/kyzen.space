@@ -7,13 +7,13 @@ import type {
   MessageRow,
   NotificationRow,
   PublicUserRow,
-} from "@gamelobby/database";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+} from "@kyzen/database";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import {
   gameJsonSchema,
   moveJsonSchema,
   seriesDetailSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import {
   serializeConversation,
   serializeFriendship,

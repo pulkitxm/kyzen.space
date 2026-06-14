@@ -1,12 +1,12 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
   type ConversationJson,
   type GameJson,
   isGameOver,
   type SeriesDetail,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { AnimatePresence, domAnimation, LazyMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";

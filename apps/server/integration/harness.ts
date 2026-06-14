@@ -1,5 +1,5 @@
 import { expect } from "bun:test";
-import { db, friends, schema } from "@gamelobby/database";
+import { db, friends, schema } from "@kyzen/database";
 import { eq, or, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";

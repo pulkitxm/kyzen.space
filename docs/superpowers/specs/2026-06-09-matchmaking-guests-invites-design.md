@@ -40,7 +40,7 @@ The guiding constraint, set by the product owner: **make it work exactly the sam
 - **Identity is one `userId: string`.** Socket auth (`apps/server/src/realtime/index.ts` `io.use()`) hard-rejects any connection without a Better Auth session. The anonymous plugin gives guests a real session, so this gate is unchanged.
 - **`game_player.userId` / `move.playerId` are `NOT NULL` text with no FK.** Social tables (`friendship`, `conversation_member`, `message`, `notification`, `user_profile`) FK to `user.id` with cascade - all work for anon users because anon users are real `user` rows.
 - **Scale infra exists:** Redis is wired (`realtime/redis.ts` `attachRedisAdapter`), `RedisPresenceStore.onlineAmong()`, per-user rooms + `emitToUser` (`realtime/rooms.ts`), and a persistent notification pipeline (`realtime/notify.ts` + `notification_new`).
-- **Skeletons exist:** `getGameSkeleton(gameType)` / `SKELETON_REGISTRY` / `DefaultGameSkeleton` exported from `@gamelobby/games-client`.
+- **Skeletons exist:** `getGameSkeleton(gameType)` / `SKELETON_REGISTRY` / `DefaultGameSkeleton` exported from `@kyzen/games-client`.
 - **`NotificationType`** = `friend_request | friend_accepted | game_started | game_challenge` (`packages/shared/src/types/chat/dto.ts`).
 - **Better Auth** resolves to **1.6.11**; `better-auth/plugins/anonymous` and `better-auth/client/plugins`' `anonymousClient` are present. Schema is managed by hand in Drizzle (`schema.ts`) with a `drift-guard`; we do NOT run `npx auth generate`.
 
@@ -61,7 +61,7 @@ anonymous({
 ```
 
 - `signIn.anonymous()` creates a real `user` row (`isAnonymous: true`), a throwaway email (`temp@<id>.com`), and a session cookie.
-- The existing `databaseHooks.user.create.after` → `ensureUsernameForUser(userId, displayName)` fires for anon users too, provisioning a username + DiceBear avatar automatically. **Integration check:** confirm `ensureUsernameForUser` tolerates an anon user with no Google image (it already generates a random avatar via `@gamelobby/avatar`, so this should hold; verify during implementation).
+- The existing `databaseHooks.user.create.after` → `ensureUsernameForUser(userId, displayName)` fires for anon users too, provisioning a username + DiceBear avatar automatically. **Integration check:** confirm `ensureUsernameForUser` tolerates an anon user with no Google image (it already generates a random avatar via `@kyzen/avatar`, so this should hold; verify during implementation).
 
 **Web client** (`apps/web/lib/auth-client.ts`): add `anonymousClient()`.
 
@@ -103,7 +103,7 @@ Index on `(targetUserId, status)`.
 3. `[Merge]` → `POST /api/account/merge/:id/confirm` (auth as target; asserts `session.userId === row.targetUserId`) → runs the migration transaction, deletes the anon user, marks `confirmed`.
 4. `[Discard]` → `POST /api/account/merge/:id/discard` → deletes the anon user + data directly via the DB layer (Better Auth's `/delete-anonymous-user` is disabled by our flag), marks `discarded`.
 
-**Migration transaction** - `mergeAccounts(anonId, targetId)` in a new `packages/database/src/repositories/account-merge.ts` (all DB actions live in `@gamelobby/database`). Reassign everything keyed on `anonId` → `targetId`, resolving unique-constraint collisions and **collapsing self-references** (the invite flow can make a user friends-with / in-a-DM-with / having-played their own anon self):
+**Migration transaction** - `mergeAccounts(anonId, targetId)` in a new `packages/database/src/repositories/account-merge.ts` (all DB actions live in `@kyzen/database`). Reassign everything keyed on `anonId` → `targetId`, resolving unique-constraint collisions and **collapsing self-references** (the invite flow can make a user friends-with / in-a-DM-with / having-played their own anon self):
 
 | Data | Policy |
 |---|---|

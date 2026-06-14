@@ -2,7 +2,7 @@ import type { Server as HTTPServer } from "node:http";
 import {
   clientJoinRoomSchema,
   clientMakeMoveSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { Server as IOServer } from "socket.io";
 import { getAuth } from "../auth";
 import { env } from "../env";

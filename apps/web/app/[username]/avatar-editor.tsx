@@ -12,7 +12,7 @@ import {
   configsEqual,
   isHatTop,
   randomAvatarConfig,
-} from "@gamelobby/avatar";
+} from "@kyzen/avatar";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useEffectEvent, useState } from "react";
 import { createPortal } from "react-dom";

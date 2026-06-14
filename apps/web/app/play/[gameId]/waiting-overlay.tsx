@@ -1,6 +1,6 @@
 "use client";
 
-import type { GameJson } from "@gamelobby/shared/types";
+import type { GameJson } from "@kyzen/shared/types";
 import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
 import { useEffect, useState } from "react";
 import { FaCheck, FaRegCopy, FaUserCheck } from "react-icons/fa6";

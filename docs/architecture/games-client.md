@@ -2,7 +2,7 @@
 
 ## What this is / why it matters
 
-`@gamelobby/games-client` is the **web-only React layer** that draws a game's board and wires it to the realtime backend. It is the visible half of a deliberate split that runs through the whole monorepo:
+`@kyzen/games-client` is the **web-only React layer** that draws a game's board and wires it to the realtime backend. It is the visible half of a deliberate split that runs through the whole monorepo:
 
 - **`packages/games-core`** holds the *logic* - the `GameEngine`, the strict Zod schemas, the rules. It has **no React** and no DOM dependency, so the **server can import it** to authoritatively validate every move.
 - **`packages/games-client`** holds the *UI* - one `"use client"` React component per game. It depends on React and `socket.io-client` (as *peer* deps), so it can never be pulled into the server bundle.
@@ -18,7 +18,7 @@ A second key idea is **resolution by `type` string**. The web app has a single d
 | `packages/games-client/src/index.ts` | Public package surface: re-exports `getGameClient`, `getGameSkeleton`, `DefaultGameSkeleton`, `SkeletonBox`, the `GameClientProps` type, the playing-card primitives (`PlayingCard`, `CardBack`, `Joker` + their prop types), and the game-audio API (`getGameAudioEngine`, `useGameAudio`, `clampVolume`/`stepVolume`/`shouldPlayMusic`, `SfxKey`/`SfxSources` - see [audio.md](./audio.md)). |
 | `packages/games-client/src/audio/` | The jotai-free `GameAudioEngine` (file-based Web Audio SFX + a streamed, crossfaded music track; no synthesis) and the `useGameAudio()` hook. Consumed by the boards (SFX) and by `apps/web`'s audio bridge (sources/volume/mute/active). |
 | `packages/games-client/src/types.ts` | `GameClientProps` - the contract every board component receives (`gameId`, `userId`, the shared `socket` + `connected`, `initialGame`, `initialMoves`). |
-| `packages/games-client/src/registry.ts` | Two registries keyed by the typed `GameType` from `@gamelobby/shared`: `REGISTRY` (board components - `ComponentType<GameClientProps>`, currently the statically-imported `TicTacToeGameClient`) and `SKELETON_REGISTRY` (eager skeleton components). `getGameClient(type)` returns the board (`null` for unknown types); `getGameSkeleton(type)` returns the skeleton, falling back to `DefaultGameSkeleton`. |
+| `packages/games-client/src/registry.ts` | Two registries keyed by the typed `GameType` from `@kyzen/shared`: `REGISTRY` (board components - `ComponentType<GameClientProps>`, currently the statically-imported `TicTacToeGameClient`) and `SKELETON_REGISTRY` (eager skeleton components). `getGameClient(type)` returns the board (`null` for unknown types); `getGameSkeleton(type)` returns the skeleton, falling back to `DefaultGameSkeleton`. |
 | `packages/games-client/src/skeletons.tsx` | `SkeletonBox` (a pulse-animated placeholder primitive) and `DefaultGameSkeleton` (the generic board placeholder). No `"use client"` - pure markup, so it renders in both server and client trees. |
 | `packages/games-client/src/games/tic-tac-toe/client.tsx` | A concrete board: reuses the shared socket from props, emits `join_room`/`make_move`/`leave_room`, listens for `game_state`/`game_error`, derives `canMove`, fires SFX via `useGameAudio()`, and renders a replay scrubber for finished games. Composes the sibling modules below (`PlayerBar`, `TttMark`/`TttMarkDefs`, `WinStrike`, `findWinningLine`). |
 | `packages/games-client/src/games/tic-tac-toe/marks.tsx` | `TttMark` (the X/O SVG glyph, themed via `currentColor`) and `TttMarkDefs` (a hidden `<defs>` holding the shared `ttt-mark-sheen` gradient). Decorative art, so it stays inline SVG, not `react-icons`. |
@@ -130,7 +130,7 @@ React, `socket.io-client`, and `motion` (Framer Motion, used for board animation
 Every board component is a `ComponentType<GameClientProps>`. The shape is intentionally small:
 
 ```ts
-import type { AvatarConfig } from "@gamelobby/shared/types";
+import type { AvatarConfig } from "@kyzen/shared/types";
 import type { Socket } from "socket.io-client";
 
 export type GameClientProps = {
@@ -174,11 +174,11 @@ These `initial*` props are SSR data: the RSC route fetches them once so the boar
 
 ## Resolution by type
 
-The registry is an object keyed by the **typed `GameType`** from `@gamelobby/shared` (not a bare string literal), with each value a `ComponentType<GameClientProps>`. The key is the exported `TIC_TAC_TOE` constant, so a typo is a compile error rather than a silently missing board. The currently registered board is **statically imported** - the registry holds the `TicTacToeGameClient` component directly:
+The registry is an object keyed by the **typed `GameType`** from `@kyzen/shared` (not a bare string literal), with each value a `ComponentType<GameClientProps>`. The key is the exported `TIC_TAC_TOE` constant, so a typo is a compile error rather than a silently missing board. The currently registered board is **statically imported** - the registry holds the `TicTacToeGameClient` component directly:
 
 ```ts
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { GameType } from "@gamelobby/shared/types";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { GameType } from "@kyzen/shared/types";
 import type { ComponentType } from "react";
 import { TicTacToeGameClient } from "./games/tic-tac-toe/client";
 import { TicTacToeSkeleton } from "./games/tic-tac-toe/skeleton";
@@ -205,7 +205,7 @@ export function getGameClient(
 
 Why this design:
 
-- **Typed keys.** `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>`, so the compiler requires an entry for every game type the registry (`GAME_TYPES` in `@gamelobby/shared/constants`) knows about. The public getters still accept a plain `string` and widen through a local `Record<string, …>` alias, so an unknown type returns `null`/the default instead of failing to type-check.
+- **Typed keys.** `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>`, so the compiler requires an entry for every game type the registry (`GAME_TYPES` in `@kyzen/shared/constants`) knows about. The public getters still accept a plain `string` and widen through a local `Record<string, …>` alias, so an unknown type returns `null`/the default instead of failing to type-check.
 - **Eager import → server-rendered board.** The registry holds `TicTacToeGameClient` directly (a plain function component), so the board renders during SSR and ships in the initial HTML. Opening or reloading a finished game shows the final position immediately, with no skeleton-to-board snap. Because the only registered game's board is reached on the `/play` route - already its own route bundle - there is no meaningful code-splitting cost.
 - **Lazy is still permitted for a heavy game.** The registry value type is `ComponentType<GameClientProps>`, which a `React.lazy(() => import(…))`-wrapped board also satisfies. If a future game ships a heavy board (large assets, a big dependency), register it lazily to code-split it into its own chunk; its `<Suspense>` fallback (`getGameSkeleton`) will then actually render while the chunk loads. A `React.lazy` board needs the `.then((m) => ({ default: m.BoardComponent }))` adapter because `client.tsx` exports a *named* component, not a default.
 - **Unknown types return `null`, not a throw.** A game-type the web build doesn't know how to render degrades gracefully - the caller shows a "not supported here" message rather than crashing (`apps/web/app/play/[gameId]/play-client.tsx:75`).
@@ -416,7 +416,7 @@ Net: **user click → `make_move` over socket → server Zod-validates + `engine
 
 When a game's status is `completed` or `abandoned`, the board flips from "live, socket-driven" to "offline replay scrubber". The same component handles both; it just selects a different state source.
 
-The mode flags and initial scrub position - the live/over distinction is delegated to the shared `isGameLive`/`isGameOver` status helpers (`packages/shared/src/types/games/wire.ts:104`/`:108`, re-exported from `@gamelobby/shared/types`), so the board never hard-codes the status strings:
+The mode flags and initial scrub position - the live/over distinction is delegated to the shared `isGameLive`/`isGameOver` status helpers (`packages/shared/src/types/games/wire.ts:104`/`:108`, re-exported from `@kyzen/shared/types`), so the board never hard-codes the status strings:
 
 ```tsx
 const isLive = isGameLive(game.status);
@@ -479,8 +479,8 @@ The rest of replay is UI sugar: a `<ReplayToolbar>` with first/prev/play/next/la
 - **Identity is never in the payload.** Boards send `{ gameId, moveData }` only. The server reads the user from the authenticated socket (`socket.data.userId`), set from the Better Auth session cookie that rode on the shared connection's handshake (`withCredentials: true`). Sending a `userId` from the client would be ignored.
 - **`gameState` and `moveData` cross the boundary as `unknown`.** `GameClientProps.initialGame.gameState` is `unknown` and `initialMoves` is `Record<string, unknown>[]` because games-client is generic. Each board narrows these itself (tic-tac-toe casts to a local `GameJson`/`TicState`). The real schema lives in games-core; keep that the single source of truth and import its types rather than re-declaring shapes.
 - **Boards must be `"use client"` and Suspense-safe.** The web route wraps every board in `<Suspense>` (`apps/web/app/play/[gameId]/play-client.tsx:62`), so a board registered with `React.lazy` has its fallback covered; the currently registered board is eagerly imported, so it SSRs and that boundary never suspends for it. Either way the first line of `client.tsx` is `"use client"`.
-- **Register by the typed `GameType` key.** Both `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>` keyed by the constant exported from `@gamelobby/shared/constants` (`TIC_TAC_TOE`), so a typo or a missing entry is a *compile error* - the registries can't fall out of sync with `GAME_TYPES` silently. The runtime getters still accept a plain `string` (the value comes off a fetched record), and an unrecognized one yields `null` (board) / `DefaultGameSkeleton` (skeleton).
-- **Tailwind must see the source.** Classes used in board components only survive the build because `apps/web/app/globals.css:3` has `@source "../../../packages/games-client/src/**/*.{ts,tsx}"` and `apps/web/next.config.ts:5` lists `@gamelobby/games-client` in `transpilePackages`. A new board file outside that glob would lose its Tailwind classes.
+- **Register by the typed `GameType` key.** Both `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>` keyed by the constant exported from `@kyzen/shared/constants` (`TIC_TAC_TOE`), so a typo or a missing entry is a *compile error* - the registries can't fall out of sync with `GAME_TYPES` silently. The runtime getters still accept a plain `string` (the value comes off a fetched record), and an unrecognized one yields `null` (board) / `DefaultGameSkeleton` (skeleton).
+- **Tailwind must see the source.** Classes used in board components only survive the build because `apps/web/app/globals.css:3` has `@source "../../../packages/games-client/src/**/*.{ts,tsx}"` and `apps/web/next.config.ts:5` lists `@kyzen/games-client` in `transpilePackages`. A new board file outside that glob would lose its Tailwind classes.
 - **React/socket.io/motion are peers.** Don't add `react`, `socket.io-client`, or `motion` (Framer Motion, used by `win-strike.tsx`) as regular dependencies of this package - they must come from the host app to avoid duplicate-instance bugs.
 - **Room participation is keyed on `liveSocketKey`.** Signing out, or a game reaching a terminal status, sets the key to `null`; the effect then emits `leave_room` and detaches its listeners (leaving the shared connection intact). Finished games never join a room; they replay from the move log.
 

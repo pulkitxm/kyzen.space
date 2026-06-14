@@ -1,6 +1,6 @@
 "use client";
 
-import type { GameType } from "@gamelobby/shared/types";
+import type { GameType } from "@kyzen/shared/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FaPlus } from "react-icons/fa6";

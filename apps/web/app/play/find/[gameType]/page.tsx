@@ -1,4 +1,4 @@
-import { getDefinition, hasEngine } from "@gamelobby/games-core";
+import { getDefinition, hasEngine } from "@kyzen/games-core";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { FindClient } from "./find-client";

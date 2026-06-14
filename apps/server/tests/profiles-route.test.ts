@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { AvatarConfig } from "@gamelobby/avatar";
-import { randomAvatarConfig, seedAvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
+import { randomAvatarConfig, seedAvatarConfig } from "@kyzen/avatar";
 
 type Session = {
   user: { id: string; name: string | null; email: string | null };
@@ -41,7 +41,7 @@ mock.module("../src/auth", () => ({
   }),
 }));
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   profiles: {
     getProfileByUserId: async () => storedProfile,
     getProfileByUsername: async () => storedProfile,

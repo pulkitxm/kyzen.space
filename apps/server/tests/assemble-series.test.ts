@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 
 const CARD_GAME_UUID = "11111111-1111-1111-1111-111111111111";
 const CARD_GAME_CODE = "K7P2QX";
@@ -25,7 +25,7 @@ const state: {
   seriesCalls: [],
 };
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   games: {
     getGameById: async () => state.game,
     getGameByCode: async () => state.game,

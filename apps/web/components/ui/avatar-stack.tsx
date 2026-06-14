@@ -1,4 +1,4 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import { Character } from "@/components/ui";
 import { cn } from "@/lib/utils";
 

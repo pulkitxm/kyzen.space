@@ -6,7 +6,7 @@
 
 **Architecture:** A `MatchmakingStore` mirrors the presence-store pattern: one interface, a Redis implementation (one sorted set per `gameType`, key `mm:queue:<gameType>`, member `userId`, score = enqueue `Date.now()`), an in-memory fallback, and a factory keyed on `REDIS_URL`. The Redis impl pairs with an **atomic Lua `pairAndPop`** (`ZRANGE 0 1 WITHSCORES` then `ZREM` in one `EVAL` round-trip) so two server nodes can never double-match the same pair. New socket handlers `game:queue_join` / `game:queue_leave` are registered in `realtime/index.ts` next to the game lane; on each successful `pairAndPop([a, b])` the pairing function verifies both are still online (`presenceStore.onlineAmong`), `getOrCreateDm(a, b)`, `createGameInConversation({ userId: a, conversationId, gameType, seatingMode: "challenge", challengedUserId: b, config })`, and `emitToUser(match_found, { gameId })` to both. (Because the pair always shares a *DM* conversation, `createGameInConversation` coerces `seatingMode` to `"open"` and `challengedUserId` to `null` for the persisted game - exactly like the existing friend-challenge-in-a-DM path; the `"challenge"` arguments are forwarded for parity but only take effect in group conversations.) Disconnect removes the user from every queue. The web lobby gains a "Find a match" button that calls `ensureIdentity()` (Phase 0), emits `queue_join`, shows a Searching/Cancel state backed by a `matchmakingAtom`, and on `match_found` navigates to `/play/<gameId>`.
 
-**Tech Stack:** TypeScript, Socket.IO on Bun, `ioredis` (`EVAL` Lua), Drizzle/Postgres (only through `@gamelobby/database` repositories), Zod schemas in `@gamelobby/shared`, Next.js 16 App Router + Jotai + react-icons, Bun test (`mock.module`).
+**Tech Stack:** TypeScript, Socket.IO on Bun, `ioredis` (`EVAL` Lua), Drizzle/Postgres (only through `@kyzen/database` repositories), Zod schemas in `@kyzen/shared`, Next.js 16 App Router + Jotai + react-icons, Bun test (`mock.module`).
 
 **Scope note:** This phase delivers the matchmaking queue, the pairing service, the two socket events + `match_found`, and the lobby UI. It depends on Phase 0 (`ensureIdentity()` in `apps/web/lib/auth/ensure-identity.ts`, the `anonymousClient` plugin, and the `isAnonymous` session flag) and is independent of Phase 1 (merge) and Phase 3 (invites). `match_found` is a transient socket event, **not** a persisted notification, so no `NotificationType` change is in scope. No new DB table is introduced - the queue lives entirely in Redis (or process memory in dev), so there is **no `drift-guard` / `schema.ts` change** in this phase. No new top-level web route is added, so `RESERVED_USERNAMES` is unchanged. The `game:queue_*` event names live on raw socket events (the game lane already uses raw `join_room` / `make_move`, not `CHAT_EVENTS`), so no `CHAT_EVENTS` constant is added.
 
@@ -31,9 +31,9 @@
 
 ---
 
-## Task 1: Add matchmaking socket payload schemas to `@gamelobby/shared`
+## Task 1: Add matchmaking socket payload schemas to `@kyzen/shared`
 
-Per repo rules every socket payload schema lives in `@gamelobby/shared/types`, never inline in the server. The game lane validates `clientJoinRoomSchema` / `clientMakeMoveSchema` from `wire.ts`; the matchmaking schemas join them there. `gameTypeSchema` (a `z.enum(GAME_TYPES)`) already rejects unknown game types at parse time, which satisfies the "validate gameType against the registry" security requirement at the wire boundary.
+Per repo rules every socket payload schema lives in `@kyzen/shared/types`, never inline in the server. The game lane validates `clientJoinRoomSchema` / `clientMakeMoveSchema` from `wire.ts`; the matchmaking schemas join them there. `gameTypeSchema` (a `z.enum(GAME_TYPES)`) already rejects unknown game types at parse time, which satisfies the "validate gameType against the registry" security requirement at the wire boundary.
 
 **Files:**
 - Modify: `packages/shared/src/types/games/wire.ts:35-41`
@@ -46,11 +46,11 @@ Create `packages/shared/tests/matchmaking-schemas.test.ts`:
 
 ```ts
 import { describe, expect, it } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import {
   clientQueueJoinSchema,
   clientQueueLeaveSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 
 describe("clientQueueJoinSchema", () => {
   it("accepts a known game type with no config", () => {
@@ -96,7 +96,7 @@ describe("clientQueueLeaveSchema", () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `cd packages/shared && bun test tests/matchmaking-schemas.test.ts`
-Expected: FAIL - `clientQueueJoinSchema` / `clientQueueLeaveSchema` are not exported from `@gamelobby/shared/types`.
+Expected: FAIL - `clientQueueJoinSchema` / `clientQueueLeaveSchema` are not exported from `@kyzen/shared/types`.
 
 - [ ] **Step 3: Add the schemas to `wire.ts`**
 
@@ -625,7 +625,7 @@ git commit -m "test(server): cover atomic pairAndPop over a FakeRedis"
 
 ## Task 4: Pairing service `runPairing` (creates DM + game, emits to both)
 
-`runPairing` is the pure, dependency-injected core of matchmaking: given a popped `[a, b]`, it guards self-match and online liveness, then reuses `getOrCreateDm` + `createGameInConversation` (the exact friend-challenge path) and emits `match_found` to both via `emitToUser`. Injecting deps keeps it unit-testable with `mock.module` of the complete `@gamelobby/database` barrel and the presence store. Defaults wire the real `conversations.getOrCreateDm`, the real `createGameInConversation` service, `presenceStore`, and `emitToUser`.
+`runPairing` is the pure, dependency-injected core of matchmaking: given a popped `[a, b]`, it guards self-match and online liveness, then reuses `getOrCreateDm` + `createGameInConversation` (the exact friend-challenge path) and emits `match_found` to both via `emitToUser`. Injecting deps keeps it unit-testable with `mock.module` of the complete `@kyzen/database` barrel and the presence store. Defaults wire the real `conversations.getOrCreateDm`, the real `createGameInConversation` service, `presenceStore`, and `emitToUser`.
 
 `runPairing` forwards `seatingMode: "challenge"` and `challengedUserId: b` to `createGameInConversation` for parity with the friend-challenge call shape, but note that for the DM conversation `getOrCreateDm` returns, the service coerces those to `seatingMode: "open"` / `challengedUserId: null` (`games-in-chat-service.ts:96-115`). The unit test below mocks `createGameInConversation`, so it asserts the *forwarded* call args (`"challenge"` / `"b"`); the DB-backed Task 9 test asserts the *persisted* coerced values (`"open"` / `null`).
 
@@ -639,7 +639,7 @@ Create `apps/server/tests/matchmaking.test.ts`:
 
 ```ts
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 
 type CreateGameInput = {
   userId: string;
@@ -660,7 +660,7 @@ let createGameResult: { ok: boolean; value?: unknown; error?: string } = {
 const emitted: Array<{ userId: string; event: string; payload: unknown }> = [];
 const requeued: Array<{ gameType: string; userId: string }> = [];
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   conversations: {
     getOrCreateDm: async (a: string, b: string) => {
       getOrCreateDmCalls.push([a, b]);
@@ -773,13 +773,13 @@ Expected: FAIL - module `../src/realtime/matchmaking` does not exist.
 Create `apps/server/src/realtime/matchmaking.ts`:
 
 ```ts
-import { conversations } from "@gamelobby/database";
-import { hasEngine } from "@gamelobby/games-core";
+import { conversations } from "@kyzen/database";
+import { hasEngine } from "@kyzen/games-core";
 import {
   clientQueueJoinSchema,
   clientQueueLeaveSchema,
   type GameType,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { createGameInConversation } from "../chat/games-in-chat-service";
 import { childLogger } from "../logger";
@@ -987,7 +987,7 @@ git commit -m "feat(server): register matchmaking handlers and dequeue on discon
 
 ## Task 6: `dequeueUserFromAllQueues` unit coverage
 
-The disconnect path calls `dequeueUserFromAllQueues`, which delegates to `matchmakingStore.removeFromAll`; `handleQueueLeave` removes from one queue. Cover both against a real `InMemoryMatchmakingStore` injected via `mock.module`. This lives in its own file (not appended to `matchmaking.test.ts`) so the store mock is declared **before** the first import of `../src/realtime/matchmaking` - otherwise the matchmaking module would already have evaluated against the real singleton and the mock would not rebind (per the Bun mock-isolation note). Per that same note, the `matchmaking-store` mock is a **complete barrel** - it re-exports every runtime symbol the real module exports (`matchmakingStore`, `InMemoryMatchmakingStore`, `RedisMatchmakingStore`, `queueKey`) so the leak does not break `matchmaking-store.test.ts` (which imports `RedisMatchmakingStore`) regardless of file run order. The complete `@gamelobby/database` and games-in-chat barrels are still mocked because importing `matchmaking.ts` transitively loads them.
+The disconnect path calls `dequeueUserFromAllQueues`, which delegates to `matchmakingStore.removeFromAll`; `handleQueueLeave` removes from one queue. Cover both against a real `InMemoryMatchmakingStore` injected via `mock.module`. This lives in its own file (not appended to `matchmaking.test.ts`) so the store mock is declared **before** the first import of `../src/realtime/matchmaking` - otherwise the matchmaking module would already have evaluated against the real singleton and the mock would not rebind (per the Bun mock-isolation note). Per that same note, the `matchmaking-store` mock is a **complete barrel** - it re-exports every runtime symbol the real module exports (`matchmakingStore`, `InMemoryMatchmakingStore`, `RedisMatchmakingStore`, `queueKey`) so the leak does not break `matchmaking-store.test.ts` (which imports `RedisMatchmakingStore`) regardless of file run order. The complete `@kyzen/database` and games-in-chat barrels are still mocked because importing `matchmaking.ts` transitively loads them.
 
 **Files:**
 - Create: `apps/server/tests/matchmaking-dequeue.test.ts`
@@ -998,7 +998,7 @@ Create `apps/server/tests/matchmaking-dequeue.test.ts`:
 
 ```ts
 import { describe, expect, it, mock } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import {
   InMemoryMatchmakingStore,
   queueKey,
@@ -1014,7 +1014,7 @@ mock.module("../src/realtime/matchmaking-store", () => ({
   queueKey,
 }));
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   conversations: { getOrCreateDm: async () => ({ conversation: { id: "c" } }) },
   games: {},
   profiles: {},
@@ -1150,7 +1150,7 @@ Replace the top of `apps/web/app/games/_shared/game-lobby.tsx` (lines 1-59, the 
 ```tsx
 "use client";
 
-import type { ConfigField, GameMeta } from "@gamelobby/shared/types";
+import type { ConfigField, GameMeta } from "@kyzen/shared/types";
 import { useAtom } from "jotai";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -1312,8 +1312,8 @@ Create `apps/server/integration/matchmaking-flow.test.ts`:
 
 ```ts
 import { afterAll, describe, expect, it } from "bun:test";
-import { conversations, db, games, schema } from "@gamelobby/database";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { conversations, db, games, schema } from "@kyzen/database";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { eq } from "drizzle-orm";
 import { createGameInConversation } from "../src/chat/games-in-chat-service";
 import { runPairing } from "../src/realtime/matchmaking";
@@ -1448,7 +1448,7 @@ Insert the following block immediately after the game-lane paragraph identified 
 ```md
 ### Matchmaking lane
 
-`game:queue_join { gameType, config? }` and `game:queue_leave { gameType }` (payloads validated by `clientQueueJoinSchema` / `clientQueueLeaveSchema` in `@gamelobby/shared/types`) drive a FIFO queue. The queue lives in `realtime/matchmaking-store.ts`: one Redis sorted set per game type (`mm:queue:<gameType>`, member `userId`, score = enqueue `Date.now()`) with an atomic Lua `pairAndPop` that pops the two oldest members in one round-trip, plus an in-memory fallback selected when `REDIS_URL` is unset (the same factory pattern as `presence-store-instance.ts`). On each successful `pairAndPop([a, b])`, `runPairing` (`realtime/matchmaking.ts`) guards self-matches, confirms both are still online via `presenceStore.onlineAmong` (requeuing the survivor otherwise), then reuses `getOrCreateDm(a, b)` + `createGameInConversation({ seatingMode: "challenge", challengedUserId: b, ... })` and emits the transient `match_found { gameId }` to both via `emitToUser`. Because the pair shares a DM, the service coerces the persisted game to `seatingMode: "open"` / `challengedUserId: null` (the same as the friend-challenge-in-a-DM path); the `"challenge"` args are forwarded for call-shape parity but only bind in group conversations. `match_found` is not a persisted notification. Disconnect drains the user from every queue (`dequeueUserFromAllQueues`). The queue stores only `userId` - no PII.
+`game:queue_join { gameType, config? }` and `game:queue_leave { gameType }` (payloads validated by `clientQueueJoinSchema` / `clientQueueLeaveSchema` in `@kyzen/shared/types`) drive a FIFO queue. The queue lives in `realtime/matchmaking-store.ts`: one Redis sorted set per game type (`mm:queue:<gameType>`, member `userId`, score = enqueue `Date.now()`) with an atomic Lua `pairAndPop` that pops the two oldest members in one round-trip, plus an in-memory fallback selected when `REDIS_URL` is unset (the same factory pattern as `presence-store-instance.ts`). On each successful `pairAndPop([a, b])`, `runPairing` (`realtime/matchmaking.ts`) guards self-matches, confirms both are still online via `presenceStore.onlineAmong` (requeuing the survivor otherwise), then reuses `getOrCreateDm(a, b)` + `createGameInConversation({ seatingMode: "challenge", challengedUserId: b, ... })` and emits the transient `match_found { gameId }` to both via `emitToUser`. Because the pair shares a DM, the service coerces the persisted game to `seatingMode: "open"` / `challengedUserId: null` (the same as the friend-challenge-in-a-DM path); the `"challenge"` args are forwarded for call-shape parity but only bind in group conversations. `match_found` is not a persisted notification. Disconnect drains the user from every queue (`dequeueUserFromAllQueues`). The queue stores only `userId` - no PII.
 ```
 
 - [ ] **Step 3: Verify the em-dash gate stays green**
@@ -1494,7 +1494,7 @@ Expected: PASS - `matchmaking-flow.test.ts` plus the existing integration suite.
 ## Self-review notes (coverage against spec §5.3)
 
 - Redis sorted set per gameType (`mm:queue:<gameType>`, member `userId`, score = enqueue `Date.now()`) + atomic Lua `pairAndPop` + in-memory fallback + `REDIS_URL` factory mirroring `presence-store-instance.ts` - Tasks 2-3. ✅
-- `game:queue_join { gameType, config? }` / `game:queue_leave { gameType }` registered in `realtime/index.ts` via the per-connection attach approach; payload Zod schemas in `@gamelobby/shared` (not inline) - Tasks 1, 4, 5. ✅
+- `game:queue_join { gameType, config? }` / `game:queue_leave { gameType }` registered in `realtime/index.ts` via the per-connection attach approach; payload Zod schemas in `@kyzen/shared` (not inline) - Tasks 1, 4, 5. ✅
 - `match_found { gameId }` emitted to BOTH players via `emitToUser` - Task 4 (asserted), Task 8 (client navigates). ✅
 - Disconnect removes the user from all queues (hooked into the presence disconnect path) - Tasks 5-6. ✅
 - Pairing reuses `presenceStore.onlineAmong([a, b])` liveness (requeue survivor) → `getOrCreateDm(a, b)` → `createGameInConversation({ userId: a, seatingMode: "challenge", challengedUserId: b, config })` → `emitToUser match_found` - Task 4 (unit), Task 9 (DB-backed). The DM persists as `seatingMode: "open"` / `challengedUserId: null` (the service coerces challenge→open for DMs); Task 9 asserts the coerced values, Task 4 asserts the forwarded call args. ✅

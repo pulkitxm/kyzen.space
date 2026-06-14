@@ -4,7 +4,7 @@ import {
   type GameMeta,
   isGameCode,
   normalizeGameCode,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { AnimatePresence, m } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";

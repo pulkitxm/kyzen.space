@@ -7,7 +7,7 @@ import {
   GLASS_MODES,
   PATTERN_IDS,
   THEME_IDS,
-} from "@gamelobby/shared/constants";
+} from "@kyzen/shared/constants";
 import type {
   AccountMergeStatus,
   AvatarConfig,
@@ -22,8 +22,8 @@ import type {
   NotificationType,
   ProfileStats,
   SeatingMode,
-} from "@gamelobby/shared/types";
-import { generateGameCode } from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
+import { generateGameCode } from "@kyzen/shared/types";
 import {
   type AnyPgColumn,
   boolean,

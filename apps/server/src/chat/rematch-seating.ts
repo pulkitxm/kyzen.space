@@ -1,5 +1,5 @@
-import type { GameRecord } from "@gamelobby/database";
-import { getDefinition } from "@gamelobby/games-core";
+import type { GameRecord } from "@kyzen/database";
+import { getDefinition } from "@kyzen/games-core";
 
 export function computeRematchSeating(prev: GameRecord): string[] {
   const { engine } = getDefinition(prev.gameType);

@@ -4,7 +4,7 @@ description: >-
   Use when the user wants to implement a NEW game on this platform from an idea,
   spec, plan, or rules doc (e.g. "add Connect Four", "build a Nim game from this
   doc", "implement <game> as a new game"). Authors the strict Zod schemas + types
-  in @gamelobby/shared, the engine + GameDefinition in games-core (registered in
+  in @kyzen/shared, the engine + GameDefinition in games-core (registered in
   the single GAMES array), and the games-client UI, writes a `docs/games/<type>.md`
   doc + tests, and verifies the logic end-to-end. Do NOT use for editing existing
   games' rules or non-game features.
@@ -23,12 +23,12 @@ first; it is the canonical guide and this prompt mirrors it.
 - **Never** add a new web route, API endpoint, DB table/column, socket event, or
   realtime handler for a game. If you think you need one, you've misunderstood -
   re-read `docs/adding-a-game.md`. The platform is already generic.
-- **Strict Zod, always - authored in `@gamelobby/shared`.** Every game ships
+- **Strict Zod, always - authored in `@kyzen/shared`.** Every game ships
   `stateSchema`, `moveSchema`, and `configSchema` using `.strict()`, exact enums,
   and integer/range bounds, under `packages/shared/src/types/games/<type>/schemas.ts`.
   Inside `packages/shared` (the sole `zod`-owning package) import `z` directly
   (`import { z } from "zod"`); everywhere else `z`/schemas come from
-  `@gamelobby/shared/types`. TS types derive from the schemas via `z.infer` - never
+  `@kyzen/shared/types`. TS types derive from the schemas via `z.infer` - never
   hand-write a parallel type. Structural move validation lives in `moveSchema`, not
   in `reduce`.
 - **Reuse, never recreate** these shared pieces: the `/games/[gameType]` lobby +
@@ -52,25 +52,25 @@ first; it is the canonical guide and this prompt mirrors it.
    inputs (→ `configFields`). If anything is ambiguous, ask before coding.
 
 2. **shared (slug + schemas + types)**, then **games-core (logic)**:
-   - **`@gamelobby/shared/constants` (`packages/shared/src/constants/games.ts`)** -
+   - **`@kyzen/shared/constants` (`packages/shared/src/constants/games.ts`)** -
      add the slug constant (`export const <SLUG> = "<type>";`) and append it to
      `GAME_TYPES` (`export const GAME_TYPES = [TIC_TAC_TOE, <SLUG>] as const;`).
      This is the **only** place the string literal lives; `GameType` /
-     `gameTypeSchema` (in `@gamelobby/shared/types`) derive from it automatically.
+     `gameTypeSchema` (in `@kyzen/shared/types`) derive from it automatically.
      Never redeclare the slug in a per-game file. Add a new `GAME_CATEGORIES` entry
      here only if needed.
    - **`packages/shared/src/types/games/<type>/schemas.ts`** - strict Zod `state`,
      `move`, `config` schemas + `z.infer` types (use `import { z } from "zod"`,
-     allowed because this is inside `@gamelobby/shared`). Re-export them from
-     `@gamelobby/shared/types` (via `packages/shared/src/types/games/index.ts`).
+     allowed because this is inside `@kyzen/shared`). Re-export them from
+     `@kyzen/shared/types` (via `packages/shared/src/types/games/index.ts`).
      No slug constant here.
    - Under `packages/games-core/src/games/<type>/`:
      - `engine.ts` - the `GameEngine<State, Move>`: `createInitialState(seats)`,
        and `reduce` (turn-based) or `step` (realtime); import the slug from
-       `@gamelobby/shared/constants` and the schemas/types from
-       `@gamelobby/shared/types`. Enforce game *rules* only; `reduce` may
+       `@kyzen/shared/constants` and the schemas/types from
+       `@kyzen/shared/types`. Enforce game *rules* only; `reduce` may
        `safeParse` the move with `moveSchema` for defense-in-depth.
-     - `meta.ts` - the `GameMeta`; import the slug from `@gamelobby/shared/constants`.
+     - `meta.ts` - the `GameMeta`; import the slug from `@kyzen/shared/constants`.
        Include `howToPlay`: 3-5 short player-facing steps (plain strings, no
        markdown) shown in the game page's "How to play" card; the conformance
        suite rejects an empty list or blank steps.
@@ -113,7 +113,7 @@ first; it is the canonical guide and this prompt mirrors it.
    - Add `packages/games-core/tests/<type>.test.ts` for the engine: turn/role
      enforcement, every win line, draws, illegal/out-of-bounds moves (rejected by
      the schema), and post-terminal rejection. Add schema-strictness cases in
-     `packages/shared/tests/` (the schemas now live in `@gamelobby/shared`).
+     `packages/shared/tests/` (the schemas now live in `@kyzen/shared`).
    - Registry parity is **enforced**:
      `packages/games-client/tests/registry.test.ts` fails if the game type has no
      board or no skeleton, and `packages/games-core/tests/game-docs.test.ts` fails

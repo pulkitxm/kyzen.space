@@ -1,16 +1,16 @@
-import { GLASS_MODES, GLASS_STORAGE_KEY } from "@gamelobby/shared/constants";
-import type { GlassMode } from "@gamelobby/shared/types";
+import { GLASS_MODES, GLASS_STORAGE_KEY } from "@kyzen/shared/constants";
+import type { GlassMode } from "@kyzen/shared/types";
 
 export {
   DEFAULT_GLASS_MODE,
   GLASS_MODE_DEFS,
   GLASS_MODES,
   GLASS_STORAGE_KEY,
-} from "@gamelobby/shared/constants";
+} from "@kyzen/shared/constants";
 export {
   type GlassMode,
   isValidGlassMode,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 
 export function applyGlass(root: HTMLElement, id: GlassMode): void {
   if (id === "off") {

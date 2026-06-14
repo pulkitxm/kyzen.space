@@ -16,7 +16,7 @@ presentation concern, so the same `GameDefinition` model from
 
 The design splits cleanly across the package boundary:
 
-- **`@gamelobby/games-client` owns the engine** - a framework-light, imperative
+- **`@kyzen/games-client` owns the engine** - a framework-light, imperative
   `GameAudioEngine` singleton plus pure helpers. It has **no jotai dependency**;
   it just exposes `play*` / `set*` methods.
 - **`apps/web` owns the preferences and the UI** - two `atomWithStorage` atoms, a

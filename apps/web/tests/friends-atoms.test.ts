@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { FriendshipJson } from "@gamelobby/shared/types";
+import type { FriendshipJson } from "@kyzen/shared/types";
 import { upsertFriend } from "@/lib/chat/atoms";
 
 function friendship(id: string, userId: string): FriendshipJson {

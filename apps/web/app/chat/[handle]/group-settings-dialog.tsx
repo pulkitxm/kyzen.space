@@ -1,7 +1,7 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { ConversationJson } from "@gamelobby/shared/types";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { ConversationJson } from "@kyzen/shared/types";
 import { useAtomValue, useStore } from "jotai";
 import { useRouter } from "next/navigation";
 import { useState } from "react";

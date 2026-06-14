@@ -1,6 +1,6 @@
 "use client";
 
-import type { Mark } from "@gamelobby/shared/types";
+import type { Mark } from "@kyzen/shared/types";
 
 const STROKE = "color-mix(in srgb, currentColor 62%, #0a0e14)";
 

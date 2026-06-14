@@ -4,7 +4,7 @@ import { ThemePicker } from "@/app/settings/theme-picker";
 import { getAccountSessions } from "@/lib/get-account-sessions";
 
 export const metadata: Metadata = {
-  title: "Theme · Settings · GameLobby",
+  title: "Theme · Settings · Kyzen",
 };
 
 export const dynamic = "force-dynamic";

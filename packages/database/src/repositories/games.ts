@@ -10,7 +10,7 @@ import {
   type GameUpdate,
   type MoveRow,
   normalizeGameCode,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { and, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
 import { db } from "../client";
 import { game, gamePlayer, move, userProfile } from "../schema";

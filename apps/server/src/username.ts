@@ -1,10 +1,10 @@
-import { type AvatarStyle, randomAvatarConfig } from "@gamelobby/avatar";
-import { profiles } from "@gamelobby/database";
+import { type AvatarStyle, randomAvatarConfig } from "@kyzen/avatar";
+import { profiles } from "@kyzen/database";
 import {
   isReservedUsername,
   isValidUsernameFormat,
   normalizeUsername,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { env } from "./env";
 import { predictAvatarStyle } from "./services/gender-detection";
 import {

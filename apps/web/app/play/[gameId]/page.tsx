@@ -5,7 +5,7 @@ import {
   type MessageJson,
   type MoveJson,
   normalizeGameCode,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";

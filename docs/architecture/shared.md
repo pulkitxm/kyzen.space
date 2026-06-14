@@ -1,19 +1,19 @@
-# `@gamelobby/shared` - the foundational package
+# `@kyzen/shared` - the foundational package
 
 ## What this is / why it matters
 
-`@gamelobby/shared` (`packages/shared/`) is the **base of the dependency graph**: every other package and both apps import it, and it imports nothing but `@gamelobby/avatar`. It is the home of two things and only two things:
+`@kyzen/shared` (`packages/shared/`) is the **base of the dependency graph**: every other package and both apps import it, and it imports nothing but `@kyzen/avatar`. It is the home of two things and only two things:
 
-- **all shared constant *values*** - exported from the `@gamelobby/shared/constants` subpath, and
-- **all shared TypeScript *types* and *Zod schemas*** (plus the re-exported `z`) - exported from the `@gamelobby/shared/types` subpath.
+- **all shared constant *values*** - exported from the `@kyzen/shared/constants` subpath, and
+- **all shared TypeScript *types* and *Zod schemas*** (plus the re-exported `z`) - exported from the `@kyzen/shared/types` subpath.
 
-The point is a single source of truth that is *framework-agnostic* (no React) and *runtime-light*, so it can be imported by the React-free server, the Drizzle-based `@gamelobby/database`, the engine package `@gamelobby/games-core`, the React boards in `@gamelobby/games-client`, **and** the Next.js app - without dragging any of them into a dependency they shouldn't have. Two rules make that work:
+The point is a single source of truth that is *framework-agnostic* (no React) and *runtime-light*, so it can be imported by the React-free server, the Drizzle-based `@kyzen/database`, the engine package `@kyzen/games-core`, the React boards in `@kyzen/games-client`, **and** the Next.js app - without dragging any of them into a dependency they shouldn't have. Two rules make that work:
 
-> **Zod lives here, and only here.** `@gamelobby/shared` is the only package that declares `zod` (`package.json:17`). Schemas are defined once and consumed everywhere; no other package re-declares the dependency.
+> **Zod lives here, and only here.** `@kyzen/shared` is the only package that declares `zod` (`package.json:17`). Schemas are defined once and consumed everywhere; no other package re-declares the dependency.
 >
 > **Types + schemas go in `types/`; constant values go in `constants/`.** A type or a `z.…` schema belongs under `src/types/`; a literal value (`THEME_IDS`, `GAME_TYPES`, `CHAT_EVENTS`, numeric bounds, …) belongs under `src/constants/`.
 
-This is also why the chat contract no longer has its own package: the former `@gamelobby/chat-core` was folded in here (its DTOs/schemas under `types/chat/`, its `CHAT_EVENTS` registry under `constants/`).
+This is also why the chat contract no longer has its own package: the former `@kyzen/chat-core` was folded in here (its DTOs/schemas under `types/chat/`, its `CHAT_EVENTS` registry under `constants/`).
 
 ## Files at a glance
 
@@ -37,7 +37,7 @@ This is also why the chat contract no longer has its own package: the former `@g
 | `packages/shared/src/types/audio.ts` | `AudioChannelPrefs` (`{ volume, muted }`) - a plain type (no Zod) for the two client-only audio preference channels. |
 | `packages/shared/src/types/z.ts` | `export { z } from "zod"` (+ `ZodType` / `ZodTypeAny`) - the single import point for Zod. |
 | `packages/shared/src/types/theme.ts` / `pattern.ts` / `glass.ts` / `chat-layout.ts` / `username.ts` | Per-area schemas + inferred types + small guards/helpers (`isValidTheme`, `isValidGlassMode`, `validateChatModePref`, `normalizeUsername`, …). |
-| `packages/shared/src/types/avatar.ts` | Re-exports `AvatarConfig` (and friends) from `@gamelobby/avatar`, and defines `avatarConfigSchema` (the Zod schema used to validate an avatar config on the wire). |
+| `packages/shared/src/types/avatar.ts` | Re-exports `AvatarConfig` (and friends) from `@kyzen/avatar`, and defines `avatarConfigSchema` (the Zod schema used to validate an avatar config on the wire). |
 | `packages/shared/src/types/playing-cards.ts` | `Suit` / `Rank` / `JokerVariant` for the playing-card renderer (see [playing-cards.md](./playing-cards.md)). |
 | `packages/shared/src/types/chat/` | The former `chat-core`: `dto.ts` (DTOs), `schemas.ts` (`gameCardMetaSchema`, `clientCreateGameInConversationSchema`, …), `socket-events.ts` (client/server payload types + `Ack`). |
 | `packages/shared/src/types/games/` | `core.ts` (`gameTypeSchema` + `GameType`), `code.ts` (`gameCodeSchema`/`generateGameCode`/`normalizeGameCode`/`isGameCode` - the public room code), `definition.ts` (`GameDefinition`/`GameMeta`/`ConfigField`), `engine.ts` (`GameEngine`/`Outcome`/`Seat`/`MoveContext`), `wire.ts` (`GameJson`/`MoveJson`/`gamePlayerSchema`/`clientJoinRoom`/`clientMakeMove`/`clientQueueJoin`/`clientQueueLeave`/`ServerMatchFoundPayload`), `series.ts` (rematch-series score + summary types/schemas), and per-game schemas under `games/<type>/`. |
@@ -58,8 +58,8 @@ This is also why the chat contract no longer has its own package: the former `@g
 So a caller imports **values** from one subpath and **types/schemas** from the other:
 
 ```ts
-import { THEME_IDS, GAME_TYPES, CHAT_EVENTS } from "@gamelobby/shared/constants";
-import { type GameType, gameTypeSchema, type GameRow } from "@gamelobby/shared/types";
+import { THEME_IDS, GAME_TYPES, CHAT_EVENTS } from "@kyzen/shared/constants";
+import { type GameType, gameTypeSchema, type GameRow } from "@kyzen/shared/types";
 ```
 
 The split is a convention, not a hard wall (the root `.` export re-exports both), but keeping value imports on `/constants` and type/schema imports on `/types` is what makes the layering legible - and it mirrors the internal directory split.
@@ -77,13 +77,13 @@ So the runtime edge is one-way (`types` → `constants`), while the type edge po
 
 `THEME_IDS` (`constants/theme.ts:3`, a `readonly` tuple) is the seed everything else derives from:
 
-`THEME_IDS` (`constants/theme.ts:3`) -> `themeIdSchema = z.enum(THEME_IDS)` (`types/theme.ts:4`) -> `type ThemeId = z.infer<typeof themeIdSchema>` (`types/theme.ts:5`) -> `DEFAULT_THEME = "amber" as const satisfies ThemeId` (checked against that type, `constants/theme.ts:17`) -> consumed by the Postgres enum `themeEnum = pgEnum("app_theme", THEME_IDS)` in `@gamelobby/database` (`packages/database/src/schema.ts:41`) **and** by the web palette table (`apps/web/lib/themes.ts`, which re-exports the shared core and adds the presentation-only palette).
+`THEME_IDS` (`constants/theme.ts:3`) -> `themeIdSchema = z.enum(THEME_IDS)` (`types/theme.ts:4`) -> `type ThemeId = z.infer<typeof themeIdSchema>` (`types/theme.ts:5`) -> `DEFAULT_THEME = "amber" as const satisfies ThemeId` (checked against that type, `constants/theme.ts:17`) -> consumed by the Postgres enum `themeEnum = pgEnum("app_theme", THEME_IDS)` in `@kyzen/database` (`packages/database/src/schema.ts:41`) **and** by the web palette table (`apps/web/lib/themes.ts`, which re-exports the shared core and adds the presentation-only palette).
 
 One tuple, and the DB enum, the Zod validator, the TS union, and the default value can never disagree.
 
 ## What lives under `types/games/`
 
-The game contract that the engine (`@gamelobby/games-core`) and the boards (`@gamelobby/games-client`) build on is all here:
+The game contract that the engine (`@kyzen/games-core`) and the boards (`@kyzen/games-client`) build on is all here:
 
 - `core.ts:4` - `gameTypeSchema = z.enum(GAME_TYPES)` and `type GameType = z.infer<…>` (`:5`). The literal union derives from the `GAME_TYPES` constant (`constants/games.ts:3`), so `GameType` is the registry of valid game-type strings.
 - `code.ts` - the **public game room code**: `GAME_CODE_ALPHABET` (`:3`, Crockford base32 minus I/L/O/U) + `GAME_CODE_LENGTH` (`:4`, 6), `generateGameCode()` (`:8`, unbiased `crypto.getRandomValues`), `normalizeGameCode()` (`:16`, uppercases and maps I/L→1, O→0 so typed codes are forgiving), `isGameCode()` (`:20`), and `gameCodeSchema` (`:24`, normalizes then validates `^[0-9A-HJKMNP-TV-Z]{6}$`). The code is the game id clients see in URLs and socket payloads; the UUID `game.id` stays internal - see [`generic-game-schema.md`](./generic-game-schema.md).
@@ -93,11 +93,11 @@ The game contract that the engine (`@gamelobby/games-core`) and the boards (`@ga
 - `series.ts` - the **rematch-series** contract: `seriesScoreEntrySchema` (`:6`, `{ userId, username, wins, avatar? }`), `seriesScoreSchema` (`:13`, `{ entries, draws, completedGames, totalGames }`), `seriesGameSummarySchema` (`:20`, a per-game row: `gameId` code, 1-based `gameNumber`, `status`, `winner`, `winnerUsername`, `completedAt`), and `seriesDetailSchema` (`:29`, `{ seriesId, gameType, score, games }`), each with its `z.infer` type. `SeriesScore` is what the chat game card embeds (`GameCardMeta.seriesScore`) and `SeriesDetail` is the `GET /api/games/:gameId/series` body. See [`server-api.md`](./server-api.md) and [`realtime.md`](./realtime.md).
 - `games/<type>/schemas.ts` - one folder per registered game holds its strict Zod `stateSchema` / `moveSchema` / `configSchema` and the `z.infer` types (e.g. `games/tic-tac-toe/schemas.ts`).
 
-`@gamelobby/games-core` then imports these to assemble each `GameDefinition` and to derive its registry; it holds the engines and the `GAMES` array, but no schemas. See [`games-core-schemas.md`](./games-core-schemas.md) and [`games-core-engine.md`](./games-core-engine.md).
+`@kyzen/games-core` then imports these to assemble each `GameDefinition` and to derive its registry; it holds the engines and the `GAMES` array, but no schemas. See [`games-core-schemas.md`](./games-core-schemas.md) and [`games-core-engine.md`](./games-core-engine.md).
 
 ## What lives under `types/db/`
 
-`@gamelobby/database` is server-only (it pulls in `drizzle-orm` + `postgres`), so the **row and domain types it returns are declared here** instead, where `apps/web` can read them without importing the database package. `types/db/index.ts` hand-writes `GameRow` (`:98`, which carries the nullable `seriesId` at `:110`), `MoveRow`, `GamePlayerRow`, `UserProfileRow`, the auth rows (`UserRow` at `:40` carries the guest flag `isAnonymous: boolean` at `:46`, mirroring the `user.is_anonymous` column), the `AccountMergeRow` (`:53`) + its `AccountMergeStatus` union (`:51`, `pending` / `confirmed` / `discarded`) backing the guest-identity merge ledger, plus domain aggregates like `GameRecord` (`:213`), `CreateGameInput` (`:218`, whose optional `seriesId` at `:228` lets a rematch pass its parent's series id through), and `GameUpdate` (`:231`). `types/db/io.ts` holds the **repository-input Zod schemas** - `createGameInputSchema` (`:15`, including the optional `seriesId` at `:25`), `addMoveInputSchema` (`:28`), `createMessageInputSchema`, `recordAccountMergeInputSchema` (`:57`, anon/target ids, refined to differ) + `accountMergeStatusSchema` (`:51`), and `appearancePatchSchema` (`:72`) - which the repositories `parse()` before writing; `notificationTypeSchema` itself now comes from `types/chat/schemas.ts` (imported into `db/io.ts` rather than redefined). The `accountMerge` repository namespace in `@gamelobby/database` validates against these and backs the merge endpoints (see [`server-api.md`](./server-api.md)). The schema-vs-type agreement is enforced by `drift-guard.ts` in `@gamelobby/database` (see [`database-schema.md`](./database-schema.md)).
+`@kyzen/database` is server-only (it pulls in `drizzle-orm` + `postgres`), so the **row and domain types it returns are declared here** instead, where `apps/web` can read them without importing the database package. `types/db/index.ts` hand-writes `GameRow` (`:98`, which carries the nullable `seriesId` at `:110`), `MoveRow`, `GamePlayerRow`, `UserProfileRow`, the auth rows (`UserRow` at `:40` carries the guest flag `isAnonymous: boolean` at `:46`, mirroring the `user.is_anonymous` column), the `AccountMergeRow` (`:53`) + its `AccountMergeStatus` union (`:51`, `pending` / `confirmed` / `discarded`) backing the guest-identity merge ledger, plus domain aggregates like `GameRecord` (`:213`), `CreateGameInput` (`:218`, whose optional `seriesId` at `:228` lets a rematch pass its parent's series id through), and `GameUpdate` (`:231`). `types/db/io.ts` holds the **repository-input Zod schemas** - `createGameInputSchema` (`:15`, including the optional `seriesId` at `:25`), `addMoveInputSchema` (`:28`), `createMessageInputSchema`, `recordAccountMergeInputSchema` (`:57`, anon/target ids, refined to differ) + `accountMergeStatusSchema` (`:51`), and `appearancePatchSchema` (`:72`) - which the repositories `parse()` before writing; `notificationTypeSchema` itself now comes from `types/chat/schemas.ts` (imported into `db/io.ts` rather than redefined). The `accountMerge` repository namespace in `@kyzen/database` validates against these and backs the merge endpoints (see [`server-api.md`](./server-api.md)). The schema-vs-type agreement is enforced by `drift-guard.ts` in `@kyzen/database` (see [`database-schema.md`](./database-schema.md)).
 
 ## What lives under `types/chat/`
 
@@ -105,10 +105,10 @@ The chat/social contract that web and server share: `dto.ts` (the `*Json` DTOs, 
 
 ## Gotchas, invariants & conventions
 
-- **`zod` belongs to `shared` only.** It is declared in `packages/shared/package.json:17` and nowhere else. If another package needs Zod, it imports the schema (or the re-exported `z` from `@gamelobby/shared/types`) - it does not add `zod` to its own `package.json`.
-- **`avatar` is the one exception.** `@gamelobby/avatar` is a leaf with **no Zod** - a deliberate carve-out (it owns `AvatarConfig` + DiceBear generation). `shared` re-exports `AvatarConfig` from it (`types/avatar.ts:3`); `shared` depends on `avatar`, never the reverse.
+- **`zod` belongs to `shared` only.** It is declared in `packages/shared/package.json:17` and nowhere else. If another package needs Zod, it imports the schema (or the re-exported `z` from `@kyzen/shared/types`) - it does not add `zod` to its own `package.json`.
+- **`avatar` is the one exception.** `@kyzen/avatar` is a leaf with **no Zod** - a deliberate carve-out (it owns `AvatarConfig` + DiceBear generation). `shared` re-exports `AvatarConfig` from it (`types/avatar.ts:3`); `shared` depends on `avatar`, never the reverse.
 - **Values vs. types stay separated.** Put a literal in `constants/`; put a schema or type in `types/`. The `constants → types` reference must be `import type` (so it erases) - a value import from `constants/` into `types/` is fine, but a *value* import the other way would create a real cycle.
-- **`GameType` derives from a constant, not from the registry.** `gameTypeSchema = z.enum(GAME_TYPES)` (`types/games/core.ts:4`) reads the `GAME_TYPES` list (`constants/games.ts:3`). Adding a game means appending its literal to `GAME_TYPES` here as well as shipping its schemas + engine - keep them in lockstep with the `GAMES` array in `@gamelobby/games-core`.
+- **`GameType` derives from a constant, not from the registry.** `gameTypeSchema = z.enum(GAME_TYPES)` (`types/games/core.ts:4`) reads the `GAME_TYPES` list (`constants/games.ts:3`). Adding a game means appending its literal to `GAME_TYPES` here as well as shipping its schemas + engine - keep them in lockstep with the `GAMES` array in `@kyzen/games-core`.
 - **No React, no DB driver, no server runtime.** `shared` must stay importable from every workspace; don't pull `react`, `drizzle-orm`, `postgres`, or `socket.io` into it.
 - **No comments in code.** Per the repo-wide rule, source under `packages/shared/src/` is comment-free; prose belongs here in `docs/`.
 
@@ -116,7 +116,7 @@ The chat/social contract that web and server share: `dto.ts` (the `*Json` DTOs, 
 
 - [`./README.md`](./README.md) - the architecture index and the package dependency graph.
 - [`./games-core-schemas.md`](./games-core-schemas.md) - `GameDefinition<S,I,C>`, the wire/socket schemas, and the `.strict()` + `z.infer` discipline (the `types/games/` contract).
-- [`./games-core-engine.md`](./games-core-engine.md) - the engines and registry in `@gamelobby/games-core` that build on those types.
+- [`./games-core-engine.md`](./games-core-engine.md) - the engines and registry in `@kyzen/games-core` that build on those types.
 - [`./database-schema.md`](./database-schema.md) - how the hand-written `types/db/` row types are kept honest against the Drizzle schema by `drift-guard.ts`.
 - [`./database.md`](./database.md) - the repositories that validate inputs with the `types/db/io.ts` Zod schemas.
 - [`./chat-core.md`](./chat-core.md) - the chat DTOs (`types/chat/`) and the `CHAT_EVENTS` socket contract.

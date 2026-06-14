@@ -5,7 +5,7 @@ import type {
   Outcome,
   TicTacToeMove,
   TicTacToeState,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import {
   emptyBoard,
   isBoardFull,

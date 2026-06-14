@@ -20,7 +20,7 @@ export type {
   PublicUserRow,
   SeatingMode,
   UserProfileRow,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 
 import {
   createDb as createDbImpl,

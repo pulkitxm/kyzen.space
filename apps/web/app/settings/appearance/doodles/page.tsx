@@ -4,7 +4,7 @@ import { DoodlePicker } from "@/app/settings/doodle-picker";
 import { getAccountSessions } from "@/lib/get-account-sessions";
 
 export const metadata: Metadata = {
-  title: "Doodles · Settings · GameLobby",
+  title: "Doodles · Settings · Kyzen",
 };
 
 export const dynamic = "force-dynamic";

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { dbState, gameCardDbMock } from "./support/game-card-state";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
 const CODE = "K7P2QX";
 
-mock.module("@gamelobby/database", gameCardDbMock);
+mock.module("@kyzen/database", gameCardDbMock);
 
 const { assembleMessage } = await import("../src/chat/assemble");
 

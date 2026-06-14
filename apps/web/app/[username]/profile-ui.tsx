@@ -1,4 +1,4 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import Image from "next/image";
 import Link from "next/link";
 import { FaEllipsis, FaGamepad, FaHeart, FaRegCalendar } from "react-icons/fa6";

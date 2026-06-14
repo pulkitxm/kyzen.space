@@ -7,8 +7,7 @@ import { getServerSession } from "@/lib/get-server-session";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description:
-    "Sign in with your Google account to play and chat on GameLobby.",
+  description: "Sign in with your Google account to play and chat on Kyzen.",
 };
 
 export const dynamic = "force-dynamic";

@@ -4,7 +4,7 @@
 
 **Goal:** When a guest (anonymous Better Auth user) later signs in with Google, offer a consent-gated nudge that migrates their games, chats, friends, and stats onto the real account. The migration runs server-side, only after the target user confirms, and never trusts a client-supplied anon id.
 
-**Architecture:** A new `account_merge` table records every anon→target link the moment Better Auth's `onLinkAccount` fires during the OAuth callback (`status = "pending"`). The web app, after sign-in, calls `GET /api/account/merge/pending`; if a pending row exists it shows counts (games / chats / friends / stat lines) plus the target email, with Merge / Discard buttons. `POST /api/account/merge/:id/confirm` (authenticated *as the target*, ownership-asserted) runs the `mergeAccounts(anonId, targetId)` transaction - reassigning every row keyed on `anonId`, collapsing self-references (self-friendship, self-DM, self-play seat), summing `profile.stats` per gameType, dropping self-targeted notifications, deleting the anon profile and the anon `user` row - then marks the merge `confirmed`. `POST /api/account/merge/:id/discard` deletes the anon user + its FK-cascaded data (plus the FK-less `game_player`/`move` rows) and marks `discarded`. All DB work lives in a new `@gamelobby/database` repository; the merge is idempotent (only a `pending` row is actionable).
+**Architecture:** A new `account_merge` table records every anon→target link the moment Better Auth's `onLinkAccount` fires during the OAuth callback (`status = "pending"`). The web app, after sign-in, calls `GET /api/account/merge/pending`; if a pending row exists it shows counts (games / chats / friends / stat lines) plus the target email, with Merge / Discard buttons. `POST /api/account/merge/:id/confirm` (authenticated *as the target*, ownership-asserted) runs the `mergeAccounts(anonId, targetId)` transaction - reassigning every row keyed on `anonId`, collapsing self-references (self-friendship, self-DM, self-play seat), summing `profile.stats` per gameType, dropping self-targeted notifications, deleting the anon profile and the anon `user` row - then marks the merge `confirmed`. `POST /api/account/merge/:id/discard` deletes the anon user + its FK-cascaded data (plus the FK-less `game_player`/`move` rows) and marks `discarded`. All DB work lives in a new `@kyzen/database` repository; the merge is idempotent (only a `pending` row is actionable).
 
 **Tech Stack:** Better Auth 1.6.11 (`better-auth/plugins` `anonymous`, `onLinkAccount`), Drizzle/Postgres (single `db.transaction`), Hono routes (`requireAuth`), Next.js 16 App Router + framer-motion (already in `apps/web`), Bun test (`mock.module` for unit; `integration/harness.ts` for DB-backed).
 
@@ -81,7 +81,7 @@ export const recordAccountMergeInputSchema = z
   });
 ```
 
-(`db/index.ts` re-exports `./io` via `export * from "./io"` at line 17, so both schemas are reachable from `@gamelobby/shared/types`.)
+(`db/index.ts` re-exports `./io` via `export * from "./io"` at line 17, so both schemas are reachable from `@kyzen/shared/types`.)
 
 - [ ] **Step 3: Verify type-check still passes (no DB table yet, so the guard entry is added in Task 2)**
 
@@ -105,7 +105,7 @@ git commit -m "feat(shared): add AccountMergeRow type and account-merge input sc
 
 - [ ] **Step 1: Add the `account_merge` table**
 
-In `packages/database/src/schema.ts`, first extend the `@gamelobby/shared/types` type import block (lines 9-22) to include `AccountMergeStatus`:
+In `packages/database/src/schema.ts`, first extend the `@kyzen/shared/types` type import block (lines 9-22) to include `AccountMergeStatus`:
 
 ```ts
 import type {
@@ -122,7 +122,7 @@ import type {
   NotificationType,
   ProfileStats,
   SeatingMode,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 ```
 
 Then append the table at the end of the file (after the `notification` table, which closes at line 298):
@@ -167,7 +167,7 @@ import type {
   UserProfileRow,
   UserRow,
   VerificationRow,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type {
   account,
   accountMerge,
@@ -246,7 +246,7 @@ import { describe, expect, it } from "bun:test";
 import {
   accountMergeStatusSchema,
   recordAccountMergeInputSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 
 describe("account-merge input schemas", () => {
   it("accepts a distinct anon/target pair", () => {
@@ -288,7 +288,7 @@ describe("account-merge input schemas", () => {
 - [ ] **Step 2: Run the test to verify it passes against the Task 1 schemas**
 
 Run: `cd packages/database && bun test tests/account-merge-input.test.ts`
-Expected: PASS (4 tests). This file only exercises `recordAccountMergeInputSchema` / `accountMergeStatusSchema`, which were already added to `@gamelobby/shared/types` in Task 1, so it is green the moment it is written - it is a regression guard on the input schemas, not a red-then-green checkpoint for the repository. (If it FAILs with "not exported", Task 1 was not applied; apply Task 1 first.) The repository code itself is exercised DB-backed in the Task 5 integration suite.
+Expected: PASS (4 tests). This file only exercises `recordAccountMergeInputSchema` / `accountMergeStatusSchema`, which were already added to `@kyzen/shared/types` in Task 1, so it is green the moment it is written - it is a regression guard on the input schemas, not a red-then-green checkpoint for the repository. (If it FAILs with "not exported", Task 1 was not applied; apply Task 1 first.) The repository code itself is exercised DB-backed in the Task 5 integration suite.
 
 - [ ] **Step 3: Implement the repository (record / lookup / resolve / summarize / delete)**
 
@@ -298,8 +298,8 @@ Create `packages/database/src/repositories/account-merge.ts`:
 import type {
   AccountMergeRow,
   AccountMergeStatus,
-} from "@gamelobby/shared/types";
-import { recordAccountMergeInputSchema } from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
+import { recordAccountMergeInputSchema } from "@kyzen/shared/types";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "../client";
 import {
@@ -720,7 +720,7 @@ Create `apps/server/integration/account-merge.test.ts`:
 
 ```ts
 import { afterAll, describe, expect, it } from "bun:test";
-import { accountMerge, db, friends, schema } from "@gamelobby/database";
+import { accountMerge, db, friends, schema } from "@kyzen/database";
 import { and, eq, or } from "drizzle-orm";
 import { createHarness, DB_UP, type TestUser } from "./harness";
 
@@ -1078,10 +1078,10 @@ With `disableDeleteAnonymousUser: true` (set in Phase 0), `onLinkAccount` fires 
 
 - [ ] **Step 1: Add the import**
 
-`apps/server/src/auth.ts:1` already imports named bindings from `@gamelobby/database` (`import { db, schema } from "@gamelobby/database";`). Add `accountMerge` to that **same** import statement (do NOT add a second `import ... from "@gamelobby/database"` - Biome's `organizeImports` would merge them and `bun run check` would fail on the unorganized state). Change line 1 to:
+`apps/server/src/auth.ts:1` already imports named bindings from `@kyzen/database` (`import { db, schema } from "@kyzen/database";`). Add `accountMerge` to that **same** import statement (do NOT add a second `import ... from "@kyzen/database"` - Biome's `organizeImports` would merge them and `bun run check` would fail on the unorganized state). Change line 1 to:
 
 ```ts
-import { accountMerge, db, schema } from "@gamelobby/database";
+import { accountMerge, db, schema } from "@kyzen/database";
 ```
 
 - [ ] **Step 2: Wire `onLinkAccount` in the anonymous plugin config**
@@ -1178,7 +1178,7 @@ mock.module("../src/auth", () => ({
   }),
 }));
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   accountMerge: {
     getPendingForTarget: async () => pendingRow,
     getById: async () => byId,
@@ -1353,7 +1353,7 @@ Expected: FAIL - the `/merge/*` routes do not exist yet (404s where 200/403/409 
 The existing `accountRouter` is `new Hono()` with no env. The merge handlers need `c.get("userId")` / `c.get("user")` typed, so switch it to the `AuthEnv`-typed router and add the imports. In `apps/server/src/api/routes/account.ts`, replace the import header (lines 1-2) and the router declaration (line 4):
 
 ```ts
-import { accountMerge } from "@gamelobby/database";
+import { accountMerge } from "@kyzen/database";
 import { Hono } from "hono";
 import { getAuth } from "../../auth";
 import { type AuthEnv, requireAuth } from "../middleware/auth";
@@ -1731,7 +1731,7 @@ Document the three `/api/account/merge/*` routes: `requireAuth`, the `session.us
 
 - [ ] **Step 3: Note the new shared type in `docs/architecture/shared.md`**
 
-Record `AccountMergeRow` + `AccountMergeStatus` (in `types/db`) and `accountMergeStatusSchema` / `recordAccountMergeInputSchema` (in `types/db/io`), plus the new `@gamelobby/database` `accountMerge` namespace.
+Record `AccountMergeRow` + `AccountMergeStatus` (in `types/db`) and `accountMergeStatusSchema` / `recordAccountMergeInputSchema` (in `types/db/io`), plus the new `@kyzen/database` `accountMerge` namespace.
 
 - [ ] **Step 4: Verify the doc gate passes**
 

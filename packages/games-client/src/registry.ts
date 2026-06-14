@@ -1,5 +1,5 @@
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { GameType } from "@gamelobby/shared/types";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { GameType } from "@kyzen/shared/types";
 import type { ComponentType } from "react";
 import { TicTacToeGameClient } from "./games/tic-tac-toe/client";
 import { TicTacToeSkeleton } from "./games/tic-tac-toe/skeleton";

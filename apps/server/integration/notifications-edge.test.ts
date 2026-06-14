@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { friends, notifications } from "@gamelobby/database";
+import { friends, notifications } from "@kyzen/database";
 import * as friendsService from "../src/chat/friends-service";
 import { createHarness, DB_UP, type TestUser, unwrap } from "./harness";
 

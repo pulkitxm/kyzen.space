@@ -121,7 +121,7 @@ Socket.IO connection the chat lane uses, passed down as a prop.
   one hand-authored decorative SVG, the same raw-SVG exception the playing-cards
   use.
 - **Sound** - the board uses the shared `useGameAudio()` hook
-  (`@gamelobby/games-client`, see [audio.md](../architecture/audio.md)). All sounds
+  (`@kyzen/games-client`, see [audio.md](../architecture/audio.md)). All sounds
   are audio files (no synthesis). A **hover** sound (`onMouseEnter`) and a
   **touch** sound (`onClick`) fire only on a **playable** cell (empty, your turn,
   in a live game) guarded by the same `playable` flag that drives the cell's

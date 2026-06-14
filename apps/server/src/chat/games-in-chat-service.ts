@@ -4,14 +4,14 @@ import {
   games,
   profiles,
   type SeatingMode,
-} from "@gamelobby/database";
-import { getDefinition, hasEngine } from "@gamelobby/games-core";
+} from "@kyzen/database";
+import { getDefinition, hasEngine } from "@kyzen/games-core";
 import type {
   GameCardMeta,
   GameJson,
   GameType,
   MessageJson,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { serializeGame } from "../api/serialize";
 import { notify } from "../realtime/notify";
 import { sendMessage } from "./messages-service";

@@ -65,7 +65,7 @@ Migration generated via `drizzle-kit generate`; applied locally with `db:push`
 
 ## 2. Shared types (new)
 
-In `@gamelobby/shared/types` (under `games/` for the series types; `chat/` for the
+In `@kyzen/shared/types` (under `games/` for the series types; `chat/` for the
 card-meta extension):
 
 ```ts

@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { conversations, db, games, schema } from "@gamelobby/database";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { conversations, db, games, schema } from "@kyzen/database";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { eq } from "drizzle-orm";
 import { createGameInConversation } from "../src/chat/games-in-chat-service";
 import { runPairing } from "../src/realtime/matchmaking";

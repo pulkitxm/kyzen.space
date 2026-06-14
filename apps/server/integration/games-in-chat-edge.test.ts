@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { games } from "@gamelobby/database";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { games } from "@kyzen/database";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { createGameInConversation } from "../src/chat/games-in-chat-service";
 import { createHarness, DB_UP, expectErr, unwrap } from "./harness";
 

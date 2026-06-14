@@ -1,10 +1,10 @@
-import { games, profiles } from "@gamelobby/database";
-import { getDefinition, hasEngine } from "@gamelobby/games-core";
+import { games, profiles } from "@kyzen/database";
+import { getDefinition, hasEngine } from "@kyzen/games-core";
 import {
   type GameType,
   isGameOver,
   type ServerJoinByCodeResult,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { fail, ok, type ServiceResult } from "../chat/result";
 
 export async function createStandaloneGame(input: {

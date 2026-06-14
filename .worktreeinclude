@@ -7,6 +7,6 @@
 .env.local
 
 # Installed deps: root + every workspace node_modules (the bare pattern matches all levels).
-# Bun's symlinks (.bun/* and the @gamelobby/* workspace links) are relative, so they
+# Bun's symlinks (.bun/* and the @kyzen/* workspace links) are relative, so they
 # resolve correctly inside the copied worktree - no `bun install` needed.
 node_modules/

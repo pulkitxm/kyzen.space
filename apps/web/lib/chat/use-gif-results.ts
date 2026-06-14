@@ -1,4 +1,4 @@
-import type { GifJson } from "@gamelobby/shared/types";
+import type { GifJson } from "@kyzen/shared/types";
 import { useAtom } from "jotai";
 import {
   useCallback,

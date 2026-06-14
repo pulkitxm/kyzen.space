@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { TicTacToeState } from "@gamelobby/shared/types";
+import type { TicTacToeState } from "@kyzen/shared/types";
 import { emptyBoard, ticTacToeEngine } from "../src/index";
 
 const autoMove = ticTacToeEngine.autoMove;

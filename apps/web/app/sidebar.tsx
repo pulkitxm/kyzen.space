@@ -1,7 +1,7 @@
 "use client";
 
-import type { AvatarConfig } from "@gamelobby/avatar";
-import { getCategoryGroups } from "@gamelobby/games-core";
+import type { AvatarConfig } from "@kyzen/avatar";
+import { getCategoryGroups } from "@kyzen/games-core";
 import { useAtom } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
@@ -266,7 +266,7 @@ export function Sidebar({
             paddingLeft: displayCollapsed ? 8 : 0,
           }}
         >
-          <Logo variant="icon" iconClassName="size-7" label="GameLobby" />
+          <Logo variant="icon" iconClassName="size-7" label="Kyzen" />
           <Logo
             variant="text"
             decorative

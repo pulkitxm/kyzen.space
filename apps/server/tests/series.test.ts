@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { GameRecord } from "@gamelobby/database";
+import type { GameRecord } from "@kyzen/database";
 import { computeSeriesScore } from "../src/chat/series";
 
 type Player = {

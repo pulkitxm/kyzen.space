@@ -6,7 +6,7 @@ import {
   expect,
   it,
 } from "bun:test";
-import { db, profiles, schema } from "@gamelobby/database";
+import { db, profiles, schema } from "@kyzen/database";
 import { eq } from "drizzle-orm";
 import { generateGuestName } from "../src/guest-name";
 import { ensureUsernameForUser } from "../src/username";

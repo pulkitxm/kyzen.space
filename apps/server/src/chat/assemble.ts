@@ -9,14 +9,14 @@ import {
   messages,
   type NotificationRow,
   profiles,
-} from "@gamelobby/database";
+} from "@kyzen/database";
 import type {
   ConversationJson,
   FriendshipJson,
   GameCardMeta,
   MessageJson,
   NotificationJson,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import {
   serializeConversation,
   serializeFriendship,

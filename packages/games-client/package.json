@@ -1,5 +1,5 @@
 {
-  "name": "@gamelobby/games-client",
+  "name": "@kyzen/games-client",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,8 +13,8 @@
   "dependencies": {
     "@dicebear/collection": "^9.0.0",
     "@dicebear/core": "^9.0.0",
-    "@gamelobby/avatar": "workspace:*",
-    "@gamelobby/shared": "workspace:*"
+    "@kyzen/avatar": "workspace:*",
+    "@kyzen/shared": "workspace:*"
   },
   "peerDependencies": {
     "motion": "^12",
@@ -24,7 +24,7 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
-    "@gamelobby/games-core": "workspace:*",
+    "@kyzen/games-core": "workspace:*",
     "@types/bun": "^1.1.14",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { ConversationJson, MemberJson } from "@gamelobby/shared/types";
+import type { ConversationJson, MemberJson } from "@kyzen/shared/types";
 import { createStore } from "jotai";
 import {
   type ChatMessage,

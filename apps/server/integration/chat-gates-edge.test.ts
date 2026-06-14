@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { conversations, db, messages, schema } from "@gamelobby/database";
+import { conversations, db, messages, schema } from "@kyzen/database";
 import { and, eq } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as messagesService from "../src/chat/messages-service";
