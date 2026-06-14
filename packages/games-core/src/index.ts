@@ -1,4 +1,23 @@
 export { GAMES } from "./games";
+export { seaBattleDefinition } from "./games/sea-battle";
+export {
+  isTerminal as isSeaBattleTerminal,
+  seaBattleEngine,
+} from "./games/sea-battle/engine";
+export {
+  cellsOf,
+  coordKey,
+  type FleetValidation,
+  fleetLengthsMatch,
+  generateRandomFleet,
+  inBounds,
+  isFleetSunk,
+  isShipSunk,
+  isStraightContiguous,
+  randomUnfiredCell,
+  sunkShips,
+  validateFleet,
+} from "./games/sea-battle/logic";
 export { ticTacToeDefinition } from "./games/tic-tac-toe";
 export {
   emptyBoard,

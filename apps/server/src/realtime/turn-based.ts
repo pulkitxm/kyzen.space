@@ -10,13 +10,14 @@ import {
   type ClientMakeMove,
   type GameJson,
   isGameCode,
+  isGameOver,
   type Outcome,
   type ServerGameStatePayload,
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
 import { broadcastGameCard } from "../chat/game-card-broadcast";
-import { emitToGame, joinGameRoom } from "./rooms";
+import { emitToGame, emitToGamePerSocket, joinGameRoom } from "./rooms";
 import {
   abortOutcome,
   decideTimeout,
@@ -37,6 +38,45 @@ function withTimerFields(game: GameJson, gameId: string): GameJson {
       timeoutStrikes: turnTimers.strikes(gameId, p.role),
     })),
   };
+}
+
+async function emitGameState(
+  io: IOServer,
+  gameRow: GameRecord,
+  payload: ServerGameStatePayload,
+): Promise<void> {
+  const def = getDefinition(gameRow.gameType);
+  const viewFor = def.engine.viewFor;
+  if (!viewFor || isGameOver(gameRow.status)) {
+    emitToGame(io, gameRow.code, "game_state", payload);
+    return;
+  }
+
+  const parsed = def.stateSchema.safeParse(payload.game.gameState);
+  const players = gameRow.players;
+
+  await emitToGamePerSocket(io, gameRow.code, "game_state", (userId) => {
+    const role = players.find((p) => p.userId === userId)?.role ?? null;
+    const gameState = parsed.success
+      ? viewFor(parsed.data, role ?? "")
+      : payload.game.gameState;
+    const next: ServerGameStatePayload = {
+      ...payload,
+      game: { ...payload.game, gameState },
+    };
+    if (payload.moves) {
+      next.moves = payload.moves.map((m) =>
+        m.playerId === userId ? m : { ...m, moveData: null },
+      );
+    }
+    if (payload.move) {
+      next.move =
+        payload.move.playerId === userId
+          ? payload.move
+          : { ...payload.move, moveData: null };
+    }
+    return next;
+  });
 }
 
 function currentRoleOf(gameRow: GameRecord): string | null {
@@ -72,7 +112,7 @@ async function emitFullState(io: IOServer, gameRow: GameRecord) {
     game: withTimerFields(serializeGame(gameRow), gameRow.id),
     moves: moves.map((m) => serializeMove(m, gameRow.code)),
   };
-  emitToGame(io, gameRow.code, "game_state", payload);
+  await emitGameState(io, gameRow, payload);
 }
 
 async function ensureSeated(
@@ -190,7 +230,7 @@ async function applyMove(
     game: withTimerFields(serializeGame(updated), updated.id),
     move: opts.auto ? { ...move, auto: true } : move,
   };
-  emitToGame(io, gameRow.code, "game_state", statePayload);
+  await emitGameState(io, updated, statePayload);
 
   if (updated.status === "completed") {
     turnTimers.dispose(updated.id);
@@ -221,7 +261,7 @@ async function abortGame(
   }
 
   turnTimers.dispose(updated.id);
-  emitToGame(io, gameRow.code, "game_state", {
+  await emitGameState(io, updated, {
     game: withTimerFields(serializeGame(updated), updated.id),
   });
   emitToGame(io, gameRow.code, "game_over", { winner: updated.winner });

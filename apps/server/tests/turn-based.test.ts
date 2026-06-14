@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import { seaBattleEngine } from "@kyzen/games-core";
+import { SEA_BATTLE, TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { SeaBattleShip, SeaBattleState } from "@kyzen/shared/types";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
 const CODE = "K7P2QX";
@@ -653,4 +655,129 @@ describe("handleMakeMove - code guard", () => {
       expect(emits).toHaveLength(0);
     });
   }
+});
+
+function seaBattleShip(
+  row: number,
+  col: number,
+  length: number,
+): SeaBattleShip {
+  return { cells: Array.from({ length }, (_, i) => ({ row, col: col + i })) };
+}
+
+function seaBattleBattleState(): SeaBattleState {
+  const fleetA = [
+    seaBattleShip(0, 0, 5),
+    seaBattleShip(1, 0, 4),
+    seaBattleShip(2, 0, 3),
+    seaBattleShip(3, 0, 3),
+    seaBattleShip(4, 0, 2),
+  ];
+  const fleetB = [
+    seaBattleShip(5, 0, 5),
+    seaBattleShip(6, 0, 4),
+    seaBattleShip(7, 0, 3),
+    seaBattleShip(8, 0, 3),
+    seaBattleShip(9, 0, 2),
+  ];
+  const reduce = seaBattleEngine.reduce;
+  if (!reduce) throw new Error("sea-battle engine has no reduce");
+  const start = seaBattleEngine.createInitialState([
+    { role: "A" },
+    { role: "B" },
+  ]);
+  const a = reduce(start, { role: "A" }, { kind: "place", ships: fleetA });
+  if (!a.ok) throw new Error("A placement failed");
+  const b = reduce(a.state, { role: "B" }, { kind: "place", ships: fleetB });
+  if (!b.ok) throw new Error("B placement failed");
+  return b.state;
+}
+
+type SeaBattleSocket = ReturnType<typeof fakeSocket>;
+
+function fakeIoSockets(sockets: SeaBattleSocket[]) {
+  const broadcast: Emit[] = [];
+  const io = {
+    to: (room: string) => ({
+      emit: (event: string, payload: unknown) =>
+        broadcast.push({ room, event, payload }),
+    }),
+    in: () => ({
+      fetchSockets: async () => sockets.map((s) => s.socket),
+    }),
+  };
+  return { broadcast, io };
+}
+
+type StatePayload = {
+  game: { gameState: SeaBattleState };
+  move?: { moveData: unknown; playerId: string };
+};
+
+function lastGameState(emits: Emit[]): StatePayload | undefined {
+  const found = [...emits].reverse().find((e) => e.event === "game_state");
+  return found?.payload as StatePayload | undefined;
+}
+
+describe("handleMakeMove - hidden-information redaction (sea battle)", () => {
+  function seatSeaBattle() {
+    current = freshGame({
+      gameType: SEA_BATTLE,
+      status: "active",
+      gameState: seaBattleBattleState(),
+      players: [
+        { userId: "u1", username: "u1", role: "A" },
+        { userId: "u2", username: "u2", role: "B" },
+      ],
+    });
+  }
+
+  test("each player gets their own fleet but never the opponent's un-hit ships", async () => {
+    seatSeaBattle();
+    const a = fakeSocket("u1");
+    const b = fakeSocket("u2");
+    const { io } = fakeIoSockets([a, b]);
+
+    await call(handleMakeMove, io, a.socket, {
+      gameId: CODE,
+      moveData: { kind: "fire", row: 5, col: 0 },
+    });
+
+    const aView = lastGameState(a.emits);
+    const bView = lastGameState(b.emits);
+    expect(aView).toBeDefined();
+    expect(bView).toBeDefined();
+    if (!aView || !bView) return;
+
+    expect(aView.game.gameState.fleets.A).toHaveLength(5);
+    expect(aView.game.gameState.fleets.B).toHaveLength(0);
+
+    expect(bView.game.gameState.fleets.B).toHaveLength(5);
+    expect(bView.game.gameState.fleets.A).toHaveLength(0);
+
+    expect(aView.game.gameState.shots.B).toEqual([
+      { row: 5, col: 0, hit: true },
+    ]);
+    expect(bView.game.gameState.shots.B).toEqual([
+      { row: 5, col: 0, hit: true },
+    ]);
+  });
+
+  test("the firing player's move payload is stripped from the opponent", async () => {
+    seatSeaBattle();
+    const a = fakeSocket("u1");
+    const b = fakeSocket("u2");
+    const { io } = fakeIoSockets([a, b]);
+
+    await call(handleMakeMove, io, a.socket, {
+      gameId: CODE,
+      moveData: { kind: "fire", row: 7, col: 0 },
+    });
+
+    const aView = lastGameState(a.emits);
+    const bView = lastGameState(b.emits);
+    expect(aView?.move?.moveData).toEqual({ kind: "fire", row: 7, col: 0 });
+    expect(aView?.move?.playerId).toBe("u1");
+    expect(bView?.move?.moveData).toBeNull();
+  });
 });

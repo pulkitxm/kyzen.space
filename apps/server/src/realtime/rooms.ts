@@ -21,6 +21,19 @@ export function emitToGame(
   io.to(gameRoom(gameId)).emit(event, payload);
 }
 
+export async function emitToGamePerSocket(
+  io: IOServer,
+  gameId: string,
+  event: string,
+  build: (userId: string | undefined) => unknown,
+): Promise<void> {
+  const sockets = await io.in(gameRoom(gameId)).fetchSockets();
+  for (const socket of sockets) {
+    const userId = (socket.data as { userId?: string }).userId;
+    socket.emit(event, build(userId));
+  }
+}
+
 export function convRoom(conversationId: string): string {
   return `conv:${conversationId}`;
 }
