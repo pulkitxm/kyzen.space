@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { GameCardMeta } from "@gamelobby/shared/types";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { GameCardMeta } from "@kyzen/shared/types";
 import { enrichGameCardMeta } from "../src/chat/game-card";
 import * as rooms from "../src/realtime/rooms";
 import { dbState, gameCardDbMock } from "./support/game-card-state";
@@ -85,7 +85,7 @@ describe("enrichGameCardMeta", () => {
 
 const emitted: Array<{ event: string; payload: unknown }> = [];
 
-mock.module("@gamelobby/database", gameCardDbMock);
+mock.module("@kyzen/database", gameCardDbMock);
 mock.module("../src/realtime/rooms", () => ({
   ...realRooms,
   // biome-ignore lint/suspicious/noExplicitAny: test stub

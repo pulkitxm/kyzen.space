@@ -1,5 +1,5 @@
-import type { GameRecord } from "@gamelobby/database";
-import type { SeriesScore, SeriesScoreEntry } from "@gamelobby/shared/types";
+import type { GameRecord } from "@kyzen/database";
+import type { SeriesScore, SeriesScoreEntry } from "@kyzen/shared/types";
 
 export function computeSeriesScore(seriesGames: GameRecord[]): SeriesScore {
   const byUser = new Map<string, SeriesScoreEntry>();

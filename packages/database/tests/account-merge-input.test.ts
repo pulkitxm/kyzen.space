@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   accountMergeStatusSchema,
   recordAccountMergeInputSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 
 describe("account-merge input schemas", () => {
   it("accepts a distinct anon/target pair", () => {

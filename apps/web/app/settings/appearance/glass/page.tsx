@@ -4,7 +4,7 @@ import { GlassPicker } from "@/app/settings/glass-picker";
 import { getAccountSessions } from "@/lib/get-account-sessions";
 
 export const metadata: Metadata = {
-  title: "Glass · Settings · GameLobby",
+  title: "Glass · Settings · Kyzen",
 };
 
 export const dynamic = "force-dynamic";

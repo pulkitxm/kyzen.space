@@ -1,4 +1,4 @@
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import {
   type Cell,
   type GameEngine,
@@ -9,7 +9,7 @@ import {
   type TicTacToeMove,
   type TicTacToeState,
   ticTacToeMoveSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 
 const BOARD_SIZE = 9;
 

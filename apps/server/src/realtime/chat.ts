@@ -1,5 +1,5 @@
-import { conversations, notifications } from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { conversations, notifications } from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
   clientAddMembersSchema,
   clientConversationRefSchema,
@@ -10,7 +10,7 @@ import {
   clientRemoveMemberSchema,
   clientRenameGroupSchema,
   clientSendMessageSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import * as conversationsService from "../chat/conversations-service";
 import * as messagesService from "../chat/messages-service";

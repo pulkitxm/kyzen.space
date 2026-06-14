@@ -6,7 +6,7 @@
 
 **Architecture:** A new `game_invite` table stores a cryptographically random `token` (NOT the 6-char game code), the `inviterUserId`, `gameType`, optional `config`, optional `seatingMode`, and an `expiresAt` defaulting to now + 24h. A new `invites` repository (the only place that touches the table) exposes `create` and `getByToken`, generating the token with a `crypto.randomBytes`-based base64url helper. Three Hono routes under `/api/invite`: `POST /api/invite` (auth) mints a token + row and returns `{ token, url }`; `GET /api/invite/:token` (PUBLIC) peeks, returning only `{ gameType, inviter: { username, avatar }, expired }` (never the inviter's email or any third party's data); `POST /api/invite/:token/accept` (PUBLIC) resolves the token (rejecting expired/unknown with one uniform shape), mints an anonymous session when logged out (Better Auth `auth.api.signInAnonymous` with `returnHeaders: true`, copying `Set-Cookie` onto the Hono response), no-ops self-acceptance, then `getOrCreateDm` + `createGameInConversation` + `notify(inviter, "game_invite", { gameId })`. The web adds a top-level `/invite/[token]` client page that paints `getGameSkeleton(gameType)` + an inviter banner on the first frame from the peek, fires the accept underneath, then crossfades (motion) to `/play/<gameId>`, plus a non-blocking "Add as friend" popup wired to the existing friend-request socket flow, and an "Invite a friend (link)" button in the game lobby.
 
-**Tech Stack:** Drizzle/Postgres, Zod (in `@gamelobby/shared` only), Hono, Better Auth 1.6.11 (`auth.api.signInAnonymous`), Next.js 16 App Router, `motion/react` (`m` + `AnimatePresence`, already wrapped by `LazyMotion`/`domAnimation` in `apps/web/app/providers.tsx`), `react-icons/fa6`, Bun test (`mock.module`).
+**Tech Stack:** Drizzle/Postgres, Zod (in `@kyzen/shared` only), Hono, Better Auth 1.6.11 (`auth.api.signInAnonymous`), Next.js 16 App Router, `motion/react` (`m` + `AnimatePresence`, already wrapped by `LazyMotion`/`domAnimation` in `apps/web/app/providers.tsx`), `react-icons/fa6`, Bun test (`mock.module`).
 
 **Scope note:** This phase depends on Phase 0 (the anonymous plugin must be registered in `apps/server/src/auth.ts` and `isAnonymous` must exist on `user`). The accept route mints anon sessions through the server-side Better Auth API; Phase 0 already set `disableDeleteAnonymousUser: true`, so opening an invite never produces an orphaned auto-deleted row. Links are **reusable until expiry** (each acceptance spins up a fresh game); single-use (`redeemedAt`) is a deferred tweak. A lightweight per-inviter in-memory rate limiter caps mass game creation on `accept`; a cross-node Redis limiter is a follow-up (noted in Task 6).
 
@@ -108,7 +108,7 @@ import type {
   UserProfileRow,
   UserRow,
   VerificationRow,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type {
   account,
   conversation,
@@ -383,7 +383,7 @@ Create `packages/database/tests/invite-token.test.ts`:
 
 ```ts
 import { describe, expect, it } from "bun:test";
-import { generateGameCode } from "@gamelobby/shared/types";
+import { generateGameCode } from "@kyzen/shared/types";
 import { generateInviteToken, INVITE_TOKEN_LENGTH } from "../src/invite-token";
 
 describe("generateInviteToken", () => {
@@ -494,7 +494,7 @@ import {
   type CreateGameInviteInput,
   createGameInviteInputSchema,
   type GameInviteRow,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { eq } from "drizzle-orm";
 import { db } from "../client";
 import { gameInvite } from "../schema";
@@ -559,7 +559,7 @@ export type {
   PublicUserRow,
   SeatingMode,
   UserProfileRow,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 export { createDb, type DB, db, schema } from "./client";
 export {
   generateInviteToken,
@@ -574,7 +574,7 @@ export * as notifications from "./repositories/notifications";
 export * as profiles from "./repositories/profiles";
 ```
 
-(Move the token helper's authoritative test in Task 4 to import from `../src/invite-token` directly - that intra-package relative import is fine; only *cross-package* consumers must use the `@gamelobby/database` barrel.)
+(Move the token helper's authoritative test in Task 4 to import from `../src/invite-token` directly - that intra-package relative import is fine; only *cross-package* consumers must use the `@kyzen/database` barrel.)
 
 - [ ] **Step 3: Run type-check**
 
@@ -606,7 +606,7 @@ Create `apps/server/tests/invite-service.test.ts`:
 
 ```ts
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 
 type Invite = {
   id: string;
@@ -629,7 +629,7 @@ let dmCreated: { a: string; b: string } | null = null;
 let createGameArgs: any = null;
 const notifyCalls: Array<{ userId: string; type: string; payload: unknown }> = [];
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   generateInviteToken: () => "x".repeat(43),
   INVITE_TOKEN_LENGTH: 43,
   invites: {
@@ -867,8 +867,8 @@ import {
   generateInviteToken,
   invites,
   profiles,
-} from "@gamelobby/database";
-import type { AvatarConfig, GameType, SeatingMode } from "@gamelobby/shared/types";
+} from "@kyzen/database";
+import type { AvatarConfig, GameType, SeatingMode } from "@kyzen/shared/types";
 import { env } from "../env";
 import { notify } from "../realtime/notify";
 import { createGameInConversation } from "./games-in-chat-service";
@@ -1022,7 +1022,7 @@ Create `apps/server/tests/invite-route.test.ts`:
 
 ```ts
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 
 type Session = { user: { id: string } } | null;
 let session: Session = null;
@@ -1217,7 +1217,7 @@ Expected: FAIL - module `../src/api/routes/invite` does not exist.
 Create `apps/server/src/api/routes/invite.ts`:
 
 ```ts
-import { gameTypeSchema } from "@gamelobby/shared/types";
+import { gameTypeSchema } from "@kyzen/shared/types";
 import { Hono } from "hono";
 import { getAuth } from "../../auth";
 import {
@@ -1337,8 +1337,8 @@ import {
   generateInviteToken,
   invites,
   notifications,
-} from "@gamelobby/database";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+} from "@kyzen/database";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { acceptInvite, peekInvite } from "../src/chat/invite-service";
 import { createHarness, DB_UP } from "./harness";
 
@@ -1551,7 +1551,7 @@ git commit -m "feat(web): add 'Invite a friend (link)' button to the game lobby"
 
 ## Task 10: Web - the snappy `/invite/[token]` accept page
 
-The page is a client component. On the first frame it paints `getGameSkeleton(gameType)` (from `@gamelobby/games-client`) + an inviter banner, driven by the fast public peek; underneath it fires the POST accept (which mints a guest session via `Set-Cookie` if needed). On success it crossfades the skeleton out (motion `AnimatePresence` + `m.div`, already wrapped by `LazyMotion`/`domAnimation` in `providers.tsx`) and navigates to `/play/<gameId>`; a non-blocking "Add as friend" popup fires the existing friend-request socket flow.
+The page is a client component. On the first frame it paints `getGameSkeleton(gameType)` (from `@kyzen/games-client`) + an inviter banner, driven by the fast public peek; underneath it fires the POST accept (which mints a guest session via `Set-Cookie` if needed). On success it crossfades the skeleton out (motion `AnimatePresence` + `m.div`, already wrapped by `LazyMotion`/`domAnimation` in `providers.tsx`) and navigates to `/play/<gameId>`; a non-blocking "Add as friend" popup fires the existing friend-request socket flow.
 
 **Files:**
 - Create: `apps/web/app/invite/[token]/page.tsx`
@@ -1563,8 +1563,8 @@ Create `apps/web/app/invite/[token]/page.tsx`:
 ```tsx
 "use client";
 
-import { getGameSkeleton } from "@gamelobby/games-client";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { getGameSkeleton } from "@kyzen/games-client";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import { AnimatePresence, m } from "motion/react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";

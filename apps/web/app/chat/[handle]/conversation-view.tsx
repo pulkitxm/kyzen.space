@@ -1,7 +1,7 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { ConversationJson, MessageJson } from "@gamelobby/shared/types";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { ConversationJson, MessageJson } from "@kyzen/shared/types";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";

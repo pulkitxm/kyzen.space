@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Cell } from "@gamelobby/shared/types";
+import type { Cell } from "@kyzen/shared/types";
 import {
   findWinningLine,
   WINNING_LINES,

@@ -2,7 +2,7 @@ import {
   type CreateMessageInput,
   createMessageInputSchema,
   type MessageRow,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { db } from "../client";
 import { message } from "../schema";

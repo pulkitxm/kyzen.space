@@ -5,7 +5,7 @@ import {
   VOLUME_MAX,
   VOLUME_MIN,
   VOLUME_STEP,
-} from "@gamelobby/shared/constants";
+} from "@kyzen/shared/constants";
 import { clampVolume, shouldPlayMusic, stepVolume } from "../src/audio/engine";
 
 describe("clampVolume", () => {

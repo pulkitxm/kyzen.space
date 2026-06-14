@@ -1,4 +1,4 @@
-import type { GameMeta } from "@gamelobby/shared/types";
+import type { GameMeta } from "@kyzen/shared/types";
 import { TutorialButton } from "./tutorial-button";
 
 export function HowToPlay({ meta }: { meta: GameMeta }) {

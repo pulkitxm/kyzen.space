@@ -1,4 +1,4 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -56,7 +56,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await fetchProfile(username);
   if (!data) return {};
   return {
-    title: `${data.profile.username} · GameLobby`,
+    title: `${data.profile.username} · Kyzen`,
     description: `Player profile for @${data.profile.username}`,
   };
 }

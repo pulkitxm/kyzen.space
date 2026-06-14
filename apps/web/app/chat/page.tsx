@@ -5,7 +5,7 @@ import { ChatListClient } from "./chat-client";
 
 export const metadata: Metadata = {
   title: "Chat",
-  description: "Your conversations and group chats on GameLobby.",
+  description: "Your conversations and group chats on Kyzen.",
 };
 
 export const dynamic = "force-dynamic";

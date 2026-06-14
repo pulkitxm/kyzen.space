@@ -3,8 +3,8 @@ import {
   DEFAULT_SFX_VOLUME,
   GAME_MUSIC_STORAGE_KEY,
   GAME_SFX_STORAGE_KEY,
-} from "@gamelobby/shared/constants";
-import type { AudioChannelPrefs } from "@gamelobby/shared/types";
+} from "@kyzen/shared/constants";
+import type { AudioChannelPrefs } from "@kyzen/shared/types";
 import { atomWithStorage, createJSONStorage } from "jotai/utils";
 
 const noopStringStorage = {

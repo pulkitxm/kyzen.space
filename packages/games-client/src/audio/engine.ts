@@ -4,7 +4,7 @@ import {
   VOLUME_MAX,
   VOLUME_MIN,
   VOLUME_STEP,
-} from "@gamelobby/shared/constants";
+} from "@kyzen/shared/constants";
 
 export function clampVolume(value: number): number {
   if (Number.isNaN(value)) return VOLUME_MIN;

@@ -3,8 +3,8 @@ import {
   type GameRecord,
   games,
   profiles,
-} from "@gamelobby/database";
-import { getDefinition } from "@gamelobby/games-core";
+} from "@kyzen/database";
+import { getDefinition } from "@kyzen/games-core";
 import {
   type ClientJoinRoom,
   type ClientMakeMove,
@@ -12,7 +12,7 @@ import {
   isGameCode,
   type Outcome,
   type ServerGameStatePayload,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
 import { broadcastGameCard } from "../chat/game-card-broadcast";

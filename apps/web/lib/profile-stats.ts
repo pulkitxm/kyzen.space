@@ -1,4 +1,4 @@
-import { listGameMeta } from "@gamelobby/games-core";
+import { listGameMeta } from "@kyzen/games-core";
 
 type GameStat = {
   played: number;

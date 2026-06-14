@@ -1,6 +1,6 @@
 # Game video tutorials
 
-`vid-tutorials/` (`@gamelobby/vid-tutorials`) is a [Remotion](https://www.remotion.dev/)
+`vid-tutorials/` (`@kyzen/vid-tutorials`) is a [Remotion](https://www.remotion.dev/)
 workspace that renders one short animated **tutorial video per game** - the
 goal, setup, turns, win conditions, and edge cases of a game in 30-90 seconds
 of motion graphics, themed like the app and scored with the game's own
@@ -67,7 +67,7 @@ without loading compositions.
 ## Theme - the app's tokens, not new ones
 
 `<ThemeRoot>` wraps every composition. It reads `THEMES` /`DEFAULT_THEME` from
-`@gamelobby/shared/constants` (so the default video theme **is** the app's
+`@kyzen/shared/constants` (so the default video theme **is** the app's
 default theme) and sets the same `--d`/`--v` seed variables the web app uses;
 `src/theme/theme.css` derives the full token set (`--background`, `--surface`,
 `--primary`, `--muted-foreground`, `--border`, …) with the same `color-mix`

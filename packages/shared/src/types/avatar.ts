@@ -5,7 +5,7 @@ export type {
   AvatarConfig,
   AvatarOptionKey,
   AvatarStyle,
-} from "@gamelobby/avatar";
+} from "@kyzen/avatar";
 
 export const avatarConfigSchema = z.object({
   skinColor: z.string(),

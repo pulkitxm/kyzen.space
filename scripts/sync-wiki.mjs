@@ -72,7 +72,7 @@ function ownerRepo() {
     const match = url.match(/github\.com[:/]+([^/]+)\/(.+?)(?:\.git)?$/);
     if (match) return { owner: match[1], repo: match[2] };
   } catch {}
-  return { owner: "pulkitxm", repo: "gamelobby.space" };
+  return { owner: "pulkitxm", repo: "kyzen.space" };
 }
 
 function collect() {
@@ -180,7 +180,7 @@ function endWithNewline(text) {
 
 function buildHome() {
   const lines = [
-    "Reference documentation for **GameLobby**, auto-generated from the `docs/` directory of the main repository. Edit the docs in the repo - these pages are overwritten on every push to `main`.",
+    "Reference documentation for **Kyzen**, auto-generated from the `docs/` directory of the main repository. Edit the docs in the repo - these pages are overwritten on every push to `main`.",
     "",
   ];
   for (const section of SECTIONS) {

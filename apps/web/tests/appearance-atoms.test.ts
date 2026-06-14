@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { isValidTheme, type ThemeId } from "@gamelobby/shared/types";
+import { isValidTheme, type ThemeId } from "@kyzen/shared/types";
 import { createStore } from "jotai";
 import {
   glassAtom,

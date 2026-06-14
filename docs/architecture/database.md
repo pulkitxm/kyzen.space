@@ -2,11 +2,11 @@
 
 ## What this is / why it matters
 
-This is the **data-access stack**: `@gamelobby/database` (`packages/database/`), the **server-only** package that owns one Postgres database, modelled with the [Drizzle ORM](https://orm.drizzle.team) and reached through a thin **repository layer** that every route and realtime handler funnels through. Only `apps/server` imports it; the Next.js frontend never does. One rule defines the layer:
+This is the **data-access stack**: `@kyzen/database` (`packages/database/`), the **server-only** package that owns one Postgres database, modelled with the [Drizzle ORM](https://orm.drizzle.team) and reached through a thin **repository layer** that every route and realtime handler funnels through. Only `apps/server` imports it; the Next.js frontend never does. One rule defines the layer:
 
 > **Routes and realtime handlers never write SQL. They call repository functions, and repositories are the only code that touches Drizzle / Postgres.**
 
-That layering buys three things. **Testability** - repositories are plain async functions in `packages/database/src/repositories/*`, so a route test can `mock.module("@gamelobby/database", …)` instead of standing up a database. **A single place for query shape** - pagination, soft-delete, and the `GameRecord` join each live in one file, so they can't drift between callers. **A clean seam** - the Next.js frontend never opens a database connection (it never imports `@gamelobby/database`); only the server's repositories touch Postgres.
+That layering buys three things. **Testability** - repositories are plain async functions in `packages/database/src/repositories/*`, so a route test can `mock.module("@kyzen/database", …)` instead of standing up a database. **A single place for query shape** - pagination, soft-delete, and the `GameRecord` join each live in one file, so they can't drift between callers. **A clean seam** - the Next.js frontend never opens a database connection (it never imports `@kyzen/database`); only the server's repositories touch Postgres.
 
 The *shape* of the tables themselves - the schema, the generic JSONB game model, and how Drizzle models it - is documented separately in [`database-schema.md`](./database-schema.md). This page is about how that schema is **read and written**.
 
@@ -15,7 +15,7 @@ The *shape* of the tables themselves - the schema, the generic JSONB game model,
 | Path | Responsibility |
 | --- | --- |
 | `packages/database/src/client.ts` | `createDb(url, latencyMs)` factory + the singleton it builds: the `postgres-js` connection pool and the Drizzle `db` instance. Also `ping()` (`select 1` over the singleton `db` - the `/health` readiness probe). Re-exports `createDb`, `db`, `client`, `schema`, `ping`, and the `DB` type. |
-| `packages/database/src/index.ts` | The public facade (`@gamelobby/database`): re-exports each repository as a namespace (`accountMerge`, `conversations`, `friends`, `games`, `messages`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@gamelobby/shared/types`) and the `ping` helper. |
+| `packages/database/src/index.ts` | The public facade (`@kyzen/database`): re-exports each repository as a namespace (`accountMerge`, `conversations`, `friends`, `games`, `messages`, `notifications`, `profiles`) plus the row / `GameRecord` types (re-exported from `@kyzen/shared/types`) and the `ping` helper. |
 | `packages/database/src/latency.ts` | `withLatency` Proxy that injects an artificial per-query delay (`DB_LATENCY_MS`) in non-production, for exercising loading states. |
 | `packages/database/src/repositories/games.ts` | Game/move/seat CRUD; assembles `GameRecord` (the `game` row with `players` attached and `gameType` narrowed to the registry `GameType`) via `toGameRecord` and the `getGameById` / `getGameByCode` joins; `createGame` allocates the public `code` (and defaults `seriesId` to the row's own id) and retries on a `game_code_uq` collision; the series reads `getSeriesGames` / `findLiveGameInConversation`. |
 | `packages/database/src/repositories/messages.ts` | Message insert/read/soft-delete + keyset-paginated `listMessages`. |
@@ -66,15 +66,15 @@ export * as notifications from "./repositories/notifications";
 export * as profiles from "./repositories/profiles";
 ```
 
-So callers write `import { games, profiles } from "@gamelobby/database"` and then `games.getGameById(id)` / `profiles.bumpStats(...)`. There is no class, no DI container, no base "Repository" abstraction - just modules. The discipline is conventional, not enforced by types: routes and realtime handlers import these namespaces and never import Drizzle directly.
+So callers write `import { games, profiles } from "@kyzen/database"` and then `games.getGameById(id)` / `profiles.bumpStats(...)`. There is no class, no DI container, no base "Repository" abstraction - just modules. The discipline is conventional, not enforced by types: routes and realtime handlers import these namespaces and never import Drizzle directly.
 
-The value exports (`createDb`, `db`, `ping`, `schema`) are deliberately **owned `const` bindings** - `index.ts` imports them under `*Impl` aliases and re-exports fresh constants - rather than `export { … } from "./client"` alias re-exports. An alias re-export shares its live binding with the source module, so when a test calls `mock.module("@gamelobby/database", …)` on an already-loaded barrel (which Bun patches in place), the patch would write *through* the alias into `./client` itself, poisoning direct importers of that module for the rest of the process. Owned constants confine the patch to the barrel: barrel consumers see the mock, the source modules stay real. (This is exactly what a cross-workspace `bun test` run from the repo root exercises - integration tests load the real barrel, then route tests mock it.)
+The value exports (`createDb`, `db`, `ping`, `schema`) are deliberately **owned `const` bindings** - `index.ts` imports them under `*Impl` aliases and re-exports fresh constants - rather than `export { … } from "./client"` alias re-exports. An alias re-export shares its live binding with the source module, so when a test calls `mock.module("@kyzen/database", …)` on an already-loaded barrel (which Bun patches in place), the patch would write *through* the alias into `./client` itself, poisoning direct importers of that module for the rest of the process. Owned constants confine the patch to the barrel: barrel consumers see the mock, the source modules stay real. (This is exactly what a cross-workspace `bun test` run from the repo root exercises - integration tests load the real barrel, then route tests mock it.)
 
-Repositories also **validate their inputs** with the Zod schemas exported from `@gamelobby/shared/types` before they write: `createGame` runs `createGameInputSchema.parse(input)` (`games.ts:30`), `addMove` runs `addMoveInputSchema.parse(input)` (`games.ts:215`), `insertMessage` / `create` / `createProfile` / `updateAppearance` parse theirs the same way.
+Repositories also **validate their inputs** with the Zod schemas exported from `@kyzen/shared/types` before they write: `createGame` runs `createGameInputSchema.parse(input)` (`games.ts:30`), `addMove` runs `addMoveInputSchema.parse(input)` (`games.ts:215`), `insertMessage` / `create` / `createProfile` / `updateAppearance` parse theirs the same way.
 
 ### `GameRecord` and the seat join
 
-The single most important repository type is `GameRecord`. It is now declared once in `@gamelobby/shared/types` (`packages/shared/src/types/db/index.ts:224`) and re-exported by `@gamelobby/database`:
+The single most important repository type is `GameRecord`. It is now declared once in `@kyzen/shared/types` (`packages/shared/src/types/db/index.ts:224`) and re-exported by `@kyzen/database`:
 
 ```ts
 export type GameRecord = Omit<GameRow, "gameType"> & {
@@ -193,7 +193,7 @@ Notice that no SQL appears anywhere in `turn-based.ts` - only `games.*` and `pro
 
 ## Gotchas, invariants & conventions
 
-- **Never write SQL outside `packages/database/src/repositories/*`.** Routes and realtime handlers import the namespaces from `@gamelobby/database` and call functions. If you need a new query, add a repository function - don't reach for `db` in a route.
+- **Never write SQL outside `packages/database/src/repositories/*`.** Routes and realtime handlers import the namespaces from `@kyzen/database` and call functions. If you need a new query, add a repository function - don't reach for `db` in a route.
 - **`GameRecord` always carries `players`; `GameRow` never does.** Seats live in `game_player`. `getGameById` / `getGameByCode` / `getSeriesGames` / `findLiveGameInConversation` / `createGame` / `updateGame` return the assembled `GameRecord`; `gamesForUser` (`games.ts:179`) returns bare `GameRow[]` (a list view that doesn't need seats).
 - **Resolve games by code from the wire, by id internally.** The realtime lane and `GET /api/games/:gameId` hold the public room **code**, so they call `getGameByCode(code)` (`games.ts:100`); writes (`addMove` / `updateGame` / `listMoves` / `seatPlayer`) all take the internal UUID `gameRow.id`. `createGame` retries on a `game_code_uq` collision before giving up with `Failed to allocate a unique game code` once it exhausts `GAME_CODE_MAX_ATTEMPTS` (`games.ts:18`).
 - **`seatPlayer` is idempotent.** It inserts the `game_player` row with `ON CONFLICT (game_id, user_id) DO NOTHING` and returns a `boolean` - `true` if the seat was written, `false` if that `(game_id, user_id)` was already seated (`games.ts:146`). This absorbs a duplicate/concurrent `join_room` for the same user without raising `game_player_uq`; the realtime driver branches on the result rather than blindly re-activating the game (see [realtime](./realtime.md)).
@@ -208,7 +208,7 @@ Notice that no SQL appears anywhere in `turn-based.ts` - only `games.*` and `pro
 ## Where to go next
 
 - [`./README.md`](./README.md) - the architecture index and reading order, the map of every subsystem doc.
-- [`./shared.md`](./shared.md) - `@gamelobby/shared`, the package this layer imports for its row types, domain types, and the Zod input schemas the repositories validate against.
+- [`./shared.md`](./shared.md) - `@kyzen/shared`, the package this layer imports for its row types, domain types, and the Zod input schemas the repositories validate against.
 - [`./database-schema.md`](./database-schema.md) - the table definitions, the generic JSONB game schema, and how Drizzle models it (the shapes this layer reads and writes).
 - [`./games-core-schemas.md`](./games-core-schemas.md) - the Zod `stateSchema` / `moveSchema` / `configSchema` that own the shape of the JSONB this layer stores.
 - [`./games-core-engine.md`](./games-core-engine.md) - `GameEngine` / `reduce`, the authority that produces the state persisted via `games.updateGame`.

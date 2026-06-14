@@ -1,5 +1,5 @@
 {
-  "name": "@gamelobby/shared",
+  "name": "@kyzen/shared",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@gamelobby/avatar": "workspace:*",
+    "@kyzen/avatar": "workspace:*",
     "zod": "^3.24.1"
   },
   "devDependencies": {

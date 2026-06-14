@@ -1,6 +1,6 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import { useAtomValue } from "jotai";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

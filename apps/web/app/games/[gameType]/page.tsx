@@ -1,5 +1,5 @@
-import { getDefinition, hasEngine } from "@gamelobby/games-core";
-import { GAME_CATEGORIES } from "@gamelobby/shared/constants";
+import { getDefinition, hasEngine } from "@kyzen/games-core";
+import { GAME_CATEGORIES } from "@kyzen/shared/constants";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";

@@ -3,7 +3,7 @@ import { env } from "./env";
 
 export const logger = pino({
   level: env.logLevel || "info",
-  base: { service: "gamelobby-server" },
+  base: { service: "kyzen-server" },
   timestamp: pino.stdTimeFunctions.isoTime,
   redact: {
     paths: [

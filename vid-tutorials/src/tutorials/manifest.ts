@@ -1,5 +1,5 @@
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { GameType } from "@gamelobby/shared/types";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { GameType } from "@kyzen/shared/types";
 import type { TutorialChapter } from "../lib/video";
 import { TIC_TAC_TOE_CHAPTERS } from "./tic-tac-toe/timeline";
 

@@ -1,4 +1,4 @@
-import { notifications } from "@gamelobby/database";
+import { notifications } from "@kyzen/database";
 import { Hono } from "hono";
 import { assembleNotification } from "../../chat/assemble";
 import { type AuthEnv, requireAuth } from "../middleware/auth";

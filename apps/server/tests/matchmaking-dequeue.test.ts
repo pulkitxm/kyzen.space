@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import {
   InMemoryMatchmakingStore,
   queueKey,

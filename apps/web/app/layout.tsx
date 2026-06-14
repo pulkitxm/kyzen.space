@@ -1,9 +1,9 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import type {
   ConversationJson,
   FriendshipJson,
   NotificationJson,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
@@ -51,7 +51,7 @@ const gamePaused = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "GameLobby",
+  title: "Kyzen",
   description: "Play live multiplayer games",
 };
 

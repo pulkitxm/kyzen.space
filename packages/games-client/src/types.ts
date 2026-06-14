@@ -1,4 +1,4 @@
-import type { AvatarConfig } from "@gamelobby/shared/types";
+import type { AvatarConfig } from "@kyzen/shared/types";
 import type { Socket } from "socket.io-client";
 
 export type GameClientProps = {

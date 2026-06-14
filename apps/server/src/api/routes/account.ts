@@ -1,4 +1,4 @@
-import { accountMerge } from "@gamelobby/database";
+import { accountMerge } from "@kyzen/database";
 import { Hono } from "hono";
 import { getAuth } from "../../auth";
 import { type AuthEnv, requireAuth } from "../middleware/auth";

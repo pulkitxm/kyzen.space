@@ -1,5 +1,5 @@
-import { conversations, messages, profiles } from "@gamelobby/database";
-import { gameTypeSchema } from "@gamelobby/shared/types";
+import { conversations, messages, profiles } from "@kyzen/database";
+import { gameTypeSchema } from "@kyzen/shared/types";
 import { Hono } from "hono";
 import {
   assembleConversation,

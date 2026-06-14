@@ -1,6 +1,6 @@
-import * as db from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { PresenceStatus } from "@gamelobby/shared/types";
+import * as db from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { PresenceStatus } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { childLogger } from "../logger";
 import type { PresenceStore } from "./presence-store";

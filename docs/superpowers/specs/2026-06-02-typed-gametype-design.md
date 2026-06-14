@@ -47,7 +47,7 @@ The existing `TIC_TAC_TOE` constant **moves here** from `games/tic-tac-toe/schem
 
 ### Reuse the slug constant (kill the remaining raw literals)
 
-- **games-client** (`registry.ts`): switch the hardcoded keys to computed keys (`{ [TIC_TAC_TOE]: ... }`) importing `TIC_TAC_TOE` from `@gamelobby/games-core`. Combined with the `Record<GameType, …>` annotation below, the registries are now driven entirely by the single source.
+- **games-client** (`registry.ts`): switch the hardcoded keys to computed keys (`{ [TIC_TAC_TOE]: ... }`) importing `TIC_TAC_TOE` from `@kyzen/games-core`. Combined with the `Record<GameType, …>` annotation below, the registries are now driven entirely by the single source.
 - **Tests**: replace fixture/setup usages (`{ gameType: "tic-tac-toe" }`) with the imported `TIC_TAC_TOE` constant. Leave assertions that check the literal wire value (`expect(...).toBe("tic-tac-toe")`, `.toContain("tic-tac-toe")`) as raw strings - they intentionally pin the contract.
 
 ### Why a leaf module, not derivation from `GAMES`
@@ -75,7 +75,7 @@ This catches the one remaining manual step (appending to `GAME_TYPES` when addin
 ### Schemas → `gameTypeSchema`
 
 - `games-core/src/schemas.ts`: `gameJsonSchema.gameType` → `gameTypeSchema`. This narrows `GameJson.gameType`, which flows into the web app.
-- `chat-core`: add `"@gamelobby/games-core": "workspace:*"` to `package.json` (no package cycle: `games-core` does not depend on `chat-core`), then:
+- `chat-core`: add `"@kyzen/games-core": "workspace:*"` to `package.json` (no package cycle: `games-core` does not depend on `chat-core`), then:
   - `clientCreateGameInConversationSchema.gameType` → `gameTypeSchema` (the create path, now rejected at parse).
   - `gameCardMetaSchema.gameType` → `gameTypeSchema`.
   - `notificationPayloadSchema.gameType` → `gameTypeSchema.optional()`.

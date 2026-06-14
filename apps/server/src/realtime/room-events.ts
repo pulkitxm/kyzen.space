@@ -1,7 +1,7 @@
 import {
   clientCreateRoomSchema,
   clientJoinByCodeSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { Socket } from "socket.io";
 import { childLogger } from "../logger";
 import { createStandaloneGame, validateJoinByCode } from "./rooms-service";

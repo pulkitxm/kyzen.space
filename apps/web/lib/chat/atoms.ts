@@ -5,7 +5,7 @@ import type {
   MessageJson,
   NotificationJson,
   TypingUser,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import { atomFamily } from "jotai-family";

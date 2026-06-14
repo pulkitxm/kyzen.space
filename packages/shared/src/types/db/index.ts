@@ -1,4 +1,4 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import type {
   ConversationKind,
   FriendStatus,

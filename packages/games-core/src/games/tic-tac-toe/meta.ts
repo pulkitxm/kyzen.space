@@ -1,5 +1,5 @@
-import { GAME_CATEGORIES, TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { GameMeta } from "@gamelobby/shared/types";
+import { GAME_CATEGORIES, TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { GameMeta } from "@kyzen/shared/types";
 
 export const ticTacToeMeta: GameMeta = {
   type: TIC_TAC_TOE,

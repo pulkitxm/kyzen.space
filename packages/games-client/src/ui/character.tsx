@@ -6,7 +6,7 @@ import {
   type AvatarConfig,
   seedAvatarConfig,
   toDicebearOptions,
-} from "@gamelobby/avatar";
+} from "@kyzen/avatar";
 import { useMemo } from "react";
 
 export function Character({

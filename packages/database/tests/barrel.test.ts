@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-describe("@gamelobby/database barrel surface", () => {
+describe("@kyzen/database barrel surface", () => {
   test("re-exports every repository namespace as a function-bag object", async () => {
     const idx = await import("../src/index");
     const namespaces = [

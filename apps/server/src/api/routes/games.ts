@@ -1,5 +1,5 @@
-import { games } from "@gamelobby/database";
-import { isGameCode } from "@gamelobby/shared/types";
+import { games } from "@kyzen/database";
+import { isGameCode } from "@kyzen/shared/types";
 import { Hono } from "hono";
 import { computeSeriesScore } from "../../chat/series";
 import type { LoggerEnv } from "../middleware/logger";

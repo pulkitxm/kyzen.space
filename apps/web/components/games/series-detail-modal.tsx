@@ -1,6 +1,6 @@
 "use client";
 
-import type { SeriesDetail } from "@gamelobby/shared/types";
+import type { SeriesDetail } from "@kyzen/shared/types";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FaArrowRight } from "react-icons/fa6";

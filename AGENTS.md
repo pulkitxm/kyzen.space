@@ -10,23 +10,23 @@ Use `react-icons` for icons instead of hand-writing inline `<svg>`. Prefer Font 
 
 # Shared packages: one home for types, schemas, and constants
 
-`@gamelobby/shared` is the single source of truth for **every TypeScript type, every Zod schema, and every shared constant**, and is the **only** package allowed to depend on `zod`.
+`@kyzen/shared` is the single source of truth for **every TypeScript type, every Zod schema, and every shared constant**, and is the **only** package allowed to depend on `zod`.
 
-- Import types, Zod schemas, and `z` itself from `@gamelobby/shared/types`; import shared constant values from `@gamelobby/shared/constants`. Never `import … from "zod"` outside `packages/shared`, and never add `zod` to another `package.json`.
-- A new shared type or schema goes under `@gamelobby/shared/types` (`chat/`, `games/`, `db/`, or a top-level module). A new shared constant goes in `@gamelobby/shared/constants`.
-- The Drizzle schema and all DB repositories live in `@gamelobby/database`; repositories validate inputs with `@gamelobby/shared/types` schemas. `apps/web` must never import `@gamelobby/database`.
-- `@gamelobby/avatar` is the one exception: it owns its own types and stays `zod`-free (`@gamelobby/shared` re-exports `AvatarConfig`).
-- Never duplicate a type, schema, or constant across web and server - put it in `@gamelobby/shared`.
+- Import types, Zod schemas, and `z` itself from `@kyzen/shared/types`; import shared constant values from `@kyzen/shared/constants`. Never `import … from "zod"` outside `packages/shared`, and never add `zod` to another `package.json`.
+- A new shared type or schema goes under `@kyzen/shared/types` (`chat/`, `games/`, `db/`, or a top-level module). A new shared constant goes in `@kyzen/shared/constants`.
+- The Drizzle schema and all DB repositories live in `@kyzen/database`; repositories validate inputs with `@kyzen/shared/types` schemas. `apps/web` must never import `@kyzen/database`.
+- `@kyzen/avatar` is the one exception: it owns its own types and stays `zod`-free (`@kyzen/shared` re-exports `AvatarConfig`).
+- Never duplicate a type, schema, or constant across web and server - put it in `@kyzen/shared`.
 
 See `docs/architecture/shared.md` and the "Shared packages - strict rules" section of `CLAUDE.md`.
 
 # Reserved usernames vs. top-level routes
 
-The profile page is a dynamic `/[username]` route, so every top-level segment under `apps/web/app/` is a potential username collision. When you add a new top-level route, add its segment to `RESERVED_USERNAMES` in `@gamelobby/shared/constants` (`packages/shared/src/constants/username.ts`) if a user claiming that name would shadow the route. Per-user blocklisting is separate - that's the `NOT_ALLOWED_USERNAMES` env var (parsed in `apps/server/src/env.ts`).
+The profile page is a dynamic `/[username]` route, so every top-level segment under `apps/web/app/` is a potential username collision. When you add a new top-level route, add its segment to `RESERVED_USERNAMES` in `@kyzen/shared/constants` (`packages/shared/src/constants/username.ts`) if a user claiming that name would shadow the route. Per-user blocklisting is separate - that's the `NOT_ALLOWED_USERNAMES` env var (parsed in `apps/server/src/env.ts`).
 
 # Game video tutorials
 
-`vid-tutorials/` is a Remotion workspace with one tutorial composition per game; the composition id is the game's type slug (Studio at `localhost:3100/<type>`). Videos must use the app's theme tokens (`<ThemeRoot>` + `src/theme/theme.css`, seeded from `@gamelobby/shared/constants`) and the game's own bg music (`<TutorialMusic>`; `publicDir` is `apps/web/public`). Build tutorials with the `game-tutorial-builder` agent from a markdown rules brief (canonically `docs/games/<type>.md`); conventions are in the `game-tutorial-videos` skill. Inside Remotion, animate only with `useCurrentFrame()` + `interpolate()`/`spring()` - CSS animations/transitions and `motion/react` are forbidden there. See `docs/video-tutorials.md`.
+`vid-tutorials/` is a Remotion workspace with one tutorial composition per game; the composition id is the game's type slug (Studio at `localhost:3100/<type>`). Videos must use the app's theme tokens (`<ThemeRoot>` + `src/theme/theme.css`, seeded from `@kyzen/shared/constants`) and the game's own bg music (`<TutorialMusic>`; `publicDir` is `apps/web/public`). Build tutorials with the `game-tutorial-builder` agent from a markdown rules brief (canonically `docs/games/<type>.md`); conventions are in the `game-tutorial-videos` skill. Inside Remotion, animate only with `useCurrentFrame()` + `interpolate()`/`spring()` - CSS animations/transitions and `motion/react` are forbidden there. See `docs/video-tutorials.md`.
 
 # Keep docs and agents in sync
 

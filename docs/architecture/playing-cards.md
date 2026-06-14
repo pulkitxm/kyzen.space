@@ -6,9 +6,9 @@ Playing cards are drawn **from code as inline SVG**, not loaded from static imag
 
 Like the rest of the codebase, the card code follows the **logic ↔ UI split**:
 
-- **`@gamelobby/games-core`** holds the *logic*: a framework-agnostic SVG **builder** that returns markup strings (`packages/games-core/src/playing-cards/svg.ts`). No React.
-- **`@gamelobby/games-client`** holds the *UI*: `"use client"` components that render the builder's markup inline (`packages/games-client/src/playing-cards/playing-card.tsx`).
-- **`@gamelobby/shared`** owns the *types + constants*: `Suit` / `Rank` / `JokerVariant` and the `CARD_SUITS` / `CARD_RANKS` lists.
+- **`@kyzen/games-core`** holds the *logic*: a framework-agnostic SVG **builder** that returns markup strings (`packages/games-core/src/playing-cards/svg.ts`). No React.
+- **`@kyzen/games-client`** holds the *UI*: `"use client"` components that render the builder's markup inline (`packages/games-client/src/playing-cards/playing-card.tsx`).
+- **`@kyzen/shared`** owns the *types + constants*: `Suit` / `Rank` / `JokerVariant` and the `CARD_SUITS` / `CARD_RANKS` lists.
 
 There are **no card image assets** and **no generator script** to run - rendering a card is a function call. (This replaced an earlier `scripts/generate-deck.js` that wrote `public/games/playing-cards/*.svg`.)
 
@@ -26,10 +26,10 @@ There are **no card image assets** and **no generator script** to run - renderin
 
 ### React components - the normal way to render
 
-Import from `@gamelobby/games-client`:
+Import from `@kyzen/games-client`:
 
 ```tsx
-import { PlayingCard, Joker, CardBack } from "@gamelobby/games-client";
+import { PlayingCard, Joker, CardBack } from "@kyzen/games-client";
 
 <PlayingCard suit="hearts" rank="Q" className="h-auto w-full" />;
 <Joker variant="red" className="h-auto w-full" />;
@@ -44,7 +44,7 @@ All three render an `<svg viewBox="0 0 360 504">` and inject the art with `dange
 
 ### String builders - for non-React / tests / standalone files
 
-Import from `@gamelobby/games-core`. Two flavors per card:
+Import from `@kyzen/games-core`. Two flavors per card:
 
 | Function | Returns |
 | --- | --- |
@@ -60,8 +60,8 @@ Use `*Svg` when you want a freestanding file/string (e.g. writing a `.svg`, an e
 ### Types & constants
 
 ```ts
-import type { Suit, Rank, JokerVariant } from "@gamelobby/shared/types";
-import { CARD_SUITS, CARD_RANKS } from "@gamelobby/shared/constants";
+import type { Suit, Rank, JokerVariant } from "@kyzen/shared/types";
+import { CARD_SUITS, CARD_RANKS } from "@kyzen/shared/constants";
 ```
 
 - `Suit` = `"spades" | "hearts" | "clubs" | "diamonds"`.

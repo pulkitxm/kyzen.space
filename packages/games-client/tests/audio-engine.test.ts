@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  VOLUME_MAX,
-  VOLUME_MIN,
-  VOLUME_STEP,
-} from "@gamelobby/shared/constants";
+import { VOLUME_MAX, VOLUME_MIN, VOLUME_STEP } from "@kyzen/shared/constants";
 import {
   clampVolume,
   GameAudioEngine,

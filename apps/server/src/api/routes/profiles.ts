@@ -1,12 +1,12 @@
-import { seedAvatarConfig, validateAvatarConfig } from "@gamelobby/avatar";
-import { games, profiles } from "@gamelobby/database";
+import { seedAvatarConfig, validateAvatarConfig } from "@kyzen/avatar";
+import { games, profiles } from "@kyzen/database";
 import {
   DEFAULT_COLOR_MODE,
   DEFAULT_GLASS_MODE,
   DEFAULT_PATTERN,
   DEFAULT_THEME,
   DISPLAY_NAME_MAX_LENGTH,
-} from "@gamelobby/shared/constants";
+} from "@kyzen/shared/constants";
 import {
   type ColorMode,
   type GlassMode,
@@ -20,7 +20,7 @@ import {
   type PatternId,
   type ThemeId,
   validateChatModePref,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { Hono } from "hono";
 import { env } from "../../env";
 import { isUsernameBlocked, suggestUsernames } from "../../username";

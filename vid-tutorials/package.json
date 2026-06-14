@@ -1,5 +1,5 @@
 {
-  "name": "@gamelobby/vid-tutorials",
+  "name": "@kyzen/vid-tutorials",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@gamelobby/shared": "workspace:*",
+    "@kyzen/shared": "workspace:*",
     "@remotion/cli": "^4.0.0",
     "@remotion/google-fonts": "^4.0.0",
     "@remotion/media": "^4.0.0",

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { CreateGameInput } from "@gamelobby/shared/types";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { CreateGameInput } from "@kyzen/shared/types";
 import * as realClient from "../src/client";
 
 type Behavior =

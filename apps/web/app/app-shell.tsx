@@ -1,11 +1,11 @@
 "use client";
 
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import type {
   ConversationJson,
   FriendshipJson,
   NotificationJson,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { Provider } from "jotai";
 import { useCallback, useRef, useState } from "react";
 import { FaChevronRight } from "react-icons/fa6";

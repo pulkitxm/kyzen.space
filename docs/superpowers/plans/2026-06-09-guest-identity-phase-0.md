@@ -108,7 +108,7 @@ git commit -m "feat(db): add isAnonymous flag to user for guest accounts"
 
 ## Task 2: `ensureUsernameForUser` can skip gender detection
 
-`predictAvatarStyle` calls the external genderize.io API. For guests (auto-named "Guest-xxxx") that call is wasteful and meaningless, so guest provisioning must skip it. `AvatarStyle` is exported from `@gamelobby/avatar`.
+`predictAvatarStyle` calls the external genderize.io API. For guests (auto-named "Guest-xxxx") that call is wasteful and meaningless, so guest provisioning must skip it. `AvatarStyle` is exported from `@kyzen/avatar`.
 
 **Files:**
 - Modify: `apps/server/src/username.ts:43-52`
@@ -124,7 +124,7 @@ import { describe, expect, it, mock } from "bun:test";
 const createdProfiles: Array<{ userId: string; username: string }> = [];
 let genderDetectionCalls = 0;
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   profiles: {
     getProfileByUserId: async () => null,
     getTakenUsernames: async () => new Set<string>(),
@@ -180,7 +180,7 @@ Expected: FAIL - `ensureUsernameForUser` does not accept a third argument / stil
 In `apps/server/src/username.ts`, add the import and modify the signature + the style line:
 
 ```ts
-import type { AvatarStyle } from "@gamelobby/avatar";
+import type { AvatarStyle } from "@kyzen/avatar";
 ```
 
 ```ts

@@ -1,5 +1,5 @@
-import { conversations } from "@gamelobby/database";
-import { hasEngine } from "@gamelobby/games-core";
+import { conversations } from "@kyzen/database";
+import { hasEngine } from "@kyzen/games-core";
 import {
   type ClientQueueJoin,
   type ClientQueueLeave,
@@ -7,7 +7,7 @@ import {
   clientQueueLeaveSchema,
   type GameType,
   type ServerMatchFoundPayload,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { createGameInConversation } from "../chat/games-in-chat-service";
 import { childLogger } from "../logger";

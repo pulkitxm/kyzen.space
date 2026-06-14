@@ -1,6 +1,6 @@
 "use client";
 
-import type { AvatarConfig } from "@gamelobby/shared/types";
+import type { AvatarConfig } from "@kyzen/shared/types";
 import { atom, useAtomValue, useSetAtom } from "jotai";
 import { m } from "motion/react";
 import Link from "next/link";
@@ -99,7 +99,7 @@ function ProfilePopupBody({ user }: { user: ProfilePopupUser }) {
         {fresh ? (
           `Joined ${joinedLabel(fresh.createdAt)}`
         ) : failed ? (
-          "Joined GameLobby"
+          "Joined Kyzen"
         ) : (
           <Skeleton className="h-3 w-28" />
         )}

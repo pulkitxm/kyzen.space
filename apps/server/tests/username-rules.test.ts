@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { USERNAME_MAX_LENGTH } from "@gamelobby/shared/constants";
+import { USERNAME_MAX_LENGTH } from "@kyzen/shared/constants";
 import {
   buildUsernameCandidates,
   parseUsernameCsv,

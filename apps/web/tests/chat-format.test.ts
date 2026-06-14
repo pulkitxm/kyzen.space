@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { MessageJson } from "@gamelobby/shared/types";
+import type { MessageJson } from "@kyzen/shared/types";
 import { messagePreview, relativeTime, timeOfDay } from "@/lib/chat/format";
 
 function isoSecondsAgo(seconds: number): string {

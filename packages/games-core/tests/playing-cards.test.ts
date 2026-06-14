@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { CARD_RANKS, CARD_SUITS } from "@gamelobby/shared/constants";
+import { CARD_RANKS, CARD_SUITS } from "@kyzen/shared/constants";
 import {
   CARD_VIEWBOX,
   cardBackSvg,

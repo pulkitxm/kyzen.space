@@ -1,5 +1,5 @@
-import { messages as messagesRepo } from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { messages as messagesRepo } from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import type { Server as IOServer } from "socket.io";
 import { emitToConv } from "../realtime/rooms";
 import { assembleMessage } from "./assemble";

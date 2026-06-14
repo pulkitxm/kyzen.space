@@ -1,5 +1,5 @@
-import { DEFAULT_THEME, THEMES } from "@gamelobby/shared/constants";
-import type { ThemeId } from "@gamelobby/shared/types";
+import { DEFAULT_THEME, THEMES } from "@kyzen/shared/constants";
+import type { ThemeId } from "@kyzen/shared/types";
 import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill } from "remotion";
 import { fontSans } from "./fonts";

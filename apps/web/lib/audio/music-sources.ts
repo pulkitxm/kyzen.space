@@ -1,4 +1,4 @@
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 
 const GAME_MUSIC_SOURCES: Record<string, string> = {
   [TIC_TAC_TOE]: "/sounds/tic-tac-toe-bg.ogg",

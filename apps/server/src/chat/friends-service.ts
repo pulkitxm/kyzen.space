@@ -1,10 +1,10 @@
-import { friends, notifications, profiles } from "@gamelobby/database";
+import { friends, notifications, profiles } from "@kyzen/database";
 import {
   ANON_FRIEND_LIMIT_MESSAGE,
   ANON_MAX_FRIENDS,
   CHAT_EVENTS,
-} from "@gamelobby/shared/constants";
-import type { FriendshipJson, FriendshipRow } from "@gamelobby/shared/types";
+} from "@kyzen/shared/constants";
+import type { FriendshipJson, FriendshipRow } from "@kyzen/shared/types";
 import { getIO } from "../realtime/io";
 import { notify } from "../realtime/notify";
 import { emitToUser } from "../realtime/rooms";

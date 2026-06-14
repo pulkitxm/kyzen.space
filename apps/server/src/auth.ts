@@ -1,4 +1,4 @@
-import { accountMerge, db, schema } from "@gamelobby/database";
+import { accountMerge, db, schema } from "@kyzen/database";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous } from "better-auth/plugins";

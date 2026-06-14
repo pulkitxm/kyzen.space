@@ -1,8 +1,8 @@
-# GameLobby
+# Kyzen
 
 A real-time multiplayer **game and chat lobby**: sign in, message friends, and play turn-based games together inside live conversations.
 
-GameLobby is a [Bun](https://bun.sh) + [Turborepo](https://turbo.build) monorepo. A Next.js web app and an Express + Hono + Socket.IO server sit on top of shared, framework-agnostic game and chat logic. The single most important idea: **the game/chat domain logic lives in `packages/` and is imported by both the frontend and the backend**, so the same engine and Zod schemas that render a game in the browser also _authoritatively_ validate every move on the server. The client is never trusted.
+Kyzen is a [Bun](https://bun.sh) + [Turborepo](https://turbo.build) monorepo. A Next.js web app and an Express + Hono + Socket.IO server sit on top of shared, framework-agnostic game and chat logic. The single most important idea: **the game/chat domain logic lives in `packages/` and is imported by both the frontend and the backend**, so the same engine and Zod schemas that render a game in the browser also _authoritatively_ validate every move on the server. The client is never trusted.
 
 ## Features
 
@@ -16,7 +16,7 @@ GameLobby is a [Bun](https://bun.sh) + [Turborepo](https://turbo.build) monorepo
 - **Web**: Next.js 16, React 19 (App Router), Tailwind CSS v4, Jotai
 - **Server**: Bun, Express + Hono (REST under `/api/*`), Socket.IO (realtime)
 - **Data**: Postgres via Drizzle ORM; optional Redis adapter for multi-node scale-out
-- **Shared packages**: `@gamelobby/shared` holds the strict Zod schemas, types, and constants that are the single source of truth; [Biome](https://biomejs.dev) for format + lint
+- **Shared packages**: `@kyzen/shared` holds the strict Zod schemas, types, and constants that are the single source of truth; [Biome](https://biomejs.dev) for format + lint
 
 ## Monorepo layout
 

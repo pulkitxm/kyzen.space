@@ -2,8 +2,8 @@ import type {
   AccountMergeRow,
   AccountMergeStatus,
   FriendStatus,
-} from "@gamelobby/shared/types";
-import { recordAccountMergeInputSchema } from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
+import { recordAccountMergeInputSchema } from "@kyzen/shared/types";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "../client";
 import {

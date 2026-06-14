@@ -5,7 +5,7 @@ import {
   GLASS_STORAGE_KEY,
   PALETTE_STORAGE_KEY,
   PATTERN_STORAGE_KEY,
-} from "@gamelobby/shared/constants";
+} from "@kyzen/shared/constants";
 import {
   type GlassMode,
   isValidGlassMode,
@@ -13,7 +13,7 @@ import {
   isValidTheme,
   type PatternId,
   type ThemeId,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 

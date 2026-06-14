@@ -2,7 +2,7 @@
 
 ## What this is / why it matters
 
-`@gamelobby/games-core` is the **framework-agnostic brain** of every game in the lobby. It is now **logic-only**: it contains no React, no Express, no socket code - just the concrete engines and a registry that turns a single hand-written array of game definitions into all the lookups the rest of the monorepo needs. The *contracts* it builds on - the `GameEngine<State, Input>` interface, the `GameDefinition` shape, and every game's strict Zod schemas + inferred types - live in **`@gamelobby/shared/types`**. games-core declares `@gamelobby/shared` as its only dependency and imports those types/schemas from there (`packages/games-core/package.json:14`).
+`@kyzen/games-core` is the **framework-agnostic brain** of every game in the lobby. It is now **logic-only**: it contains no React, no Express, no socket code - just the concrete engines and a registry that turns a single hand-written array of game definitions into all the lookups the rest of the monorepo needs. The *contracts* it builds on - the `GameEngine<State, Input>` interface, the `GameDefinition` shape, and every game's strict Zod schemas + inferred types - live in **`@kyzen/shared/types`**. games-core declares `@kyzen/shared` as its only dependency and imports those types/schemas from there (`packages/games-core/package.json:14`).
 
 This document covers the **logic + registry layer** specifically:
 
@@ -28,7 +28,7 @@ Why it matters: because this code (and the shared contracts it builds on) is **p
 | `packages/games-core/src/games/index.ts` | **The single `GAMES` array** - the one place every game is registered |
 | `packages/shared/src/constants/categories.ts` | (shared) `GAME_CATEGORIES` object/record used for grouping in lobby UI |
 | `packages/games-core/src/registry.ts` | Derives `byType` Map + `getDefinition` / `getEngine` / `hasEngine` / `listGameMeta` / `getCategoryGroups` from `GAMES` |
-| `packages/games-core/src/index.ts` | Public barrel - re-exports the registry functions, `GAMES`, per-game engine symbols, and the `playing-cards/svg` card-rendering helpers (`CARD_WIDTH`/`cardSvg`/`jokerSvg`/…) (types/schemas come from `@gamelobby/shared/types`) |
+| `packages/games-core/src/index.ts` | Public barrel - re-exports the registry functions, `GAMES`, per-game engine symbols, and the `playing-cards/svg` card-rendering helpers (`CARD_WIDTH`/`cardSvg`/`jokerSvg`/…) (types/schemas come from `@kyzen/shared/types`) |
 | `packages/games-core/tests/conformance.test.ts` | Invariant suite run against *every* entry in `GAMES` |
 | `packages/games-core/tests/tic-tac-toe.test.ts` | Focused engine tests for tic-tac-toe |
 | `apps/server/src/realtime/turn-based.ts` | The server consumer - proves how the engine is trusted to validate/apply moves |
@@ -224,7 +224,7 @@ export const ticTacToeDefinition: GameDefinition<
 This is the design decision the whole package hinges on. There is exactly **one** place every game is registered (`packages/games-core/src/games/index.ts`):
 
 ```ts
-import type { GameDefinition } from "@gamelobby/shared/types";
+import type { GameDefinition } from "@kyzen/shared/types";
 import { ticTacToeDefinition } from "./tic-tac-toe";
 
 export const GAMES = [ticTacToeDefinition] satisfies GameDefinition[];
@@ -361,11 +361,11 @@ The focused `tests/tic-tac-toe.test.ts` complements this with game-specific beha
 
 ## Gotchas, invariants & conventions
 
-- **No React, no I/O in this package - ever.** games-core is imported by the server, which has no DOM and must stay React-free. Keep game UI in `@gamelobby/games-client` (see [./games-client.md](./games-client.md)) and logic here.
+- **No React, no I/O in this package - ever.** games-core is imported by the server, which has no DOM and must stay React-free. Keep game UI in `@kyzen/games-client` (see [./games-client.md](./games-client.md)) and logic here.
 - **`reduce` must be pure and deterministic.** No mutation of `state`/`input`, no `Date.now`/`Math.random`/network/DB. Copy-then-write; return a fresh state object. The server's trust model depends on it.
 - **The engine validates everything itself.** Don't rely on the caller having pre-validated. tic-tac-toe re-runs `moveSchema.safeParse` *inside* `reduce` (`packages/games-core/src/games/tic-tac-toe/engine.ts:80`) even though the server already parsed - defense in depth, and it keeps the engine correct in isolation (tests call `reduce` directly).
 - **Roles are not users.** `Outcome.winnerRole`, `MoveContext.role`, and `engine.roles` are all in role-space (`"X"`/`"O"`). The user↔role mapping lives entirely on the server (`apps/server/src/realtime/turn-based.ts:88`, `:141`).
-- **The slug constant lives only in `@gamelobby/shared/constants`.** `meta.ts` and `engine.ts` import `TIC_TAC_TOE` from `@gamelobby/shared/constants` (`packages/shared/src/constants/games.ts`); it is never redeclared in a per-game file. `GameMeta.type` is `GameType` (not `string`); the shared `GAME_TYPES` tuple and the `GAMES` array must stay in sync - the conformance suite's `"GAME_TYPES matches the registry exactly"` test enforces this.
+- **The slug constant lives only in `@kyzen/shared/constants`.** `meta.ts` and `engine.ts` import `TIC_TAC_TOE` from `@kyzen/shared/constants` (`packages/shared/src/constants/games.ts`); it is never redeclared in a per-game file. `GameMeta.type` is `GameType` (not `string`); the shared `GAME_TYPES` tuple and the `GAMES` array must stay in sync - the conformance suite's `"GAME_TYPES matches the registry exactly"` test enforces this.
 - **`meta.type` must equal `engine.type`, and types must be globally unique.** Both are enforced by conformance; both feed the `byType` registry key.
 - **`roles.length >= maxPlayers`.** The server seats by index (`engine.roles[players.length]`), so there must be a role for each seat. Conformance guards it (`packages/games-core/tests/conformance.test.ts:39`).
 - **Failures are values, not throws** - in `reduce` (`ReduceResult.error`). The *registry* is the exception: `getDefinition` throws on an unknown type because that's a bug, not a runtime condition.

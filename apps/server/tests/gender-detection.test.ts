@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 
 const mockEnv = {
   genderizeApiKey: "test-key",
@@ -30,7 +30,7 @@ let createProfileImpl: (
 ) => Promise<{ username: string }> = defaultCreateProfile;
 let createProfileCalls = 0;
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   games: {},
   profiles: {
     getProfileByUserId: async () => existingProfile,

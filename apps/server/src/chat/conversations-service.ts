@@ -1,6 +1,6 @@
-import { conversations, friends, profiles } from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { ConversationJson } from "@gamelobby/shared/types";
+import { conversations, friends, profiles } from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { ConversationJson } from "@kyzen/shared/types";
 import { getIO } from "../realtime/io";
 import { convRoom, emitToUser, userRoom } from "../realtime/rooms";
 import { assembleConversation } from "./assemble";

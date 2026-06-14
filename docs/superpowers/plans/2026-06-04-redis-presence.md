@@ -782,7 +782,7 @@ Expected: FAIL - the current `presence.ts` still uses the in-memory map, so `pre
 Replace the entire contents of `apps/server/src/realtime/presence.ts` with:
 
 ```ts
-import { CHAT_EVENTS, type PresenceStatus } from "@gamelobby/chat-core";
+import { CHAT_EVENTS, type PresenceStatus } from "@kyzen/chat-core";
 import type { Server as IOServer, Socket } from "socket.io";
 import { conversations, friends, profiles } from "../db";
 import { childLogger } from "../logger";

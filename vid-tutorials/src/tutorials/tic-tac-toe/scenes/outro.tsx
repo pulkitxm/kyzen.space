@@ -76,7 +76,7 @@ export function OutroScene() {
         style={{ transform: `scale(${ctaPop * pulse})` }}
       >
         <FaPlay size={38} aria-hidden="true" />
-        Play Tic-tac-toe on GameLobby
+        Play Tic-tac-toe on Kyzen
       </div>
     </AbsoluteFill>
   );

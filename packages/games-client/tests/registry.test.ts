@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { listGameTypes } from "@gamelobby/games-core";
+import { listGameTypes } from "@kyzen/games-core";
 import { getGameClient, getGameSkeleton } from "../src/registry";
 import { DefaultGameSkeleton } from "../src/skeletons";
 

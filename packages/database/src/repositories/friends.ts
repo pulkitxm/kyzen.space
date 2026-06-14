@@ -1,4 +1,4 @@
-import type { FriendStatus, FriendshipRow } from "@gamelobby/shared/types";
+import type { FriendStatus, FriendshipRow } from "@kyzen/shared/types";
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "../client";
 import { friendship } from "../schema";

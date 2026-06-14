@@ -7,7 +7,7 @@ metadata:
 
 # Game tutorial videos (`vid-tutorials/`)
 
-`vid-tutorials/` is the Bun workspace (`@gamelobby/vid-tutorials`) that holds one
+`vid-tutorials/` is the Bun workspace (`@kyzen/vid-tutorials`) that holds one
 Remotion composition per game. The **composition id is the game's type slug**
 (e.g. `tic-tac-toe`), so Remotion Studio serves each tutorial at
 `http://localhost:3100/<type>` (`bun run studio` from `vid-tutorials/`).
@@ -55,7 +55,7 @@ vid-tutorials/
    "The goal", "Winning", "The draw", …).
 2. Add `{ id, title, chapters }` to `TUTORIAL_MANIFEST` in
    `src/tutorials/manifest.ts`. The `id` must be the game's type-slug
-   constant from `@gamelobby/shared/constants` (e.g. `TIC_TAC_TOE`). Keep
+   constant from `@kyzen/shared/constants` (e.g. `TIC_TAC_TOE`). Keep
    this file free of React imports - the export script loads it directly.
 3. Map the composition component by id in `COMPONENTS` in
    `src/tutorials/registry.tsx`.
@@ -68,7 +68,7 @@ else or change those dimensions per game.
 ## Theme - always the app's tokens
 
 Wrap every composition in `<ThemeRoot>` (defaults: the app's `DEFAULT_THEME`,
-dark mode). It sets `--d`/`--v` from `THEMES` in `@gamelobby/shared/constants`
+dark mode). It sets `--d`/`--v` from `THEMES` in `@kyzen/shared/constants`
 and `theme.css` derives the same tokens as the web app's `globals.css`.
 
 - Style **only** with the CSS variables: `var(--background)`, `--foreground`,
@@ -151,7 +151,7 @@ instead of substituting another game's music.
   array/object default props to module constants.
 - No `zod` and no new deps without checking the shared-package rules in
   `CLAUDE.md`; types/constants shared with the app come from
-  `@gamelobby/shared`.
+  `@kyzen/shared`.
 
 ## Verification (all from `vid-tutorials/`)
 

@@ -1,4 +1,4 @@
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import type { FC } from "react";
 import {
   TUTORIAL_MANIFEST,

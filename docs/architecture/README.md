@@ -1,21 +1,21 @@
 # Architecture overview
 
-GameLobby is a real-time multiplayer game **and** chat lobby. Two apps sit on top of five shared packages in a Bun + Turborepo monorepo:
+Kyzen is a real-time multiplayer game **and** chat lobby. Two apps sit on top of five shared packages in a Bun + Turborepo monorepo:
 
 - **`apps/web`** - Next.js 16 / React 19 frontend (App Router, Tailwind v4, Jotai). Renders the lobby, chat, profiles, and the game board UIs.
-- **`apps/server`** - a single Bun process running Express + Hono (REST under `/api/*`) and Socket.IO (realtime), backed by Postgres (Drizzle ORM, via `@gamelobby/database`) and an optional Redis adapter for multi-node scale-out.
+- **`apps/server`** - a single Bun process running Express + Hono (REST under `/api/*`) and Socket.IO (realtime), backed by Postgres (Drizzle ORM, via `@kyzen/database`) and an optional Redis adapter for multi-node scale-out.
 - **`packages/{shared,games-core,games-client,database,avatar}`** - shared code imported across the monorepo via `workspace:*`.
 
 ## The core insight: shared logic, imported by both sides
 
-The single most important architectural decision is that **the game and chat domain logic lives in `packages/` and is imported across the monorepo**. A game is one self-describing `GameDefinition` - an engine assembled in `packages/games-core` (`@gamelobby/games-core`) over the strict Zod schemas + types that live in `packages/shared` (`@gamelobby/shared`). Because both packages are **framework-agnostic (no React)**, the server can import them directly:
+The single most important architectural decision is that **the game and chat domain logic lives in `packages/` and is imported across the monorepo**. A game is one self-describing `GameDefinition` - an engine assembled in `packages/games-core` (`@kyzen/games-core`) over the strict Zod schemas + types that live in `packages/shared` (`@kyzen/shared`). Because both packages are **framework-agnostic (no React)**, the server can import them directly:
 
 - The **server** uses the engine as the authority. On every move it re-validates the move and the stored state against the game's Zod schemas and runs `engine.reduce(...)` to compute the next state. The client is never trusted. See `apps/server/src/realtime/turn-based.ts:297` (`handleMakeMove`).
-- The **client** imports the same packages for its TypeScript types and shared rules, and renders the board via a separate React-only package, `@gamelobby/games-client`, resolved by game `type` (`packages/games-client/src/registry.ts:20`).
+- The **client** imports the same packages for its TypeScript types and shared rules, and renders the board via a separate React-only package, `@kyzen/games-client`, resolved by game `type` (`packages/games-client/src/registry.ts:20`).
 
-A registry-typed `gameType` ties the two sides together: `packages/shared/src/types/games/core.ts` derives the literal `GameType` union and a `gameTypeSchema` (`z.enum`) from the `GAME_TYPES` constant (`@gamelobby/shared/constants`), so every wire/socket payload validates its `gameType` at the Zod parse layer (`packages/shared/src/types/games/wire.ts:64`). Games are addressed on the wire by a short public room **code** (`gameCodeSchema`, `packages/shared/src/types/games/code.ts`), not the internal UUID `game.id`.
+A registry-typed `gameType` ties the two sides together: `packages/shared/src/types/games/core.ts` derives the literal `GameType` union and a `gameTypeSchema` (`z.enum`) from the `GAME_TYPES` constant (`@kyzen/shared/constants`), so every wire/socket payload validates its `gameType` at the Zod parse layer (`packages/shared/src/types/games/wire.ts:64`). Games are addressed on the wire by a short public room **code** (`gameCodeSchema`, `packages/shared/src/types/games/code.ts`), not the internal UUID `game.id`.
 
-The same is true for chat: `@gamelobby/shared` is the single source of truth for the realtime message shapes (`@gamelobby/shared/types`, under `types/chat/`) and the socket event names (`CHAT_EVENTS` in `@gamelobby/shared/constants`), imported by both web and server so the wire contract can never drift.
+The same is true for chat: `@kyzen/shared` is the single source of truth for the realtime message shapes (`@kyzen/shared/types`, under `types/chat/`) and the socket event names (`CHAT_EVENTS` in `@kyzen/shared/constants`), imported by both web and server so the wire contract can never drift.
 
 The consequence: **adding a game requires no new routes, endpoints, DB tables, socket events, or drivers** - just the game's Zod schemas + types (shared), one `GameDefinition` (games-core), and one board component (games-client). See `docs/adding-a-game.md`.
 
@@ -23,7 +23,7 @@ The consequence: **adding a game requires no new routes, endpoints, DB tables, s
 
 ```text
           ┌──────────────────────────────────────────────────────────────┐
-          │                  shared packages (@gamelobby/*)               │
+          │                  shared packages (@kyzen/*)               │
           │                     (workspace:* imports)                     │
           │                                                              │
           │                          avatar                              │
@@ -55,7 +55,7 @@ The consequence: **adding a game requires no new routes, endpoints, DB tables, s
           │  - chat UI           │      │  - realtime (Socket.IO)  │
           └───────────┬──────────┘      └────────┬─────────────────┘
                       │                          │
-        HTTP /api/*   │   WebSocket              │ @gamelobby/database
+        HTTP /api/*   │   WebSocket              │ @kyzen/database
         (cookies)     │   (Socket.IO)            │ (Drizzle ORM)
                       └──────────┬───────────────┘
                                  ▼
@@ -73,7 +73,7 @@ Who imports whom:
 - **`apps/web`** imports `shared`, `games-core`, `games-client`, and `avatar` (never `database`). `shared` + `games-core` + `games-client` are listed in `next.config.ts` `transpilePackages` (`apps/web/next.config.ts:5`).
 - **`apps/server`** imports `shared`, `games-core`, `database`, and `avatar` (never `games-client`, which is React-only). This is what keeps the server React-free.
 - **`games-client`** depends only on `shared` (for types) and has React + `react-icons` + `socket.io-client` as peer deps.
-- Both apps reach the same Postgres instance only through the server; the web app never touches the database directly (it never imports `@gamelobby/database`).
+- Both apps reach the same Postgres instance only through the server; the web app never touches the database directly (it never imports `@kyzen/database`).
 
 ## Two end-to-end journeys
 
@@ -82,7 +82,7 @@ Who imports whom:
 1. The browser hits the sign-in page `apps/web/app/auth/page.tsx`. It's an RSC: if a session already exists it redirects to `/profile`; otherwise it renders the client button `apps/web/app/google-sign-in-button.tsx`.
 2. Clicking the button calls `authClient.signIn.social({ provider: "google", ... })` (`apps/web/app/google-sign-in-button.tsx:20`), which kicks off the Better Auth OAuth dance against the server's `/api/auth/*` routes.
 3. On the server, all `/api/auth/*` requests are forwarded by Hono to the Better Auth handler (`apps/server/src/api/index.ts:15`, mounted at line 20). Express forwards everything under `/api/*` to the Hono app (`apps/server/src/index.ts:46`).
-4. Better Auth is configured in `apps/server/src/auth.ts` (which pulls `db` + `schema` from `@gamelobby/database`, `auth.ts:1`). On **first** sign-in, the `databaseHooks.user.create.after` hook provisions a profile (assigns a username) via `ensureUsernameForUser` (`apps/server/src/auth.ts:55`). Sessions/accounts persist through the Drizzle adapter into the `user` / `session` / `account` tables (`packages/database/src/schema.ts:46`).
+4. Better Auth is configured in `apps/server/src/auth.ts` (which pulls `db` + `schema` from `@kyzen/database`, `auth.ts:1`). On **first** sign-in, the `databaseHooks.user.create.after` hook provisions a profile (assigns a username) via `ensureUsernameForUser` (`apps/server/src/auth.ts:55`). Sessions/accounts persist through the Drizzle adapter into the `user` / `session` / `account` tables (`packages/database/src/schema.ts:46`).
 5. Back in the web app, server components read the session by calling the server's `/api/auth/get-session` with the user's cookies forwarded: `getServerSession()` (`apps/web/lib/get-server-session.ts:17`) wraps `serverFetchJson` (`apps/web/lib/api-server.ts:24`), which attaches the cookie header and uses `cache: "no-store"`.
 6. From then on, authenticated REST routes re-derive the same session from the cookie through a single shared `requireAuth` middleware (`apps/server/src/api/middleware/auth.ts:16`) - it calls `getAuth().api.getSession`, 401s when there's no user, and otherwise sets `userId` / `user` / `session` on the Hono context for the handler. Routes opt in by mounting this middleware rather than each re-implementing the session lookup.
 
@@ -102,17 +102,17 @@ This is the index for `docs/architecture/`. Each per-subsystem doc is a sibling 
 
 | Doc | What it covers |
 | --- | --- |
-| [shared.md](./shared.md) | `@gamelobby/shared`: the foundational package every other one imports. Its two subpath exports - `@gamelobby/shared/constants` (all constant **values**) and `@gamelobby/shared/types` (all TypeScript **types + Zod schemas**, plus the re-exported `z`) - the strict rules (zod lives here only; the `constants ← types` strict-annotation pattern; the `avatar` exception). |
+| [shared.md](./shared.md) | `@kyzen/shared`: the foundational package every other one imports. Its two subpath exports - `@kyzen/shared/constants` (all constant **values**) and `@kyzen/shared/types` (all TypeScript **types + Zod schemas**, plus the re-exported `z`) - the strict rules (zod lives here only; the `constants ← types` strict-annotation pattern; the `avatar` exception). |
 | [auth.md](./auth.md) | Better Auth (Google OAuth only) mounted at `/api/auth/*`, the `user`/`session`/`account`/`verification` tables, first-sign-in profile provisioning, and how RSC, browser fetch, and the Socket.IO handshake all re-derive the same session from one cookie. |
-| [database-schema.md](./database-schema.md) | `@gamelobby/database`'s Drizzle/Postgres **schema**: the **generic** `game`/`move`/`game_player` tables (JSONB state, no per-game tables), the pgEnums-from-`@gamelobby/shared/constants`, the `$type` modeling patterns, the hand-written row types + the `drift-guard` `$inferSelect` assertions, and migrations (generate vs. push). |
+| [database-schema.md](./database-schema.md) | `@kyzen/database`'s Drizzle/Postgres **schema**: the **generic** `game`/`move`/`game_player` tables (JSONB state, no per-game tables), the pgEnums-from-`@kyzen/shared/constants`, the `$type` modeling patterns, the hand-written row types + the `drift-guard` `$inferSelect` assertions, and migrations (generate vs. push). |
 | [generic-game-schema.md](./generic-game-schema.md) | **How the generic schema generalizes**: what actually lives in `game_state` / `move_data` / `config` for a real game (tic-tac-toe, column-by-column), how the `GameDefinition` maps to the columns, and worked illustrations for other game types. |
-| [database.md](./database.md) | `@gamelobby/database`, the **data-access** layer over that schema: the postgres-js client singleton + `createDb` factory, the repository pattern exposed as namespaces from `@gamelobby/database`, the `GameRecord` seat join, keyset pagination, and the persist-a-move data flow. |
-| [games-core-schemas.md](./games-core-schemas.md) | The contract layer (now in `@gamelobby/shared/types`, under `types/games/`): `GameDefinition<S,I,C>`, the `GameEngine` types, the shared wire/socket Zod schemas, and the `.strict()` + `z.infer` discipline. |
+| [database.md](./database.md) | `@kyzen/database`, the **data-access** layer over that schema: the postgres-js client singleton + `createDb` factory, the repository pattern exposed as namespaces from `@kyzen/database`, the `GameRecord` seat join, keyset pagination, and the persist-a-move data flow. |
+| [games-core-schemas.md](./games-core-schemas.md) | The contract layer (now in `@kyzen/shared/types`, under `types/games/`): `GameDefinition<S,I,C>`, the `GameEngine` types, the shared wire/socket Zod schemas, and the `.strict()` + `z.infer` discipline. |
 | [games-core-engine.md](./games-core-engine.md) | The logic/registry layer: the `GameEngine` contract, tic-tac-toe's pure `reduce()`, the single `GAMES` array, the derived registry, and the conformance invariants every game must satisfy. |
-| [games-client.md](./games-client.md) | `@gamelobby/games-client`: the web-only React board package, board resolution by game type via `getGameClient` (the current board is statically imported so it SSRs; the registry still permits a `React.lazy` board for a heavy future game), the `GameClientProps` SSR contract, and how a board rides the app's shared socket. |
+| [games-client.md](./games-client.md) | `@kyzen/games-client`: the web-only React board package, board resolution by game type via `getGameClient` (the current board is statically imported so it SSRs; the registry still permits a `React.lazy` board for a heavy future game), the `GameClientProps` SSR contract, and how a board rides the app's shared socket. |
 | [audio.md](./audio.md) | Game audio: the jotai-free, file-based `GameAudioEngine` (Web Audio SFX buffers + a streamed, crossfaded Opus music track) in `games-client`, the two `atomWithStorage` preference channels + bridge in `apps/web`, the sliding settings **gear** over the layered-popup modal, and the play-once-live win-sound detection. Assets are Opus `.ogg` under `public/sounds/`; no DB/schema/socket changes. |
-| [playing-cards.md](./playing-cards.md) | The themed playing-card primitive: an in-code SVG **builder** in `@gamelobby/games-core` + the `"use client"` `<PlayingCard>` / `<Joker>` / `<CardBack>` components in `@gamelobby/games-client`, why it must render inline (so theme `var(--…)` resolve), the `--pc-*` → theme-token → hex fallback theming, per-instance id-prefixing, and how to generate or customize any card - including the back. |
-| [chat-core.md](./chat-core.md) | The chat/social contract (now folded into `@gamelobby/shared` - DTOs + schemas under `types/chat/`, `CHAT_EVENTS` in `@gamelobby/shared/constants`): the DTOs, the `CHAT_EVENTS` socket registry, the `Ack` discriminated union, and how game cards get embedded in conversations. |
+| [playing-cards.md](./playing-cards.md) | The themed playing-card primitive: an in-code SVG **builder** in `@kyzen/games-core` + the `"use client"` `<PlayingCard>` / `<Joker>` / `<CardBack>` components in `@kyzen/games-client`, why it must render inline (so theme `var(--…)` resolve), the `--pc-*` → theme-token → hex fallback theming, per-instance id-prefixing, and how to generate or customize any card - including the back. |
+| [chat-core.md](./chat-core.md) | The chat/social contract (now folded into `@kyzen/shared` - DTOs + schemas under `types/chat/`, `CHAT_EVENTS` in `@kyzen/shared/constants`): the DTOs, the `CHAT_EVENTS` socket registry, the `Ack` discriminated union, and how game cards get embedded in conversations. |
 | [realtime.md](./realtime.md) | The Socket.IO layer: one authenticated connection multiplexed into a **chat lane** and a **game lane** (both Zod-validated), the `registerGameEvent` wrapper that calls the turn-based handlers directly, and the full authoritative `make_move` round trip with its cross-lane broadcast. |
 | [server-api.md](./server-api.md) | How the backend process is assembled (Express + Hono + Socket.IO on one port), the routes → services → repositories layering with the `ServiceResult` pattern, and why the only game REST endpoints are reads (`GET /api/games/:gameId` + `GET /api/games/:gameId/series`). |
 | [web.md](./web.md) | The Next.js 16 app: the two fetch paths (`serverFetch` vs `clientFetch`), the SSR-hydrate-then-socket lifecycle, the Jotai-first state convention, and how one dynamic route renders every game. |
@@ -128,9 +128,9 @@ The authoritative quick-start narrative also lives in the repo root `CLAUDE.md` 
 2. **`docs/adding-a-game.md`** - the fastest way to internalize the `GameDefinition` model and the packages↔apps split, by walking the smallest possible feature.
 3. **`packages/shared`** ([shared.md](./shared.md)) and **`packages/games-core`** - start at `packages/shared/src/types/games/` (`definition.ts`, `engine.ts` - the `GameDefinition` + `GameEngine` shapes - and the per-game Zod schemas), then `packages/games-core` (`registry.ts` and `games/index.ts` - the single `GAMES` array + the engines). This is the domain core.
 4. **`apps/server/src/realtime/`** - `index.ts` (connection + the `join_room` / `make_move` / `leave_room` game lane), then `turn-based.ts` (the authoritative driver). This is where games-core meets the database.
-5. **`apps/server/src/api/`** and **`@gamelobby/database`** - Hono router-per-feature and the layered repositories (the namespaces re-exported from `packages/database/src/index.ts`).
+5. **`apps/server/src/api/`** and **`@kyzen/database`** - Hono router-per-feature and the layered repositories (the namespaces re-exported from `packages/database/src/index.ts`).
 6. **`apps/web/app/play/[gameId]/`** and **`packages/games-client`** - how a board is fetched, hydrated, and wired to the socket.
-7. **`@gamelobby/shared` (`types/chat/`)** and the server's `realtime/chat.ts` + `chat/` services - the chat lane that shares the same connection.
+7. **`@kyzen/shared` (`types/chat/`)** and the server's `realtime/chat.ts` + `chat/` services - the chat lane that shares the same connection.
 
 ## Key commands and conventions
 

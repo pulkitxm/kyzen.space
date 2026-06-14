@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import {
   clientQueueJoinSchema,
   clientQueueLeaveSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 
 describe("clientQueueJoinSchema", () => {
   it("accepts a known game type with no config", () => {

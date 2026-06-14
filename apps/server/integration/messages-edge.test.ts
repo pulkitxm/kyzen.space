@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { conversations, messages } from "@gamelobby/database";
+import { conversations, messages } from "@kyzen/database";
 import * as messagesService from "../src/chat/messages-service";
 import {
   createHarness,

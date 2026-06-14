@@ -38,30 +38,23 @@ function LogoMark({ className }: { className?: string }) {
       </defs>
       <rect
         x="6"
-        y="8"
+        y="6"
         width="52"
-        height="36"
-        rx="13"
+        height="52"
+        rx="16"
         fill={`url(#${gradientId})`}
       />
-      <path d="M22 42 L22 56 L36 43 Z" fill={`url(#${gradientId})`} />
-      <g
-        className="text-primary-foreground"
-        stroke="currentColor"
-        strokeWidth="4.2"
-        strokeLinecap="round"
-      >
-        <line x1="16" y1="20" x2="26" y2="30" />
-        <line x1="26" y1="20" x2="16" y2="30" />
+      <g className="text-primary-foreground" fill="currentColor">
+        <rect x="14" y="38" width="12" height="12" rx="3.5" />
+        <rect x="26" y="30" width="12" height="12" rx="3.5" />
+        <rect x="38" y="22" width="12" height="12" rx="3.5" />
       </g>
       <circle
         className="text-logo-ring"
-        cx="43"
-        cy="25"
-        r="6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="4.2"
+        cx="48"
+        cy="17"
+        r="4.2"
+        fill="currentColor"
       />
     </svg>
   );
@@ -70,8 +63,8 @@ function LogoMark({ className }: { className?: string }) {
 function LogoWordmark() {
   return (
     <span className="font-extrabold leading-none tracking-tight">
-      Game
-      <span className="text-logo-mark">Lobby</span>
+      ky
+      <span className="text-logo-mark">zen</span>
       <span className="font-semibold opacity-60">.space</span>
     </span>
   );
@@ -81,7 +74,7 @@ export function Logo({
   variant = "full",
   className,
   iconClassName,
-  label = "GameLobby.space",
+  label = "Kyzen",
   decorative = false,
 }: LogoProps) {
   const accessibility: React.HTMLAttributes<HTMLSpanElement> = decorative

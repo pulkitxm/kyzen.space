@@ -8,8 +8,8 @@ import {
   MIN_CHAT_POPOUT_H,
   MIN_CHAT_POPOUT_W,
   MIN_GAME,
-} from "@gamelobby/shared/constants";
-import type { ChatMode, PopoutGeometry } from "@gamelobby/shared/types";
+} from "@kyzen/shared/constants";
+import type { ChatMode, PopoutGeometry } from "@kyzen/shared/types";
 
 export type { ChatMode, PopoutGeometry };
 export { MAX_CHAT, MIN_CHAT, MIN_CHAT_POPOUT_H, MIN_CHAT_POPOUT_W };

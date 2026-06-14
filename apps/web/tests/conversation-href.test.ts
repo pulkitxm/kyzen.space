@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { ConversationJson, MemberJson } from "@gamelobby/shared/types";
+import type { ConversationJson, MemberJson } from "@kyzen/shared/types";
 import { conversationHref } from "@/lib/chat/conversation-href";
 
 function member(id: string, username: string): MemberJson {

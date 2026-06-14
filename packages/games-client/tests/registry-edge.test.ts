@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { getGameClient, getGameSkeleton } from "../src/registry";
 import { DefaultGameSkeleton } from "../src/skeletons";
 

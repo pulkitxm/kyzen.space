@@ -1,4 +1,4 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -20,7 +20,7 @@ import { memberForLabel } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Your profile · GameLobby",
+  title: "Your profile · Kyzen",
 };
 
 type ProfileResponse = {

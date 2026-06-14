@@ -12,7 +12,7 @@ let listResult = {
 };
 let unreadCountResult = 0;
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   notifications: {
     listForUser: async (_userId: string, opts: ListOpts) => {
       listCalls.push(opts);

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 
 const CODE = "K7P2QX";
 
@@ -32,7 +32,7 @@ const profiles = {
   getProfileByUserId: async () => profile,
 };
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   games,
   profiles,
   accountMerge: {},

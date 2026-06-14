@@ -1,6 +1,6 @@
 "use client";
 
-import type { GifJson } from "@gamelobby/shared/types";
+import type { GifJson } from "@kyzen/shared/types";
 import { useAtom } from "jotai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaRegFaceSmile } from "react-icons/fa6";

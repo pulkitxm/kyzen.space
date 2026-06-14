@@ -11,11 +11,11 @@ import type {
   PublicUserRow,
   ThemeId,
   UserProfileRow,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import {
   appearancePatchSchema,
   createProfileInputSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "../client";
 import { user, userProfile } from "../schema";

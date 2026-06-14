@@ -5,14 +5,14 @@ import type {
   AvatarColorKey,
   AvatarConfig,
   AvatarOptionKey,
-} from "@gamelobby/avatar";
+} from "@kyzen/avatar";
 import {
   AVATAR_COLORS,
   AVATAR_OPTIONS,
   randomAvatarConfig,
   seedAvatarConfig,
   toDicebearOptions,
-} from "@gamelobby/avatar";
+} from "@kyzen/avatar";
 
 function render(config: AvatarConfig): string {
   return createAvatar(

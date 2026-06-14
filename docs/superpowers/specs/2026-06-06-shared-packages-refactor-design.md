@@ -1,4 +1,4 @@
-# Shared Packages Refactor: `@gamelobby/{constants,types,database}`
+# Shared Packages Refactor: `@kyzen/{constants,types,database}`
 
 Date: 2026-06-06 · Branch: `batch-username-provisioning`
 
@@ -7,23 +7,23 @@ Date: 2026-06-06 · Branch: `batch-username-provisioning`
 Eliminate all cross-boundary (web ↔ server) duplication by introducing three shared
 workspace packages and centralizing every type + every Zod schema into one place.
 
-- **`@gamelobby/constants`** - pure constant values shared by web and server.
-- **`@gamelobby/types`** - ALL types and ALL Zod schemas. The **only** package that
+- **`@kyzen/constants`** - pure constant values shared by web and server.
+- **`@kyzen/types`** - ALL types and ALL Zod schemas. The **only** package that
   declares `zod` as a dependency. Re-exports `z` so nothing else imports `zod` directly.
-- **`@gamelobby/database`** - Drizzle tables + repositories (the data layer), validating
+- **`@kyzen/database`** - Drizzle tables + repositories (the data layer), validating
   strictly against the `types` schemas.
 
-`@gamelobby/chat-core` is **deleted** - it is purely types/schemas/const, so its contents
+`@kyzen/chat-core` is **deleted** - it is purely types/schemas/const, so its contents
 move into `types/chat/` and `constants` and the empty package is removed.
 
 ## Non-negotiable rules (these become agent + CLAUDE.md rules)
 
-1. `zod` appears in exactly one `package.json`: `@gamelobby/types`. Everywhere else,
-   `import { z } from "@gamelobby/types"`.
-2. Every shared/cross-package type and every Zod schema lives in `@gamelobby/types`.
-3. Shared constant VALUES live in `@gamelobby/constants` (no types, no zod, zero deps).
-4. The Drizzle schema and all repositories (db actions) live in `@gamelobby/database`.
-   Repositories validate inputs and outputs against `@gamelobby/types` schemas.
+1. `zod` appears in exactly one `package.json`: `@kyzen/types`. Everywhere else,
+   `import { z } from "@kyzen/types"`.
+2. Every shared/cross-package type and every Zod schema lives in `@kyzen/types`.
+3. Shared constant VALUES live in `@kyzen/constants` (no types, no zod, zero deps).
+4. The Drizzle schema and all repositories (db actions) live in `@kyzen/database`.
+   Repositories validate inputs and outputs against `@kyzen/types` schemas.
 5. Nothing is duplicated across web and server.
 
 ## Dependency graph (acyclic)
@@ -46,7 +46,7 @@ the deliberate exception to rule 2.
 
 ## Package contents
 
-### `@gamelobby/constants` (values only, zero deps)
+### `@kyzen/constants` (values only, zero deps)
 - `theme.ts`: `THEME_IDS`, `COLOR_MODES`, `DEFAULT_THEME`, `DEFAULT_COLOR_MODE`
 - `pattern.ts`: `PATTERN_IDS`, `DEFAULT_PATTERN`
 - `chat-layout.ts`: `MIN_GAME`, `MIN_CHAT`, `MAX_CHAT`, `DEFAULT_CHAT_W`,
@@ -56,7 +56,7 @@ the deliberate exception to rule 2.
 - `games.ts`: `TIC_TAC_TOE`, `GAME_TYPES`, `GAME_CATEGORIES`
 - `chat.ts`: `CHAT_EVENTS`
 
-### `@gamelobby/types` (all types + all zod; deps: constants, avatar, zod)
+### `@kyzen/types` (all types + all zod; deps: constants, avatar, zod)
 - `z.ts`: `export { z } from "zod"` + `export type { ZodType, ... }`, the only zod touch
 - `theme.ts`: `themeIdSchema`, `ThemeId`, `colorModeSchema`, `ColorMode`,
   `isValidTheme`, `isValidColorMode` (guards via schema.safeParse)
@@ -64,7 +64,7 @@ the deliberate exception to rule 2.
 - `chat-layout.ts`: `chatModeSchema`, `ChatMode`, `PopoutGeometry`, `ChatLayout`
 - `username.ts`: `usernameSchema`, `isValidUsernameFormat`, `isReservedUsername`,
   `normalizeUsername`, `displayNameSchema`
-- `avatar.ts`: `export type { AvatarConfig, ... } from "@gamelobby/avatar"` (re-export)
+- `avatar.ts`: `export type { AvatarConfig, ... } from "@kyzen/avatar"` (re-export)
 - `chat/`: `dto.ts`, `schemas.ts`, `socket-events.ts` (former chat-core, minus CHAT_EVENTS)
 - `games/`: `core.ts` (GameType, gameTypeSchema, GameMeta, GameDefinition, GameEngine,
   Outcome, Seat, ConfigField…), `wire.ts` (GameJson, MoveJson, gamePlayerSchema,
@@ -74,7 +74,7 @@ the deliberate exception to rule 2.
   `profiles.ts`, `games.ts`, `messages.ts`, `conversations.ts`, `friends.ts`,
   `notifications.ts`, `auth.ts` (user/session/account/verification)
 
-### `@gamelobby/database` (deps: types, constants, drizzle-orm, postgres)
+### `@kyzen/database` (deps: types, constants, drizzle-orm, postgres)
 - `schema.ts`: Drizzle tables + pgEnums (enums built from `constants` arrays)
 - `client.ts`: `createDb(url, { latencyMs })` factory (NO import of server env)
 - `latency.ts`: `withLatency`, `resolveDbLatencyMs`
@@ -85,22 +85,22 @@ the deliberate exception to rule 2.
 
 ## Consumer migration
 
-- `apps/server`: `db/*` deleted → `import { games, profiles, createDb } from "@gamelobby/database"`.
+- `apps/server`: `db/*` deleted → `import { games, profiles, createDb } from "@kyzen/database"`.
   `auth.ts` builds db via `createDb(env.databaseUrl)` and passes schema to drizzleAdapter.
-  `env.ts` imports `resolveDbLatencyMs` from `@gamelobby/database`. `lib/theme.ts`,
+  `env.ts` imports `resolveDbLatencyMs` from `@kyzen/database`. `lib/theme.ts`,
   `lib/pattern.ts` deleted; `lib/chat-layout.ts` keeps only server-specific bits or is
-  deleted if fully covered. All `@gamelobby/chat-core` → `@gamelobby/types`. Direct
-  `zod` imports → `@gamelobby/types`.
+  deleted if fully covered. All `@kyzen/chat-core` → `@kyzen/types`. Direct
+  `zod` imports → `@kyzen/types`.
 - `apps/web`: `lib/themes.ts` / `lib/patterns.ts` keep ONLY web-only presentation
   (`THEMES`/`PATTERNS` palette data, `getThemeDef`, boot scripts, storage keys) and
   re-export the shared core from packages. `lib/chat-layout.ts` keeps web-only
   persistence; shared bits from packages. `account-identity-form.tsx` imports the
-  username schema/constants instead of re-hardcoding the regex. `@gamelobby/chat-core`
-  → `@gamelobby/types`. Add new packages to `next.config.ts` `transpilePackages` if
+  username schema/constants instead of re-hardcoding the regex. `@kyzen/chat-core`
+  → `@kyzen/types`. Add new packages to `next.config.ts` `transpilePackages` if
   needed (pure types/constants/db usually need it for Next to compile raw TS).
-- `games-core`: per-game schemas import from `@gamelobby/types`; types/schemas files
+- `games-core`: per-game schemas import from `@kyzen/types`; types/schemas files
   move out; engines/registry/GAMES stay. Adding a game now touches 3 packages.
-- `games-client`: imports types from `@gamelobby/types`.
+- `games-client`: imports types from `@kyzen/types`.
 
 ## Build wiring
 
@@ -131,5 +131,5 @@ the deliberate exception to rule 2.
 
 - Move theme/pattern/chat-layout/username unit tests to the owning package's `tests/`.
 - DB repository tests + the `Expect<Equal<...>>` drift guards live in `database`.
-- Server unit tests that `mock.module("../src/db", …)` switch to mocking `@gamelobby/database`.
+- Server unit tests that `mock.module("../src/db", …)` switch to mocking `@kyzen/database`.
 - Conformance suite stays in games-core; update to import schemas from types.

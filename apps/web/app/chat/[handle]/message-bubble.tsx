@@ -6,7 +6,7 @@ import type {
   GifMeta,
   MessageMetadata,
   SystemMeta,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { ReactNode } from "react";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import { ProfilePopupTrigger } from "@/components/ui/profile-popup";

@@ -1,8 +1,8 @@
 "use client";
 
-import { listGameMeta } from "@gamelobby/games-core";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { GameCardMeta, GameType } from "@gamelobby/shared/types";
+import { listGameMeta } from "@kyzen/games-core";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { GameCardMeta, GameType } from "@kyzen/shared/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";

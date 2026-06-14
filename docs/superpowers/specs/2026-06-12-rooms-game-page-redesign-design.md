@@ -85,7 +85,7 @@ Full-bleed, seamless, centered. Top → bottom: **name → cover image → tutor
 
 ## 6. Architecture & components
 
-### 6.1 Shared types (`@gamelobby/shared`)
+### 6.1 Shared types (`@kyzen/shared`)
 - `GameMeta` gains `tutorialVideo?: string` (a `/games/...` path, mirroring `coverImage`). `packages/shared/src/types/games/definition.ts`.
 - New wire schemas in `packages/shared/src/types/games/wire.ts` (zod stays in shared):
   - `clientCreateRoomSchema = { gameType, config? }`

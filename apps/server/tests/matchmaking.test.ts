@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { runPairing } from "../src/realtime/matchmaking";
 import { InMemoryMatchmakingStore } from "../src/realtime/matchmaking-store";
 

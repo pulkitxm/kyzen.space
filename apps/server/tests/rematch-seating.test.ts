@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { GameRecord } from "@gamelobby/database";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import type { GameRecord } from "@kyzen/database";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { computeRematchSeating } from "../src/chat/rematch-seating";
 
 type Player = { userId: string; username: string; role: string };

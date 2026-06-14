@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { db, friends, games, schema } from "@gamelobby/database";
-import { ticTacToeEngine } from "@gamelobby/games-core";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { TicTacToeState } from "@gamelobby/shared/types";
+import { db, friends, games, schema } from "@kyzen/database";
+import { ticTacToeEngine } from "@kyzen/games-core";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { TicTacToeState } from "@kyzen/shared/types";
 import { eq, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";

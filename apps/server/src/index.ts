@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
-import { ping } from "@gamelobby/database";
 import { getRequestListener } from "@hono/node-server";
+import { ping } from "@kyzen/database";
 import cors from "cors";
 import express from "express";
 import { app as honoApp } from "./api";
@@ -39,7 +39,7 @@ server.get("/health", async (_req, res) => {
   const ok = db === "ok" && redis !== "error" && probe !== "error";
   res
     .status(ok ? 200 : 503)
-    .json({ ok, service: "gamelobby-server", db, redis, probe });
+    .json({ ok, service: "kyzen-server", db, redis, probe });
 });
 
 const honoListener = getRequestListener(honoApp.fetch);
@@ -59,7 +59,7 @@ httpServer
   .listen(env.port, env.host, () => {
     logger.info(
       { host: env.host, port: env.port, env: env.nodeEnv },
-      "GameLobby server ready",
+      "Kyzen server ready",
     );
   });
 

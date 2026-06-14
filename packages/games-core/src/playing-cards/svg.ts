@@ -1,4 +1,4 @@
-import type { JokerVariant, Rank, Suit } from "@gamelobby/shared/types";
+import type { JokerVariant, Rank, Suit } from "@kyzen/shared/types";
 
 export const CARD_WIDTH = 360;
 export const CARD_HEIGHT = 504;

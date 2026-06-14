@@ -1,6 +1,6 @@
 "use client";
 
-import type { SeriesScore } from "@gamelobby/shared/types";
+import type { SeriesScore } from "@kyzen/shared/types";
 import { Character } from "@/components/ui";
 
 export function SeriesScoreboard({ score }: { score: SeriesScore }) {

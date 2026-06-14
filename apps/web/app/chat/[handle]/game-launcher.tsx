@@ -1,8 +1,8 @@
 "use client";
 
-import { listGameMeta } from "@gamelobby/games-core";
-import { CHAT_EVENTS, TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { ConversationJson, GameType } from "@gamelobby/shared/types";
+import { listGameMeta } from "@kyzen/games-core";
+import { CHAT_EVENTS, TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { ConversationJson, GameType } from "@kyzen/shared/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FaGamepad } from "react-icons/fa6";

@@ -6,7 +6,7 @@ import {
   isGameLive,
   isGameOver,
   type TicTacToeState as TicState,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import {
   useCallback,
   useEffect,

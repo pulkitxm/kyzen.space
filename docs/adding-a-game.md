@@ -13,13 +13,13 @@ event.
 
 | Concern | Package | What you add |
 | --- | --- | --- |
-| Strict Zod schemas + inferred types (the source of truth) | `@gamelobby/shared` | the slug in `src/constants/games.ts` and `stateSchema`/`moveSchema`/`configSchema` + `z.infer` types in `src/types/games/<type>/schemas.ts` |
-| Engine, metadata, definition (server-safe, **no React**) | `@gamelobby/games-core` | a `GameEngine` + `GameMeta` + a `GameDefinition` in `src/games/<type>/`, appended to the single `GAMES` array |
-| React board UI (web-only) | `@gamelobby/games-client` | a `"use client"` board component (and an optional loading skeleton), registered by `type` |
+| Strict Zod schemas + inferred types (the source of truth) | `@kyzen/shared` | the slug in `src/constants/games.ts` and `stateSchema`/`moveSchema`/`configSchema` + `z.infer` types in `src/types/games/<type>/schemas.ts` |
+| Engine, metadata, definition (server-safe, **no React**) | `@kyzen/games-core` | a `GameEngine` + `GameMeta` + a `GameDefinition` in `src/games/<type>/`, appended to the single `GAMES` array |
+| React board UI (web-only) | `@kyzen/games-client` | a `"use client"` board component (and an optional loading skeleton), registered by `type` |
 
-The split matters: the schemas and types live in `@gamelobby/shared` so the
+The split matters: the schemas and types live in `@kyzen/shared` so the
 **server**, the **web app**, `games-core`, and `games-client` all validate against
-the very same Zod schemas - `@gamelobby/shared` is the only package that declares
+the very same Zod schemas - `@kyzen/shared` is the only package that declares
 `zod`. `games-core` imports those schemas to assemble each `GameDefinition` and run
 engines, so it must never import React. All UI lives in `games-client`.
 
@@ -113,8 +113,8 @@ packages/shared/src/types/games/core.ts                      # GameType union + 
 packages/shared/src/types/games/tic-tac-toe/schemas.ts       # cell/mark + strict state/move/config schemas, z.infer types
 packages/shared/src/types/games/index.ts                     # re-exports the tic-tac-toe schemas + types
 packages/games-core/src/games/tic-tac-toe/
-  engine.ts    # ticTacToeEngine: createInitialState + reduce (rules only); imports TIC_TAC_TOE from @gamelobby/shared/constants
-  meta.ts      # ticTacToeMeta: GameMeta; imports TIC_TAC_TOE from @gamelobby/shared/constants
+  engine.ts    # ticTacToeEngine: createInitialState + reduce (rules only); imports TIC_TAC_TOE from @kyzen/shared/constants
+  meta.ts      # ticTacToeMeta: GameMeta; imports TIC_TAC_TOE from @kyzen/shared/constants
   index.ts     # ticTacToeDefinition: GameDefinition (engine + meta + the shared schemas)
 packages/games-core/src/games/index.ts                       # GAMES array includes ticTacToeDefinition
 packages/games-client/src/games/tic-tac-toe/client.tsx       # board UI
@@ -150,14 +150,14 @@ When adding a game:
 1. Declare `export const <SLUG> = "<type>";` in
    `packages/shared/src/constants/games.ts`.
 2. Append it to `GAME_TYPES`: `export const GAME_TYPES = [TIC_TAC_TOE, <SLUG>] as const;`.
-3. Import `<SLUG>` from `@gamelobby/shared/constants` in the game's `meta.ts` and
+3. Import `<SLUG>` from `@kyzen/shared/constants` in the game's `meta.ts` and
    `engine.ts` (and anywhere else that references the slug). `GameType` /
    `gameTypeSchema` pick up the new entry automatically.
    **Never redeclare the string literal in a per-game file.**
 
 `gameTypeSchema` is a `z.enum(GAME_TYPES)` - every wire boundary that carries a
 `gameType` value is validated against it (`gameJsonSchema`, `gameCardMetaSchema`,
-and `clientCreateGameInConversationSchema`, all in `@gamelobby/shared/types`). The
+and `clientCreateGameInConversationSchema`, all in `@kyzen/shared/types`). The
 conformance suite asserts `GAME_TYPES` matches the `GAMES` registry exactly
 (`"GAME_TYPES matches the registry exactly"` test in
 `packages/games-core/tests/conformance.test.ts`) so the tuple and the array can
@@ -171,13 +171,13 @@ type, `listGameTypes(): GameType[]` returns the narrowed list.
    `GAME_TYPES` in `packages/shared/src/constants/games.ts` (see above). Then
    create `packages/shared/src/types/games/<type>/schemas.ts` with the strict Zod
    schemas + `z.infer` types (no slug here) and re-export them from
-   `packages/shared/src/types/games/index.ts`. Inside `@gamelobby/shared` import
+   `packages/shared/src/types/games/index.ts`. Inside `@kyzen/shared` import
    `z` directly (`import { z } from "zod"`) - it is the only package that declares
    `zod`. Add a category to `src/constants/categories.ts` (`GAME_CATEGORIES`) only
    if you need a new one.
 2. **games-core** - create `src/games/<type>/{engine,meta,index}.ts`.
-   In `engine.ts` and `meta.ts` import the slug from `@gamelobby/shared/constants`
-   and the schemas/types from `@gamelobby/shared/types`; `index.ts` assembles the
+   In `engine.ts` and `meta.ts` import the slug from `@kyzen/shared/constants`
+   and the schemas/types from `@kyzen/shared/types`; `index.ts` assembles the
    `GameDefinition` from the engine, meta, and the shared schemas. Append the
    definition to `GAMES` (`src/games/index.ts`) and export the public symbols from
    `src/index.ts`.
@@ -258,7 +258,7 @@ These already work for every game - do not duplicate them:
   wire it up there **only** for a genuinely different `mode` (e.g. realtime
   `step`-based games).
 - **Database** - the generic `game` (+ `config` JSONB), `move`, and `game_player`
-  tables in `@gamelobby/database` (`packages/database/src/schema.ts`) store every
+  tables in `@kyzen/database` (`packages/database/src/schema.ts`) store every
   game. Never add a per-game table; the engine owns the typed shape and Zod
   validates it.
 

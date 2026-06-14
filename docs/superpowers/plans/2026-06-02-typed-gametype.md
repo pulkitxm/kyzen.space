@@ -247,7 +247,7 @@ git commit -m "test(games-core): assert GAME_TYPES never drifts from the registr
 In `packages/games-client/src/registry.ts`, add after the existing imports:
 
 ```ts
-import { type GameType, TIC_TAC_TOE } from "@gamelobby/games-core";
+import { type GameType, TIC_TAC_TOE } from "@kyzen/games-core";
 ```
 
 - [ ] **Step 2: Type both registries against `GameType` and use computed keys**
@@ -311,7 +311,7 @@ git commit -m "feat(games-client): drive board/skeleton registries from GameType
 In `apps/server/src/db/repositories/games.ts`, add to the imports:
 
 ```ts
-import type { GameType } from "@gamelobby/games-core";
+import type { GameType } from "@kyzen/games-core";
 ```
 
 Change the `GameRecord` type (line 14) to override the raw row's `gameType`, and add a private helper just below it:
@@ -354,7 +354,7 @@ In the same file, replace the three `return { ...row, players }` style returns:
 In `apps/server/src/db/repositories/profiles.ts`, add to the imports:
 
 ```ts
-import type { GameType } from "@gamelobby/games-core";
+import type { GameType } from "@kyzen/games-core";
 ```
 
 Change the `bumpStats` signature parameter from `gameType: string` to:
@@ -394,8 +394,8 @@ In `packages/chat-core/package.json`, add to `dependencies` (keep alphabetical):
 
 ```json
   "dependencies": {
-    "@gamelobby/avatar": "workspace:*",
-    "@gamelobby/games-core": "workspace:*",
+    "@kyzen/avatar": "workspace:*",
+    "@kyzen/games-core": "workspace:*",
     "zod": "^3.24.1"
   },
 ```
@@ -440,7 +440,7 @@ Expected: FAIL: `"chess"` currently passes `z.string().min(1)`.
 In `packages/chat-core/src/schemas.ts`, add the import at the top:
 
 ```ts
-import { gameTypeSchema } from "@gamelobby/games-core";
+import { gameTypeSchema } from "@kyzen/games-core";
 ```
 
 Then change the three fields:
@@ -547,7 +547,7 @@ import {
   type GameType,
   getDefinition,
   hasEngine,
-} from "@gamelobby/games-core";
+} from "@kyzen/games-core";
 ```
 
 Change the `createGameInConversation` input field from `gameType: string;` to:
@@ -561,7 +561,7 @@ Change the `createGameInConversation` input field from `gameType: string;` to:
 In `apps/server/src/api/routes/conversations.ts`, add `gameTypeSchema` to the games-core import (add the import if none exists):
 
 ```ts
-import { gameTypeSchema } from "@gamelobby/games-core";
+import { gameTypeSchema } from "@kyzen/games-core";
 ```
 
 In the `.post("/:id/games", ...)` handler, replace the inline `gameType: typeof body?.gameType === "string" ? body.gameType : ""` by validating first. Insert before the `createGameInConversation` call:
@@ -609,10 +609,10 @@ git commit -m "feat(server): accept GameType on the game-creation paths"
 
 - [ ] **Step 1: `play-client.tsx`**
 
-Add `GameType` to the games-client import block (it already imports from `@gamelobby/games-client`, but `GameType` lives in games-core - add a games-core import):
+Add `GameType` to the games-client import block (it already imports from `@kyzen/games-client`, but `GameType` lives in games-core - add a games-core import):
 
 ```ts
-import type { GameType } from "@gamelobby/games-core";
+import type { GameType } from "@kyzen/games-core";
 ```
 
 Change the prop type `gameType: string;` to `gameType: GameType;`. (The value comes from the loaded game's `gameType`, now `GameType`; if the parent passes a `string`, narrow it at the source - `initialGame.gameType` is `GameType`.)
@@ -622,7 +622,7 @@ Change the prop type `gameType: string;` to `gameType: GameType;`. (The value co
 Add:
 
 ```ts
-import type { GameType } from "@gamelobby/games-core";
+import type { GameType } from "@kyzen/games-core";
 ```
 
 Change the prop type `gameType: string;` to `gameType: GameType;`.
@@ -632,7 +632,7 @@ Change the prop type `gameType: string;` to `gameType: GameType;`.
 Change the existing games-core import to also bring in `TIC_TAC_TOE` and `GameType`:
 
 ```ts
-import { type GameType, listGameMeta, TIC_TAC_TOE } from "@gamelobby/games-core";
+import { type GameType, listGameMeta, TIC_TAC_TOE } from "@kyzen/games-core";
 ```
 
 Change the destructured default and the prop type. The default must be a real `GameType` (not `""`):
@@ -654,7 +654,7 @@ export function GameLauncher({
 Add:
 
 ```ts
-import type { GameType } from "@gamelobby/games-core";
+import type { GameType } from "@kyzen/games-core";
 ```
 
 Change the helper signature `function gameName(gameType: string): string {` to:
@@ -670,7 +670,7 @@ function gameName(gameType: GameType): string {
 Change the existing import to add `GameType`:
 
 ```ts
-import { type GameType, listGameMeta } from "@gamelobby/games-core";
+import { type GameType, listGameMeta } from "@kyzen/games-core";
 ```
 
 Change `ProfileActivityApiRow.gameType` from `gameType: string;` to:
@@ -713,7 +713,7 @@ Convert **fixture/setup** usages of `"tic-tac-toe"` to the imported `TIC_TAC_TOE
 Add to each file's imports (games-core test uses the relative path, the rest use the package):
 
 - games-core test: `import { TIC_TAC_TOE } from "../src/index";` (merge into the existing `../src/index` import if present)
-- all others: `import { TIC_TAC_TOE } from "@gamelobby/games-core";`
+- all others: `import { TIC_TAC_TOE } from "@kyzen/games-core";`
 
 - [ ] **Step 2: Swap fixture occurrences**
 

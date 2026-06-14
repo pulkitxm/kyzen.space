@@ -1,6 +1,6 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import type {
   ConversationJson,
   FriendshipJson,
@@ -19,7 +19,7 @@ import type {
   ServerPresenceSnapshot,
   ServerPresenceUpdate,
   ServerTypingUpdate,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { useStore } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import {

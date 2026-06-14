@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { GAME_CATEGORIES } from "@gamelobby/shared/constants";
+import { GAME_CATEGORIES } from "@kyzen/shared/constants";
 import {
   GAMES,
   getCategoryGroups,
