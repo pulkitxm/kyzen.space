@@ -2,19 +2,16 @@
 
 import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
+  buildGameResultViewModel,
   type ConversationJson,
   type GameJson,
   isGameOver,
   type SeriesDetail,
 } from "@kyzen/shared/types";
-import { AnimatePresence, domAnimation, LazyMotion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { FaTrophy } from "react-icons/fa6";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GameResultModal } from "@/components/games/game-result-modal";
 import { SeriesDetailModal } from "@/components/games/series-detail-modal";
-import { SeriesScoreboard } from "@/components/games/series-scoreboard";
-import { GlassMotionPane } from "@/components/glass/glass-pane";
-import { Button, Character } from "@/components/ui";
 import { clientFetchJson } from "@/lib/api-client";
 import { conversationHref } from "@/lib/chat/conversation-href";
 import { useLayeredPopup } from "@/lib/popups/use-layered-popup";
@@ -23,50 +20,6 @@ import {
   useSocket,
   useSocketEvent,
 } from "@/lib/socket/socket-context";
-import { cn } from "@/lib/utils";
-
-function outcomeLabel(game: GameJson, userId: string): string {
-  if (game.status === "abandoned") return "Game abandoned";
-  if (game.winner === "draw") return "It's a draw";
-  if (!game.winner) return "Game over";
-  return game.winner === userId ? "You won! 🎉" : "You lost";
-}
-
-function PlayersRow({ game }: { game: GameJson }) {
-  return (
-    <div className="flex items-start justify-center gap-8">
-      {game.players.map((p) => {
-        const won = game.winner === p.userId;
-        return (
-          <div key={p.userId} className="flex flex-col items-center gap-1">
-            <div
-              className={cn(
-                "rounded-full",
-                won &&
-                  "ring-2 ring-amber-500 ring-offset-2 ring-offset-surface-raised",
-              )}
-            >
-              <Character
-                config={p.avatar ?? null}
-                fallbackSeed={p.username}
-                size={56}
-                className="rounded-full border-2 border-card bg-surface-overlay"
-              />
-            </div>
-            <span className="max-w-24 truncate text-sm">{p.username}</span>
-            {won ? (
-              <FaTrophy
-                className="text-amber-500"
-                size={14}
-                aria-hidden="true"
-              />
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export function GameOverOverlay({
   gameId,
@@ -92,14 +45,29 @@ export function GameOverOverlay({
     code: string | null;
   }>({ busy: false, error: null, code: null });
 
+  useEffect(() => {
+    setGame(initialGame);
+    setOpen(isGameOver(initialGame.status));
+    setDetail(null);
+    setRematch({ busy: false, error: null, code: null });
+  }, [initialGame]);
+
   useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
     setGame(payload.game);
-    if (isGameOver(payload.game.status)) setOpen(true);
+    if (isGameOver(payload.game.status)) {
+      setOpen(true);
+      setRematch((state) => ({ ...state, busy: false }));
+    }
   });
+
   useSocketEvent<{ newGameId: string }>(
     CHAT_EVENTS.rematchCreated,
     (payload) => {
-      setRematch((r) => ({ ...r, code: payload.newGameId }));
+      setRematch((state) => ({
+        ...state,
+        busy: false,
+        code: payload.newGameId,
+      }));
     },
   );
 
@@ -107,8 +75,8 @@ export function GameOverOverlay({
     if (!open || !isGameOver(game.status)) return;
     let active = true;
     clientFetchJson<SeriesDetail>(`/api/games/${gameId}/series`)
-      .then((d) => {
-        if (active) setDetail(d);
+      .then((series) => {
+        if (active) setDetail(series);
       })
       .catch(() => {});
     return () => {
@@ -119,26 +87,37 @@ export function GameOverOverlay({
   const layerCount = layers.length;
   useEffect(() => {
     if (!open) return;
-    function onPointerDown(e: MouseEvent) {
+    function onPointerDown(event: MouseEvent) {
       if (layerCount > 0) return;
       const card = cardRef.current;
-      if (card && !card.contains(e.target as Node)) setOpen(false);
+      if (card && !card.contains(event.target as Node)) setOpen(false);
     }
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [open, layerCount]);
 
-  const isPlayer = game.players.some((p) => p.userId === userId);
-  const canRematch =
-    isPlayer && game.status === "completed" && !!game.conversationId;
-  const showSeries = (detail?.score.totalGames ?? 0) >= 2;
+  const canContinue =
+    game.players.some((player) => player.userId === userId) &&
+    game.status === "completed" &&
+    !!game.conversationId;
 
-  const onRematch = useCallback(async () => {
+  const viewModel = useMemo(
+    () =>
+      buildGameResultViewModel({
+        game,
+        userId,
+        series: detail,
+        canContinue,
+      }),
+    [game, userId, detail, canContinue],
+  );
+
+  const onContinue = useCallback(async () => {
     if (rematch.code) {
       router.push(`/play/${rematch.code}`);
       return;
     }
-    setRematch((r) => ({ ...r, busy: true, error: null }));
+    setRematch((state) => ({ ...state, busy: true, error: null }));
     try {
       const res = await emitAck<{ gameId: string }>(
         socket,
@@ -146,81 +125,51 @@ export function GameOverOverlay({
         { gameId },
       );
       router.push(`/play/${res.gameId}`);
-    } catch (e) {
-      setRematch((r) => ({
-        ...r,
+    } catch (error) {
+      setRematch((state) => ({
+        ...state,
         busy: false,
-        error: e instanceof Error ? e.message : "Couldn't start the rematch",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Couldn't continue the match",
       }));
     }
   }, [socket, gameId, rematch.code, router]);
 
+  if (!viewModel) return null;
+
+  const pendingLabel = rematch.code
+    ? viewModel.primaryAction === "nextRound"
+      ? "Go to next round"
+      : "Go to rematch"
+    : null;
+
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
-      <LazyMotion features={domAnimation}>
-        <AnimatePresence>
-          {open && isGameOver(game.status) ? (
-            <GlassMotionPane
-              ref={cardRef}
-              className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"
-              initial={{ opacity: 0, y: 8, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.97 }}
-              transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.18 }}
-            >
-              <h2 className="mb-4 text-center font-bold text-xl">
-                {outcomeLabel(game, userId)}
-              </h2>
-              <div className="mb-4">
-                {showSeries && detail ? (
-                  <SeriesScoreboard score={detail.score} />
-                ) : (
-                  <PlayersRow game={game} />
-                )}
-              </div>
-              {rematch.error ? (
-                <p className="mb-2 text-center text-danger text-sm">
-                  {rematch.error}
-                </p>
-              ) : null}
-              <div className="flex flex-col gap-2">
-                {canRematch ? (
-                  <Button onClick={onRematch} disabled={rematch.busy}>
-                    {rematch.code ? "Go to rematch" : "Rematch"}
-                  </Button>
-                ) : null}
-                {conversation ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      router.push(conversationHref(conversation, userId))
-                    }
-                  >
-                    Chat
-                  </Button>
-                ) : null}
-                {showSeries ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      openLayer({
-                        title: "Series",
-                        content: <SeriesDetailModal gameId={gameId} />,
-                        size: "md",
-                      })
-                    }
-                  >
-                    View series
-                  </Button>
-                ) : null}
-                <Button variant="ghost" onClick={() => setOpen(false)}>
-                  Close
-                </Button>
-              </div>
-            </GlassMotionPane>
-          ) : null}
-        </AnimatePresence>
-      </LazyMotion>
-    </div>
+    <GameResultModal
+      open={open}
+      model={viewModel}
+      userId={userId}
+      draws={detail?.score.draws ?? (game.winner === "draw" ? 1 : 0)}
+      cardRef={cardRef}
+      actions={{
+        onPrimary: canContinue ? onContinue : undefined,
+        onChat: conversation
+          ? () => router.push(conversationHref(conversation, userId))
+          : undefined,
+        onViewSeries: viewModel.showSeriesHistory
+          ? () =>
+              openLayer({
+                title: "Series",
+                content: <SeriesDetailModal gameId={gameId} />,
+                size: "md",
+              })
+          : undefined,
+        onClose: () => setOpen(false),
+        primaryBusy: rematch.busy,
+        primaryError: rematch.error,
+        primaryPendingLabel: pendingLabel,
+      }}
+    />
   );
 }

@@ -60,6 +60,7 @@ export function serializeGame(row: GameRecord): GameJson {
     creatorUserId: row.creatorUserId,
     seatingMode: row.seatingMode,
     challengedUserId: row.challengedUserId,
+    config: row.config ?? undefined,
     startedAt: iso(row.startedAt),
     completedAt: iso(row.completedAt),
     createdAt: iso(row.createdAt),
