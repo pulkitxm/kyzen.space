@@ -3,11 +3,11 @@ import {
   type TicTacToeConfig,
   type TicTacToeMove,
   type TicTacToeState,
+  type ZodType,
   ticTacToeConfigSchema,
   ticTacToeMoveSchema,
   ticTacToeStateSchema,
 } from "@kyzen/shared/types";
-import type { ZodType } from "zod";
 import { ticTacToeEngine } from "./engine";
 import { ticTacToeMeta } from "./meta";
 
