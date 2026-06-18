@@ -56,10 +56,13 @@ export function PlayClient({
   useGameAudioBridge(gameMusicSource(gameType));
 
   const connected = status === "connected";
+  const containerWidth = gameType === "tic-tac-toe" ? "max-w-6xl" : "max-w-2xl";
   const gameNode = useMemo(
     () =>
       GameClient ? (
-        <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
+        <div
+          className={`mx-auto flex h-full w-full flex-col p-4 ${containerWidth}`}
+        >
           <Suspense fallback={<GameSkeleton />}>
             <GameClient
               gameId={gameId}
@@ -87,6 +90,7 @@ export function PlayClient({
       initialGame,
       initialMoves,
       openProfile,
+      containerWidth,
     ],
   );
 

@@ -399,10 +399,12 @@ const { socket } = useSocket();
 const status = useAtomValue(socketStatusAtom);
 
 const connected = status === "connected";
+const containerWidth =
+  gameType === "tic-tac-toe" ? "max-w-6xl" : "max-w-2xl";
 const gameNode = useMemo(
   () =>
     GameClient ? (
-      <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
+      <div className={`mx-auto flex h-full w-full flex-col p-4 ${containerWidth}`}>
         <Suspense fallback={<GameSkeleton />}>
           <GameClient
             gameId={gameId}
@@ -424,7 +426,9 @@ const gameNode = useMemo(
 );
 ```
 
-See `apps/web/app/play/[gameId]/play-client.tsx:59`. If the game belongs to a conversation it wraps the board and a `ConversationView` in a `GameChatSplit` (`apps/web/app/play/[gameId]/play-client.tsx:117`); otherwise it renders the board alone (`apps/web/app/play/[gameId]/play-client.tsx:105`). In both branches it mounts an `overlay` (`play-client.tsx:93`) carrying the `WaitingForOpponentOverlay` and the `GameOverOverlay` above the board.
+See `apps/web/app/play/[gameId]/play-client.tsx:59`. The wrapper's max width is per-game (`containerWidth`): `tic-tac-toe` gets `max-w-6xl` so its desktop "match arena" can use side rails, while other games keep the centered `max-w-2xl` column. If the game belongs to a conversation it wraps the board and a `ConversationView` in a `GameChatSplit` (`apps/web/app/play/[gameId]/play-client.tsx:117`); otherwise it renders the board alone (`apps/web/app/play/[gameId]/play-client.tsx:105`). In both branches it mounts an `overlay` (`play-client.tsx:93`) carrying the `WaitingForOpponentOverlay` and the `GameOverOverlay` above the board.
+
+The `tic-tac-toe` board is itself a **theme-aware match arena** (`packages/games-client/src/games/tic-tac-toe/`): an `@container` 3-column layout (`board.tsx` center, `player-card.tsx` rails) that collapses to a single stacked column inside the chat-split pane. It composes the live board, per-seat player cards (avatar + countdown ring + rank/rating/streak), a turn banner, move log, quick reactions, and a post-match summary. Competitive/social extras that have no backend yet (rating, rank, streak, spectator count, friends-watching, reactions, XP/achievements) are presentational mocks derived deterministically from ids in `mock-arena.ts`; players, avatars, turn timer, move history, win/draw, and replay stay real. Every surface uses semantic theme tokens (`primary`, `surface-*`, `border`, `success`/`warning`/`danger`), so it re-skins to any theme with no per-theme code.
 
 `PlayClient` also calls `useGameAudioBridge(gameMusicSource(gameType))` once (`apps/web/app/play/[gameId]/play-client.tsx:56`), which pipes the two audio preference atoms (`gameSfxAtom` / `gameMusicAtom`) into the `games-client` `GameAudioEngine`, sets the per-game background-music source, and wires the browser-autoplay gesture unlock. The settings **gear** lives in `GameChatSplit` (it owns the chat docking state): an `absolute top-3 right-3` button that slides horizontally via a CSS transform - the `--gear-shift` custom property + `transition-transform duration-300 ease-out` applied at the `md` breakpoint (`apps/web/app/play/[gameId]/game-settings-gear.tsx:29`), no framer-motion. `GameChatSplit` drives it with `shifted={gearShifted}` and `offset={chatWidth + RESIZE_HANDLE_W}` (`apps/web/app/play/[gameId]/game-chat-split.tsx:277`), where `gearShifted = mode === "mounted" && !minimized` (`apps/web/app/play/[gameId]/game-chat-split.tsx:202`) - so the gear sits left of the docked chat and snaps back to `--gear-shift: 0px` when the chat pops out / minimizes / stashes. The button opens the audio settings modal through `useLayeredPopup`. The no-conversation branch renders a static, non-sliding gear (`shifted={false} offset={0}`). See [audio.md](./audio.md).
 
@@ -466,7 +470,7 @@ Two more pieces of the play screen are tied to the room/timer model.
 
 **`WaitingForOpponentOverlay`** (`apps/web/app/play/[gameId]/waiting-overlay.tsx`) is mounted in `play-client.tsx`'s `overlay` and renders while `game.status === "waiting" && game.players.length < 2`. It shows the room **code** (the same 6-char code you share so a friend can Join) with **Copy code** / **Copy link** buttons. It watches the `game_state` socket event and, when the game flips from `waiting` to `active` with both seats filled (`waiting-overlay.tsx:21`), flashes an "Opponent joined!" transition (framer-motion `AnimatePresence`/`m.div`) for ~1.5s before dismissing - so the host who created a room gets a clear hand-off into the live board. It is `pointer-events-none` except for its card, so it never blocks the board behind it.
 
-**Avatar countdown ring.** The board never shows the turn timer as a number; instead `CountdownRing` (`packages/games-client/src/ui/countdown-ring.tsx`) wraps the **active** player's avatar in the player bar with a circular SVG progress arc that depletes linearly from full to empty over `turnDeadline - now`. The board reads the server-provided `game.turnDeadline` (stamped onto `GameJson` by the server's `withTimerFields`) and passes it to the ring for whichever seat is on the clock (`packages/games-client/src/games/tic-tac-toe/player-bar.tsx:53`); a new turn (a fresh `turnDeadline`) resets the arc to 100%. It is a generated decorative indicator (a raw `<svg>` stroke arc), not an icon, so it sits outside the react-icons rule. See [the turn timer in realtime](./realtime.md#turn-timer-auto-move--auto-abort).
+**Avatar countdown ring.** The board never shows the turn timer as a number; instead `CountdownRing` (`packages/games-client/src/ui/countdown-ring.tsx`) wraps the **active** player's avatar in the player card with a circular SVG progress arc that depletes linearly from full to empty over `turnDeadline - now`. The board reads the server-provided `game.turnDeadline` (stamped onto `GameJson` by the server's `withTimerFields`) and passes it to the ring for whichever seat is on the clock (`packages/games-client/src/games/tic-tac-toe/player-card.tsx`); a new turn (a fresh `turnDeadline`) resets the arc to 100%. It is a generated decorative indicator (a raw `<svg>` stroke arc), not an icon, so it sits outside the react-icons rule. See [the turn timer in realtime](./realtime.md#turn-timer-auto-move--auto-abort).
 
 ### Two skeletons: the board fallback vs. the route loading
 
