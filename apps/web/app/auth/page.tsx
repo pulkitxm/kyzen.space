@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { GuestButton } from "@/app/auth/guest-button";
 import { GoogleSignInButton } from "@/app/google-sign-in-button";
+import { serverFetchJson } from "@/lib/api-server";
 import { getServerSession } from "@/lib/get-server-session";
 
 export const metadata: Metadata = {
@@ -19,7 +20,12 @@ export default async function AuthPage() {
   );
 
   const session = await getServerSession();
-  if (session?.user) redirect("/profile");
+  if (session?.user) {
+    const me = await serverFetchJson<{ profile: { username: string } }>(
+      "/api/profiles/me",
+    );
+    if (me?.profile?.username) redirect("/profile");
+  }
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center px-4 py-14">

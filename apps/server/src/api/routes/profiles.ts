@@ -23,7 +23,11 @@ import {
 } from "@kyzen/shared/types";
 import { Hono } from "hono";
 import { env } from "../../env";
-import { isUsernameBlocked, suggestUsernames } from "../../username";
+import {
+  ensureUsernameForUser,
+  isUsernameBlocked,
+  suggestUsernames,
+} from "../../username";
 import { usernameEditableAt } from "../../username-rules";
 import { readJson } from "../auth-context";
 import { type AuthEnv, requireAuth } from "../middleware/auth";
@@ -61,7 +65,14 @@ export const profilesRouter = new Hono<AuthEnv>()
   .get("/me", requireAuth, async (c) => {
     const user = c.get("user");
 
-    const profile = await profiles.getProfileByUserId(user.id);
+    let profile = await profiles.getProfileByUserId(user.id);
+    if (!profile) {
+      const isAnon = (user as { isAnonymous?: boolean }).isAnonymous === true;
+      await ensureUsernameForUser(user.id, user.name, {
+        skipGenderDetection: isAnon,
+      });
+      profile = await profiles.getProfileByUserId(user.id);
+    }
     if (!profile) return c.json({ error: "Profile not found" }, 404);
 
     const editableAt = usernameEditableAt(
