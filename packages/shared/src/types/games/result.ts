@@ -270,6 +270,25 @@ function buildSeriesLabel(matchConfig: MatchConfig): string | null {
   return null;
 }
 
+export function isMatchSeriesComplete(
+  config: unknown,
+  score: SeriesScore,
+): boolean {
+  const matchConfig = resolveMatchConfig(config);
+  if (matchConfig.format === "single") return true;
+
+  const stats: PlayerSessionStats[] = score.entries.map((entry) => ({
+    userId: entry.userId,
+    username: entry.username,
+    avatar: entry.avatar ?? null,
+    played: score.completedGames,
+    wins: entry.wins,
+    losses: 0,
+  }));
+
+  return detectSeriesState(matchConfig, stats, score.completedGames).complete;
+}
+
 export function buildGameResultViewModel(input: {
   game: GameJson;
   userId: string;

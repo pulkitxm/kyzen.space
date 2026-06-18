@@ -67,8 +67,7 @@ describe("GameOverOverlay", () => {
       />,
     );
     expect(html).toContain("Round won!");
-    expect(html).toContain("Session record");
-    expect(html).toContain("Next round");
     expect(html).toContain("Best of 3");
+    expect(html).toContain("Next round");
   });
 });

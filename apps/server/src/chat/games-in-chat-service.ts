@@ -6,17 +6,20 @@ import {
   type SeatingMode,
 } from "@kyzen/database";
 import { getDefinition, hasEngine } from "@kyzen/games-core";
-import type {
-  GameCardMeta,
-  GameJson,
-  GameType,
-  MessageJson,
+import {
+  type GameCardMeta,
+  type GameJson,
+  type GameType,
+  isMatchSeriesComplete,
+  type MessageJson,
+  resolveMatchConfig,
 } from "@kyzen/shared/types";
 import { serializeGame } from "../api/serialize";
 import { notify } from "../realtime/notify";
 import { sendMessage } from "./messages-service";
 import { computeRematchSeating } from "./rematch-seating";
 import { fail, ok, type ServiceResult } from "./result";
+import { computeSeriesScore } from "./series";
 
 async function announceGame(opts: {
   game: GameRecord;
@@ -157,16 +160,29 @@ export async function rematchGame(input: {
   if (!prev.players.some((p) => p.userId === input.userId)) {
     return fail("Not a player in this game", 403);
   }
-  if (!prev.conversationId) return fail("Game is not in a conversation", 400);
   if (!hasEngine(prev.gameType)) return fail("Unsupported game type", 400);
 
-  const existingLive = await games.findLiveGameInConversation(
-    prev.conversationId,
-    prev.gameType,
-  );
+  const definition = getDefinition(prev.gameType);
+  const parsedConfig = definition.configSchema.safeParse(prev.config ?? {});
+  const gameConfig = parsedConfig.success
+    ? parsedConfig.data
+    : (prev.config ?? {});
+
+  let existingLive: GameRecord | null = null;
+  if (prev.conversationId) {
+    existingLive = await games.findLiveGameInConversation(
+      prev.conversationId,
+      prev.gameType,
+    );
+  } else if (prev.seriesId) {
+    existingLive = await games.findLiveGameInSeries(
+      prev.seriesId,
+      prev.gameType,
+    );
+  }
   if (existingLive) return ok({ game: serializeGame(existingLive) });
 
-  const { engine } = getDefinition(prev.gameType);
+  const { engine } = definition;
   const orderedUserIds = computeRematchSeating(prev);
   const players: { userId: string; username: string; role: string }[] = [];
   for (let i = 0; i < orderedUserIds.length; i++) {
@@ -180,6 +196,16 @@ export async function rematchGame(input: {
   }
   const becomesActive = players.length >= engine.minPlayers;
 
+  let seriesId: string | undefined = prev.seriesId ?? undefined;
+  const matchConfig = resolveMatchConfig(gameConfig);
+  if (seriesId && matchConfig.format !== "single") {
+    const seriesGames = await games.getSeriesGames(seriesId);
+    const score = computeSeriesScore(seriesGames);
+    if (isMatchSeriesComplete(gameConfig, score)) {
+      seriesId = undefined;
+    }
+  }
+
   const created = await games.createGame({
     gameType: prev.gameType,
     status: becomesActive ? "active" : "waiting",
@@ -187,24 +213,26 @@ export async function rematchGame(input: {
     gameState: engine.createInitialState(
       players.map((p) => ({ role: p.role })),
     ),
-    config: prev.config,
+    config: gameConfig,
     conversationId: prev.conversationId,
     creatorUserId: input.userId,
-    seriesId: prev.seriesId,
+    seriesId,
     seatingMode: prev.seatingMode ?? undefined,
     challengedUserId: prev.challengedUserId,
   });
 
-  const creatorUsername =
-    prev.players.find((p) => p.userId === input.userId)?.username ?? "player";
-  const announced = await announceGame({
-    game: created,
-    actorUserId: input.userId,
-    creatorUsername,
-    seatingMode: created.seatingMode ?? "open",
-    challengedUserId: created.challengedUserId,
-  });
-  if (!announced.ok) return fail(announced.error, announced.status);
+  if (prev.conversationId) {
+    const creatorUsername =
+      prev.players.find((p) => p.userId === input.userId)?.username ?? "player";
+    const announced = await announceGame({
+      game: created,
+      actorUserId: input.userId,
+      creatorUsername,
+      seatingMode: created.seatingMode ?? "open",
+      challengedUserId: created.challengedUserId,
+    });
+    if (!announced.ok) return fail(announced.error, announced.status);
+  }
 
   return ok({ game: serializeGame(created) });
 }

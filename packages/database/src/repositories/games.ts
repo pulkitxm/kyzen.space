@@ -149,6 +149,27 @@ export async function findLiveGameInConversation(
   return toGameRecord(row, players);
 }
 
+export async function findLiveGameInSeries(
+  seriesId: string,
+  gameType: GameType,
+): Promise<GameRecord | null> {
+  const [row] = await db
+    .select()
+    .from(game)
+    .where(
+      and(
+        eq(game.seriesId, seriesId),
+        eq(game.gameType, gameType),
+        inArray(game.status, ["waiting", "active"]),
+      ),
+    )
+    .orderBy(desc(game.createdAt))
+    .limit(1);
+  if (!row) return null;
+  const players = await getPlayers(row.id);
+  return toGameRecord(row, players);
+}
+
 export async function seatPlayer(
   gameId: string,
   player: GamePlayer,

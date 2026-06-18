@@ -3,10 +3,14 @@
 import type { GameResultViewModel } from "@kyzen/shared/types";
 import { AnimatePresence, m } from "motion/react";
 import type { Ref } from "react";
-import { FaArrowRight, FaRotateRight, FaTrophy } from "react-icons/fa6";
-import { SessionScoreboard } from "@/components/games/session-scoreboard";
+import {
+  FaArrowRight,
+  FaRotateRight,
+  FaTrophy,
+  FaXmark,
+} from "react-icons/fa6";
 import { GlassMotionPane } from "@/components/glass/glass-pane";
-import { Button } from "@/components/ui";
+import { Button, Character } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export type GameResultModalActions = {
@@ -19,74 +23,6 @@ export type GameResultModalActions = {
   primaryPendingLabel?: string | null;
 };
 
-function RoundProgress({
-  current,
-  total,
-  seriesLabel,
-}: {
-  current: number;
-  total: number | null;
-  seriesLabel: string | null;
-}) {
-  const pct =
-    total && total > 0 ? Math.min(100, (current / total) * 100) : null;
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between text-muted-foreground text-xs">
-        <span>{seriesLabel ?? "Series"}</span>
-        <span className="tabular-nums">
-          Round {current}
-          {total ? ` of ${total}` : ""}
-        </span>
-      </div>
-      {pct != null ? (
-        <div className="h-1.5 overflow-hidden rounded-full bg-surface-overlay">
-          <m.div
-            className="h-full rounded-full bg-primary"
-            initial={{ width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.45 }}
-          />
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function OutcomeIcon({ model }: { model: GameResultViewModel }) {
-  if (model.phase === "seriesComplete" && model.seriesWinnerId) {
-    return (
-      <m.div
-        initial={{ scale: 0.6, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 420, damping: 22 }}
-        className="mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-500"
-      >
-        <FaTrophy size={28} aria-hidden="true" />
-      </m.div>
-    );
-  }
-  if (model.outcome === "win" || model.phase === "roundComplete") {
-    return (
-      <m.div
-        initial={{ scale: 0.6, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 420, damping: 22 }}
-        className={cn(
-          "mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl",
-          model.outcome === "win"
-            ? "bg-emerald-500/15 text-emerald-500"
-            : "bg-primary/10 text-primary",
-        )}
-      >
-        <FaTrophy size={28} aria-hidden="true" />
-      </m.div>
-    );
-  }
-  return null;
-}
-
 function primaryLabel(
   model: GameResultViewModel,
   pendingLabel: string | null,
@@ -95,6 +31,197 @@ function primaryLabel(
   if (model.primaryAction === "nextRound") return "Next round";
   if (model.primaryAction === "rematch") return "Rematch";
   return "Continue";
+}
+
+function MatchScorePanel({
+  model,
+  userId,
+  draws,
+}: {
+  model: GameResultViewModel;
+  userId: string;
+  draws: number;
+}) {
+  const stats = model.sessionStats;
+  const isDuel = stats.length === 2;
+  const [left, right] = isDuel ? stats : [stats[0], null];
+  const roundPct =
+    model.roundProgress?.total && model.roundProgress.total > 0
+      ? Math.min(
+          100,
+          (model.roundProgress.current / model.roundProgress.total) * 100,
+        )
+      : null;
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-border bg-surface-overlay/40">
+      {isDuel && left && right ? (
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 pt-4 pb-3">
+          <PlayerSide
+            stats={left}
+            align="start"
+            highlight={userId === left.userId}
+            isRoundWinner={model.roundWinnerId === left.userId}
+            isSeriesWinner={model.seriesWinnerId === left.userId}
+          />
+          <div className="flex flex-col items-center gap-0.5 px-1">
+            <div className="flex items-baseline gap-1.5 font-bold text-3xl tabular-nums tracking-tight">
+              <span>{left.wins}</span>
+              <span className="text-lg text-muted-foreground">:</span>
+              <span>{right.wins}</span>
+            </div>
+            {draws > 0 ? (
+              <span className="text-[11px] text-muted-foreground">
+                {draws} draw{draws === 1 ? "" : "s"}
+              </span>
+            ) : null}
+          </div>
+          <PlayerSide
+            stats={right}
+            align="end"
+            highlight={userId === right.userId}
+            isRoundWinner={model.roundWinnerId === right.userId}
+            isSeriesWinner={model.seriesWinnerId === right.userId}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-wrap justify-center gap-4 px-4 pt-4 pb-3">
+          {stats.map((entry) => (
+            <PlayerSide
+              key={entry.userId}
+              stats={entry}
+              align="center"
+              highlight={userId === entry.userId}
+              isRoundWinner={model.roundWinnerId === entry.userId}
+              isSeriesWinner={model.seriesWinnerId === entry.userId}
+            />
+          ))}
+        </div>
+      )}
+
+      {(model.roundLabel || model.roundProgress || model.seriesLabel) && (
+        <div className="space-y-2 border-border/70 border-t px-4 py-3">
+          {model.roundLabel ? (
+            <p className="text-center text-muted-foreground text-xs">
+              {model.roundLabel}
+            </p>
+          ) : null}
+          {model.roundProgress ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{model.seriesLabel ?? "Series"}</span>
+                <span className="tabular-nums">
+                  Round {model.roundProgress.current}
+                  {model.roundProgress.total
+                    ? ` / ${model.roundProgress.total}`
+                    : ""}
+                </span>
+              </div>
+              {roundPct != null ? (
+                <div className="h-1.5 overflow-hidden rounded-full bg-surface-overlay">
+                  <m.div
+                    className="h-full rounded-full bg-primary"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${roundPct}%` }}
+                    transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.45 }}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PlayerSide({
+  stats,
+  align,
+  highlight,
+  isRoundWinner,
+  isSeriesWinner,
+}: {
+  stats: {
+    userId: string;
+    username: string;
+    avatar?: import("@kyzen/avatar").AvatarConfig | null;
+    wins: number;
+  };
+  align: "start" | "center" | "end";
+  highlight?: boolean;
+  isRoundWinner?: boolean;
+  isSeriesWinner?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 flex-col gap-1.5",
+        align === "start" && "items-start text-left",
+        align === "center" && "items-center text-center",
+        align === "end" && "items-end text-right",
+      )}
+    >
+      <div
+        className={cn(
+          "relative shrink-0 rounded-full",
+          highlight && "ring-2 ring-primary ring-offset-2 ring-offset-surface-raised",
+          isSeriesWinner &&
+            "ring-2 ring-amber-500 ring-offset-2 ring-offset-surface-raised",
+          isRoundWinner &&
+            !isSeriesWinner &&
+            "ring-2 ring-emerald-500/80 ring-offset-2 ring-offset-surface-raised",
+        )}
+      >
+        <Character
+          config={stats.avatar ?? null}
+          fallbackSeed={stats.username}
+          size={44}
+          className="rounded-full border border-border bg-card"
+        />
+        {isSeriesWinner ? (
+          <span className="absolute -top-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full bg-amber-500 text-background">
+            <FaTrophy size={9} aria-hidden="true" />
+          </span>
+        ) : null}
+      </div>
+      <span className="max-w-[5.5rem] truncate font-medium text-sm">
+        {stats.username}
+      </span>
+    </div>
+  );
+}
+
+export function GameResultReopenChip({
+  headline,
+  onClick,
+}: {
+  headline: string;
+  onClick: () => void;
+}) {
+  return (
+    <m.button
+      type="button"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 8 }}
+      transition={{ duration: 0.2 }}
+      onClick={onClick}
+      className="pointer-events-auto fixed bottom-6 left-1/2 z-40 flex max-w-[min(100%-2rem,20rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-border bg-surface-raised/95 px-4 py-2.5 shadow-lg backdrop-blur-md outline-none transition hover:bg-surface-overlay"
+    >
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <FaTrophy size={14} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 text-left">
+        <span className="block font-semibold text-foreground text-sm leading-tight">
+          View results
+        </span>
+        <span className="block truncate text-muted-foreground text-xs">
+          {headline}
+        </span>
+      </span>
+    </m.button>
+  );
 }
 
 export function GameResultModal({
@@ -114,132 +241,123 @@ export function GameResultModal({
 }) {
   const showPrimary =
     model.primaryAction !== "none" && Boolean(actions.onPrimary);
+  const secondaryCount =
+    Number(Boolean(actions.onChat)) +
+    Number(Boolean(model.showSeriesHistory && actions.onViewSeries));
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
       <AnimatePresence>
         {open ? (
-          <GlassMotionPane
-            key="game-result"
-            ref={cardRef}
-            className="pointer-events-auto w-full max-w-md rounded-2xl border border-border bg-surface-raised p-6 shadow-xl"
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.96 }}
-            transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.22 }}
-          >
-            <OutcomeIcon model={model} />
-
+          <>
             <m.div
-              initial={{ opacity: 0, y: 6 }}
+              key="game-result-backdrop"
+              className="pointer-events-auto absolute inset-0 bg-background/60 backdrop-blur-[2px]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              onClick={actions.onClose}
+              aria-hidden="true"
+            />
+            <GlassMotionPane
+              key="game-result"
+              ref={cardRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="game-result-title"
+              className="pointer-events-auto relative z-10 flex w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-2xl"
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05, duration: 0.2 }}
+              exit={{ opacity: 0, y: 24 }}
+              transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.22 }}
             >
-              <h2 className="text-center font-bold text-2xl tracking-tight">
-                {model.headline}
-              </h2>
-              {model.subheadline ? (
-                <p className="mt-1 text-center text-muted-foreground text-sm">
-                  {model.subheadline}
-                </p>
-              ) : null}
-            </m.div>
-
-            {model.roundLabel ? (
-              <m.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.08, duration: 0.2 }}
-                className="mt-4 flex justify-center"
-              >
-                <span
-                  className={cn(
-                    "rounded-full px-3 py-1 font-medium text-xs",
-                    model.isDraw
-                      ? "bg-muted text-muted-foreground"
-                      : "bg-primary/10 text-primary",
-                  )}
-                >
-                  {model.roundLabel}
-                </span>
-              </m.div>
-            ) : null}
-
-            {model.roundProgress ? (
-              <m.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.1, duration: 0.2 }}
-                className="mt-4"
-              >
-                <RoundProgress
-                  current={model.roundProgress.current}
-                  total={model.roundProgress.total}
-                  seriesLabel={model.seriesLabel}
-                />
-              </m.div>
-            ) : null}
-
-            <m.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12, duration: 0.22 }}
-              className="mt-5 rounded-2xl border border-border/80 bg-surface-overlay/40 p-4"
-            >
-              <p className="mb-3 text-center font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                Session record
-              </p>
-              <SessionScoreboard
-                stats={model.sessionStats}
-                draws={draws}
-                highlightUserId={userId}
-                seriesWinnerId={model.seriesWinnerId}
-              />
-            </m.div>
-
-            {actions.primaryError ? (
-              <p className="mt-3 text-center text-danger text-sm">
-                {actions.primaryError}
-              </p>
-            ) : null}
-
-            <m.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.16, duration: 0.22 }}
-              className="mt-5 flex flex-col gap-2"
-            >
-              {showPrimary ? (
-                <Button
-                  onClick={actions.onPrimary}
-                  disabled={actions.primaryBusy}
-                  loading={actions.primaryBusy}
-                >
-                  {model.primaryAction === "nextRound" ? (
-                    <FaArrowRight size={14} aria-hidden="true" />
+              <header className="flex items-center justify-between gap-3 border-border/80 border-b px-4 py-3">
+                <div className="min-w-0">
+                  {model.seriesLabel ? (
+                    <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
+                      {model.seriesLabel}
+                    </p>
                   ) : (
-                    <FaRotateRight size={14} aria-hidden="true" />
+                    <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
+                      Match result
+                    </p>
                   )}
-                  {primaryLabel(model, actions.primaryPendingLabel ?? null)}
-                </Button>
-              ) : null}
-              {actions.onChat ? (
-                <Button variant="secondary" onClick={actions.onChat}>
-                  Chat
-                </Button>
-              ) : null}
-              {model.showSeriesHistory && actions.onViewSeries ? (
-                <Button variant="secondary" onClick={actions.onViewSeries}>
-                  View series
-                </Button>
-              ) : null}
-              {actions.onClose ? (
-                <Button variant="ghost" onClick={actions.onClose}>
-                  Close
-                </Button>
-              ) : null}
-            </m.div>
-          </GlassMotionPane>
+                </div>
+                {actions.onClose ? (
+                  <button
+                    type="button"
+                    onClick={actions.onClose}
+                    aria-label="Close results"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition hover:bg-surface-overlay hover:text-foreground"
+                  >
+                    <FaXmark size={16} aria-hidden="true" />
+                  </button>
+                ) : null}
+              </header>
+
+              <div className="flex flex-col gap-4 px-4 py-5">
+                <div className="space-y-1 text-center">
+                  <h2
+                    id="game-result-title"
+                    className="font-bold text-2xl tracking-tight"
+                  >
+                    {model.headline}
+                  </h2>
+                  {model.subheadline ? (
+                    <p className="text-muted-foreground text-sm">
+                      {model.subheadline}
+                    </p>
+                  ) : null}
+                </div>
+
+                <MatchScorePanel model={model} userId={userId} draws={draws} />
+
+                {actions.primaryError ? (
+                  <p className="text-center text-danger text-sm">
+                    {actions.primaryError}
+                  </p>
+                ) : null}
+              </div>
+
+              <footer className="flex flex-col gap-2 border-border/80 border-t bg-surface-overlay/30 px-4 py-4">
+                {showPrimary ? (
+                  <Button
+                    onClick={actions.onPrimary}
+                    disabled={actions.primaryBusy}
+                    loading={actions.primaryBusy}
+                    className="w-full"
+                  >
+                    {model.primaryAction === "nextRound" ? (
+                      <FaArrowRight size={14} aria-hidden="true" />
+                    ) : (
+                      <FaRotateRight size={14} aria-hidden="true" />
+                    )}
+                    {primaryLabel(model, actions.primaryPendingLabel ?? null)}
+                  </Button>
+                ) : null}
+                {secondaryCount > 0 ? (
+                  <div
+                    className={cn(
+                      "grid gap-2",
+                      secondaryCount === 2 ? "grid-cols-2" : "grid-cols-1",
+                    )}
+                  >
+                    {actions.onChat ? (
+                      <Button variant="secondary" onClick={actions.onChat}>
+                        Chat
+                      </Button>
+                    ) : null}
+                    {model.showSeriesHistory && actions.onViewSeries ? (
+                      <Button variant="secondary" onClick={actions.onViewSeries}>
+                        Series history
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </footer>
+            </GlassMotionPane>
+          </>
         ) : null}
       </AnimatePresence>
     </div>

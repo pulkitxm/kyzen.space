@@ -32,6 +32,7 @@ export {
   type GameResultPlayer,
   type GameResultPrimaryAction,
   type GameResultViewModel,
+  isMatchSeriesComplete,
   type MatchConfig,
   type MatchFormat,
   type PlayerSessionStats,

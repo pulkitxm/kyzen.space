@@ -32,6 +32,8 @@ let createdConfig: unknown = null;
 const notifyCalls: { userId: string; type: string }[] = [];
 const sentCards: { gameId: string }[] = [];
 
+let seriesGamesForMock: AnyGame[] = [];
+
 mock.module("@kyzen/database", () => ({
   conversations: {
     getMemberIds: async () => ["u1", "u2"],
@@ -42,6 +44,8 @@ mock.module("@kyzen/database", () => ({
   games: {
     getGameByCode: async () => prev,
     findLiveGameInConversation: async () => liveGame,
+    getSeriesGames: async () => seriesGamesForMock,
+    findLiveGameInSeries: async () => liveGame,
     createGame: async (input: AnyGame) => {
       createInput = {
         players: input.players,
@@ -95,7 +99,7 @@ function freshPrev(over: Partial<AnyGame> = {}): AnyGame {
     status: "completed",
     winner: "u1",
     gameState: null,
-    config: { firstPlayer: "X" },
+    config: {},
     conversationId: "conv1",
     creatorUserId: "u1",
     seatingMode: "open",
@@ -119,6 +123,7 @@ describe("rematchGame", () => {
     liveGame = null;
     createInput = null;
     createdConfig = null;
+    seriesGamesForMock = [prev];
     notifyCalls.length = 0;
     sentCards.length = 0;
   });
@@ -169,12 +174,12 @@ describe("rematchGame", () => {
     expect(createInput).toBeNull();
   });
 
-  test("rejects a rematch of a game with no conversation", async () => {
-    prev = freshPrev({ conversationId: null });
+  test("creates a standalone rematch without posting a chat card", async () => {
+    prev = freshPrev({ conversationId: null, seriesId: "series1" });
     const res = await rematchGame({ userId: "u1", gameId: "OLDGM1" });
-    expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.status).toBe(400);
-    expect(createInput).toBeNull();
+    expect(res.ok).toBe(true);
+    expect(createInput?.seriesId).toBe("series1");
+    expect(sentCards.length).toBe(0);
   });
 
   test("seats the loser of a decisive O win as the first role", async () => {
@@ -188,11 +193,35 @@ describe("rematchGame", () => {
   });
 
   test("copies the parent config and seats both players active", async () => {
-    prev = freshPrev({ config: { firstPlayer: "O" } });
+    prev = freshPrev({ config: { bestOf: 3 } });
     const res = await rematchGame({ userId: "u1", gameId: "OLDGM1" });
     expect(res.ok).toBe(true);
     expect(createInput?.status).toBe("active");
     expect(createInput?.players).toHaveLength(2);
-    expect(createdConfig).toEqual({ firstPlayer: "O" });
+    expect(createdConfig).toEqual({ bestOf: 3 });
+  });
+
+  test("starts a fresh series after a completed best-of match", async () => {
+    prev = freshPrev({
+      config: { bestOf: 3 },
+      winner: "u1",
+    });
+    seriesGamesForMock = [
+      freshPrev({
+        id: "g1",
+        code: "GAME01",
+        winner: "u1",
+        config: { bestOf: 3 },
+      }),
+      freshPrev({
+        id: "g2",
+        code: "GAME02",
+        winner: "u1",
+        config: { bestOf: 3 },
+      }),
+    ];
+    const res = await rematchGame({ userId: "u1", gameId: "OLDGM1" });
+    expect(res.ok).toBe(true);
+    expect(createInput?.seriesId).toBeUndefined();
   });
 });

@@ -9,8 +9,9 @@ import {
   type SeriesDetail,
 } from "@kyzen/shared/types";
 import { useRouter } from "next/navigation";
+import { AnimatePresence } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GameResultModal } from "@/components/games/game-result-modal";
+import { GameResultModal, GameResultReopenChip } from "@/components/games/game-result-modal";
 import { SeriesDetailModal } from "@/components/games/series-detail-modal";
 import { clientFetchJson } from "@/lib/api-client";
 import { conversationHref } from "@/lib/chat/conversation-href";
@@ -72,7 +73,7 @@ export function GameOverOverlay({
   );
 
   useEffect(() => {
-    if (!open || !isGameOver(game.status)) return;
+    if (!isGameOver(game.status)) return;
     let active = true;
     clientFetchJson<SeriesDetail>(`/api/games/${gameId}/series`)
       .then((series) => {
@@ -82,7 +83,7 @@ export function GameOverOverlay({
     return () => {
       active = false;
     };
-  }, [open, gameId, game.status]);
+  }, [gameId, game.status]);
 
   const layerCount = layers.length;
   useEffect(() => {
@@ -98,8 +99,7 @@ export function GameOverOverlay({
 
   const canContinue =
     game.players.some((player) => player.userId === userId) &&
-    game.status === "completed" &&
-    !!game.conversationId;
+    game.status === "completed";
 
   const viewModel = useMemo(
     () =>
@@ -119,12 +119,14 @@ export function GameOverOverlay({
     }
     setRematch((state) => ({ ...state, busy: true, error: null }));
     try {
-      const res = await emitAck<{ gameId: string }>(
+      const res = await emitAck<{ ok?: boolean; gameId?: string }>(
         socket,
         CHAT_EVENTS.rematch,
         { gameId },
       );
-      router.push(`/play/${res.gameId}`);
+      const nextCode = res.gameId;
+      if (!nextCode) throw new Error("No game code returned");
+      router.push(`/play/${nextCode}`);
     } catch (error) {
       setRematch((state) => ({
         ...state,
@@ -145,31 +147,43 @@ export function GameOverOverlay({
       : "Go to rematch"
     : null;
 
+  const showReopen = !open && isGameOver(game.status);
+
   return (
-    <GameResultModal
-      open={open}
-      model={viewModel}
-      userId={userId}
-      draws={detail?.score.draws ?? (game.winner === "draw" ? 1 : 0)}
-      cardRef={cardRef}
-      actions={{
-        onPrimary: canContinue ? onContinue : undefined,
-        onChat: conversation
-          ? () => router.push(conversationHref(conversation, userId))
-          : undefined,
-        onViewSeries: viewModel.showSeriesHistory
-          ? () =>
-              openLayer({
-                title: "Series",
-                content: <SeriesDetailModal gameId={gameId} />,
-                size: "md",
-              })
-          : undefined,
-        onClose: () => setOpen(false),
-        primaryBusy: rematch.busy,
-        primaryError: rematch.error,
-        primaryPendingLabel: pendingLabel,
-      }}
-    />
+    <>
+      <GameResultModal
+        open={open}
+        model={viewModel}
+        userId={userId}
+        draws={detail?.score.draws ?? (game.winner === "draw" ? 1 : 0)}
+        cardRef={cardRef}
+        actions={{
+          onPrimary: canContinue ? onContinue : undefined,
+          onChat: conversation
+            ? () => router.push(conversationHref(conversation, userId))
+            : undefined,
+          onViewSeries: viewModel.showSeriesHistory
+            ? () =>
+                openLayer({
+                  title: "Series",
+                  content: <SeriesDetailModal gameId={gameId} />,
+                  size: "md",
+                })
+            : undefined,
+          onClose: () => setOpen(false),
+          primaryBusy: rematch.busy,
+          primaryError: rematch.error,
+          primaryPendingLabel: pendingLabel,
+        }}
+      />
+      <AnimatePresence>
+        {showReopen ? (
+          <GameResultReopenChip
+            headline={viewModel.headline}
+            onClick={() => setOpen(true)}
+          />
+        ) : null}
+      </AnimatePresence>
+    </>
   );
 }

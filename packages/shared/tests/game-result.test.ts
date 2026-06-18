@@ -3,6 +3,7 @@ import { TIC_TAC_TOE } from "../src/constants";
 import {
   buildGameResultViewModel,
   type GameJson,
+  isMatchSeriesComplete,
   resolveMatchConfig,
 } from "../src/types";
 
@@ -176,5 +177,52 @@ describe("buildGameResultViewModel", () => {
       canContinue: false,
     });
     expect(model?.primaryAction).toBe("none");
+  });
+});
+
+describe("isMatchSeriesComplete", () => {
+  test("treats single format as always complete", () => {
+    expect(
+      isMatchSeriesComplete({}, {
+        entries: [],
+        draws: 0,
+        completedGames: 1,
+        totalGames: 1,
+      }),
+    ).toBe(true);
+  });
+
+  test("detects a finished best-of series", () => {
+    expect(
+      isMatchSeriesComplete(
+        { bestOf: 3 },
+        {
+          entries: [
+            { userId: "u1", username: "alice", wins: 2 },
+            { userId: "u2", username: "bob", wins: 0 },
+          ],
+          draws: 0,
+          completedGames: 2,
+          totalGames: 2,
+        },
+      ),
+    ).toBe(true);
+  });
+
+  test("keeps an in-progress best-of series open", () => {
+    expect(
+      isMatchSeriesComplete(
+        { bestOf: 3 },
+        {
+          entries: [
+            { userId: "u1", username: "alice", wins: 1 },
+            { userId: "u2", username: "bob", wins: 0 },
+          ],
+          draws: 0,
+          completedGames: 1,
+          totalGames: 1,
+        },
+      ),
+    ).toBe(false);
   });
 });
