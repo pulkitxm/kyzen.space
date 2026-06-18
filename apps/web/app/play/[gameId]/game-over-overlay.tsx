@@ -8,10 +8,13 @@ import {
   isGameOver,
   type SeriesDetail,
 } from "@kyzen/shared/types";
-import { useRouter } from "next/navigation";
 import { AnimatePresence } from "motion/react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GameResultModal, GameResultReopenChip } from "@/components/games/game-result-modal";
+import {
+  GameResultModal,
+  GameResultReopenChip,
+} from "@/components/games/game-result-modal";
 import { SeriesDetailModal } from "@/components/games/series-detail-modal";
 import { clientFetchJson } from "@/lib/api-client";
 import { conversationHref } from "@/lib/chat/conversation-href";

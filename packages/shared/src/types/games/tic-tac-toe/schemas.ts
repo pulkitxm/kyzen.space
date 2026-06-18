@@ -1,5 +1,5 @@
-import { TIC_TAC_TOE_DEFAULT_BEST_OF } from "../../../constants/games";
 import { z } from "zod";
+import { TIC_TAC_TOE_DEFAULT_BEST_OF } from "../../../constants/games";
 
 const cellSchema = z.enum(["X", "O"]).nullable();
 export type Cell = z.infer<typeof cellSchema>;

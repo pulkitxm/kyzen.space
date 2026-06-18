@@ -183,12 +183,15 @@ describe("buildGameResultViewModel", () => {
 describe("isMatchSeriesComplete", () => {
   test("treats single format as always complete", () => {
     expect(
-      isMatchSeriesComplete({}, {
-        entries: [],
-        draws: 0,
-        completedGames: 1,
-        totalGames: 1,
-      }),
+      isMatchSeriesComplete(
+        {},
+        {
+          entries: [],
+          draws: 0,
+          completedGames: 1,
+          totalGames: 1,
+        },
+      ),
     ).toBe(true);
   });
 

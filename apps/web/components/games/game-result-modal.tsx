@@ -165,7 +165,8 @@ function PlayerSide({
       <div
         className={cn(
           "relative shrink-0 rounded-full",
-          highlight && "ring-2 ring-primary ring-offset-2 ring-offset-surface-raised",
+          highlight &&
+            "ring-2 ring-primary ring-offset-2 ring-offset-surface-raised",
           isSeriesWinner &&
             "ring-2 ring-amber-500 ring-offset-2 ring-offset-surface-raised",
           isRoundWinner &&
@@ -185,7 +186,7 @@ function PlayerSide({
           </span>
         ) : null}
       </div>
-      <span className="max-w-[5.5rem] truncate font-medium text-sm">
+      <span className="max-w-22 truncate font-medium text-sm">
         {stats.username}
       </span>
     </div>
@@ -207,7 +208,7 @@ export function GameResultReopenChip({
       exit={{ opacity: 0, y: 8 }}
       transition={{ duration: 0.2 }}
       onClick={onClick}
-      className="pointer-events-auto fixed bottom-6 left-1/2 z-40 flex max-w-[min(100%-2rem,20rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-border bg-surface-raised/95 px-4 py-2.5 shadow-lg backdrop-blur-md outline-none transition hover:bg-surface-overlay"
+      className="pointer-events-auto fixed bottom-6 left-1/2 z-40 flex max-w-[min(100%-2rem,20rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-border bg-surface-raised/95 px-4 py-2.5 shadow-lg outline-none backdrop-blur-md transition hover:bg-surface-overlay"
     >
       <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
         <FaTrophy size={14} aria-hidden="true" />
@@ -349,7 +350,10 @@ export function GameResultModal({
                       </Button>
                     ) : null}
                     {model.showSeriesHistory && actions.onViewSeries ? (
-                      <Button variant="secondary" onClick={actions.onViewSeries}>
+                      <Button
+                        variant="secondary"
+                        onClick={actions.onViewSeries}
+                      >
                         Series history
                       </Button>
                     ) : null}
