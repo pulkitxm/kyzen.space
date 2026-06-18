@@ -168,7 +168,7 @@ export function PlayerCard({
       </div>
 
       <div className="flex flex-col items-center gap-1">
-        <span className="max-w-[12rem] truncate font-semibold text-card-foreground">
+        <span className="max-w-48 truncate font-semibold text-card-foreground">
           {player.username}
           {isMe ? " (you)" : ""}
         </span>

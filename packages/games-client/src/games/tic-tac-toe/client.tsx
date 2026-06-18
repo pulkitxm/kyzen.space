@@ -8,7 +8,13 @@ import {
   type Mark,
   type TicTacToeState as TicState,
 } from "@kyzen/shared/types";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  AnimatePresence,
+  domAnimation,
+  LazyMotion,
+  m,
+  useReducedMotion,
+} from "motion/react";
 import {
   useCallback,
   useEffect,
@@ -259,7 +265,7 @@ function TurnBanner({
         {label}
       </span>
       {active && !outcome ? (
-        <motion.span
+        <m.span
           aria-hidden="true"
           className="absolute right-4 bottom-0 left-4 h-0.5 origin-left rounded-full bg-primary"
           initial={{ scaleX: 0.2, opacity: 0.5 }}
@@ -283,7 +289,7 @@ function FloatingReactions({ items }: { items: FloatingReaction[] }) {
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       <AnimatePresence>
         {items.map((r) => (
-          <motion.span
+          <m.span
             key={r.id}
             className="absolute bottom-6 text-3xl"
             style={{ left: `${r.offset}%` }}
@@ -297,10 +303,58 @@ function FloatingReactions({ items }: { items: FloatingReaction[] }) {
             transition={{ duration: reduceMotion ? 0.4 : 1.5, ease: "easeOut" }}
           >
             {r.emoji}
-          </motion.span>
+          </m.span>
         ))}
       </AnimatePresence>
     </div>
+  );
+}
+
+function SeatCard({
+  player,
+  variant,
+  userId,
+  active,
+  currentTurn,
+  winnerId,
+  connected,
+  turnDeadline,
+  onViewProfile,
+}: {
+  player: CardPlayer | null;
+  variant: "rail" | "strip";
+  userId: string | null;
+  active: boolean;
+  currentTurn: Mark;
+  winnerId: string | null;
+  connected: boolean;
+  turnDeadline: number | null;
+  onViewProfile?: (user: {
+    username: string;
+    avatar?: AvatarConfig | null;
+  }) => void;
+}) {
+  if (!player) {
+    return (
+      <div className="flex flex-1 items-center justify-center rounded-2xl border border-border border-dashed bg-surface-raised/50 px-4 py-5 text-center text-muted-foreground text-sm">
+        Waiting for a player
+      </div>
+    );
+  }
+  const mark =
+    player.role === "X" || player.role === "O" ? (player.role as Mark) : null;
+  const isMe = player.userId === userId;
+  return (
+    <PlayerCard
+      player={player}
+      variant={variant}
+      isTurn={active && mark !== null && mark === currentTurn}
+      isMe={isMe}
+      isWinner={winnerId === player.userId}
+      online={isMe ? connected : true}
+      turnDeadline={turnDeadline}
+      onViewProfile={onViewProfile}
+    />
   );
 }
 
@@ -602,121 +656,111 @@ export function TicTacToeGameClient({
     [gameId, summaryResult],
   );
 
-  function renderPlayerCard(p: CardPlayer | null, variant: "rail" | "strip") {
-    if (!p) {
-      return (
-        <div className="flex flex-1 items-center justify-center rounded-2xl border border-border border-dashed bg-surface-raised/50 px-4 py-5 text-center text-muted-foreground text-sm">
-          Waiting for a player
-        </div>
-      );
-    }
-    const mark = p.role === "X" || p.role === "O" ? (p.role as Mark) : null;
-    const isMe = p.userId === userId;
-    return (
-      <PlayerCard
-        player={p}
-        variant={variant}
-        isTurn={active && mark !== null && mark === state.currentTurn}
-        isMe={isMe}
-        isWinner={game.winner === p.userId}
-        online={isMe ? connected : true}
-        turnDeadline={game.turnDeadline ?? null}
-        onViewProfile={onViewProfile}
-      />
-    );
-  }
+  const seatProps = {
+    userId,
+    active,
+    currentTurn: state.currentTurn,
+    winnerId: game.winner,
+    connected,
+    turnDeadline: game.turnDeadline ?? null,
+    onViewProfile,
+  };
 
   return (
-    <div className="@container w-full pt-2">
-      <TttMarkDefs />
+    <LazyMotion features={domAnimation}>
+      <div className="@container w-full pt-2">
+        <TttMarkDefs />
 
-      {error ? (
-        <p className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger text-sm">
-          {error}
-        </p>
-      ) : null}
+        {error ? (
+          <p className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger text-sm">
+            {error}
+          </p>
+        ) : null}
 
-      <div className="grid @5xl:grid-cols-[17rem_minmax(0,1fr)_18rem] @5xl:items-start @5xl:gap-6 gap-5">
-        <aside className="@5xl:flex hidden flex-col gap-4">
-          {renderPlayerCard(playerX, "rail")}
+        <div className="grid @5xl:grid-cols-[17rem_minmax(0,1fr)_18rem] @5xl:items-start @5xl:gap-6 gap-5">
+          <aside className="@5xl:flex hidden flex-col gap-4">
+            <SeatCard player={playerX} variant="rail" {...seatProps} />
+            {!isPast ? (
+              <Spectators count={specCount} watchers={watchers} />
+            ) : null}
+          </aside>
+
+          <main className="flex flex-col items-center gap-5">
+            <div className="flex @5xl:hidden w-full items-stretch gap-3">
+              <SeatCard player={playerX} variant="strip" {...seatProps} />
+              <SeatCard player={playerO} variant="strip" {...seatProps} />
+            </div>
+
+            <TurnBanner
+              active={active}
+              currentTurn={state.currentTurn}
+              isMyTurn={canMove}
+              hasRole={myRole !== null}
+              outcome={winnerLabel}
+            />
+
+            <div className="relative">
+              <TttBoard
+                board={state.board}
+                myRole={myRole}
+                canMove={canMove}
+                active={active}
+                glow={boardGlow}
+                winningLine={winningLine}
+                winMark={winMark}
+                winAnimate={winState.animate}
+                onPlay={makeMove}
+                onHoverCell={audio.playHover}
+              />
+              <FloatingReactions items={reactions} />
+            </div>
+
+            {!isPast && !userId ? (
+              <p className="max-w-md rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-center text-sm text-warning-foreground">
+                Sign in to take a seat. Open this link signed in as the second
+                player to fill the match.
+              </p>
+            ) : null}
+
+            {isPast ? (
+              <>
+                <ReplayToolbar
+                  step={replayShown}
+                  maxStep={sortedLen}
+                  isPlaying={replayPlaying}
+                  onFirst={goFirst}
+                  onPrev={goPrev}
+                  onTogglePlay={toggleReplayPlay}
+                  onNext={goNext}
+                  onLast={goLast}
+                />
+                <p className="text-muted-foreground text-xs">
+                  Position after {replayShown} of {sortedLen} moves
+                </p>
+                {summary ? <MatchSummary stats={summary} /> : null}
+              </>
+            ) : null}
+          </main>
+
+          <aside className="@5xl:flex hidden flex-col gap-5">
+            <SeatCard player={playerO} variant="rail" {...seatProps} />
+            <MoveLog entries={logEntries} />
+            {!isPast ? (
+              <ReactionsBar onReact={spawnReaction} disabled={!isLive} />
+            ) : null}
+          </aside>
+        </div>
+
+        <div className="mt-5 flex @5xl:hidden flex-col gap-5">
           {!isPast ? (
             <Spectators count={specCount} watchers={watchers} />
           ) : null}
-        </aside>
-
-        <main className="flex flex-col items-center gap-5">
-          <div className="flex @5xl:hidden w-full items-stretch gap-3">
-            {renderPlayerCard(playerX, "strip")}
-            {renderPlayerCard(playerO, "strip")}
-          </div>
-
-          <TurnBanner
-            active={active}
-            currentTurn={state.currentTurn}
-            isMyTurn={canMove}
-            hasRole={myRole !== null}
-            outcome={winnerLabel}
-          />
-
-          <div className="relative">
-            <TttBoard
-              board={state.board}
-              myRole={myRole}
-              canMove={canMove}
-              active={active}
-              glow={boardGlow}
-              winningLine={winningLine}
-              winMark={winMark}
-              winAnimate={winState.animate}
-              onPlay={makeMove}
-              onHoverCell={audio.playHover}
-            />
-            <FloatingReactions items={reactions} />
-          </div>
-
-          {!isPast && !userId ? (
-            <p className="max-w-md rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-center text-sm text-warning-foreground">
-              Sign in to take a seat. Open this link signed in as the second
-              player to fill the match.
-            </p>
-          ) : null}
-
-          {isPast ? (
-            <>
-              <ReplayToolbar
-                step={replayShown}
-                maxStep={sortedLen}
-                isPlaying={replayPlaying}
-                onFirst={goFirst}
-                onPrev={goPrev}
-                onTogglePlay={toggleReplayPlay}
-                onNext={goNext}
-                onLast={goLast}
-              />
-              <p className="text-muted-foreground text-xs">
-                Position after {replayShown} of {sortedLen} moves
-              </p>
-              {summary ? <MatchSummary stats={summary} /> : null}
-            </>
-          ) : null}
-        </main>
-
-        <aside className="@5xl:flex hidden flex-col gap-5">
-          {renderPlayerCard(playerO, "rail")}
           <MoveLog entries={logEntries} />
           {!isPast ? (
             <ReactionsBar onReact={spawnReaction} disabled={!isLive} />
           ) : null}
-        </aside>
+        </div>
       </div>
-
-      <div className="mt-5 flex @5xl:hidden flex-col gap-5">
-        {!isPast ? <Spectators count={specCount} watchers={watchers} /> : null}
-        <MoveLog entries={logEntries} />
-        {!isPast ? (
-          <ReactionsBar onReact={spawnReaction} disabled={!isLive} />
-        ) : null}
-      </div>
-    </div>
+    </LazyMotion>
   );
 }

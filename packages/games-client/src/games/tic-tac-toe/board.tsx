@@ -38,7 +38,7 @@ export function TttBoard({
       <div
         aria-hidden="true"
         className={[
-          "pointer-events-none absolute inset-0 -z-10 rounded-[2rem] blur-2xl transition-opacity duration-500",
+          "pointer-events-none absolute inset-0 -z-10 rounded-4xl blur-2xl transition-opacity duration-500",
           glow ? "bg-primary/25 opacity-100" : "bg-primary/10 opacity-60",
         ].join(" ")}
       />
