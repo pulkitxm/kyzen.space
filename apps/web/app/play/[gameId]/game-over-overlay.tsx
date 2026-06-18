@@ -10,7 +10,14 @@ import {
 } from "@kyzen/shared/types";
 import { AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import {
   GameResultModal,
   GameResultReopenChip,
@@ -24,6 +31,84 @@ import {
   useSocket,
   useSocketEvent,
 } from "@/lib/socket/socket-context";
+
+type RematchState = {
+  busy: boolean;
+  error: string | null;
+  code: string | null;
+};
+
+type OverlayState = {
+  game: GameJson;
+  dismissed: boolean;
+  detail: SeriesDetail | null;
+  rematch: RematchState;
+};
+
+type OverlayAction =
+  | { type: "reset"; game: GameJson }
+  | { type: "game_state"; game: GameJson }
+  | { type: "series_loaded"; detail: SeriesDetail }
+  | { type: "dismiss" }
+  | { type: "reopen" }
+  | { type: "rematch_start" }
+  | { type: "rematch_fail"; error: string }
+  | { type: "rematch_created"; code: string };
+
+function emptyRematch(): RematchState {
+  return { busy: false, error: null, code: null };
+}
+
+function initialOverlayState(game: GameJson): OverlayState {
+  return {
+    game,
+    dismissed: false,
+    detail: null,
+    rematch: emptyRematch(),
+  };
+}
+
+function overlayReducer(
+  state: OverlayState,
+  action: OverlayAction,
+): OverlayState {
+  switch (action.type) {
+    case "reset":
+      return initialOverlayState(action.game);
+    case "game_state": {
+      const ended = isGameOver(action.game.status);
+      return {
+        ...state,
+        game: action.game,
+        dismissed: ended ? false : state.dismissed,
+        rematch: ended ? { ...state.rematch, busy: false } : state.rematch,
+      };
+    }
+    case "series_loaded":
+      return { ...state, detail: action.detail };
+    case "dismiss":
+      return { ...state, dismissed: true };
+    case "reopen":
+      return { ...state, dismissed: false };
+    case "rematch_start":
+      return {
+        ...state,
+        rematch: { busy: true, error: null, code: state.rematch.code },
+      };
+    case "rematch_fail":
+      return {
+        ...state,
+        rematch: { ...state.rematch, busy: false, error: action.error },
+      };
+    case "rematch_created":
+      return {
+        ...state,
+        rematch: { busy: false, error: null, code: action.code },
+      };
+    default:
+      return state;
+  }
+}
 
 export function GameOverOverlay({
   gameId,
@@ -40,65 +125,59 @@ export function GameOverOverlay({
   const { socket } = useSocket();
   const { openLayer, layers } = useLayeredPopup();
   const cardRef = useRef<HTMLDivElement>(null);
-  const [game, setGame] = useState<GameJson>(initialGame);
-  const [open, setOpen] = useState(() => isGameOver(initialGame.status));
-  const [detail, setDetail] = useState<SeriesDetail | null>(null);
-  const [rematch, setRematch] = useState<{
-    busy: boolean;
-    error: string | null;
-    code: string | null;
-  }>({ busy: false, error: null, code: null });
+  const [state, dispatch] = useReducer(
+    overlayReducer,
+    initialGame,
+    initialOverlayState,
+  );
 
-  useEffect(() => {
-    setGame(initialGame);
-    setOpen(isGameOver(initialGame.status));
-    setDetail(null);
-    setRematch({ busy: false, error: null, code: null });
-  }, [initialGame]);
+  const [prevGameId, setPrevGameId] = useState(gameId);
+  if (gameId !== prevGameId) {
+    setPrevGameId(gameId);
+    dispatch({ type: "reset", game: initialGame });
+  }
 
   useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
-    setGame(payload.game);
-    if (isGameOver(payload.game.status)) {
-      setOpen(true);
-      setRematch((state) => ({ ...state, busy: false }));
-    }
+    dispatch({ type: "game_state", game: payload.game });
   });
 
   useSocketEvent<{ newGameId: string }>(
     CHAT_EVENTS.rematchCreated,
     (payload) => {
-      setRematch((state) => ({
-        ...state,
-        busy: false,
-        code: payload.newGameId,
-      }));
+      dispatch({ type: "rematch_created", code: payload.newGameId });
     },
   );
 
   useEffect(() => {
-    if (!isGameOver(game.status)) return;
+    if (!isGameOver(state.game.status)) return;
     let active = true;
     clientFetchJson<SeriesDetail>(`/api/games/${gameId}/series`)
       .then((series) => {
-        if (active) setDetail(series);
+        if (active) dispatch({ type: "series_loaded", detail: series });
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, [gameId, game.status]);
+  }, [gameId, state.game.status]);
 
+  const modalOpen = isGameOver(state.game.status) && !state.dismissed;
   const layerCount = layers.length;
+
   useEffect(() => {
-    if (!open) return;
+    if (!modalOpen) return;
     function onPointerDown(event: MouseEvent) {
       if (layerCount > 0) return;
       const card = cardRef.current;
-      if (card && !card.contains(event.target as Node)) setOpen(false);
+      if (card && !card.contains(event.target as Node)) {
+        dispatch({ type: "dismiss" });
+      }
     }
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [open, layerCount]);
+  }, [modalOpen, layerCount]);
+
+  const { game, detail, rematch } = state;
 
   const canContinue =
     game.players.some((player) => player.userId === userId) &&
@@ -120,7 +199,7 @@ export function GameOverOverlay({
       router.push(`/play/${rematch.code}`);
       return;
     }
-    setRematch((state) => ({ ...state, busy: true, error: null }));
+    dispatch({ type: "rematch_start" });
     try {
       const res = await emitAck<{ ok?: boolean; gameId?: string }>(
         socket,
@@ -131,14 +210,13 @@ export function GameOverOverlay({
       if (!nextCode) throw new Error("No game code returned");
       router.push(`/play/${nextCode}`);
     } catch (error) {
-      setRematch((state) => ({
-        ...state,
-        busy: false,
+      dispatch({
+        type: "rematch_fail",
         error:
           error instanceof Error
             ? error.message
             : "Couldn't continue the match",
-      }));
+      });
     }
   }, [socket, gameId, rematch.code, router]);
 
@@ -150,12 +228,12 @@ export function GameOverOverlay({
       : "Go to rematch"
     : null;
 
-  const showReopen = !open && isGameOver(game.status);
+  const showReopen = state.dismissed && isGameOver(game.status);
 
   return (
     <>
       <GameResultModal
-        open={open}
+        open={modalOpen}
         model={viewModel}
         userId={userId}
         draws={detail?.score.draws ?? (game.winner === "draw" ? 1 : 0)}
@@ -173,7 +251,7 @@ export function GameOverOverlay({
                   size: "md",
                 })
             : undefined,
-          onClose: () => setOpen(false),
+          onClose: () => dispatch({ type: "dismiss" }),
           primaryBusy: rematch.busy,
           primaryError: rematch.error,
           primaryPendingLabel: pendingLabel,
@@ -183,7 +261,7 @@ export function GameOverOverlay({
         {showReopen ? (
           <GameResultReopenChip
             headline={viewModel.headline}
-            onClick={() => setOpen(true)}
+            onClick={() => dispatch({ type: "reopen" })}
           />
         ) : null}
       </AnimatePresence>
