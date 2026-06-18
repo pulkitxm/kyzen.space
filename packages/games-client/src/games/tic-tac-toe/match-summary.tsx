@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { m, useReducedMotion } from "motion/react";
 import {
   FaArrowTrendDown,
   FaArrowTrendUp,
@@ -48,7 +48,7 @@ export function MatchSummary({ stats }: { stats: MatchSummaryStats }) {
           </span>
         </div>
         <div className="h-2.5 overflow-hidden rounded-full bg-background">
-          <motion.div
+          <m.div
             className="h-full rounded-full bg-primary"
             initial={reduceMotion ? false : { width: 0 }}
             animate={{ width: `${stats.xpInto}%` }}

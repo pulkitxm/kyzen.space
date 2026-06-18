@@ -1,7 +1,7 @@
 "use client";
 
 import type { Cell, Mark } from "@kyzen/shared/types";
-import { motion, useReducedMotion } from "motion/react";
+import { m, useReducedMotion } from "motion/react";
 import { TttMark } from "./marks";
 import { WinStrike } from "./win-strike";
 
@@ -78,7 +78,7 @@ export function TttBoard({
                 ].join(" ")}
               >
                 {mark ? (
-                  <motion.span
+                  <m.span
                     initial={reduceMotion ? false : { scale: 0.35, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={
@@ -89,7 +89,7 @@ export function TttBoard({
                     className="flex size-[62%] items-center justify-center"
                   >
                     <TttMark mark={mark} className="size-full" />
-                  </motion.span>
+                  </m.span>
                 ) : ghostMark ? (
                   <TttMark
                     mark={ghostMark}
