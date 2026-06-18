@@ -23,7 +23,7 @@ export const ticTacToeMoveSchema = z
   .strict();
 export type TicTacToeMove = z.infer<typeof ticTacToeMoveSchema>;
 
-export const ticTacToeBestOfSchema = z.union([
+const ticTacToeBestOfSchema = z.union([
   z.literal(1),
   z.literal(3),
   z.literal(5),

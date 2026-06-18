@@ -3,10 +3,10 @@ import {
   type TicTacToeConfig,
   type TicTacToeMove,
   type TicTacToeState,
-  type ZodType,
   ticTacToeConfigSchema,
   ticTacToeMoveSchema,
   ticTacToeStateSchema,
+  type ZodType,
 } from "@kyzen/shared/types";
 import { ticTacToeEngine } from "./engine";
 import { ticTacToeMeta } from "./meta";
