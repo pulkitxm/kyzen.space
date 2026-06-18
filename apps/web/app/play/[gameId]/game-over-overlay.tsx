@@ -10,14 +10,7 @@ import {
 } from "@kyzen/shared/types";
 import { AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import {
   GameResultModal,
   GameResultReopenChip,
@@ -131,9 +124,9 @@ export function GameOverOverlay({
     initialOverlayState,
   );
 
-  const [prevGameId, setPrevGameId] = useState(gameId);
-  if (gameId !== prevGameId) {
-    setPrevGameId(gameId);
+  const prevGameIdRef = useRef(gameId);
+  if (gameId !== prevGameIdRef.current) {
+    prevGameIdRef.current = gameId;
     dispatch({ type: "reset", game: initialGame });
   }
 
