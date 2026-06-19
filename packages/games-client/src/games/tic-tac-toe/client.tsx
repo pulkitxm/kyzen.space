@@ -6,15 +6,10 @@ import {
   isGameLive,
   isGameOver,
   type Mark,
+  type ProfileStats,
   type TicTacToeState as TicState,
 } from "@kyzen/shared/types";
-import {
-  AnimatePresence,
-  domAnimation,
-  LazyMotion,
-  m,
-  useReducedMotion,
-} from "motion/react";
+import { domAnimation, LazyMotion, m } from "motion/react";
 import {
   useCallback,
   useEffect,
@@ -33,16 +28,9 @@ import {
 } from "react-icons/fa6";
 import { useGameAudio } from "../../audio/use-game-audio";
 import type { GameClientProps } from "../../types";
-import {
-  type MoveEntry,
-  MoveLog,
-  ReactionsBar,
-  Spectators,
-} from "./arena-panels";
 import { TttBoard } from "./board";
 import { TttMark, TttMarkDefs } from "./marks";
-import { MatchSummary } from "./match-summary";
-import { friendWatchers, matchSummary, spectatorCount } from "./mock-arena";
+
 import { type CardPlayer, PlayerCard } from "./player-card";
 import { findWinningLine } from "./winning-line";
 
@@ -55,6 +43,7 @@ type GameJson = {
     username: string;
     role: string;
     avatar?: AvatarConfig | null;
+    stats?: ProfileStats | null;
   }[];
   gameState: TicState;
   turnDeadline?: number | null;
@@ -63,18 +52,6 @@ type GameJson = {
 type MoveJson = Record<string, unknown>;
 
 const REPLAY_MS = 850;
-
-const CELL_LABELS = [
-  "top-left",
-  "top",
-  "top-right",
-  "left",
-  "center",
-  "right",
-  "bottom-left",
-  "bottom",
-  "bottom-right",
-] as const;
 
 function emptyBoard(): Cell[] {
   return Array.from({ length: 9 }, () => null as Cell);
@@ -124,32 +101,6 @@ function buildStateAtStep(
     currentTurn = role === "X" ? "O" : "X";
   }
   return { board, currentTurn };
-}
-
-function moveEntries(
-  moves: MoveJson[],
-  players: GameJson["players"],
-  upTo: number,
-): MoveEntry[] {
-  const sorted = sortMoves(moves);
-  const n = Math.max(0, Math.min(upTo, sorted.length));
-  const out: MoveEntry[] = [];
-  for (let i = 0; i < n; i++) {
-    const m = sorted[i];
-    if (!m) continue;
-    const role = roleForPlayer(players, String(m.playerId ?? ""));
-    const md = m.moveData as { row?: unknown; col?: unknown };
-    if (!role || typeof md.row !== "number" || typeof md.col !== "number") {
-      continue;
-    }
-    const idx = md.row * 3 + md.col;
-    out.push({
-      id: String(m.moveNumber ?? i),
-      mark: role,
-      label: CELL_LABELS[idx] ?? "center",
-    });
-  }
-  return out;
 }
 
 function ReplayToolbar({
@@ -281,35 +232,6 @@ function TurnBanner({
   );
 }
 
-type FloatingReaction = { id: number; emoji: string; offset: number };
-
-function FloatingReactions({ items }: { items: FloatingReaction[] }) {
-  const reduceMotion = useReducedMotion();
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <AnimatePresence>
-        {items.map((r) => (
-          <m.span
-            key={r.id}
-            className="absolute bottom-6 text-3xl"
-            style={{ left: `${r.offset}%` }}
-            initial={{ opacity: 0, y: 10, scale: 0.6 }}
-            animate={{
-              opacity: reduceMotion ? 1 : [0, 1, 1, 0],
-              y: reduceMotion ? -20 : -120,
-              scale: 1,
-            }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduceMotion ? 0.4 : 1.5, ease: "easeOut" }}
-          >
-            {r.emoji}
-          </m.span>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 function SeatCard({
   player,
   variant,
@@ -380,22 +302,6 @@ export function TicTacToeGameClient({
   const [replayPlaying, setReplayPlaying] = useState(false);
   const replayStepRef = useRef(replayStep);
   replayStepRef.current = replayStep;
-
-  const [reactions, setReactions] = useState<FloatingReaction[]>([]);
-  const reactionIdRef = useRef(0);
-
-  const spawnReaction = useCallback(
-    (emoji: string) => {
-      const id = ++reactionIdRef.current;
-      const offset = 12 + ((id * 37) % 70);
-      setReactions((prev) => [...prev, { id, emoji, offset }]);
-      audio.playTouch();
-      window.setTimeout(() => {
-        setReactions((prev) => prev.filter((r) => r.id !== id));
-      }, 1600);
-    },
-    [audio],
-  );
 
   const isLive = isGameLive(game.status);
   const isPast = isGameOver(game.status);
@@ -635,26 +541,6 @@ export function TicTacToeGameClient({
     : active && (!myRole || liveState.currentTurn === myRole);
 
   const replayShown = Math.min(replayStep, sortedLen);
-  const logEntries = useMemo(
-    () => moveEntries(moves, game.players, isPast ? replayShown : sortedLen),
-    [moves, game.players, isPast, replayShown, sortedLen],
-  );
-
-  const specCount = useMemo(() => spectatorCount(gameId), [gameId]);
-  const watchers = useMemo(() => friendWatchers(gameId), [gameId]);
-
-  const summaryResult: "win" | "loss" | "draw" | null =
-    isPast && game.winner
-      ? game.winner === "draw"
-        ? "draw"
-        : game.winner === userId
-          ? "win"
-          : "loss"
-      : null;
-  const summary = useMemo(
-    () => (summaryResult ? matchSummary(gameId, summaryResult) : null),
-    [gameId, summaryResult],
-  );
 
   const seatProps = {
     userId,
@@ -680,9 +566,6 @@ export function TicTacToeGameClient({
         <div className="grid @5xl:grid-cols-[17rem_minmax(0,1fr)_18rem] @5xl:items-start @5xl:gap-6 gap-5">
           <aside className="@5xl:flex hidden flex-col gap-4">
             <SeatCard player={playerX} variant="rail" {...seatProps} />
-            {!isPast ? (
-              <Spectators count={specCount} watchers={watchers} />
-            ) : null}
           </aside>
 
           <main className="flex flex-col items-center gap-5">
@@ -712,7 +595,6 @@ export function TicTacToeGameClient({
                 onPlay={makeMove}
                 onHoverCell={audio.playHover}
               />
-              <FloatingReactions items={reactions} />
             </div>
 
             {!isPast && !userId ? (
@@ -737,28 +619,13 @@ export function TicTacToeGameClient({
                 <p className="text-muted-foreground text-xs">
                   Position after {replayShown} of {sortedLen} moves
                 </p>
-                {summary ? <MatchSummary stats={summary} /> : null}
               </>
             ) : null}
           </main>
 
           <aside className="@5xl:flex hidden flex-col gap-5">
             <SeatCard player={playerO} variant="rail" {...seatProps} />
-            <MoveLog entries={logEntries} />
-            {!isPast ? (
-              <ReactionsBar onReact={spawnReaction} disabled={!isLive} />
-            ) : null}
           </aside>
-        </div>
-
-        <div className="mt-5 flex @5xl:hidden flex-col gap-5">
-          {!isPast ? (
-            <Spectators count={specCount} watchers={watchers} />
-          ) : null}
-          <MoveLog entries={logEntries} />
-          {!isPast ? (
-            <ReactionsBar onReact={spawnReaction} disabled={!isLive} />
-          ) : null}
         </div>
       </div>
     </LazyMotion>

@@ -83,6 +83,7 @@ export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
       username: gamePlayer.username,
       role: gamePlayer.role,
       avatar: userProfile.avatar,
+      stats: userProfile.stats,
     })
     .from(gamePlayer)
     .leftJoin(userProfile, eq(userProfile.userId, gamePlayer.userId))
@@ -93,6 +94,7 @@ export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
     username: r.username,
     role: r.role,
     avatar: r.avatar ?? null,
+    stats: r.stats ?? null,
   }));
 }
 
