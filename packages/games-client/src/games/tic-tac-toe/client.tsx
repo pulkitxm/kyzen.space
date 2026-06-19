@@ -34,8 +34,6 @@ import {
 import { useGameAudio } from "../../audio/use-game-audio";
 import type { GameClientProps } from "../../types";
 import {
-  type MoveEntry,
-  MoveLog,
   ReactionsBar,
   Spectators,
 } from "./arena-panels";
@@ -124,32 +122,6 @@ function buildStateAtStep(
     currentTurn = role === "X" ? "O" : "X";
   }
   return { board, currentTurn };
-}
-
-function moveEntries(
-  moves: MoveJson[],
-  players: GameJson["players"],
-  upTo: number,
-): MoveEntry[] {
-  const sorted = sortMoves(moves);
-  const n = Math.max(0, Math.min(upTo, sorted.length));
-  const out: MoveEntry[] = [];
-  for (let i = 0; i < n; i++) {
-    const m = sorted[i];
-    if (!m) continue;
-    const role = roleForPlayer(players, String(m.playerId ?? ""));
-    const md = m.moveData as { row?: unknown; col?: unknown };
-    if (!role || typeof md.row !== "number" || typeof md.col !== "number") {
-      continue;
-    }
-    const idx = md.row * 3 + md.col;
-    out.push({
-      id: String(m.moveNumber ?? i),
-      mark: role,
-      label: CELL_LABELS[idx] ?? "center",
-    });
-  }
-  return out;
 }
 
 function ReplayToolbar({
@@ -635,10 +607,7 @@ export function TicTacToeGameClient({
     : active && (!myRole || liveState.currentTurn === myRole);
 
   const replayShown = Math.min(replayStep, sortedLen);
-  const logEntries = useMemo(
-    () => moveEntries(moves, game.players, isPast ? replayShown : sortedLen),
-    [moves, game.players, isPast, replayShown, sortedLen],
-  );
+ 
 
   const specCount = useMemo(() => spectatorCount(gameId), [gameId]);
   const watchers = useMemo(() => friendWatchers(gameId), [gameId]);
@@ -744,7 +713,6 @@ export function TicTacToeGameClient({
 
           <aside className="@5xl:flex hidden flex-col gap-5">
             <SeatCard player={playerO} variant="rail" {...seatProps} />
-            <MoveLog entries={logEntries} />
             {!isPast ? (
               <ReactionsBar onReact={spawnReaction} disabled={!isLive} />
             ) : null}
@@ -755,7 +723,6 @@ export function TicTacToeGameClient({
           {!isPast ? (
             <Spectators count={specCount} watchers={watchers} />
           ) : null}
-          <MoveLog entries={logEntries} />
           {!isPast ? (
             <ReactionsBar onReact={spawnReaction} disabled={!isLive} />
           ) : null}

@@ -51,33 +51,6 @@ export function Spectators({
   );
 }
 
-export type MoveEntry = { id: string; mark: Mark; label: string };
-
-export function MoveLog({ entries }: { entries: MoveEntry[] }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <PanelHeading>Move history</PanelHeading>
-      {entries.length === 0 ? (
-        <p className="px-1 text-muted-foreground text-xs">No moves yet.</p>
-      ) : (
-        <ol className="flex max-h-52 flex-col gap-1 overflow-y-auto pr-1">
-          {entries.map((e, i) => (
-            <li
-              key={e.id}
-              className="flex items-center gap-2 rounded-lg border border-border/60 bg-surface-raised px-2.5 py-1.5 text-sm"
-            >
-              <span className="w-5 shrink-0 text-muted-foreground text-xs tabular-nums">
-                {i + 1}
-              </span>
-              <TttMark mark={e.mark} className="size-3.5 shrink-0" />
-              <span className="truncate text-card-foreground">{e.label}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </div>
-  );
-}
 
 export function ReactionsBar({
   onReact,
