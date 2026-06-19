@@ -98,7 +98,6 @@ export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
   }));
 }
 
-
 export async function getGameById(id: string): Promise<GameRecord | null> {
   const [row] = await db.select().from(game).where(eq(game.id, id)).limit(1);
   if (!row) return null;

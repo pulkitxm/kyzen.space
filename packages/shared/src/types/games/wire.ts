@@ -36,7 +36,6 @@ export const gamePlayerSchema = z
   .strict();
 export type GamePlayerDto = z.infer<typeof gamePlayerSchema>;
 
-
 export const clientJoinRoomSchema = z
   .object({
     gameId: gameCodeSchema,

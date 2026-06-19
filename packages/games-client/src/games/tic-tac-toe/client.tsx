@@ -9,13 +9,7 @@ import {
   type ProfileStats,
   type TicTacToeState as TicState,
 } from "@kyzen/shared/types";
-import {
-  AnimatePresence,
-  domAnimation,
-  LazyMotion,
-  m,
-  useReducedMotion,
-} from "motion/react";
+import { domAnimation, LazyMotion, m } from "motion/react";
 import {
   useCallback,
   useEffect,
@@ -36,8 +30,7 @@ import { useGameAudio } from "../../audio/use-game-audio";
 import type { GameClientProps } from "../../types";
 import { TttBoard } from "./board";
 import { TttMark, TttMarkDefs } from "./marks";
-// import { MatchSummary } from "./match-summary";
-import { friendWatchers, matchSummary, spectatorCount } from "./mock-arena";
+
 import { type CardPlayer, PlayerCard } from "./player-card";
 import { findWinningLine } from "./winning-line";
 
@@ -59,18 +52,6 @@ type GameJson = {
 type MoveJson = Record<string, unknown>;
 
 const REPLAY_MS = 850;
-
-const CELL_LABELS = [
-  "top-left",
-  "top",
-  "top-right",
-  "left",
-  "center",
-  "right",
-  "bottom-left",
-  "bottom",
-  "bottom-right",
-] as const;
 
 function emptyBoard(): Cell[] {
   return Array.from({ length: 9 }, () => null as Cell);
@@ -251,35 +232,6 @@ function TurnBanner({
   );
 }
 
-type FloatingReaction = { id: number; emoji: string; offset: number };
-
-function FloatingReactions({ items }: { items: FloatingReaction[] }) {
-  const reduceMotion = useReducedMotion();
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <AnimatePresence>
-        {items.map((r) => (
-          <m.span
-            key={r.id}
-            className="absolute bottom-6 text-3xl"
-            style={{ left: `${r.offset}%` }}
-            initial={{ opacity: 0, y: 10, scale: 0.6 }}
-            animate={{
-              opacity: reduceMotion ? 1 : [0, 1, 1, 0],
-              y: reduceMotion ? -20 : -120,
-              scale: 1,
-            }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduceMotion ? 0.4 : 1.5, ease: "easeOut" }}
-          >
-            {r.emoji}
-          </m.span>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 function SeatCard({
   player,
   variant,
@@ -350,22 +302,6 @@ export function TicTacToeGameClient({
   const [replayPlaying, setReplayPlaying] = useState(false);
   const replayStepRef = useRef(replayStep);
   replayStepRef.current = replayStep;
-
-  const [reactions, setReactions] = useState<FloatingReaction[]>([]);
-  const reactionIdRef = useRef(0);
-
-  const spawnReaction = useCallback(
-    (emoji: string) => {
-      const id = ++reactionIdRef.current;
-      const offset = 12 + ((id * 37) % 70);
-      setReactions((prev) => [...prev, { id, emoji, offset }]);
-      audio.playTouch();
-      window.setTimeout(() => {
-        setReactions((prev) => prev.filter((r) => r.id !== id));
-      }, 1600);
-    },
-    [audio],
-  );
 
   const isLive = isGameLive(game.status);
   const isPast = isGameOver(game.status);
@@ -605,23 +541,6 @@ export function TicTacToeGameClient({
     : active && (!myRole || liveState.currentTurn === myRole);
 
   const replayShown = Math.min(replayStep, sortedLen);
- 
-
-  const specCount = useMemo(() => spectatorCount(gameId), [gameId]);
-  const watchers = useMemo(() => friendWatchers(gameId), [gameId]);
-
-  const summaryResult: "win" | "loss" | "draw" | null =
-    isPast && game.winner
-      ? game.winner === "draw"
-        ? "draw"
-        : game.winner === userId
-          ? "win"
-          : "loss"
-      : null;
-  const summary = useMemo(
-    () => (summaryResult ? matchSummary(gameId, summaryResult) : null),
-    [gameId, summaryResult],
-  );
 
   const seatProps = {
     userId,
@@ -676,7 +595,6 @@ export function TicTacToeGameClient({
                 onPlay={makeMove}
                 onHoverCell={audio.playHover}
               />
-              <FloatingReactions items={reactions} />
             </div>
 
             {!isPast && !userId ? (
@@ -701,7 +619,6 @@ export function TicTacToeGameClient({
                 <p className="text-muted-foreground text-xs">
                   Position after {replayShown} of {sortedLen} moves
                 </p>
-                {/* {summary ? <MatchSummary stats={summary} /> : null} */}
               </>
             ) : null}
           </main>
@@ -710,8 +627,6 @@ export function TicTacToeGameClient({
             <SeatCard player={playerO} variant="rail" {...seatProps} />
           </aside>
         </div>
-
-
       </div>
     </LazyMotion>
   );

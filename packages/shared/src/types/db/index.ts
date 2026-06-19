@@ -25,7 +25,6 @@ export type GamePlayer = {
   stats?: ProfileStats | null;
 };
 
-
 export type GameStatus = GameStatusDto;
 
 export type SeatingMode = SeatingModeDto;

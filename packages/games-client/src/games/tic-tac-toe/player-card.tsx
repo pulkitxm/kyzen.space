@@ -86,9 +86,17 @@ export function PlayerCard({
   }) => void;
 }) {
   const mark = asMark(player.role);
-  const tttStats = player.stats?.["tic-tac-toe"] ?? { played: 0, won: 0, lost: 0, drawn: 0 };
+  const tttStats = player.stats?.["tic-tac-toe"] ?? {
+    played: 0,
+    won: 0,
+    lost: 0,
+    drawn: 0,
+  };
   const wins = tttStats.won;
-  const winRate = tttStats.played > 0 ? Math.round((tttStats.won / tttStats.played) * 100) : 0;
+  const winRate =
+    tttStats.played > 0
+      ? Math.round((tttStats.won / tttStats.played) * 100)
+      : 0;
 
   const frame = [
     "rounded-2xl border transition-colors",
@@ -120,8 +128,10 @@ export function PlayerCard({
             </span>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground text-xs">
-            <span className="tabular-nums">{wins} {wins === 1 ? "win" : "wins"}</span>
-            <span className="tabular-nums ml-2">{winRate}%</span>
+            <span className="tabular-nums">
+              {wins} {wins === 1 ? "win" : "wins"}
+            </span>
+            <span className="ml-2 tabular-nums">{winRate}%</span>
           </div>
         </div>
         {isTurn ? (
@@ -173,29 +183,29 @@ export function PlayerCard({
         </span>
       </div>
 
-     <div className="w-full pt-1">
-  <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background/40 px-3 py-2">
-    <div className="text-center">
-      <div className="font-semibold text-sm text-card-foreground tabular-nums">
-        {wins}
-      </div>
-      <div className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-        Wins
-      </div>
-    </div>
+      <div className="w-full pt-1">
+        <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background/40 px-3 py-2">
+          <div className="text-center">
+            <div className="font-semibold text-card-foreground text-sm tabular-nums">
+              {wins}
+            </div>
+            <div className="text-[0.65rem] text-muted-foreground uppercase tracking-wide">
+              Wins
+            </div>
+          </div>
 
-    <div className="h-8 w-px bg-border/70" />
+          <div className="h-8 w-px bg-border/70" />
 
-    <div className="text-center">
-      <div className="font-semibold text-sm text-card-foreground tabular-nums">
-        {winRate}%
+          <div className="text-center">
+            <div className="font-semibold text-card-foreground text-sm tabular-nums">
+              {winRate}%
+            </div>
+            <div className="text-[0.65rem] text-muted-foreground uppercase tracking-wide">
+              Win %
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-        Win %
-      </div>
-    </div>
-  </div>
-</div>
       {isTurn ? (
         <span className="font-medium text-primary text-xs">
           {isMe ? "Your move" : "Thinking…"}
