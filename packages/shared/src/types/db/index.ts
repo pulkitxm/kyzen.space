@@ -22,7 +22,9 @@ export type GamePlayer = {
   username: string;
   role: string;
   avatar?: AvatarConfig | null;
+  stats?: ProfileStats | null;
 };
+
 
 export type GameStatus = GameStatusDto;
 

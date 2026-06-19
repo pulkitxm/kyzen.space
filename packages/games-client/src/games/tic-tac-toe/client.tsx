@@ -6,6 +6,7 @@ import {
   isGameLive,
   isGameOver,
   type Mark,
+  type ProfileStats,
   type TicTacToeState as TicState,
 } from "@kyzen/shared/types";
 import {
@@ -33,13 +34,9 @@ import {
 } from "react-icons/fa6";
 import { useGameAudio } from "../../audio/use-game-audio";
 import type { GameClientProps } from "../../types";
-import {
-  ReactionsBar,
-  Spectators,
-} from "./arena-panels";
 import { TttBoard } from "./board";
 import { TttMark, TttMarkDefs } from "./marks";
-import { MatchSummary } from "./match-summary";
+// import { MatchSummary } from "./match-summary";
 import { friendWatchers, matchSummary, spectatorCount } from "./mock-arena";
 import { type CardPlayer, PlayerCard } from "./player-card";
 import { findWinningLine } from "./winning-line";
@@ -53,6 +50,7 @@ type GameJson = {
     username: string;
     role: string;
     avatar?: AvatarConfig | null;
+    stats?: ProfileStats | null;
   }[];
   gameState: TicState;
   turnDeadline?: number | null;
@@ -649,9 +647,6 @@ export function TicTacToeGameClient({
         <div className="grid @5xl:grid-cols-[17rem_minmax(0,1fr)_18rem] @5xl:items-start @5xl:gap-6 gap-5">
           <aside className="@5xl:flex hidden flex-col gap-4">
             <SeatCard player={playerX} variant="rail" {...seatProps} />
-            {!isPast ? (
-              <Spectators count={specCount} watchers={watchers} />
-            ) : null}
           </aside>
 
           <main className="flex flex-col items-center gap-5">
@@ -706,27 +701,17 @@ export function TicTacToeGameClient({
                 <p className="text-muted-foreground text-xs">
                   Position after {replayShown} of {sortedLen} moves
                 </p>
-                {summary ? <MatchSummary stats={summary} /> : null}
+                {/* {summary ? <MatchSummary stats={summary} /> : null} */}
               </>
             ) : null}
           </main>
 
           <aside className="@5xl:flex hidden flex-col gap-5">
             <SeatCard player={playerO} variant="rail" {...seatProps} />
-            {!isPast ? (
-              <ReactionsBar onReact={spawnReaction} disabled={!isLive} />
-            ) : null}
           </aside>
         </div>
 
-        <div className="mt-5 flex @5xl:hidden flex-col gap-5">
-          {!isPast ? (
-            <Spectators count={specCount} watchers={watchers} />
-          ) : null}
-          {!isPast ? (
-            <ReactionsBar onReact={spawnReaction} disabled={!isLive} />
-          ) : null}
-        </div>
+
       </div>
     </LazyMotion>
   );

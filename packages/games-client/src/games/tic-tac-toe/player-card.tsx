@@ -1,31 +1,21 @@
 "use client";
 
-import type { AvatarConfig, Mark } from "@kyzen/shared/types";
-import { FaCircleDot, FaFire, FaTrophy } from "react-icons/fa6";
+import type { AvatarConfig, Mark, ProfileStats } from "@kyzen/shared/types";
+import { FaCircleDot } from "react-icons/fa6";
 import { Character } from "../../ui/character";
 import { CountdownRing } from "../../ui/countdown-ring";
 import { TttMark } from "./marks";
-import { arenaStats } from "./mock-arena";
 
 export type CardPlayer = {
   userId: string;
   username: string;
   role: string;
   avatar?: AvatarConfig | null;
+  stats?: ProfileStats | null;
 };
 
 function asMark(role: string): Mark | null {
   return role === "X" || role === "O" ? role : null;
-}
-
-function StreakBadge({ streak }: { streak: number }) {
-  if (streak < 2) return null;
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 font-semibold text-warning text-xs">
-      <FaFire size={11} aria-hidden="true" />
-      {streak}
-    </span>
-  );
 }
 
 function Avatar({
@@ -96,7 +86,9 @@ export function PlayerCard({
   }) => void;
 }) {
   const mark = asMark(player.role);
-  const stats = arenaStats(player.userId || player.username);
+  const tttStats = player.stats?.["tic-tac-toe"] ?? { played: 0, won: 0, lost: 0, drawn: 0 };
+  const wins = tttStats.won;
+  const winRate = tttStats.played > 0 ? Math.round((tttStats.won / tttStats.played) * 100) : 0;
 
   const frame = [
     "rounded-2xl border transition-colors",
@@ -128,9 +120,8 @@ export function PlayerCard({
             </span>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground text-xs">
-            <span className="tabular-nums">{stats.rating}</span>
-            <span aria-hidden="true">·</span>
-            <span>{stats.rank}</span>
+            <span className="tabular-nums">{wins} {wins === 1 ? "win" : "wins"}</span>
+            <span className="tabular-nums ml-2">{winRate}%</span>
           </div>
         </div>
         {isTurn ? (
@@ -182,33 +173,29 @@ export function PlayerCard({
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-1.5">
-        <span className="inline-flex items-center gap-1 rounded-full bg-primary/12 px-2 py-0.5 font-semibold text-primary text-xs">
-          <FaTrophy size={10} aria-hidden="true" />
-          {stats.rank}
-        </span>
-        <StreakBadge streak={stats.streak} />
+     <div className="w-full pt-1">
+  <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background/40 px-3 py-2">
+    <div className="text-center">
+      <div className="font-semibold text-sm text-card-foreground tabular-nums">
+        {wins}
       </div>
-
-      <div className="grid w-full grid-cols-2 gap-2 pt-1">
-        <div className="rounded-lg border border-border/70 bg-background/40 px-2 py-1.5">
-          <div className="font-semibold text-card-foreground text-sm tabular-nums">
-            {stats.rating}
-          </div>
-          <div className="text-[0.65rem] text-muted-foreground uppercase tracking-wide">
-            Rating
-          </div>
-        </div>
-        <div className="rounded-lg border border-border/70 bg-background/40 px-2 py-1.5">
-          <div className="font-semibold text-card-foreground text-sm tabular-nums">
-            {stats.winRate}%
-          </div>
-          <div className="text-[0.65rem] text-muted-foreground uppercase tracking-wide">
-            Win rate
-          </div>
-        </div>
+      <div className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+        Wins
       </div>
+    </div>
 
+    <div className="h-8 w-px bg-border/70" />
+
+    <div className="text-center">
+      <div className="font-semibold text-sm text-card-foreground tabular-nums">
+        {winRate}%
+      </div>
+      <div className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+        Win %
+      </div>
+    </div>
+  </div>
+</div>
       {isTurn ? (
         <span className="font-medium text-primary text-xs">
           {isMe ? "Your move" : "Thinking…"}
