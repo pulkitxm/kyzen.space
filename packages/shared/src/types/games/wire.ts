@@ -15,14 +15,14 @@ export type GameStatusDto = z.infer<typeof gameStatusSchema>;
 export const seatingModeSchema = z.enum(["open", "challenge"]);
 export type SeatingModeDto = z.infer<typeof seatingModeSchema>;
 
-export const gameStatSchema = z.object({
+const gameStatSchema = z.object({
   played: z.number(),
   won: z.number(),
   lost: z.number(),
   drawn: z.number(),
 });
 
-export const profileStatsSchema = z.record(gameStatSchema);
+const profileStatsSchema = z.record(gameStatSchema);
 
 export const gamePlayerSchema = z
   .object({
