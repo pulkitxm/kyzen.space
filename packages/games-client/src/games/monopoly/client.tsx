@@ -114,17 +114,15 @@ export function MonopolyGameClient({
     turnSecondsLeft,
   } = useGamePhase(liveState, makeMove, isMyTurn, gameId);
 
-  const [displayedState, setDisplayedState] =
-    useState<MonopolyState>(liveState);
-  const displayedStateRef = useRef<MonopolyState>(displayedState);
+  const liveStateRef = useRef<MonopolyState>(liveState);
   useEffect(() => {
-    displayedStateRef.current = displayedState;
-  }, [displayedState]);
+    liveStateRef.current = liveState;
+  }, [liveState]);
 
   const prevBalancesRef = useRef<Record<string, number>>({});
   useEffect(() => {
     const prev = prevBalancesRef.current;
-    displayedState.players.forEach((p) => {
+    liveState.players.forEach((p) => {
       const old = prev[p.id];
       if (old !== undefined && old !== p.balance) {
         const diff = p.balance - old;
@@ -137,13 +135,7 @@ export function MonopolyGameClient({
       }
       prev[p.id] = p.balance;
     });
-  }, [displayedState, addFloat]);
-
-  useEffect(() => {
-    if (isLive) {
-      setDisplayedState(liveState);
-    }
-  }, [liveState, isLive]);
+  }, [liveState, addFloat]);
 
   const triggerAnimationRef = useRef(triggerRollAnimation);
   useEffect(() => {
@@ -163,7 +155,6 @@ export function MonopolyGameClient({
     const onGameState = (payload: { game: GameJson; moves: MoveJson[] }) => {
       setGame(payload.game);
       setMoves(payload.moves);
-      setDisplayedState(payload.game.gameState);
     };
 
     const onMoveMade = (payload: {
@@ -174,15 +165,13 @@ export function MonopolyGameClient({
       if (md.type === "ROLL_DICE") {
         const d1 = md.payload.die1;
         const d2 = md.payload.die2;
-        const pState = displayedStateRef.current;
+        const pState = liveStateRef.current;
         const activePlayer = pState.players[pState.currentPlayerIndex];
         if (activePlayer) {
           triggerAnimationRef.current(d1, d2, activePlayer.position, () => {
-            setDisplayedState(payload.gameState);
             setGame((g) => ({ ...g, gameState: payload.gameState }));
           });
         } else {
-          setDisplayedState(payload.gameState);
           setGame((g) => ({ ...g, gameState: payload.gameState }));
         }
       } else {
@@ -190,7 +179,6 @@ export function MonopolyGameClient({
         else if (md.type === "DRAW_CARD") sounds.playCardDraw();
         else if (md.type === "DECLARE_BANKRUPTCY") sounds.playJail();
 
-        setDisplayedState(payload.gameState);
         setGame((g) => ({ ...g, gameState: payload.gameState }));
       }
       setMoves((m) => [...m, payload.move]);
@@ -222,7 +210,7 @@ export function MonopolyGameClient({
     };
   }, [socket, liveSocketKey, sounds]);
 
-  const state = displayedState;
+  const state = liveState;
 
   const mappedState = useMemo(() => {
     if (!state) return state;
