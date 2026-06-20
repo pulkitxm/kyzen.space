@@ -115,7 +115,7 @@ function Die({
 }) {
   const isRoll = phase === "rolling";
   const isShake = phase === "shaking";
-  const rot = rotationMap[value] ?? rotationMap[1]!;
+  const rot = rotationMap[value] ?? { rx: 0, ry: 0 };
 
   const style: React.CSSProperties = {
     width: "100%",
@@ -186,6 +186,7 @@ export function Dice({ values, phase }: DiceProps) {
         gap: 8,
       }}
     >
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static module-level CSS keyframes, no user input */}
       <style dangerouslySetInnerHTML={{ __html: DICE_STYLE }} />
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <Die value={values[0] ?? 1} phase={phase} color={accentColor} />

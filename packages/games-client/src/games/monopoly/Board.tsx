@@ -4,6 +4,7 @@ import { avataaars } from "@dicebear/collection";
 import { createAvatar } from "@dicebear/core";
 import { seedAvatarConfig, toDicebearOptions } from "@kyzen/avatar";
 import type {
+  AvatarConfig,
   MonopolyMove,
   MonopolyState,
   Player,
@@ -19,7 +20,7 @@ export function PlayerAvatar({
   size,
   className,
 }: {
-  avatar?: any;
+  avatar?: AvatarConfig | null;
   username: string;
   size: number;
   className?: string;
@@ -27,7 +28,9 @@ export function PlayerAvatar({
   const resolved = avatar ?? seedAvatarConfig(username || "player");
   const dataUri = createAvatar(
     avataaars,
-    toDicebearOptions(resolved) as any,
+    toDicebearOptions(resolved) as unknown as Parameters<
+      typeof createAvatar
+    >[1],
   ).toDataUri();
 
   return (
@@ -311,11 +314,7 @@ function TileCell({
             lineHeight: 1,
           }}
         >
-          <PlayerAvatar
-            avatar={(owner as any).avatar}
-            username={owner.name}
-            size={cellSize * 0.22}
-          />
+          <PlayerAvatar username={owner.name} size={cellSize * 0.22} />
         </div>
       )}
     </div>
@@ -424,7 +423,6 @@ function TokensOverlay({
               }}
             >
               <PlayerAvatar
-                avatar={(player as any).avatar}
                 username={player.name}
                 size={cellSize * 0.45}
                 className={

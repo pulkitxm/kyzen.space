@@ -1,18 +1,14 @@
 import type { Tile } from "@kyzen/shared/types";
 
 export const BOARD_SIZE = 32;
-export const GO_POSITION = 0;
 export const JAIL_POSITION = 8;
-export const FREE_PARKING_POSITION = 16;
-export const GO_TO_JAIL_POSITION = 24;
 export const GO_SALARY = 200;
 export const JAIL_FINE = 50;
 export const MAX_JAIL_TURNS = 3;
-export const INCOME_TAX = 150;
-export const LUXURY_TAX = 75;
+const INCOME_TAX = 150;
+const LUXURY_TAX = 75;
 export const MORTGAGE_RATE = 0.5;
 export const UNMORTGAGE_RATE = 0.6;
-export const MAX_HOUSES = 4;
 export const HOTEL_HOUSES = 5;
 
 export const BOARD: ReadonlyArray<Tile> = [

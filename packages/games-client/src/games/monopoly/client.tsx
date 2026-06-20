@@ -1,6 +1,5 @@
 "use client";
 
-// import { applyAction, monopolyEngine } from "@kyzen/games-core";
 import type {
   GamePlayer,
   MonopolyMove,
@@ -8,16 +7,6 @@ import type {
   Tile,
 } from "@kyzen/shared/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-/*
-import {
-  FaBackwardStep,
-  FaChevronLeft,
-  FaChevronRight,
-  FaForwardStep,
-  FaPause,
-  FaPlay,
-} from "react-icons/fa6";
-*/
 import type { GameClientProps } from "../../types";
 import { Board } from "./Board";
 import { Controls } from "./Controls";
@@ -42,118 +31,6 @@ type MoveJson = {
   moveData: Record<string, unknown>;
   createdAt: string;
 };
-
-/*
-const REPLAY_MS = 1000;
-
-function sortMoves(moves: MoveJson[]): MoveJson[] {
-  return [...moves].sort(
-    (a, b) => (Number(a.moveNumber) || 0) - (Number(b.moveNumber) || 0),
-  );
-}
-
-function buildStateAtStep(
-  moves: MoveJson[],
-  step: number,
-  players: GameJson["players"],
-): MonopolyState {
-  const sortedPlayers = [...players].sort((a, b) =>
-    a.role.localeCompare(b.role),
-  );
-  const seats = sortedPlayers.map((p) => ({ role: p.role }));
-  let state = monopolyEngine.createInitialState(seats);
-
-  const sorted = sortMoves(moves);
-  const n = Math.max(0, Math.min(step, sorted.length));
-  for (let i = 0; i < n; i++) {
-    const m = sorted[i];
-    if (!m) continue;
-    state = applyAction(state, m.moveData as MonopolyMove);
-  }
-  return state;
-}
-
-function ReplayToolbar({
-  step,
-  maxStep,
-  isPlaying,
-  onFirst,
-  onPrev,
-  onTogglePlay,
-  onNext,
-  onLast,
-}: {
-  step: number;
-  maxStep: number;
-  isPlaying: boolean;
-  onFirst: () => void;
-  onPrev: () => void;
-  onTogglePlay: () => void;
-  onNext: () => void;
-  onLast: () => void;
-}) {
-  const glass =
-    "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card px-3 text-card-foreground shadow-sm outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35";
-
-  return (
-    <div
-      className="mt-6 flex max-w-[320px] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-border bg-surface-overlay/60 p-2"
-      role="toolbar"
-      aria-label="Replay controls"
-    >
-      <button
-        type="button"
-        className={glass}
-        onClick={onFirst}
-        disabled={step <= 0}
-        title="First"
-      >
-        <FaBackwardStep size={20} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className={glass}
-        onClick={onPrev}
-        disabled={step <= 0}
-        title="Previous move (←)"
-      >
-        <FaChevronLeft size={20} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className={`${glass} min-w-13`}
-        onClick={onTogglePlay}
-        disabled={maxStep === 0}
-        title={isPlaying ? "Pause (Space)" : "Play (Space)"}
-      >
-        {isPlaying ? (
-          <FaPause size={20} aria-hidden="true" />
-        ) : (
-          <FaPlay size={20} aria-hidden="true" />
-        )}
-      </button>
-      <button
-        type="button"
-        className={glass}
-        onClick={onNext}
-        disabled={step >= maxStep}
-        title="Next move (→)"
-      >
-        <FaChevronRight size={20} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className={glass}
-        onClick={onLast}
-        disabled={step >= maxStep}
-        title="Last move"
-      >
-        <FaForwardStep size={20} aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-*/
 
 function StatusDot({ online }: { online: boolean }) {
   const tone = online ? "bg-success" : "bg-danger";
@@ -185,18 +62,8 @@ export function MonopolyGameClient({
   const [_moves, setMoves] = useState<MoveJson[]>(initialMoves as MoveJson[]);
   const [error, setError] = useState<string | null>(null);
 
-  /*
-  const pastInitially =
-    initialGame.status === "completed" || initialGame.status === "abandoned";
-  const [replayStep, setReplayStep] = useState(() =>
-    pastInitially ? initialMoves.length : 0,
-  );
-  const [replayPlaying, setReplayPlaying] = useState(false);
-  */
-
   const isLive = game.status === "waiting" || game.status === "active";
   const isPast = game.status === "completed" || game.status === "abandoned";
-  // const sortedLen = useMemo(() => sortMoves(moves).length, [moves]);
 
   const liveSocketKey = useMemo((): {
     gameId: string;
@@ -279,35 +146,6 @@ export function MonopolyGameClient({
     }
   }, [liveState, isLive]);
 
-  /*
-  useEffect(() => {
-    if (!isPast || !replayPlaying) return;
-    const id = window.setInterval(() => {
-      setReplayStep((s) => {
-        const cur = Math.min(s, sortedLen);
-        if (cur >= sortedLen) {
-          queueMicrotask(() => setReplayPlaying(false));
-          return sortedLen;
-        }
-        return cur + 1;
-      });
-    }, REPLAY_MS);
-    return () => window.clearInterval(id);
-  }, [isPast, replayPlaying, sortedLen]);
-
-  const prevIsLiveRef = useRef(
-    initialGame.status === "waiting" || initialGame.status === "active",
-  );
-
-  useEffect(() => {
-    if (prevIsLiveRef.current && !isLive && isPast) {
-      setReplayStep(sortMoves(moves).length);
-      setReplayPlaying(false);
-    }
-    prevIsLiveRef.current = isLive;
-  }, [isLive, isPast, moves]);
-  */
-
   const triggerAnimationRef = useRef(triggerRollAnimation);
   useEffect(() => {
     triggerAnimationRef.current = triggerRollAnimation;
@@ -385,17 +223,7 @@ export function MonopolyGameClient({
     };
   }, [socket, liveSocketKey, sounds]);
 
-  /*
-  const replayState = useMemo(() => {
-    return buildStateAtStep(
-      moves,
-      Math.min(replayStep, sortedLen),
-      game.players,
-    );
-  }, [moves, replayStep, sortedLen, game.players]);
-  */
-
-  const state = displayedState; // isPast ? replayState : displayedState;
+  const state = displayedState;
 
   const mappedState = useMemo(() => {
     if (!state) return state;
@@ -435,78 +263,6 @@ export function MonopolyGameClient({
       payload: { die1: d1, die2: d2 },
     });
   }, [uiPhase, isMyTurn, makeMove]);
-
-  /*
-  const goFirst = useCallback(() => {
-    setReplayPlaying(false);
-    setReplayStep(0);
-  }, []);
-
-  const goPrev = useCallback(() => {
-    setReplayPlaying(false);
-    setReplayStep((s) => {
-      const cur = Math.min(s, sortedLen);
-      return Math.max(0, cur - 1);
-    });
-  }, [sortedLen]);
-
-  const goNext = useCallback(() => {
-    setReplayPlaying(false);
-    setReplayStep((s) => {
-      const cur = Math.min(s, sortedLen);
-      return Math.min(sortedLen, cur + 1);
-    });
-  }, [sortedLen]);
-
-  const goLast = useCallback(() => {
-    setReplayPlaying(false);
-    setReplayStep(sortedLen);
-  }, [sortedLen]);
-
-  const toggleReplayPlay = useCallback(() => {
-    setReplayPlaying((wasPlaying) => {
-      if (wasPlaying) return false;
-      setReplayStep((s) => {
-        const cur = Math.min(s, sortedLen);
-        if (sortedLen <= 0) return 0;
-        if (cur >= sortedLen) return 0;
-        return cur;
-      });
-      return true;
-    });
-  }, [sortedLen]);
-
-  useEffect(() => {
-    if (!isPast) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      const t = e.target;
-      if (
-        t instanceof HTMLInputElement ||
-        t instanceof HTMLTextAreaElement ||
-        t instanceof HTMLSelectElement ||
-        (t instanceof HTMLElement && t.isContentEditable)
-      ) {
-        return;
-      }
-
-      if (e.code === "ArrowLeft") {
-        e.preventDefault();
-        goPrev();
-      } else if (e.code === "ArrowRight") {
-        e.preventDefault();
-        goNext();
-      } else if (e.code === "Space") {
-        if (sortedLen <= 0) return;
-        e.preventDefault();
-        toggleReplayPlay();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [isPast, sortedLen, goPrev, goNext, toggleReplayPlay]);
-  */
 
   const winnerLabel = useMemo(() => {
     if (!game.winner) return null;
@@ -604,26 +360,7 @@ export function MonopolyGameClient({
         )}
       </div>
 
-      {/* {isPast && (
-        <div className="flex flex-col items-center justify-center">
-          <ReplayToolbar
-            step={Math.min(replayStep, sortedLen)}
-            maxStep={sortedLen}
-            isPlaying={replayPlaying}
-            onFirst={goFirst}
-            onPrev={goPrev}
-            onTogglePlay={toggleReplayPlay}
-            onNext={goNext}
-            onLast={goLast}
-          />
-          <p className="mt-3 text-muted-foreground text-xs">
-            Position after {Math.min(replayStep, sortedLen)} of {sortedLen}{" "}
-            moves
-          </p>
-        </div>
-      )} */}
+      {}
     </div>
   );
 }
-export { MonopolyGameClient as MonopolyBoard };
-export default MonopolyGameClient;

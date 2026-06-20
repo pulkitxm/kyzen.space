@@ -121,7 +121,6 @@ function PlayerCard({
       }}
     >
       <PlayerAvatar
-        avatar={(player as any).avatar}
         username={player.name}
         size={24}
         className={
@@ -616,11 +615,7 @@ export function Controls({
             <PhaseBadge phase={uiPhase} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <PlayerAvatar
-              avatar={(currentPlayer as any).avatar}
-              username={currentPlayer.name}
-              size={24}
-            />
+            <PlayerAvatar username={currentPlayer.name} size={24} />
             <div>
               <div
                 style={{
@@ -886,7 +881,7 @@ export function Controls({
                         ACTION REQUIRED
                       </div>
                       <ActionBtn
-                        label={`🏠 Buy ${currentTile.name} — $${(currentTile as PropertyTile).price ?? 0}`}
+                        label={`🏠 Buy ${currentTile.name} - $${(currentTile as PropertyTile).price ?? 0}`}
                         color="var(--success)"
                         onClick={() => dispatch({ type: "BUY_PROPERTY" })}
                         disabled={
@@ -1113,7 +1108,7 @@ export function Controls({
                       boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                     }}
                   >
-                    {/* Header: Color + Name + Badges */}
+                    {}
                     <div
                       style={{ display: "flex", alignItems: "center", gap: 6 }}
                     >
@@ -1177,7 +1172,7 @@ export function Controls({
                       )}
                     </div>
 
-                    {/* Actions */}
+                    {}
                     {isMyTurn && (
                       <div style={{ display: "flex", gap: 4 }}>
                         {tile.type === "Property" &&

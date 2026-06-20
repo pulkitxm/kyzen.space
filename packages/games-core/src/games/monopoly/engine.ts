@@ -215,7 +215,7 @@ function handleLanding(state: MonopolyState, player: Player): MonopolyState {
       if (!owner) {
         next = addLog(
           next,
-          `${player.name} landed on ${tile.name}. No owner — available to buy.`,
+          `${player.name} landed on ${tile.name}. No owner - available to buy.`,
         );
         return { ...next, turnPhase: "LANDED" };
       }
@@ -378,7 +378,8 @@ function applyAction(
     next = updatePlayer(next, initialPlayer.id, { consecutiveTimeouts: 0 });
   }
 
-  const player = next.players[next.currentPlayerIndex]!;
+  const player = next.players[next.currentPlayerIndex];
+  if (!player) return state;
 
   switch (action.type) {
     case "ROLL_DICE": {

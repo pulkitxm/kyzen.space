@@ -296,7 +296,7 @@ export function PropertyPanel({
               </>
             ) : (
               <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-                🏦 Bank — Available
+                🏦 Bank - Available
               </div>
             )}
           </div>
@@ -423,112 +423,5 @@ export function PropertyPanel({
         </div>
       </div>
     </>
-  );
-}
-
-const CARD_STYLE = `
-@keyframes cardSlideUp {
-  from { opacity: 0; transform: translateY(40px) rotateX(20deg); }
-  to   { opacity: 1; transform: translateY(0) rotateX(0deg); }
-}
-@keyframes backdropFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-`;
-
-let cardStyleInjected = false;
-function injectCardStyle() {
-  if (cardStyleInjected || typeof document === "undefined") return;
-  cardStyleInjected = true;
-  const el = document.createElement("style");
-  el.textContent = CARD_STYLE;
-  document.head.appendChild(el);
-}
-
-interface CardModalProps {
-  tileType: "Chance" | "CommunityChest";
-  dispatch: (a: MonopolyMove) => void;
-}
-
-export function CardModal({ tileType, dispatch }: CardModalProps) {
-  injectCardStyle();
-
-  const isChance = tileType === "Chance";
-  const cardColor = isChance ? "var(--warning)" : "var(--primary)";
-  const cardBg = "var(--card)";
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.5)",
-        zIndex: 300,
-        backdropFilter: "blur(4px)",
-        animation: "backdropFadeIn 0.2s ease",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <div
-        style={{
-          width: 320,
-          background: cardBg,
-          border: `2px solid ${cardColor}`,
-          borderRadius: 20,
-          padding: "32px 28px",
-          textAlign: "center",
-          animation: "cardSlideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)",
-          boxShadow: `0 0 60px color-mix(in srgb, ${cardColor} 20%, transparent), 0 24px 60px rgba(0,0,0,0.3)`,
-          perspective: "800px",
-        }}
-      >
-        <div style={{ fontSize: 40, marginBottom: 12 }}>
-          {isChance ? "?" : "🏛"}
-        </div>
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            letterSpacing: 2,
-            color: cardColor,
-            marginBottom: 16,
-            textTransform: "uppercase",
-          }}
-        >
-          {isChance ? "Chance" : "Community Chest"}
-        </div>
-        <p
-          style={{
-            fontSize: 14,
-            color: "var(--foreground)",
-            lineHeight: 1.6,
-            marginBottom: 24,
-          }}
-        >
-          Draw a card to see your fate...
-        </p>
-        <button
-          type="button"
-          onClick={() => dispatch({ type: "DRAW_CARD" })}
-          style={{
-            width: "100%",
-            padding: "12px 0",
-            borderRadius: 12,
-            border: `1px solid ${cardColor}`,
-            background: `color-mix(in srgb, ${cardColor} 12%, transparent)`,
-            color: cardColor,
-            fontWeight: 700,
-            fontSize: 14,
-            cursor: "pointer",
-            transition: "all 0.2s",
-          }}
-        >
-          Draw Card →
-        </button>
-      </div>
-    </div>
   );
 }

@@ -42,4 +42,3 @@ export function MonopolySkeleton() {
     </div>
   );
 }
-export default MonopolySkeleton;

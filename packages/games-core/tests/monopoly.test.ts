@@ -541,7 +541,7 @@ describe("monopoly engine: TIMEOUT_SKIP", () => {
 
   test("successful move resets consecutiveTimeouts to 0", () => {
     let state = init();
-    state.players[0]!.consecutiveTimeouts = 1;
+    getPlayer(state, 0).consecutiveTimeouts = 1;
 
     state = rollDice(state, "p1", 1, 2);
     expect(getPlayer(state, 0).consecutiveTimeouts).toBe(0);
@@ -552,7 +552,8 @@ describe("monopoly engine: TIMEOUT_SKIP", () => {
 
     let result = reduce(state, "p1", { type: "TIMEOUT_SKIP" });
     expect(result.ok).toBe(true);
-    state = (result as any).state;
+    if (!result.ok) throw new Error(result.error);
+    state = result.state;
     expect(getPlayer(state, 0).consecutiveTimeouts).toBe(1);
     expect(state.currentPlayerIndex).toBe(1);
 
@@ -565,7 +566,8 @@ describe("monopoly engine: TIMEOUT_SKIP", () => {
 
     result = reduce(state, "p1", { type: "TIMEOUT_SKIP" });
     expect(result.ok).toBe(true);
-    state = (result as any).state;
+    if (!result.ok) throw new Error(result.error);
+    state = result.state;
     expect(getPlayer(state, 0).consecutiveTimeouts).toBe(2);
     expect(state.currentPlayerIndex).toBe(1);
 
@@ -578,7 +580,8 @@ describe("monopoly engine: TIMEOUT_SKIP", () => {
 
     result = reduce(state, "p1", { type: "TIMEOUT_SKIP" });
     expect(result.ok).toBe(true);
-    state = (result as any).state;
+    if (!result.ok) throw new Error(result.error);
+    state = result.state;
 
     expect(getPlayer(state, 0).isBankrupt).toBe(true);
     expect(state.turnPhase).toBe("GAME_OVER");

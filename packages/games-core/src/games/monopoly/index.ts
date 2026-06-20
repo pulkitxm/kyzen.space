@@ -34,4 +34,3 @@ export {
 } from "./constants/board";
 export { CHANCE_CARDS, COMMUNITY_CHEST_CARDS } from "./constants/cards";
 export { applyAction, monopolyEngine } from "./engine";
-export { monopolyMeta } from "./meta";
