@@ -65,6 +65,7 @@ export function useGamePhase(
   state: MonopolyState,
   dispatch: (a: MonopolyMove) => void,
   isMyTurn: boolean,
+  gameId: string,
 ) {
   const sounds = useSound();
 
@@ -86,6 +87,65 @@ export function useGamePhase(
     card: Card;
     type: "Chance" | "CommunityChest";
   } | null>(null);
+
+  const [turnSecondsLeft, setTurnSecondsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (state.turnPhase === "GAME_OVER") {
+      setTurnSecondsLeft(null);
+      return;
+    }
+    const cp = state.players[state.currentPlayerIndex];
+    if (!cp || cp.isBankrupt) {
+      setTurnSecondsLeft(null);
+      return;
+    }
+
+    const timeouts = cp.consecutiveTimeouts ?? 0;
+    const initialDuration =
+      state.turnPhase === "WAITING_FOR_ROLL"
+        ? timeouts === 0
+          ? 15
+          : timeouts === 1
+            ? 5
+            : 4
+        : 20;
+
+    let elapsed = 0;
+    if (typeof window !== "undefined") {
+      const turnKey = `${state.currentPlayerIndex}_${state.turnPhase}_${state.log.length}`;
+      const savedKey = localStorage.getItem(`monopoly_turn_key_${gameId}`);
+      const savedStart = localStorage.getItem(`monopoly_turn_start_${gameId}`);
+
+      if (savedKey === turnKey && savedStart) {
+        const startTime = parseInt(savedStart, 10);
+        if (!isNaN(startTime)) {
+          elapsed = Math.floor((Date.now() - startTime) / 1000);
+        }
+      } else {
+        localStorage.setItem(`monopoly_turn_key_${gameId}`, turnKey);
+        localStorage.setItem(`monopoly_turn_start_${gameId}`, Date.now().toString());
+      }
+    }
+
+    const duration = Math.max(0, initialDuration - elapsed);
+    setTurnSecondsLeft(duration);
+
+    const interval = setInterval(() => {
+      setTurnSecondsLeft((prev) => {
+        if (prev === null || prev <= 0) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      setTurnSecondsLeft(null);
+    };
+  }, [state.currentPlayerIndex, state.turnPhase, state.players, gameId]);
 
   const [animatedPositions, setAnimatedPositions] = useState<
     Record<string, number>
@@ -348,5 +408,6 @@ export function useGamePhase(
     drawnCard,
     mustDrawCard,
     onDrawCard: drawCardAction,
+    turnSecondsLeft,
   };
 }

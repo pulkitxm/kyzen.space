@@ -1,6 +1,6 @@
 "use client";
 
-import { applyAction, monopolyEngine } from "@gamelobby/games-core";
+// import { applyAction, monopolyEngine } from "@gamelobby/games-core";
 import type {
   GamePlayer,
   MonopolyMove,
@@ -8,6 +8,7 @@ import type {
   Tile,
 } from "@gamelobby/shared/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+/*
 import {
   FaBackwardStep,
   FaChevronLeft,
@@ -16,6 +17,7 @@ import {
   FaPause,
   FaPlay,
 } from "react-icons/fa6";
+*/
 import type { GameClientProps } from "../../types";
 import { Board } from "./Board";
 import { Controls } from "./Controls";
@@ -41,6 +43,7 @@ type MoveJson = {
   createdAt: string;
 };
 
+/*
 const REPLAY_MS = 1000;
 
 function sortMoves(moves: MoveJson[]): MoveJson[] {
@@ -150,6 +153,7 @@ function ReplayToolbar({
     </div>
   );
 }
+*/
 
 function StatusDot({ online }: { online: boolean }) {
   const tone = online ? "bg-success" : "bg-danger";
@@ -178,19 +182,21 @@ export function MonopolyGameClient({
 }: GameClientProps) {
   const sounds = useSound();
   const [game, setGame] = useState<GameJson>(initialGame as GameJson);
-  const [moves, setMoves] = useState<MoveJson[]>(initialMoves as MoveJson[]);
+  const [_moves, setMoves] = useState<MoveJson[]>(initialMoves as MoveJson[]);
   const [error, setError] = useState<string | null>(null);
 
+  /*
   const pastInitially =
     initialGame.status === "completed" || initialGame.status === "abandoned";
   const [replayStep, setReplayStep] = useState(() =>
     pastInitially ? initialMoves.length : 0,
   );
   const [replayPlaying, setReplayPlaying] = useState(false);
+  */
 
   const isLive = game.status === "waiting" || game.status === "active";
   const isPast = game.status === "completed" || game.status === "abandoned";
-  const sortedLen = useMemo(() => sortMoves(moves).length, [moves]);
+  // const sortedLen = useMemo(() => sortMoves(moves).length, [moves]);
 
   const liveSocketKey = useMemo((): {
     gameId: string;
@@ -239,7 +245,8 @@ export function MonopolyGameClient({
     drawnCard,
     mustDrawCard,
     onDrawCard,
-  } = useGamePhase(liveState, makeMove, isMyTurn);
+    turnSecondsLeft,
+  } = useGamePhase(liveState, makeMove, isMyTurn, gameId);
 
   const [displayedState, setDisplayedState] =
     useState<MonopolyState>(liveState);
@@ -272,6 +279,7 @@ export function MonopolyGameClient({
     }
   }, [liveState, isLive]);
 
+  /*
   useEffect(() => {
     if (!isPast || !replayPlaying) return;
     const id = window.setInterval(() => {
@@ -298,6 +306,7 @@ export function MonopolyGameClient({
     }
     prevIsLiveRef.current = isLive;
   }, [isLive, isPast, moves]);
+  */
 
   const triggerAnimationRef = useRef(triggerRollAnimation);
   useEffect(() => {
@@ -376,6 +385,7 @@ export function MonopolyGameClient({
     };
   }, [socket, liveSocketKey, sounds]);
 
+  /*
   const replayState = useMemo(() => {
     return buildStateAtStep(
       moves,
@@ -383,8 +393,9 @@ export function MonopolyGameClient({
       game.players,
     );
   }, [moves, replayStep, sortedLen, game.players]);
+  */
 
-  const state = isPast ? replayState : displayedState;
+  const state = displayedState; // isPast ? replayState : displayedState;
 
   const mappedState = useMemo(() => {
     if (!state) return state;
@@ -425,6 +436,7 @@ export function MonopolyGameClient({
     });
   }, [uiPhase, isMyTurn, makeMove]);
 
+  /*
   const goFirst = useCallback(() => {
     setReplayPlaying(false);
     setReplayStep(0);
@@ -494,6 +506,7 @@ export function MonopolyGameClient({
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [isPast, sortedLen, goPrev, goNext, toggleReplayPlay]);
+  */
 
   const winnerLabel = useMemo(() => {
     if (!game.winner) return null;
@@ -577,6 +590,7 @@ export function MonopolyGameClient({
             drawnCard={drawnCard}
             onDrawCard={onDrawCard}
             isMyTurn={isMyTurn}
+            turnSecondsLeft={turnSecondsLeft}
           />
         </div>
 
@@ -590,7 +604,7 @@ export function MonopolyGameClient({
         )}
       </div>
 
-      {isPast && (
+      {/* {isPast && (
         <div className="flex flex-col items-center justify-center">
           <ReplayToolbar
             step={Math.min(replayStep, sortedLen)}
@@ -607,7 +621,7 @@ export function MonopolyGameClient({
             moves
           </p>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

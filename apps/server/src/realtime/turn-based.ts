@@ -10,6 +10,7 @@ import type {
   ClientMakeMove,
   Outcome,
   ServerGameStatePayload,
+  MonopolyState,
 } from "@gamelobby/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../api/serialize";
@@ -121,37 +122,36 @@ export async function handleJoinRoom(
   joinGameRoom(socket, payload.gameId);
   await emitFullState(io, game);
   if (changed) await broadcastGameCard(io, game.id);
+  await scheduleTimeout(io, game.id, false);
 }
 
-export async function handleMakeMove(
+export async function executeGameMove(
   io: IOServer,
-  socket: Socket,
-  payload: ClientMakeMove,
+  gameId: string,
+  userId: string,
+  moveData: any,
 ): Promise<void> {
-  const userId = socket.data.userId;
-  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
-
-  const gameRow = await games.getGameById(payload.gameId);
-  if (!gameRow) return err(socket, "Game not found");
-  if (gameRow.status !== "active") return err(socket, "Game is not active");
+  const gameRow = await games.getGameById(gameId);
+  if (!gameRow) throw new Error("Game not found");
+  if (gameRow.status !== "active") throw new Error("Game is not active");
 
   const player = gameRow.players.find((p) => p.userId === userId);
-  if (!player) return err(socket, "Not a player in this game");
+  if (!player) throw new Error("Not a player in this game");
 
   const def = getDefinition(gameRow.gameType);
-  if (!def.engine.reduce) return err(socket, "Game does not accept moves");
+  if (!def.engine.reduce) throw new Error("Game does not accept moves");
 
-  const parsedMove = def.moveSchema.safeParse(payload.moveData);
-  if (!parsedMove.success) return err(socket, "Invalid move");
+  const parsedMove = def.moveSchema.safeParse(moveData);
+  if (!parsedMove.success) throw new Error("Invalid move");
   const parsedState = def.stateSchema.safeParse(gameRow.gameState);
-  if (!parsedState.success) return err(socket, "Corrupt game state");
+  if (!parsedState.success) throw new Error("Corrupt game state");
 
   const result = def.engine.reduce(
     parsedState.data,
     { role: player.role },
     parsedMove.data,
   );
-  if (!result.ok) return err(socket, result.error);
+  if (!result.ok) throw new Error(result.error);
 
   const moveNumber = await games.nextMoveNumber(gameRow.id);
   const moveRow = await games.addMove({
@@ -171,7 +171,85 @@ export async function handleMakeMove(
   await emitFullState(io, updated);
 
   if (updated.status === "completed") {
+    clearGameTimeout(gameId);
     emitToGame(io, gameRow.id, "game_over", { winner: updated.winner });
     await broadcastGameCard(io, updated.id);
+  } else {
+    await scheduleTimeout(io, gameId, true);
   }
+}
+
+export async function handleMakeMove(
+  io: IOServer,
+  socket: Socket,
+  payload: ClientMakeMove,
+): Promise<void> {
+  const userId = socket.data.userId;
+  if (!isUuid(payload.gameId)) return err(socket, "Invalid game id");
+
+  try {
+    await executeGameMove(io, payload.gameId, userId, payload.moveData);
+  } catch (error: any) {
+    err(socket, error.message ?? "Error making move");
+  }
+}
+
+const gameTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function clearGameTimeout(gameId: string) {
+  const existing = gameTimers.get(gameId);
+  if (existing) {
+    clearTimeout(existing);
+    gameTimers.delete(gameId);
+  }
+}
+
+export async function scheduleTimeout(io: IOServer, gameId: string, force = false) {
+  if (!force && gameTimers.has(gameId)) return;
+
+  const gameRow = await games.getGameById(gameId);
+  if (!gameRow || gameRow.status !== "active" || gameRow.gameType !== "monopoly") {
+    clearGameTimeout(gameId);
+    return;
+  }
+
+  const state = gameRow.gameState as MonopolyState;
+  const player = state.players[state.currentPlayerIndex];
+  if (!player) return;
+
+  let duration = 15000;
+  if (state.turnPhase === "WAITING_FOR_ROLL") {
+    const consecutiveTimeouts = player.consecutiveTimeouts ?? 0;
+    if (consecutiveTimeouts === 0) duration = 15000;
+    else if (consecutiveTimeouts === 1) duration = 5000;
+    else duration = 4000;
+  } else {
+    duration = 20000;
+  }
+
+  clearGameTimeout(gameId);
+
+  const timer = setTimeout(async () => {
+    try {
+      await executeTimeoutSkip(io, gameId);
+    } catch (e) {
+      console.error(`Error executing timeout skip for game ${gameId}:`, e);
+    }
+  }, duration);
+
+  gameTimers.set(gameId, timer);
+}
+
+export async function executeTimeoutSkip(io: IOServer, gameId: string) {
+  const gameRow = await games.getGameById(gameId);
+  if (!gameRow || gameRow.status !== "active") return;
+
+  const state = gameRow.gameState as MonopolyState;
+  const player = state.players[state.currentPlayerIndex];
+  if (!player) return;
+
+  const gamePlayer = gameRow.players.find((p) => p.role === player.id);
+  const userId = gamePlayer ? gamePlayer.userId : "system";
+
+  await executeGameMove(io, gameId, userId, { type: "TIMEOUT_SKIP" });
 }

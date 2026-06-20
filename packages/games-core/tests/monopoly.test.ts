@@ -527,3 +527,65 @@ describe("monopoly engine: createInitialState", () => {
     expect(a).not.toBe(b);
   });
 });
+
+describe("monopoly engine: TIMEOUT_SKIP", () => {
+  test("TIMEOUT_SKIP increments consecutiveTimeouts and advances turn", () => {
+    let state = init();
+    expect(getPlayer(state, 0).consecutiveTimeouts).toBe(0);
+
+    const result = reduce(state, "p1", { type: "TIMEOUT_SKIP" });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      state = result.state;
+      expect(getPlayer(state, 0).consecutiveTimeouts).toBe(1);
+      expect(state.currentPlayerIndex).toBe(1);
+      expect(state.turnPhase).toBe("WAITING_FOR_ROLL");
+    }
+  });
+
+  test("successful move resets consecutiveTimeouts to 0", () => {
+    let state = init();
+    state.players[0]!.consecutiveTimeouts = 1;
+
+    state = rollDice(state, "p1", 1, 2);
+    expect(getPlayer(state, 0).consecutiveTimeouts).toBe(0);
+  });
+
+  test("3 consecutive timeouts bankrupts/invalidates the player", () => {
+    let state = init();
+    
+    let result = reduce(state, "p1", { type: "TIMEOUT_SKIP" });
+    expect(result.ok).toBe(true);
+    state = (result as any).state;
+    expect(getPlayer(state, 0).consecutiveTimeouts).toBe(1);
+    expect(state.currentPlayerIndex).toBe(1);
+
+    state = rollDice(state, "p2", 1, 2);
+    while (state.turnPhase === "LANDED") {
+      state = applyAction(state, { type: "DECLINE_PURCHASE" });
+    }
+    state = applyAction(state, { type: "END_TURN" });
+    expect(state.currentPlayerIndex).toBe(0);
+
+    result = reduce(state, "p1", { type: "TIMEOUT_SKIP" });
+    expect(result.ok).toBe(true);
+    state = (result as any).state;
+    expect(getPlayer(state, 0).consecutiveTimeouts).toBe(2);
+    expect(state.currentPlayerIndex).toBe(1);
+
+    state = rollDice(state, "p2", 1, 2);
+    while (state.turnPhase === "LANDED") {
+      state = applyAction(state, { type: "DECLINE_PURCHASE" });
+    }
+    state = applyAction(state, { type: "END_TURN" });
+    expect(state.currentPlayerIndex).toBe(0);
+
+    result = reduce(state, "p1", { type: "TIMEOUT_SKIP" });
+    expect(result.ok).toBe(true);
+    state = (result as any).state;
+    
+    expect(getPlayer(state, 0).isBankrupt).toBe(true);
+    expect(state.turnPhase).toBe("GAME_OVER");
+    expect(state.winnerId).toBe("p2");
+  });
+});

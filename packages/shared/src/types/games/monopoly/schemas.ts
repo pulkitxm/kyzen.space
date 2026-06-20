@@ -183,6 +183,7 @@ export const playerSchema = z
     outOfJailCards: z.number().int().min(0),
     isBankrupt: z.boolean(),
     ownedProperties: z.array(ownedPropertySchema),
+    consecutiveTimeouts: z.number().int().min(0),
   })
   .strict();
 export type Player = z.infer<typeof playerSchema>;
@@ -245,6 +246,7 @@ export const monopolyMoveSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("END_TURN") }),
   z.object({ type: z.literal("DECLARE_BANKRUPTCY") }),
   z.object({ type: z.literal("DRAW_CARD") }),
+  z.object({ type: z.literal("TIMEOUT_SKIP") }),
 ]);
 export type MonopolyMove = z.infer<typeof monopolyMoveSchema>;
 

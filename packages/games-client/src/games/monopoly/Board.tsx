@@ -415,7 +415,7 @@ function TokensOverlay({
                 transform: "translate(-50%, -50%)",
                 transition: isAnimating
                   ? "left 0.12s ease-in-out, top 0.12s ease-in-out"
-                  : "left 0.3s ease, top 0.3s ease",
+                  : "none",
                 zIndex: isCurrentPlayer ? 5 : 4,
                 animation: isAnimating
                   ? "tokenMove 0.12s ease-in-out"

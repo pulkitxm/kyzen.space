@@ -370,9 +370,15 @@ function applyAction(
   state: MonopolyState,
   action: MonopolyMove,
 ): MonopolyState {
-  const player = state.players[state.currentPlayerIndex];
-  if (!player) return state;
+  const initialPlayer = state.players[state.currentPlayerIndex];
+  if (!initialPlayer) return state;
   let next = state;
+
+  if (action.type !== "TIMEOUT_SKIP" && initialPlayer.consecutiveTimeouts > 0) {
+    next = updatePlayer(next, initialPlayer.id, { consecutiveTimeouts: 0 });
+  }
+
+  const player = next.players[next.currentPlayerIndex]!;
 
   switch (action.type) {
     case "ROLL_DICE": {
@@ -702,6 +708,44 @@ function applyAction(
       return { ...next, turnPhase: "WAITING_FOR_END_TURN" };
     }
 
+    case "TIMEOUT_SKIP": {
+      const nextConsecutiveTimeouts = player.consecutiveTimeouts + 1;
+      let nextPlayers = next.players.map((p, idx) =>
+        idx === next.currentPlayerIndex
+          ? { ...p, consecutiveTimeouts: nextConsecutiveTimeouts }
+          : p
+      );
+      let nextState = { ...next, players: nextPlayers };
+
+      if (nextConsecutiveTimeouts >= 3) {
+        nextState = updatePlayer(nextState, player.id, { isBankrupt: true });
+        nextState = addLog(nextState, `${player.name} was bankrupted due to inactivity.`);
+        nextState = checkWin(nextState);
+        if (nextState.turnPhase === "GAME_OVER") {
+          return nextState;
+        }
+      } else {
+        nextState = addLog(nextState, `${player.name}'s turn was skipped due to inactivity.`);
+      }
+
+      const activePlayers = nextState.players.filter((p) => !p.isBankrupt);
+      const originalIndex = next.currentPlayerIndex;
+      const nextPlayer = nextState.players
+        .slice(originalIndex + 1)
+        .concat(nextState.players.slice(0, originalIndex + 1))
+        .find((p) => !p.isBankrupt && p.id !== player.id);
+
+      if (nextPlayer === undefined) return nextState;
+
+      const realIndex = nextState.players.findIndex((p) => p.id === nextPlayer.id);
+      return {
+        ...nextState,
+        currentPlayerIndex: realIndex,
+        turnPhase: "WAITING_FOR_ROLL",
+        doublesCount: 0,
+      };
+    }
+
     default:
       return state;
   }
@@ -727,6 +771,7 @@ export const monopolyEngine: GameEngine<MonopolyState, MonopolyMove> = {
       outOfJailCards: 0,
       isBankrupt: false,
       ownedProperties: [],
+      consecutiveTimeouts: 0,
     }));
 
     return {

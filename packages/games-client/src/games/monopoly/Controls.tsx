@@ -402,6 +402,7 @@ interface ControlsProps {
   drawnCard: { card: Card; type: "Chance" | "CommunityChest" } | null;
   onDrawCard: () => void;
   isMyTurn: boolean;
+  turnSecondsLeft: number | null;
 }
 
 export function Controls({
@@ -416,6 +417,7 @@ export function Controls({
   drawnCard,
   onDrawCard,
   isMyTurn,
+  turnSecondsLeft,
 }: ControlsProps) {
   injectControlsStyle();
   const [pending, setPending] = useState<PendingAction | null>(null);
@@ -651,6 +653,26 @@ export function Controls({
                   <span style={{ color: "var(--danger)" }}> · In Jail</span>
                 )}
               </div>
+              {turnSecondsLeft !== null && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 750,
+                    color: turnSecondsLeft <= 5 ? "var(--danger)" : "var(--warning)",
+                    marginTop: 6,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <span>⏱️ {turnSecondsLeft}s left</span>
+                  {currentPlayer.consecutiveTimeouts > 0 && (
+                    <span style={{ color: "var(--danger)", fontSize: 10 }}>
+                      (Warning: Try #{currentPlayer.consecutiveTimeouts + 1})
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

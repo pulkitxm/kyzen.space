@@ -66,36 +66,6 @@ function DieFace({ value, color }: { value: number; color: string }) {
 }
 
 const DICE_STYLE = `
-.die-container {
-  width: 52px;
-  height: 52px;
-  perspective: 300px;
-  display: inline-block;
-  margin: 0 4px;
-}
-.die-cube {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.3, 1.15);
-}
-.die-face {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 10px;
-  overflow: hidden;
-  backface-visibility: hidden;
-  background: var(--card);
-}
-.die-face.face-1 { transform: rotateY(0deg) translateZ(26px); }
-.die-face.face-6 { transform: rotateY(180deg) translateZ(26px); }
-.die-face.face-3 { transform: rotateY(-90deg) translateZ(26px); }
-.die-face.face-4 { transform: rotateY(90deg) translateZ(26px); }
-.die-face.face-2 { transform: rotateX(90deg) translateZ(26px); }
-.die-face.face-5 { transform: rotateX(-90deg) translateZ(26px); }
-
 @keyframes dice3dRoll {
   0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
   100% { transform: rotateX(720deg) rotateY(1080deg) rotateZ(360deg); }
@@ -116,15 +86,6 @@ const DICE_STYLE = `
 }
 `;
 
-let styleInjected = false;
-function injectDiceStyle() {
-  if (styleInjected || typeof document === "undefined") return;
-  styleInjected = true;
-  const el = document.createElement("style");
-  el.textContent = DICE_STYLE;
-  document.head.appendChild(el);
-}
-
 const rotationMap: Record<number, { rx: number; ry: number }> = {
   1: { rx: 0, ry: 0 },
   2: { rx: -90, ry: 0 },
@@ -132,6 +93,15 @@ const rotationMap: Record<number, { rx: number; ry: number }> = {
   4: { rx: 0, ry: -90 },
   5: { rx: 90, ry: 0 },
   6: { rx: 180, ry: 0 },
+};
+
+const FACE_TRANSFORMS: Record<number, string> = {
+  1: "rotateY(0deg) translateZ(26px)",
+  2: "rotateX(90deg) translateZ(26px)",
+  3: "rotateY(-90deg) translateZ(26px)",
+  4: "rotateY(90deg) translateZ(26px)",
+  5: "rotateX(-90deg) translateZ(26px)",
+  6: "rotateY(180deg) translateZ(26px)",
 };
 
 function Die({
@@ -143,13 +113,17 @@ function Die({
   phase: DiceAnimPhase;
   color: string;
 }) {
-  injectDiceStyle();
-
   const isRoll = phase === "rolling";
   const isShake = phase === "shaking";
   const rot = rotationMap[value] ?? rotationMap[1]!;
 
-  const style: React.CSSProperties = {};
+  const style: React.CSSProperties = {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+    transformStyle: "preserve-3d",
+    transition: "transform 0.6s cubic-bezier(0.2, 0.8, 0.3, 1.15)",
+  };
   if (!isRoll && !isShake) {
     const rx = rot.rx - 12;
     const ry = rot.ry + 12;
@@ -159,26 +133,36 @@ function Die({
   const cubeClasses = `die-cube ${isRoll ? "rolling" : ""} ${isShake ? "shaking" : ""}`;
 
   return (
-    <div className="die-container">
+    <div
+      className="die-container"
+      style={{
+        width: 52,
+        height: 52,
+        perspective: 300,
+        display: "inline-block",
+        margin: "0 4px",
+      }}
+    >
       <div className={cubeClasses} style={style}>
-        <div className="die-face face-1">
-          <DieFace value={1} color={color} />
-        </div>
-        <div className="die-face face-2">
-          <DieFace value={2} color={color} />
-        </div>
-        <div className="die-face face-3">
-          <DieFace value={3} color={color} />
-        </div>
-        <div className="die-face face-4">
-          <DieFace value={4} color={color} />
-        </div>
-        <div className="die-face face-5">
-          <DieFace value={5} color={color} />
-        </div>
-        <div className="die-face face-6">
-          <DieFace value={6} color={color} />
-        </div>
+        {[1, 2, 3, 4, 5, 6].map((num) => (
+          <div
+            key={num}
+            className={`die-face face-${num}`}
+            style={{
+              position: "absolute",
+              width: "100%",
+              height: "100%",
+              borderRadius: 10,
+              overflow: "hidden",
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              background: "var(--card)",
+              transform: FACE_TRANSFORMS[num],
+            }}
+          >
+            <DieFace value={num} color={color} />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -202,6 +186,7 @@ export function Dice({ values, phase }: DiceProps) {
         gap: 8,
       }}
     >
+      <style dangerouslySetInnerHTML={{ __html: DICE_STYLE }} />
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <Die value={values[0] ?? 1} phase={phase} color={accentColor} />
         <span
