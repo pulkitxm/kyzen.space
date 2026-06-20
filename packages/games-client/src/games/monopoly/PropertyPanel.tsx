@@ -11,6 +11,10 @@ import type {
 } from "@kyzen/shared/types";
 import type React from "react";
 import { GROUP_COLORS } from "./board-constants";
+import { PropertyActions } from "./PropertyActions";
+import { PropertyOwnership } from "./PropertyOwnership";
+import { PropertyPanelHeader } from "./PropertyPanelHeader";
+import { PropertyRentTables } from "./PropertyRentTables";
 
 const BUTTON_RESET: React.CSSProperties = {
   appearance: "none",
@@ -25,15 +29,6 @@ const BUTTON_RESET: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-const RENT_ROW_STYLE: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  padding: "5px 10px",
-  borderRadius: 6,
-  transition: "background 0.2s, border-color 0.2s",
-};
-
 const BACKDROP_STYLE: React.CSSProperties = {
   position: "fixed",
   inset: 0,
@@ -42,25 +37,19 @@ const BACKDROP_STYLE: React.CSSProperties = {
   backdropFilter: "blur(2px)",
 };
 
-const BUY_BUTTON_STYLE: React.CSSProperties = {
-  flex: 1,
-  padding: "10px 0",
-  borderRadius: 10,
-  border: "none",
-  fontWeight: 700,
-  fontSize: 13,
-};
-
-const SKIP_BUTTON_STYLE: React.CSSProperties = {
-  flex: 1,
-  padding: "10px 0",
-  borderRadius: 10,
+const PANEL_CONTAINER_STYLE: React.CSSProperties = {
+  position: "fixed",
+  right: 16,
+  top: "50%",
+  transform: "translateY(-50%)",
+  width: 300,
+  background: "var(--card)",
   border: "1px solid var(--border)",
-  background: "transparent",
-  color: "var(--muted-foreground)",
-  fontWeight: 600,
-  fontSize: 13,
-  cursor: "pointer",
+  borderRadius: 16,
+  zIndex: 201,
+  boxShadow: "0 24px 60px rgba(0,0,0,0.3)",
+  animation: "panelSlideIn 0.25s ease-out",
+  overflow: "hidden",
 };
 
 const PANEL_STYLE = `
@@ -81,48 +70,6 @@ function injectStyle() {
   const el = document.createElement("style");
   el.textContent = PANEL_STYLE;
   document.head.appendChild(el);
-}
-
-function RentRow({
-  label,
-  amount,
-  highlight,
-}: {
-  label: string;
-  amount: number;
-  highlight?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        ...RENT_ROW_STYLE,
-        background: highlight
-          ? "color-mix(in srgb, var(--primary) 15%, transparent)"
-          : "transparent",
-        border: highlight
-          ? "1px solid color-mix(in srgb, var(--primary) 40%, transparent)"
-          : "1px solid transparent",
-      }}
-    >
-      <span
-        style={{
-          fontSize: 12,
-          color: highlight ? "var(--primary)" : "var(--muted-foreground)",
-        }}
-      >
-        {label}
-      </span>
-      <span
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: highlight ? "var(--primary)" : "var(--foreground)",
-        }}
-      >
-        ${amount}
-      </span>
-    </div>
-  );
 }
 
 interface PropertyPanelProps {
@@ -175,25 +122,11 @@ export function PropertyPanel({
     <>
       <button
         type="button"
+        aria-label="Close property panel"
         onClick={onClose}
         style={{ ...BUTTON_RESET, ...BACKDROP_STYLE }}
       />
-      <div
-        style={{
-          position: "fixed",
-          right: 16,
-          top: "50%",
-          transform: "translateY(-50%)",
-          width: 300,
-          background: "var(--card)",
-          border: "1px solid var(--border)",
-          borderRadius: 16,
-          zIndex: 201,
-          boxShadow: "0 24px 60px rgba(0,0,0,0.3)",
-          animation: "panelSlideIn 0.25s ease-out",
-          overflow: "hidden",
-        }}
-      >
+      <div style={PANEL_CONTAINER_STYLE}>
         <div
           style={{
             height: 8,
@@ -209,52 +142,7 @@ export function PropertyPanel({
             gap: 14,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: 17,
-                  fontWeight: 800,
-                  color: "var(--foreground)",
-                  lineHeight: 1.2,
-                }}
-              >
-                {tile.name}
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--muted-foreground)",
-                  marginTop: 2,
-                }}
-              >
-                {tile.type === "Property"
-                  ? `${(tile as PropertyTile).group} Group`
-                  : tile.type}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--muted-foreground)",
-                cursor: "pointer",
-                fontSize: 18,
-                padding: 0,
-                lineHeight: 1,
-              }}
-            >
-              ✕
-            </button>
-          </div>
+          <PropertyPanelHeader tile={tile} onClose={onClose} />
 
           {price > 0 && (
             <div
@@ -282,168 +170,22 @@ export function PropertyPanel({
             </div>
           )}
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 12px",
-              background: "var(--surface)",
-              borderRadius: 8,
-              border: "1px solid var(--border)",
-            }}
-          >
-            {isOwned ? (
-              <>
-                <span style={{ fontSize: 18 }}>{owner?.token}</span>
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{ fontSize: 12, color: "var(--muted-foreground)" }}
-                  >
-                    Owned by
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: isCurrentPlayerOwner
-                        ? "var(--success)"
-                        : "var(--danger)",
-                    }}
-                  >
-                    {owner?.name} {isCurrentPlayerOwner && "(You)"}
-                  </div>
-                </div>
-                {ownedProp?.isMortgaged && (
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: "var(--danger)",
-                      background:
-                        "color-mix(in srgb, var(--danger) 15%, transparent)",
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                    }}
-                  >
-                    MORTGAGED
-                  </span>
-                )}
-                {ownedProp && ownedProp.houses > 0 && (
-                  <span style={{ fontSize: 13 }}>
-                    {ownedProp.houses === 5 ? "🏨" : `🏠×${ownedProp.houses}`}
-                  </span>
-                )}
-              </>
-            ) : (
-              <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-                🏦 Bank - Available
-              </div>
-            )}
-          </div>
+          <PropertyOwnership
+            isOwned={isOwned}
+            owner={owner}
+            isCurrentPlayerOwner={isCurrentPlayerOwner}
+            ownedProp={ownedProp}
+          />
 
-          {tile.type === "Property" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--muted-foreground)",
-                  letterSpacing: 1,
-                  marginBottom: 4,
-                }}
-              >
-                RENT TIERS
-              </div>
-              <RentRow
-                label="Base Rent"
-                amount={(tile as PropertyTile).rent[0]}
-                highlight={!ownedProp || ownedProp.houses === 0}
-              />
-              <RentRow
-                label="1 House"
-                amount={(tile as PropertyTile).rent[1]}
-                highlight={ownedProp?.houses === 1}
-              />
-              <RentRow
-                label="2 Houses"
-                amount={(tile as PropertyTile).rent[2]}
-                highlight={ownedProp?.houses === 2}
-              />
-              <RentRow
-                label="3 Houses"
-                amount={(tile as PropertyTile).rent[3]}
-                highlight={ownedProp?.houses === 3}
-              />
-              <RentRow
-                label="4 Houses"
-                amount={(tile as PropertyTile).rent[4]}
-                highlight={ownedProp?.houses === 4}
-              />
-              <RentRow
-                label="Hotel 🏨"
-                amount={(tile as PropertyTile).rent[5]}
-                highlight={ownedProp?.houses === 5}
-              />
-            </div>
-          )}
-
-          {tile.type === "Railroad" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--muted-foreground)",
-                  letterSpacing: 1,
-                  marginBottom: 4,
-                }}
-              >
-                RENT BY RAILROADS OWNED
-              </div>
-              {[1, 2, 3, 4].map((n) => (
-                <RentRow
-                  key={n}
-                  label={`${n} Railroad${n > 1 ? "s" : ""}`}
-                  amount={(tile as RailroadTile).rent[n] ?? 0}
-                />
-              ))}
-            </div>
-          )}
+          <PropertyRentTables tile={tile} ownedProp={ownedProp} />
 
           {canBuy && currentPlayer && (
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => {
-                  dispatch({ type: "BUY_PROPERTY" });
-                  onClose();
-                }}
-                disabled={currentPlayer.balance < price}
-                style={{
-                  ...BUY_BUTTON_STYLE,
-                  background:
-                    currentPlayer.balance < price
-                      ? "var(--surface-hover)"
-                      : "var(--success)",
-                  color:
-                    currentPlayer.balance < price
-                      ? "var(--muted-foreground)"
-                      : "var(--success-foreground)",
-                  cursor:
-                    currentPlayer.balance < price ? "not-allowed" : "pointer",
-                }}
-              >
-                Buy ${price}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  dispatch({ type: "DECLINE_PURCHASE" });
-                  onClose();
-                }}
-                style={SKIP_BUTTON_STYLE}
-              >
-                Skip
-              </button>
-            </div>
+            <PropertyActions
+              currentPlayer={currentPlayer}
+              price={price}
+              dispatch={dispatch}
+              onClose={onClose}
+            />
           )}
         </div>
       </div>

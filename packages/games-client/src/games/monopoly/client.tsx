@@ -35,9 +35,8 @@ type MoveJson = {
 function StatusDot({ online }: { online: boolean }) {
   const tone = online ? "bg-success" : "bg-danger";
   return (
-    <span
+    <output
       className="relative inline-flex size-3 items-center justify-center"
-      role="status"
       aria-label={online ? "Online" : "Offline"}
       title={online ? "Online" : "Offline"}
     >
@@ -45,7 +44,7 @@ function StatusDot({ online }: { online: boolean }) {
         className={`absolute inline-flex size-3 animate-ping rounded-full opacity-70 ${tone}`}
       />
       <span className={`relative inline-flex size-2.5 rounded-full ${tone}`} />
-    </span>
+    </output>
   );
 }
 

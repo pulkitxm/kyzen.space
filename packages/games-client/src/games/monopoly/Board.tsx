@@ -39,13 +39,13 @@ export function PlayerAvatar({
       className={className}
       style={{ ...AVATAR_FRAME_STYLE, width: size, height: size }}
     >
-      <img
-        src={dataUri}
-        alt={`${username}'s avatar`}
+      <div
+        aria-hidden="true"
         style={{
           ...AVATAR_IMAGE_STYLE,
           width: size,
           height: size,
+          backgroundImage: `url(${dataUri})`,
         }}
       />
     </div>
@@ -79,13 +79,15 @@ const AVATAR_FRAME_STYLE: React.CSSProperties = {
 
 const AVATAR_IMAGE_STYLE: React.CSSProperties = {
   display: "block",
-  objectFit: "cover",
-  objectPosition: "center",
+  backgroundSize: "cover",
+  backgroundPosition: "center",
+  backgroundRepeat: "no-repeat",
 };
 
 const CORNER_IMAGE_STYLE: React.CSSProperties = {
-  objectFit: "contain",
-  objectPosition: "center",
+  backgroundSize: "contain",
+  backgroundPosition: "center",
+  backgroundRepeat: "no-repeat",
 };
 
 const TILE_CELL_STYLE: React.CSSProperties = {
@@ -285,25 +287,25 @@ function TileCell({
     tile.type === "Go" ? (
       "🚦"
     ) : tile.type === "Jail" ? (
-      <img
-        src="/games/monopoly/jail.png"
-        alt="Jail"
+      <div
+        aria-hidden="true"
         style={{
           ...CORNER_IMAGE_STYLE,
           width: Math.max(28, Math.floor(cellSize * 0.65)),
           height: Math.max(28, Math.floor(cellSize * 0.65)),
+          backgroundImage: "url(/games/monopoly/jail.png)",
         }}
       />
     ) : tile.type === "FreeParking" ? (
       "🅿️"
     ) : tile.type === "GoToJail" ? (
-      <img
-        src="/games/monopoly/go-to-jail.png"
-        alt="Go to Jail"
+      <div
+        aria-hidden="true"
         style={{
           ...CORNER_IMAGE_STYLE,
           width: Math.max(28, Math.floor(cellSize * 0.65)),
           height: Math.max(28, Math.floor(cellSize * 0.65)),
+          backgroundImage: "url(/games/monopoly/go-to-jail.png)",
         }}
       />
     ) : null;
