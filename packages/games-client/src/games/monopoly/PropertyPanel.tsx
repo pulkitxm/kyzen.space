@@ -9,7 +9,7 @@ import type {
   Tile,
   UtilityTile,
 } from "@kyzen/shared/types";
-import { GROUP_COLORS } from "./Board";
+import { GROUP_COLORS } from "./board-constants";
 
 const PANEL_STYLE = `
 @keyframes panelSlideIn {
