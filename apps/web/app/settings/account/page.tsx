@@ -18,7 +18,7 @@ type ProfileResponse = {
 };
 
 export const metadata: Metadata = {
-  title: "Account · Settings · GameLobby",
+  title: "Account · Settings · Kyzen",
 };
 
 export const dynamic = "force-dynamic";

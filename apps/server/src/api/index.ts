@@ -34,5 +34,3 @@ app.onError((err, c) => {
   );
   return c.json({ error: "Internal Server Error" }, 500);
 });
-
-export type AppRouter = typeof app;

@@ -1,19 +1,18 @@
 "use client";
 
-import type { GifJson } from "@gamelobby/shared/types";
+import type { GifJson } from "@kyzen/shared/types";
 import { useAtom } from "jotai";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FaRegFaceSmile } from "react-icons/fa6";
-import { clientFetchJson } from "@/lib/api-client";
-import { gifCacheAtom, recentEmojisAtom } from "@/lib/chat/atoms";
+import { GlassPane } from "@/components/glass/glass-pane";
+import { recentEmojisAtom } from "@/lib/chat/atoms";
 import { type EmojiGroup, loadEmojiGroups } from "@/lib/chat/emoji";
+import { useGifResults } from "@/lib/chat/use-gif-results";
 import { cn } from "@/lib/utils";
 import { BlurImage } from "./blur-image";
 
 const MAX_RECENT = 24;
 const EMOJI_STRIP = 16;
-const GIF_PAGE = 24;
-const NEAR_BOTTOM = 360;
 
 const CATEGORY_LABELS: Record<string, string> = {
   people: "Smileys & People",
@@ -171,13 +170,24 @@ export function ComposerPicker({
   const [tab, setTab] = useState<Tab>("emoji");
   const [recents, setRecents] = useAtom(recentEmojisAtom);
   const [groups, setGroups] = useState<EmojiGroup[] | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  const [cache, setCache] = useAtom(gifCacheAtom);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState(false);
-  const reqIdRef = useRef(0);
-  const gifScrollRef = useRef<HTMLDivElement>(null);
+  const query = q.trim();
+  const searching = query.length > 0;
+  const needGifs = searching || tab === "gif";
+  const {
+    gifs,
+    error,
+    showSkeletons,
+    loadingMore,
+    scrollRef,
+    onScroll,
+    reset,
+  } = useGifResults(query, needGifs);
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -189,10 +199,16 @@ export function ComposerPicker({
     };
   }, []);
 
-  const query = q.trim();
-  const searching = query.length > 0;
-  const entry = cache.get(query) ?? null;
-  const gifs = entry?.gifs ?? [];
+  const haystacks = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!groups) return map;
+    for (const g of groups) {
+      for (const e of g.emojis) {
+        map.set(e.id, e.keywords.join(" "));
+      }
+    }
+    return map;
+  }, [groups]);
 
   const emojiStrip = useMemo<EmojiCell[]>(() => {
     if (!searching || !groups) return [];
@@ -200,84 +216,14 @@ export function ComposerPicker({
     const out: EmojiCell[] = [];
     for (const g of groups) {
       for (const e of g.emojis) {
-        if (e.keywords.some((k) => k.includes(lower))) {
+        if (haystacks.get(e.id)?.toLowerCase().includes(lower)) {
           out.push({ id: e.id, native: e.native });
           if (out.length >= EMOJI_STRIP) return out;
         }
       }
     }
     return out;
-  }, [searching, query, groups]);
-
-  const fetchGifs = useCallback(
-    async (value: string, offset: number, append: boolean) => {
-      const reqId = ++reqIdRef.current;
-      if (append) setLoadingMore(true);
-      else {
-        setLoading(true);
-        setError(false);
-      }
-      try {
-        const url = value
-          ? `/api/gifs/search?q=${encodeURIComponent(value)}&limit=${GIF_PAGE}&offset=${offset}`
-          : `/api/gifs/trending?limit=${GIF_PAGE}&offset=${offset}`;
-        const res = await clientFetchJson<{
-          gifs: GifJson[];
-          nextOffset: number | null;
-        }>(url);
-        if (reqId !== reqIdRef.current) return;
-        setCache((prev) => {
-          const next = new Map(prev);
-          const base = append ? (prev.get(value)?.gifs ?? []) : [];
-          next.set(value, {
-            gifs: [...base, ...res.gifs],
-            nextOffset: res.nextOffset,
-          });
-          return next;
-        });
-      } catch {
-        if (reqId !== reqIdRef.current) return;
-        if (!append) {
-          setError(true);
-          setCache((prev) => {
-            const next = new Map(prev);
-            next.set(value, { gifs: [], nextOffset: null });
-            return next;
-          });
-        }
-      } finally {
-        if (reqId === reqIdRef.current) {
-          setLoading(false);
-          setLoadingMore(false);
-        }
-      }
-    },
-    [setCache],
-  );
-
-  useEffect(() => {
-    const value = q.trim();
-    const needGifs = value.length > 0 || tab === "gif";
-    if (!needGifs) return;
-    if (gifScrollRef.current) gifScrollRef.current.scrollTop = 0;
-    setError(false);
-    if (cache.has(value)) return;
-    const t = setTimeout(
-      () => void fetchGifs(value, 0, false),
-      value ? 300 : 0,
-    );
-    return () => clearTimeout(t);
-  }, [q, tab, cache, fetchGifs]);
-
-  const onGifScroll = useCallback(() => {
-    const el = gifScrollRef.current;
-    if (!el || loadingMore || loading) return;
-    const current = cache.get(q.trim());
-    if (!current || current.nextOffset == null) return;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM) {
-      void fetchGifs(q.trim(), current.nextOffset, true);
-    }
-  }, [cache, q, loadingMore, loading, fetchGifs]);
+  }, [searching, query, groups, haystacks]);
 
   const pickEmoji = (native: string) => {
     setRecents((prev) =>
@@ -286,16 +232,23 @@ export function ComposerPicker({
     onEmoji(native);
   };
 
-  const showSkeletons =
-    !error && gifs.length === 0 && (loading || !cache.has(query));
+  const changeQuery = (value: string) => {
+    setQ(value);
+    reset();
+  };
+
+  const selectTab = (next: Tab) => {
+    setTab(next);
+    reset();
+  };
 
   return (
-    <div className="flex h-128 w-104 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+    <GlassPane className="flex h-128 w-104 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl">
       <input
+        ref={searchRef}
         value={q}
-        onChange={(e) => setQ(e.target.value)}
-        // biome-ignore lint/a11y/noAutofocus: focus the search when the picker opens
-        autoFocus
+        onChange={(e) => changeQuery(e.target.value)}
+        aria-label="Search emoji & GIFs"
         placeholder="Search emoji & GIFs"
         className="m-2 rounded-lg border border-border bg-surface-raised px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
@@ -315,8 +268,8 @@ export function ComposerPicker({
             showSkeletons={showSkeletons}
             loadingMore={loadingMore}
             onPick={onGif}
-            scrollRef={gifScrollRef}
-            onScroll={onGifScroll}
+            scrollRef={scrollRef}
+            onScroll={onScroll}
           />
         </>
       ) : tab === "emoji" ? (
@@ -353,8 +306,8 @@ export function ComposerPicker({
           showSkeletons={showSkeletons}
           loadingMore={loadingMore}
           onPick={onGif}
-          scrollRef={gifScrollRef}
-          onScroll={onGifScroll}
+          scrollRef={scrollRef}
+          onScroll={onScroll}
         />
       )}
 
@@ -362,7 +315,7 @@ export function ComposerPicker({
         <div className="flex shrink-0 border-border border-t">
           <button
             type="button"
-            onClick={() => setTab("emoji")}
+            onClick={() => selectTab("emoji")}
             className={cn(
               "flex flex-1 items-center justify-center gap-1.5 border-b-2 py-2 text-sm outline-none transition",
               tab === "emoji"
@@ -375,7 +328,7 @@ export function ComposerPicker({
           </button>
           <button
             type="button"
-            onClick={() => setTab("gif")}
+            onClick={() => selectTab("gif")}
             className={cn(
               "flex flex-1 items-center justify-center gap-1.5 border-b-2 py-2 text-sm outline-none transition",
               tab === "gif"
@@ -388,6 +341,6 @@ export function ComposerPicker({
           </button>
         </div>
       ) : null}
-    </div>
+    </GlassPane>
   );
 }

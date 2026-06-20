@@ -1,10 +1,12 @@
-import { getDefinition, hasEngine } from "@gamelobby/games-core";
-import type {
-  ConversationJson,
-  GameJson,
-  MessageJson,
-  MoveJson,
-} from "@gamelobby/shared/types";
+import {
+  type ConversationJson,
+  type GameJson,
+  isGameCode,
+  type MessageJson,
+  type MoveJson,
+  normalizeGameCode,
+} from "@kyzen/shared/types";
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";
@@ -17,10 +19,12 @@ import {
 import { getServerSession } from "@/lib/get-server-session";
 import { PlayClient } from "./play-client";
 
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Play",
+  description: "Play a live multiplayer game with chat, side-by-side.",
+};
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const dynamic = "force-dynamic";
 
 export default async function PlayPage({
   params,
@@ -28,13 +32,15 @@ export default async function PlayPage({
   params: Promise<{ gameId: string }>;
 }) {
   const { gameId } = await params;
-  if (!UUID_RE.test(gameId)) notFound();
+  if (!isGameCode(gameId)) notFound();
+  const code = normalizeGameCode(gameId);
+  if (code !== gameId) redirect(`/play/${code}`);
 
   const session = await getServerSession();
   if (!session?.user) redirect("/auth");
 
   const data = await serverFetchJson<{ game: GameJson; moves: MoveJson[] }>(
-    `/api/games/${gameId}`,
+    `/api/games/${code}`,
   );
   if (!data) notFound();
 
@@ -68,16 +74,11 @@ export default async function PlayPage({
       initialLayout = normalizeChatLayout(me.profile.chatLayout);
   }
 
-  const layoutWidth = hasEngine(data.game.gameType)
-    ? getDefinition(data.game.gameType).meta.layoutWidth
-    : undefined;
-
   return (
     <PlayClient
-      gameId={gameId}
+      gameId={code}
       userId={session.user.id}
       gameType={data.game.gameType}
-      layoutWidth={layoutWidth}
       initialGame={data.game}
       initialMoves={data.moves}
       conversation={conversation}

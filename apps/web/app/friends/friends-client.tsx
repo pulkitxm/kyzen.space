@@ -1,12 +1,17 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { FriendshipJson, SearchUserJson } from "@gamelobby/shared/types";
+import {
+  ANON_FRIEND_LIMIT_MESSAGE,
+  CHAT_EVENTS,
+} from "@kyzen/shared/constants";
+import type { FriendshipJson, SearchUserJson } from "@kyzen/shared/types";
 import { useAtomValue, useStore } from "jotai";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
+import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import { clientFetchJson } from "@/lib/api-client";
 import {
   friendsAtom,
@@ -114,12 +119,16 @@ export function FriendsClient() {
                   key={f.id}
                   className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-surface-overlay"
                 >
-                  <PresenceAvatar
-                    config={f.user.avatar}
-                    seed={f.user.username}
-                    size={40}
-                    online={presence.get(f.user.id)?.online ? true : undefined}
-                  />
+                  <ProfilePopupTrigger user={f.user} className="shrink-0">
+                    <PresenceAvatar
+                      config={f.user.avatar}
+                      seed={f.user.username}
+                      size={40}
+                      online={
+                        presence.get(f.user.id)?.online ? true : undefined
+                      }
+                    />
+                  </ProfilePopupTrigger>
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium text-sm">
                       {f.user.displayName ?? f.user.username}
@@ -220,7 +229,9 @@ function Row({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-surface-overlay">
-      <PresenceAvatar config={user.avatar} seed={user.username} size={40} />
+      <ProfilePopupTrigger user={user} className="shrink-0">
+        <PresenceAvatar config={user.avatar} seed={user.username} size={40} />
+      </ProfilePopupTrigger>
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium text-sm">
           {user.displayName ?? user.username}
@@ -246,6 +257,7 @@ function AddFriend() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchUserJson[]>([]);
   const [loading, setLoading] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
   const { socket } = useSocket();
 
   useEffect(() => {
@@ -281,17 +293,36 @@ function AddFriend() {
         await emitAck(socket, CHAT_EVENTS.friendRequest, {
           username: user.username,
         });
-      } catch {}
+      } catch (err) {
+        setResults((prev) =>
+          prev.map((u) =>
+            u.id === user.id ? { ...u, friendState: "none" } : u,
+          ),
+        );
+        if (err instanceof Error && err.message === ANON_FRIEND_LIMIT_MESSAGE) {
+          setLimitReached(true);
+        }
+      }
     },
     [socket],
   );
 
   return (
     <div className="flex flex-col gap-3">
+      {limitReached ? (
+        <div className="rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm">
+          {ANON_FRIEND_LIMIT_MESSAGE}{" "}
+          <Link href="/auth" className="font-medium text-primary underline">
+            Log in
+          </Link>{" "}
+          to add more.
+        </div>
+      ) : null}
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search by username…"
+        aria-label="Search by username"
         className="w-full rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       {loading ? (

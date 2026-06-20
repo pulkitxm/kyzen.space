@@ -1,10 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import { FaCheck } from "react-icons/fa6";
 
 import { usePattern } from "@/lib/appearance";
-import { DEFAULT_PATTERN, PATTERNS, type PatternId } from "@/lib/patterns";
+import {
+  applyPattern,
+  DEFAULT_PATTERN,
+  PATTERNS,
+  type PatternId,
+} from "@/lib/patterns";
 import { cn } from "@/lib/utils";
 
 function useHydrated(): boolean {
@@ -16,8 +28,15 @@ function useHydrated(): boolean {
 }
 
 function previewPattern(id: PatternId) {
-  document.documentElement.setAttribute("data-pattern", id);
+  applyPattern(document.documentElement, id);
 }
+
+const PREVIEW_TILE_STYLE: CSSProperties = {
+  backgroundColor: "var(--pattern-ink)",
+  opacity: 0.72,
+  WebkitMaskRepeat: "repeat",
+  maskRepeat: "repeat",
+};
 
 export function DoodlePicker({ signedIn: _signedIn }: { signedIn: boolean }) {
   const mounted = useHydrated();
@@ -28,8 +47,12 @@ export function DoodlePicker({ signedIn: _signedIn }: { signedIn: boolean }) {
     committedRef.current = pattern;
   }, [pattern]);
 
+  const restoreCommitted = useEffectEvent(() =>
+    previewPattern(committedRef.current),
+  );
+
   useEffect(() => {
-    return () => previewPattern(committedRef.current);
+    return () => restoreCommitted();
   }, []);
 
   const restore = useCallback(() => previewPattern(committedRef.current), []);
@@ -37,12 +60,12 @@ export function DoodlePicker({ signedIn: _signedIn }: { signedIn: boolean }) {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: hover-only preview restore on a non-interactive grid of buttons; keyboard users get the same behavior via each button's onBlur
     <div
-      className="grid grid-cols-2 gap-4 sm:grid-cols-4"
+      className="grid grid-cols-2 gap-4 lg:grid-cols-3"
       onMouseLeave={restore}
     >
       {PATTERNS.map((def) => {
         const active = mounted && pattern === def.id;
-        const previewTile = Math.max(48, Math.round(def.tile / 4));
+        const previewTile = Math.max(56, Math.round(def.tile / 3.5));
         return (
           <button
             key={def.id}
@@ -61,7 +84,7 @@ export function DoodlePicker({ signedIn: _signedIn }: { signedIn: boolean }) {
             )}
           >
             <div
-              className="relative h-24 w-full overflow-hidden rounded-xl border border-border shadow-inner"
+              className="relative aspect-3/2 w-full overflow-hidden rounded-xl border border-border shadow-inner"
               style={{ backgroundColor: "var(--background)" }}
             >
               {def.src ? (
@@ -69,12 +92,9 @@ export function DoodlePicker({ signedIn: _signedIn }: { signedIn: boolean }) {
                   aria-hidden
                   className="absolute inset-0"
                   style={{
-                    backgroundColor: "var(--pattern-ink)",
-                    opacity: 0.55,
+                    ...PREVIEW_TILE_STYLE,
                     WebkitMaskImage: `url("${def.src}")`,
                     maskImage: `url("${def.src}")`,
-                    WebkitMaskRepeat: "repeat",
-                    maskRepeat: "repeat",
                     WebkitMaskSize: `${previewTile}px`,
                     maskSize: `${previewTile}px`,
                   }}

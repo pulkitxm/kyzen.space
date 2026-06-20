@@ -7,25 +7,50 @@ import type {
   MoveRow,
   NotificationRow,
   PublicUserRow,
-} from "@gamelobby/database";
-import type {
-  ConversationJson,
-  FriendshipJson,
-  GameJson,
-  MemberJson,
-  MessageJson,
-  MoveJson,
-  NotificationJson,
-  PublicUser,
-} from "@gamelobby/shared/types";
+} from "@kyzen/database";
+import {
+  type ConversationJson,
+  type FriendshipJson,
+  type GameJson,
+  type GameType,
+  type MemberJson,
+  type MessageJson,
+  type MoveJson,
+  type NotificationJson,
+  type PublicUser,
+  resolveWinnerUsername,
+  type SeriesDetail,
+  type SeriesScore,
+} from "@kyzen/shared/types";
 
 function iso(d: Date | null | undefined): string | null {
   return d ? new Date(d).toISOString() : null;
 }
 
+export function serializeSeries(
+  seriesId: string,
+  gameType: GameType,
+  seriesGames: GameRecord[],
+  score: SeriesScore,
+): SeriesDetail {
+  return {
+    seriesId,
+    gameType,
+    score,
+    games: seriesGames.map((g, i) => ({
+      gameId: g.code,
+      gameNumber: i + 1,
+      status: g.status,
+      winner: g.winner,
+      winnerUsername: resolveWinnerUsername(g.winner, g.players),
+      completedAt: iso(g.completedAt),
+    })),
+  };
+}
+
 export function serializeGame(row: GameRecord): GameJson {
   return {
-    id: row.id,
+    id: row.code,
     gameType: row.gameType,
     status: row.status,
     winner: row.winner,
@@ -42,10 +67,10 @@ export function serializeGame(row: GameRecord): GameJson {
   };
 }
 
-export function serializeMove(row: MoveRow): MoveJson {
+export function serializeMove(row: MoveRow, gameCode: string): MoveJson {
   return {
     id: row.id,
-    gameId: row.gameId,
+    gameId: gameCode,
     moveNumber: row.moveNumber,
     playerId: row.playerId,
     moveData: row.moveData,

@@ -1,15 +1,15 @@
 import { Skeleton } from "@/components/ui";
 
-export default function ConversationLoading() {
-  const bubbles = [
-    { mine: false, w: "60%" },
-    { mine: true, w: "45%" },
-    { mine: false, w: "70%" },
-    { mine: true, w: "35%" },
-    { mine: false, w: "50%" },
-    { mine: true, w: "55%" },
-  ];
+const BUBBLES = [
+  { id: "in-1", mine: false, w: "60%" },
+  { id: "out-1", mine: true, w: "45%" },
+  { id: "in-2", mine: false, w: "70%" },
+  { id: "out-2", mine: true, w: "35%" },
+  { id: "in-3", mine: false, w: "50%" },
+  { id: "out-3", mine: true, w: "55%" },
+];
 
+export default function ConversationLoading() {
   return (
     <div className="mx-auto flex h-full w-full max-w-5xl flex-col">
       <header className="flex items-center gap-3 border-border border-b px-4 py-3">
@@ -21,10 +21,9 @@ export default function ConversationLoading() {
       </header>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-        {bubbles.map((b, i) => (
+        {BUBBLES.map((b) => (
           <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder list
-            key={i}
+            key={b.id}
             className={b.mine ? "flex justify-end" : "flex justify-start"}
           >
             <Skeleton

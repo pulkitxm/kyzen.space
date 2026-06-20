@@ -4,14 +4,21 @@ import { useAtomValue } from "jotai";
 import { AvatarStack } from "@/components/ui/avatar-stack";
 import { typingAtomFamily } from "@/lib/chat/atoms";
 
+const TYPING_DOT_KEYFRAMES =
+  "@keyframes typing-dot{0%,100%{transform:translateY(0)}50%{transform:translateY(-40%)}}";
+
 function Dots() {
   return (
     <span className="inline-flex items-end gap-0.5">
+      <style>{TYPING_DOT_KEYFRAMES}</style>
       {[0, 150, 300].map((delay) => (
         <span
           key={delay}
-          className="size-1 animate-bounce rounded-full bg-muted-foreground"
-          style={{ animationDelay: `${delay}ms` }}
+          className="size-1 rounded-full bg-muted-foreground"
+          style={{
+            animation: "typing-dot 1s cubic-bezier(0.16, 1, 0.3, 1) infinite",
+            animationDelay: `${delay}ms`,
+          }}
         />
       ))}
     </span>

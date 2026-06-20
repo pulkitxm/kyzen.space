@@ -1,9 +1,15 @@
-import type { GameCardMeta } from "@gamelobby/shared/types";
+import {
+  type GameCardMeta,
+  resolveWinnerUsername,
+  type SeriesScore,
+} from "@kyzen/shared/types";
 
 export type GameCardSnapshot = {
   status: string;
   winner: string | null;
   players: { userId: string; username: string; role: string }[];
+  seriesScore?: SeriesScore;
+  seriesSuperseded?: boolean;
 };
 
 export function enrichGameCardMeta(
@@ -11,15 +17,14 @@ export function enrichGameCardMeta(
   game: GameCardSnapshot | null,
 ): GameCardMeta {
   if (!game) return base;
-  const winnerUsername =
-    game.winner && game.winner !== "draw"
-      ? (game.players.find((p) => p.userId === game.winner)?.username ?? null)
-      : null;
+  const winnerUsername = resolveWinnerUsername(game.winner, game.players);
   return {
     ...base,
     status: game.status,
     winner: game.winner,
     winnerUsername,
     players: game.players,
+    seriesScore: game.seriesScore,
+    seriesSuperseded: game.seriesSuperseded,
   };
 }

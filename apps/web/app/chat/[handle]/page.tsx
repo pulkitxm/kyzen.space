@@ -1,4 +1,5 @@
-import type { ConversationJson, MessageJson } from "@gamelobby/shared/types";
+import type { ConversationJson, MessageJson } from "@kyzen/shared/types";
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { serverFetchJson } from "@/lib/api-server";
 import { getServerSession } from "@/lib/get-server-session";
@@ -6,8 +7,14 @@ import { ConversationView } from "./conversation-view";
 
 export const dynamic = "force-dynamic";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ handle: string }>;
+}): Promise<Metadata> {
+  const { handle } = await params;
+  return { title: handle };
+}
 
 export default async function ConversationPage({
   params,
@@ -18,13 +25,9 @@ export default async function ConversationPage({
   if (!session?.user) redirect("/auth");
   const { handle } = await params;
 
-  const conv = UUID_RE.test(handle)
-    ? await serverFetchJson<{ conversation: ConversationJson }>(
-        `/api/conversations/${handle}`,
-      )
-    : await serverFetchJson<{ conversation: ConversationJson }>(
-        `/api/conversations/with/${encodeURIComponent(handle)}`,
-      );
+  const conv = await serverFetchJson<{ conversation: ConversationJson }>(
+    `/api/conversations/with/${encodeURIComponent(handle)}`,
+  );
   if (!conv) notFound();
 
   const msgs = await serverFetchJson<{

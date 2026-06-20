@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreBinaries": ["cloc"],
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.{mjs,ts}"],
+      "ignore": [".claude/**"]
+    },
+    "apps/server": {
+      "entry": ["tests/**/*.test.ts", "integration/**/*.test.ts"],
+      "ignoreDependencies": ["pino-pretty"]
+    },
+    "apps/web": {
+      "entry": ["scripts/*.ts"]
+    },
+    "packages/database": {
+      "ignore": ["src/drift-guard.ts"]
+    },
+    "vid-tutorials": {
+      "entry": ["src/index.ts", "remotion.config.ts", "scripts/*.ts"]
+    }
+  }
+}

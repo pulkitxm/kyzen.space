@@ -6,7 +6,7 @@ import {
   monopolyConfigSchema,
   monopolyMoveSchema,
   monopolyStateSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { monopolyEngine } from "./engine";
 import { monopolyMeta } from "./meta";
 

@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type {
-  MonopolyMove,
-  MonopolyState,
-  Seat,
-} from "@gamelobby/shared/types";
+import type { MonopolyMove, MonopolyState, Seat } from "@kyzen/shared/types";
 import {
   applyAction,
   BOARD_SIZE,
@@ -553,7 +549,7 @@ describe("monopoly engine: TIMEOUT_SKIP", () => {
 
   test("3 consecutive timeouts bankrupts/invalidates the player", () => {
     let state = init();
-    
+
     let result = reduce(state, "p1", { type: "TIMEOUT_SKIP" });
     expect(result.ok).toBe(true);
     state = (result as any).state;
@@ -583,7 +579,7 @@ describe("monopoly engine: TIMEOUT_SKIP", () => {
     result = reduce(state, "p1", { type: "TIMEOUT_SKIP" });
     expect(result.ok).toBe(true);
     state = (result as any).state;
-    
+
     expect(getPlayer(state, 0).isBankrupt).toBe(true);
     expect(state.turnPhase).toBe("GAME_OVER");
     expect(state.winnerId).toBe("p2");

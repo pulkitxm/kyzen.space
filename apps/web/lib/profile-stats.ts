@@ -1,6 +1,6 @@
-import { listGameMeta } from "@gamelobby/games-core";
+import { listGameMeta } from "@kyzen/games-core";
 
-export type GameStat = {
+type GameStat = {
   played: number;
   won: number;
   lost: number;

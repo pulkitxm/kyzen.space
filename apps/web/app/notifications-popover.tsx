@@ -1,7 +1,7 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { NotificationJson } from "@gamelobby/shared/types";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { NotificationJson } from "@kyzen/shared/types";
 import { useAtomValue, useStore } from "jotai";
 import Link from "next/link";
 import { useCallback } from "react";
@@ -13,6 +13,7 @@ import {
   PopoverTrigger,
 } from "@/app/ui/popover";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
+import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import { notificationsAtom, unreadNotificationsAtom } from "@/lib/chat/atoms";
 import { relativeTime } from "@/lib/chat/format";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
@@ -26,7 +27,7 @@ function notifText(n: NotificationJson): string {
     case "friend_accepted":
       return `${who} accepted your friend request`;
     case "game_started":
-      return `${who} started a game — tap to join`;
+      return `${who} started a game - tap to join`;
     case "game_challenge":
       return `${who} challenged you to a game`;
     default:
@@ -39,7 +40,6 @@ function notifHref(n: NotificationJson): string {
     return "/friends";
   }
   if (n.payload.gameId) return `/play/${n.payload.gameId}`;
-  if (n.payload.conversationId) return `/chat/${n.payload.conversationId}`;
   return "/chat";
 }
 
@@ -137,11 +137,17 @@ export function NotificationsPopover({
                   onClick={onNavigate}
                   className="flex items-center gap-3 border-border/60 border-b px-4 py-3 transition last:border-b-0 hover:bg-surface-overlay"
                 >
-                  <PresenceAvatar
-                    config={n.actor?.avatar ?? null}
-                    seed={n.actor?.username ?? "?"}
-                    size={32}
-                  />
+                  {n.actor ? (
+                    <ProfilePopupTrigger user={n.actor} className="shrink-0">
+                      <PresenceAvatar
+                        config={n.actor.avatar}
+                        seed={n.actor.username}
+                        size={32}
+                      />
+                    </ProfilePopupTrigger>
+                  ) : (
+                    <PresenceAvatar config={null} seed="?" size={32} />
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="text-sm">{notifText(n)}</div>
                     <div className="text-muted-foreground text-xs">

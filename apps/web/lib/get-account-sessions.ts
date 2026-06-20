@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { serverFetchJson } from "@/lib/api-server";
 
-export type AccountSession = {
+type AccountSession = {
   id: string;
   token?: string;
   createdAt: string;

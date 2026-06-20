@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { GAME_CATEGORIES } from "@gamelobby/shared/constants";
+import { GAME_CATEGORIES } from "@kyzen/shared/constants";
 import {
   GAMES,
   getCategoryGroups,
@@ -11,7 +11,9 @@ import {
 } from "../src/index";
 
 const knownTypes = GAMES.map((def) => def.meta.type);
-const categoryIds = new Set(GAME_CATEGORIES.map((category) => category.id));
+const categoryIds = new Set<string>(
+  Object.values(GAME_CATEGORIES).map((category) => category.id),
+);
 const UNKNOWN_TYPE = "definitely-not-a-real-game";
 
 describe("getDefinition", () => {
@@ -98,7 +100,7 @@ describe("getCategoryGroups", () => {
   test("group games all belong to the group category", () => {
     for (const group of groups) {
       for (const meta of group.games) {
-        expect(meta.categoryId).toBe(group.category.id);
+        expect<string>(meta.categoryId).toBe(group.category.id);
       }
     }
   });

@@ -8,7 +8,7 @@ import type {
   RailroadTile,
   Tile,
   UtilityTile,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { GROUP_COLORS } from "./Board";
 
 const PANEL_STYLE = `

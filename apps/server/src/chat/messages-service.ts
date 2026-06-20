@@ -1,11 +1,11 @@
-import { conversations, messages } from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { conversations, messages } from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import type {
   MessageJson,
   MessageKind,
   MessageMetadata,
   SystemMeta,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { getIO } from "../realtime/io";
 import { emitToConv } from "../realtime/rooms";
 import { assembleMessage } from "./assemble";

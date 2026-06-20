@@ -1,6 +1,6 @@
-import * as db from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { PresenceStatus } from "@gamelobby/shared/types";
+import * as db from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { PresenceStatus } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { childLogger } from "../logger";
 import type { PresenceStore } from "./presence-store";
@@ -35,10 +35,6 @@ function defaultDeps(): PresenceDeps {
     getLastSeen: (userIds) => db.profiles.getLastSeen(userIds),
     touchLastSeen: (userIds, when) => db.profiles.touchLastSeen(userIds, when),
   };
-}
-
-export function isOnline(userId: string): Promise<boolean> {
-  return presenceStore.isOnline(userId);
 }
 
 async function audienceFor(

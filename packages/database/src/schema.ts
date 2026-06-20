@@ -1,12 +1,15 @@
 import {
   COLOR_MODES,
   DEFAULT_COLOR_MODE,
+  DEFAULT_GLASS_MODE,
   DEFAULT_PATTERN,
   DEFAULT_THEME,
+  GLASS_MODES,
   PATTERN_IDS,
   THEME_IDS,
-} from "@gamelobby/shared/constants";
+} from "@kyzen/shared/constants";
 import type {
+  AccountMergeStatus,
   AvatarConfig,
   ChatMode,
   ConversationKind,
@@ -19,8 +22,10 @@ import type {
   NotificationType,
   ProfileStats,
   SeatingMode,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
+import { generateGameCode } from "@kyzen/shared/types";
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -36,6 +41,7 @@ import {
 export const themeEnum = pgEnum("app_theme", THEME_IDS);
 export const colorModeEnum = pgEnum("color_mode", COLOR_MODES);
 export const patternEnum = pgEnum("app_pattern", PATTERN_IDS);
+export const glassEnum = pgEnum("glass_mode", GLASS_MODES);
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -45,6 +51,7 @@ export const user = pgTable("user", {
     .$defaultFn(() => false)
     .notNull(),
   image: text("image"),
+  isAnonymous: boolean("is_anonymous").notNull().default(false),
   createdAt: timestamp("created_at")
     .$defaultFn(() => new Date())
     .notNull(),
@@ -97,6 +104,10 @@ export const game = pgTable(
   "game",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    code: text("code")
+      .notNull()
+      .unique("game_code_uq")
+      .$defaultFn(() => generateGameCode()),
     gameType: text("game_type").notNull(),
     status: text("status").$type<GameStatus>().notNull().default("waiting"),
     winner: text("winner"),
@@ -110,12 +121,18 @@ export const game = pgTable(
     challengedUserId: text("challenged_user_id").references(() => user.id, {
       onDelete: "set null",
     }),
+    seriesId: uuid("series_id").references((): AnyPgColumn => game.id, {
+      onDelete: "set null",
+    }),
     startedAt: timestamp("started_at"),
     completedAt: timestamp("completed_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (t) => [index("game_conversation_idx").on(t.conversationId)],
+  (t) => [
+    index("game_conversation_idx").on(t.conversationId),
+    index("game_series_idx").on(t.seriesId),
+  ],
 );
 
 export const move = pgTable(
@@ -164,6 +181,7 @@ export const userProfile = pgTable("user_profile", {
   theme: themeEnum("theme").notNull().default(DEFAULT_THEME),
   colorMode: colorModeEnum("color_mode").notNull().default(DEFAULT_COLOR_MODE),
   pattern: patternEnum("pattern").notNull().default(DEFAULT_PATTERN),
+  glass: glassEnum("glass").notNull().default(DEFAULT_GLASS_MODE),
   chatLayout: jsonb("chat_layout").$type<{ mode: ChatMode } | null>(),
   usernameChangedAt: timestamp("username_changed_at"),
   lastSeenAt: timestamp("last_seen_at"),
@@ -282,5 +300,23 @@ export const notification = pgTable(
   (t) => [
     index("notification_user_created_idx").on(t.userId, t.createdAt),
     index("notification_user_unread_idx").on(t.userId, t.readAt),
+  ],
+);
+
+export const accountMerge = pgTable(
+  "account_merge",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    anonUserId: text("anon_user_id").notNull(),
+    targetUserId: text("target_user_id").notNull(),
+    status: text("status")
+      .$type<AccountMergeStatus>()
+      .notNull()
+      .default("pending"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at"),
+  },
+  (t) => [
+    index("account_merge_target_status_idx").on(t.targetUserId, t.status),
   ],
 );

@@ -1,37 +1,34 @@
 import { z } from "zod";
+import { avatarConfigSchema } from "../avatar";
+import { gameCodeSchema } from "./code";
 import { gameTypeSchema } from "./core";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export const uuidSchema = z.string().regex(UUID_RE, "Invalid id");
 
 export const gameStatusSchema = z.enum([
   "waiting",
   "active",
   "completed",
   "abandoned",
+  "aborted",
 ]);
 export type GameStatusDto = z.infer<typeof gameStatusSchema>;
 
 export const seatingModeSchema = z.enum(["open", "challenge"]);
 export type SeatingModeDto = z.infer<typeof seatingModeSchema>;
 
-import type { AvatarConfig } from "../avatar";
-
 export const gamePlayerSchema = z
   .object({
     userId: z.string().min(1),
     username: z.string().min(1),
     role: z.string().min(1),
-    avatar: z.custom<AvatarConfig>().nullable().optional(),
+    avatar: avatarConfigSchema.nullable().optional(),
+    timeoutStrikes: z.number().int().nonnegative().optional(),
   })
   .strict();
 export type GamePlayerDto = z.infer<typeof gamePlayerSchema>;
 
 export const clientJoinRoomSchema = z
   .object({
-    gameId: uuidSchema,
+    gameId: gameCodeSchema,
     intent: z.enum(["play", "spectate"]).optional(),
   })
   .strict();
@@ -39,11 +36,58 @@ export type ClientJoinRoom = z.infer<typeof clientJoinRoomSchema>;
 
 export const clientMakeMoveSchema = z
   .object({
-    gameId: uuidSchema,
+    gameId: gameCodeSchema,
     moveData: z.unknown(),
   })
   .strict();
 export type ClientMakeMove = z.infer<typeof clientMakeMoveSchema>;
+
+export const clientQueueJoinSchema = z
+  .object({
+    gameType: gameTypeSchema,
+    config: z.unknown().optional(),
+  })
+  .strict();
+export type ClientQueueJoin = z.infer<typeof clientQueueJoinSchema>;
+
+export const clientQueueLeaveSchema = z
+  .object({
+    gameType: gameTypeSchema,
+  })
+  .strict();
+export type ClientQueueLeave = z.infer<typeof clientQueueLeaveSchema>;
+
+export type ServerMatchFoundPayload = {
+  gameId: string;
+};
+
+export const clientCreateRoomSchema = z
+  .object({
+    gameType: gameTypeSchema,
+    config: z.unknown().optional(),
+  })
+  .strict();
+export type ClientCreateRoom = z.infer<typeof clientCreateRoomSchema>;
+
+export const clientJoinByCodeSchema = z
+  .object({
+    code: gameCodeSchema,
+  })
+  .strict();
+export type ClientJoinByCode = z.infer<typeof clientJoinByCodeSchema>;
+
+export const joinByCodeErrorSchema = z.enum([
+  "not_found",
+  "full",
+  "already_started",
+  "finished",
+]);
+export type JoinByCodeError = z.infer<typeof joinByCodeErrorSchema>;
+
+export type ServerRoomCreatedPayload = { ok: true; code: string };
+export type ServerJoinByCodeResult =
+  | { ok: true; code: string }
+  | { ok: false; error: JoinByCodeError };
 
 export const gameJsonSchema = z.object({
   id: z.string(),
@@ -60,6 +104,7 @@ export const gameJsonSchema = z.object({
   completedAt: z.string().nullable().optional(),
   createdAt: z.string().nullable().optional(),
   updatedAt: z.string().nullable().optional(),
+  turnDeadline: z.number().nullable().optional(),
 });
 export type GameJson = z.infer<typeof gameJsonSchema>;
 
@@ -70,17 +115,14 @@ export const moveJsonSchema = z.object({
   playerId: z.string(),
   moveData: z.unknown(),
   createdAt: z.string().nullable().optional(),
+  auto: z.boolean().optional(),
 });
 export type MoveJson = z.infer<typeof moveJsonSchema>;
 
 export type ServerGameStatePayload = {
   game: GameJson;
-  moves: MoveJson[];
-};
-
-export type ServerMoveMadePayload = {
-  move: MoveJson;
-  gameState: unknown;
+  moves?: MoveJson[];
+  move?: MoveJson;
 };
 
 export type ServerGameOverPayload = {
@@ -90,3 +132,22 @@ export type ServerGameOverPayload = {
 export type ServerErrorPayload = {
   message: string;
 };
+
+export function isGameOver(status: string): boolean {
+  return (
+    status === "completed" || status === "abandoned" || status === "aborted"
+  );
+}
+
+export function isGameLive(status: string): boolean {
+  return status === "waiting" || status === "active";
+}
+
+export function resolveWinnerUsername(
+  winner: string | null,
+  players: ReadonlyArray<{ userId: string; username: string }>,
+): string | null {
+  return winner && winner !== "draw"
+    ? (players.find((p) => p.userId === winner)?.username ?? null)
+    : null;
+}

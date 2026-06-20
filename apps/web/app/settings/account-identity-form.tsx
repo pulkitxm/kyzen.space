@@ -3,10 +3,11 @@
 import {
   DISPLAY_NAME_MAX_LENGTH,
   USERNAME_PATTERN,
-} from "@gamelobby/shared/constants";
+} from "@kyzen/shared/constants";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FaCheck, FaXmark } from "react-icons/fa6";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { Button } from "@/components/ui/button";
 import { clientFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -32,16 +33,37 @@ type CheckState =
   | { kind: "available" }
   | { kind: "unavailable"; reason: string; suggestions: string[] };
 
+const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
+
 function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(iso));
+  return DATE_FORMATTER.format(new Date(iso));
 }
 
 function pluralizeDays(days: number): string {
   return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+function deriveCheck(
+  locked: boolean,
+  normalized: string,
+  isCurrent: boolean,
+  result: { for: string; data: AvailabilityResponse | null } | null,
+): CheckState {
+  if (locked) return { kind: "current" };
+  if (normalized.length === 0) return { kind: "idle" };
+  if (isCurrent) return { kind: "current" };
+  if (!result || result.for !== normalized) return { kind: "checking" };
+  if (result.data === null) return { kind: "idle" };
+  if (result.data.available) return { kind: "available" };
+  return {
+    kind: "unavailable",
+    reason: REASON_TEXT[result.data.reason ?? "taken"] ?? "Not available.",
+    suggestions: result.data.suggestions ?? [],
+  };
 }
 
 export function AccountIdentityForm({
@@ -158,7 +180,10 @@ function UsernameField({
   const router = useRouter();
   const [value, setValue] = useState(currentUsername);
   const [saved, setSaved] = useState(currentUsername);
-  const [check, setCheck] = useState<CheckState>({ kind: "current" });
+  const [result, setResult] = useState<{
+    for: string;
+    data: AvailabilityResponse | null;
+  } | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -169,16 +194,7 @@ function UsernameField({
   const isCurrent = normalized === saved.toLowerCase();
 
   useEffect(() => {
-    if (locked) return;
-    if (normalized.length === 0) {
-      setCheck({ kind: "idle" });
-      return;
-    }
-    if (isCurrent) {
-      setCheck({ kind: "current" });
-      return;
-    }
-    setCheck({ kind: "checking" });
+    if (locked || normalized.length === 0 || isCurrent) return;
     const id = ++requestId.current;
     const timer = setTimeout(async () => {
       try {
@@ -187,17 +203,10 @@ function UsernameField({
         );
         const data = (await res.json()) as AvailabilityResponse;
         if (id !== requestId.current) return;
-        if (data.available) {
-          setCheck({ kind: "available" });
-        } else {
-          setCheck({
-            kind: "unavailable",
-            reason: REASON_TEXT[data.reason ?? "taken"] ?? "Not available.",
-            suggestions: data.suggestions ?? [],
-          });
-        }
+        setResult({ for: normalized, data });
       } catch {
-        if (id === requestId.current) setCheck({ kind: "idle" });
+        if (id === requestId.current)
+          setResult({ for: normalized, data: null });
       }
     }, CHECK_DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -211,6 +220,8 @@ function UsernameField({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [confirmOpen]);
+
+  const check = deriveCheck(locked, normalized, isCurrent, result);
 
   const canSave =
     !pending &&
@@ -301,12 +312,12 @@ function UsernameField({
 
       {confirmOpen ? (
         <div
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4"
+          className="glass-scrim fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4"
           role="alertdialog"
           aria-modal="true"
           aria-label="Confirm username change"
         >
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
+          <GlassPane className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
             <h3 className="font-semibold text-base text-card-foreground">
               Change username?
             </h3>
@@ -329,7 +340,7 @@ function UsernameField({
                 Change username
               </Button>
             </div>
-          </div>
+          </GlassPane>
         </div>
       ) : null}
     </div>

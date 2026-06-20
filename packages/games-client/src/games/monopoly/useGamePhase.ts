@@ -1,11 +1,7 @@
 "use client";
 
-import { BOARD_SIZE } from "@gamelobby/games-core";
-import type {
-  Card,
-  MonopolyMove,
-  MonopolyState,
-} from "@gamelobby/shared/types";
+import { BOARD_SIZE } from "@kyzen/games-core";
+import type { Card, MonopolyMove, MonopolyState } from "@kyzen/shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSound } from "./useSound";
 
@@ -119,12 +115,15 @@ export function useGamePhase(
 
       if (savedKey === turnKey && savedStart) {
         const startTime = parseInt(savedStart, 10);
-        if (!isNaN(startTime)) {
+        if (!Number.isNaN(startTime)) {
           elapsed = Math.floor((Date.now() - startTime) / 1000);
         }
       } else {
         localStorage.setItem(`monopoly_turn_key_${gameId}`, turnKey);
-        localStorage.setItem(`monopoly_turn_start_${gameId}`, Date.now().toString());
+        localStorage.setItem(
+          `monopoly_turn_start_${gameId}`,
+          Date.now().toString(),
+        );
       }
     }
 
@@ -145,7 +144,13 @@ export function useGamePhase(
       clearInterval(interval);
       setTurnSecondsLeft(null);
     };
-  }, [state.currentPlayerIndex, state.turnPhase, state.players, gameId]);
+  }, [
+    state.currentPlayerIndex,
+    state.turnPhase,
+    state.players,
+    gameId,
+    state.log.length,
+  ]);
 
   const [animatedPositions, setAnimatedPositions] = useState<
     Record<string, number>

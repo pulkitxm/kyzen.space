@@ -1,5 +1,5 @@
-import { friends, profiles } from "@gamelobby/database";
-import type { FriendState } from "@gamelobby/shared/types";
+import { friends, profiles } from "@kyzen/database";
+import type { FriendState } from "@kyzen/shared/types";
 import { Hono } from "hono";
 import { assembleFriendships } from "../../chat/assemble";
 import * as friendsService from "../../chat/friends-service";

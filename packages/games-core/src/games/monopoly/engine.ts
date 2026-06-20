@@ -1,4 +1,4 @@
-import { MONOPOLY } from "@gamelobby/shared/constants";
+import { MONOPOLY } from "@kyzen/shared/constants";
 import {
   type GameEngine,
   type MonopolyMove,
@@ -12,7 +12,7 @@ import {
   type Seat,
   type Tile,
   type UtilityTile,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import {
   BOARD,
   BOARD_SIZE,
@@ -710,25 +710,30 @@ function applyAction(
 
     case "TIMEOUT_SKIP": {
       const nextConsecutiveTimeouts = player.consecutiveTimeouts + 1;
-      let nextPlayers = next.players.map((p, idx) =>
+      const nextPlayers = next.players.map((p, idx) =>
         idx === next.currentPlayerIndex
           ? { ...p, consecutiveTimeouts: nextConsecutiveTimeouts }
-          : p
+          : p,
       );
       let nextState = { ...next, players: nextPlayers };
 
       if (nextConsecutiveTimeouts >= 3) {
         nextState = updatePlayer(nextState, player.id, { isBankrupt: true });
-        nextState = addLog(nextState, `${player.name} was bankrupted due to inactivity.`);
+        nextState = addLog(
+          nextState,
+          `${player.name} was bankrupted due to inactivity.`,
+        );
         nextState = checkWin(nextState);
         if (nextState.turnPhase === "GAME_OVER") {
           return nextState;
         }
       } else {
-        nextState = addLog(nextState, `${player.name}'s turn was skipped due to inactivity.`);
+        nextState = addLog(
+          nextState,
+          `${player.name}'s turn was skipped due to inactivity.`,
+        );
       }
 
-      const activePlayers = nextState.players.filter((p) => !p.isBankrupt);
       const originalIndex = next.currentPlayerIndex;
       const nextPlayer = nextState.players
         .slice(originalIndex + 1)
@@ -737,7 +742,9 @@ function applyAction(
 
       if (nextPlayer === undefined) return nextState;
 
-      const realIndex = nextState.players.findIndex((p) => p.id === nextPlayer.id);
+      const realIndex = nextState.players.findIndex(
+        (p) => p.id === nextPlayer.id,
+      );
       return {
         ...nextState,
         currentPlayerIndex: realIndex,
@@ -824,6 +831,15 @@ export const monopolyEngine: GameEngine<MonopolyState, MonopolyMove> = {
         draw: false,
       },
     };
+  },
+
+  currentRole(state): string | null {
+    if (state.turnPhase === "GAME_OVER") return null;
+    return state.players[state.currentPlayerIndex]?.id ?? null;
+  },
+
+  autoMove(): MonopolyMove {
+    return { type: "TIMEOUT_SKIP" };
   },
 };
 export { applyAction };

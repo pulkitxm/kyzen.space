@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { FaUserGroup, FaUsers } from "react-icons/fa6";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
+import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import { conversationsAtom, presenceAtom } from "@/lib/chat/atoms";
+import { conversationHref } from "@/lib/chat/conversation-href";
 import { messagePreview, relativeTime } from "@/lib/chat/format";
 import { NewGroupDialog } from "./new-group-dialog";
 
@@ -51,10 +53,7 @@ export function ChatListClient({ userId }: { userId: string }) {
               c.kind === "group"
                 ? (c.name ?? "Group")
                 : (c.name ?? others[0]?.username ?? "Direct message");
-            const href =
-              c.kind === "dm" && others[0]
-                ? `/chat/${others[0].username}`
-                : `/chat/${c.id}`;
+            const href = conversationHref(c, userId);
             return (
               <Link
                 key={c.id}
@@ -70,17 +69,19 @@ export function ChatListClient({ userId }: { userId: string }) {
                     }))}
                     size={40}
                   />
+                ) : others[0] ? (
+                  <ProfilePopupTrigger user={others[0]} className="shrink-0">
+                    <PresenceAvatar
+                      config={others[0].avatar}
+                      seed={others[0].username}
+                      size={44}
+                      online={
+                        presence.get(others[0].id)?.online ? true : undefined
+                      }
+                    />
+                  </ProfilePopupTrigger>
                 ) : (
-                  <PresenceAvatar
-                    config={others[0]?.avatar ?? null}
-                    seed={others[0]?.username ?? "?"}
-                    size={44}
-                    online={
-                      others[0] && presence.get(others[0].id)?.online
-                        ? true
-                        : undefined
-                    }
-                  />
+                  <PresenceAvatar config={null} seed="?" size={44} />
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">

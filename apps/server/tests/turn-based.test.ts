@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
+const CODE = "K7P2QX";
 
 type Player = { userId: string; username: string; role: string };
 type GameRec = {
   id: string;
+  code: string;
   gameType: string;
   status: string;
   winner: string | null;
@@ -25,11 +27,16 @@ type GameRec = {
 let current: GameRec;
 // biome-ignore lint/suspicious/noExplicitAny: test move store
 let moves: any[] = [];
+let lookupCalls = 0;
 const seatCalls: { player: Player; seatOrder: number }[] = [];
 const bumpCalls: { userId: string; outcome: string }[] = [];
 
 const games = {
   getGameById: async () => current,
+  getGameByCode: async () => {
+    lookupCalls++;
+    return current;
+  },
   listMoves: async () => moves,
   nextMoveNumber: async () => moves.length + 1,
   // biome-ignore lint/suspicious/noExplicitAny: test stub
@@ -39,8 +46,10 @@ const games = {
     return row;
   },
   seatPlayer: async (_gameId: string, player: Player, seatOrder: number) => {
+    if (current.players.some((p) => p.userId === player.userId)) return false;
     seatCalls.push({ player, seatOrder });
     current.players = [...current.players, player];
+    return true;
   },
   // biome-ignore lint/suspicious/noExplicitAny: test stub
   updateGame: async (_id: string, patch: any) => {
@@ -56,15 +65,18 @@ const profiles = {
   },
 };
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   games,
   profiles,
+  accountMerge: {},
   conversations: {},
   friends: {},
   messages: { getGameCardByGameId: async () => null },
   notifications: {},
   db: {},
   schema: {},
+  invites: {},
+  generateInviteToken: () => "x".repeat(43),
   createDb: () => ({ db: {}, client: {} }),
 }));
 
@@ -98,6 +110,7 @@ function fakeSocket(userId: string) {
 function freshGame(over: Partial<GameRec> = {}): GameRec {
   return {
     id: UUID,
+    code: CODE,
     gameType: TIC_TAC_TOE,
     status: "waiting",
     winner: null,
@@ -123,15 +136,16 @@ const call = (fn: any, io: any, socket: any, payload: any) =>
 beforeEach(() => {
   current = freshGame();
   moves = [];
+  lookupCalls = 0;
   seatCalls.length = 0;
   bumpCalls.length = 0;
 });
 
-describe("handleJoinRoom — seating", () => {
+describe("handleJoinRoom - seating", () => {
   test("seats a second player and activates the game", async () => {
     const { io, emits } = fakeIo();
     const { socket } = fakeSocket("u2");
-    await call(handleJoinRoom, io, socket, { gameId: UUID });
+    await call(handleJoinRoom, io, socket, { gameId: CODE });
 
     expect(seatCalls).toHaveLength(1);
     expect(seatCalls[0]).toMatchObject({
@@ -146,7 +160,7 @@ describe("handleJoinRoom — seating", () => {
     const { io } = fakeIo();
     const { socket } = fakeSocket("u2");
     await call(handleJoinRoom, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       intent: "spectate",
     });
     expect(seatCalls).toHaveLength(0);
@@ -163,7 +177,7 @@ describe("handleJoinRoom — seating", () => {
     });
     const { io } = fakeIo();
     const { socket } = fakeSocket("u3");
-    await call(handleJoinRoom, io, socket, { gameId: UUID });
+    await call(handleJoinRoom, io, socket, { gameId: CODE });
     expect(seatCalls).toHaveLength(0);
   });
 
@@ -175,13 +189,30 @@ describe("handleJoinRoom — seating", () => {
     });
     const { io } = fakeIo();
     const intruder = fakeSocket("u3");
-    await call(handleJoinRoom, io, intruder.socket, { gameId: UUID });
+    await call(handleJoinRoom, io, intruder.socket, { gameId: CODE });
     expect(seatCalls).toHaveLength(0);
 
     const challenged = fakeSocket("u2");
-    await call(handleJoinRoom, io, challenged.socket, { gameId: UUID });
+    await call(handleJoinRoom, io, challenged.socket, { gameId: CODE });
     expect(seatCalls).toHaveLength(1);
     expect(seatCalls[0]?.player.userId).toBe("u2");
+  });
+
+  test("a lost seating race surfaces no error and performs no stale write", async () => {
+    const original = games.seatPlayer;
+    games.seatPlayer = async () => false;
+    try {
+      const { io, emits } = fakeIo();
+      const { socket, emits: sockEmits } = fakeSocket("u2");
+      await call(handleJoinRoom, io, socket, { gameId: CODE });
+
+      expect(sockEmits.some((e) => e.event === "game_error")).toBe(false);
+      expect(emits.some((e) => e.event === "game_state")).toBe(true);
+      expect(current.status).toBe("waiting");
+      expect(current.players).toHaveLength(1);
+    } finally {
+      games.seatPlayer = original;
+    }
   });
 
   test("an already-seated player rejoins without re-seating", async () => {
@@ -194,13 +225,70 @@ describe("handleJoinRoom — seating", () => {
     });
     const { io } = fakeIo();
     const { socket } = fakeSocket("u1");
-    await call(handleJoinRoom, io, socket, { gameId: UUID });
+    await call(handleJoinRoom, io, socket, { gameId: CODE });
     expect(seatCalls).toHaveLength(0);
     expect(current.status).toBe("active");
   });
+
+  test("join broadcasts full state carrying moves[] and no single move delta", async () => {
+    current = freshGame({
+      status: "active",
+      players: [
+        { userId: "u1", username: "u1", role: "X" },
+        { userId: "u2", username: "u2", role: "O" },
+      ],
+    });
+    moves = [
+      {
+        id: "m1",
+        gameId: UUID,
+        moveNumber: 1,
+        playerId: "u1",
+        moveData: { row: 0, col: 0 },
+        createdAt: new Date(),
+      },
+    ];
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u3");
+    await call(handleJoinRoom, io, socket, {
+      gameId: CODE,
+      intent: "spectate",
+    });
+
+    const stateEmit = emits.find((e) => e.event === "game_state");
+    expect(stateEmit).toBeDefined();
+    expect(
+      Array.isArray((stateEmit?.payload as { moves?: unknown }).moves),
+    ).toBe(true);
+    expect((stateEmit?.payload as { moves?: unknown[] }).moves).toHaveLength(1);
+    expect((stateEmit?.payload as { move?: unknown }).move).toBeUndefined();
+    expect(emits.some((e) => e.event === "move_made")).toBe(false);
+  });
+
+  test("rejects a join on a code that resolves to no game", async () => {
+    const original = games.getGameByCode;
+    games.getGameByCode = async () => {
+      lookupCalls++;
+      return null as never;
+    };
+    try {
+      const { io, emits } = fakeIo();
+      const { socket, emits: sockEmits } = fakeSocket("u2");
+      await call(handleJoinRoom, io, socket, { gameId: CODE });
+      expect(sockEmits).toContainEqual({
+        event: "game_error",
+        payload: { message: "Game not found" },
+      });
+      expect(lookupCalls).toBe(1);
+      expect(seatCalls).toHaveLength(0);
+      expect(emits).toHaveLength(0);
+    } finally {
+      games.getGameByCode = original;
+    }
+  });
 });
 
-describe("handleMakeMove — validation", () => {
+describe("handleMakeMove - validation", () => {
   function activeGame() {
     return freshGame({
       status: "active",
@@ -216,7 +304,7 @@ describe("handleMakeMove — validation", () => {
     const { io } = fakeIo();
     const { socket, emits } = fakeSocket("u3");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 0, col: 0 },
     });
     expect(emits).toContainEqual({
@@ -231,7 +319,7 @@ describe("handleMakeMove — validation", () => {
     const { io } = fakeIo();
     const { socket, emits } = fakeSocket("u1");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 0, col: 0 },
     });
     expect(emits).toContainEqual({
@@ -245,7 +333,7 @@ describe("handleMakeMove — validation", () => {
     const { io } = fakeIo();
     const { socket, emits } = fakeSocket("u1");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 5, col: 0 },
     });
     expect(emits).toContainEqual({
@@ -261,7 +349,7 @@ describe("handleMakeMove — validation", () => {
     const { io } = fakeIo();
     const { socket, emits } = fakeSocket("u1");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 0, col: 0 },
     });
     expect(emits).toContainEqual({
@@ -270,9 +358,70 @@ describe("handleMakeMove — validation", () => {
     });
     expect(moves).toHaveLength(0);
   });
+
+  test("propagates the engine's out-of-turn rejection without persisting", async () => {
+    current = activeGame();
+    const { io, emits } = fakeIo();
+    const { socket, emits: sockEmits } = fakeSocket("u2");
+    await call(handleMakeMove, io, socket, {
+      gameId: CODE,
+      moveData: { row: 0, col: 0 },
+    });
+    expect(sockEmits).toContainEqual({
+      event: "game_error",
+      payload: { message: "Not your turn" },
+    });
+    expect(moves).toHaveLength(0);
+    expect(emits).toHaveLength(0);
+  });
+
+  test("propagates the engine's occupied-cell rejection without persisting", async () => {
+    current = activeGame();
+    current.gameState = {
+      board: ["X", null, null, null, null, null, null, null, null],
+      currentTurn: "X",
+    };
+    const { io, emits } = fakeIo();
+    const { socket, emits: sockEmits } = fakeSocket("u1");
+    await call(handleMakeMove, io, socket, {
+      gameId: CODE,
+      moveData: { row: 0, col: 0 },
+    });
+    expect(sockEmits).toContainEqual({
+      event: "game_error",
+      payload: { message: "Cell occupied" },
+    });
+    expect(moves).toHaveLength(0);
+    expect(emits).toHaveLength(0);
+  });
+
+  test("rejects a move on a code that resolves to no game", async () => {
+    const original = games.getGameByCode;
+    games.getGameByCode = async () => {
+      lookupCalls++;
+      return null as never;
+    };
+    try {
+      const { io, emits } = fakeIo();
+      const { socket, emits: sockEmits } = fakeSocket("u1");
+      await call(handleMakeMove, io, socket, {
+        gameId: CODE,
+        moveData: { row: 0, col: 0 },
+      });
+      expect(sockEmits).toContainEqual({
+        event: "game_error",
+        payload: { message: "Game not found" },
+      });
+      expect(lookupCalls).toBe(1);
+      expect(moves).toHaveLength(0);
+      expect(emits).toHaveLength(0);
+    } finally {
+      games.getGameByCode = original;
+    }
+  });
 });
 
-describe("handleMakeMove — applying moves", () => {
+describe("handleMakeMove - applying moves", () => {
   function activeGame(over: Partial<GameRec> = {}) {
     return freshGame({
       status: "active",
@@ -289,7 +438,7 @@ describe("handleMakeMove — applying moves", () => {
     const { io, emits } = fakeIo();
     const { socket } = fakeSocket("u1");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 1, col: 1 },
     });
 
@@ -298,8 +447,11 @@ describe("handleMakeMove — applying moves", () => {
       "O",
     );
     expect(current.status).toBe("active");
-    expect(emits.some((e) => e.event === "move_made")).toBe(true);
-    expect(emits.some((e) => e.event === "game_state")).toBe(true);
+    const stateEmit = emits.find((e) => e.event === "game_state");
+    expect(stateEmit).toBeDefined();
+    expect((stateEmit?.payload as { move?: unknown }).move).toBeDefined();
+    expect((stateEmit?.payload as { moves?: unknown }).moves).toBeUndefined();
+    expect(emits.some((e) => e.event === "move_made")).toBe(false);
     expect(emits.some((e) => e.event === "game_over")).toBe(false);
   });
 
@@ -313,18 +465,192 @@ describe("handleMakeMove — applying moves", () => {
     const { io, emits } = fakeIo();
     const { socket } = fakeSocket("u1");
     await call(handleMakeMove, io, socket, {
-      gameId: UUID,
+      gameId: CODE,
       moveData: { row: 0, col: 2 },
     });
 
     expect(current.status).toBe("completed");
     expect(current.winner).toBe("u1");
     expect(emits).toContainEqual({
-      room: `game:${UUID}`,
+      room: `game:${CODE}`,
       event: "game_over",
       payload: { winner: "u1" },
     });
     expect(bumpCalls).toContainEqual({ userId: "u1", outcome: "won" });
     expect(bumpCalls).toContainEqual({ userId: "u2", outcome: "lost" });
   });
+
+  test("a drawing move completes the game with winner draw and bumps both as drawn", async () => {
+    current = activeGame({
+      gameState: {
+        board: ["X", "O", "X", "X", "O", "O", "O", "X", null],
+        currentTurn: "X",
+      },
+    });
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u1");
+    await call(handleMakeMove, io, socket, {
+      gameId: CODE,
+      moveData: { row: 2, col: 2 },
+    });
+
+    expect(current.status).toBe("completed");
+    expect(current.winner).toBe("draw");
+    expect(emits).toContainEqual({
+      room: `game:${CODE}`,
+      event: "game_over",
+      payload: { winner: "draw" },
+    });
+    expect(bumpCalls).toContainEqual({ userId: "u1", outcome: "drawn" });
+    expect(bumpCalls).toContainEqual({ userId: "u2", outcome: "drawn" });
+    expect(bumpCalls.filter((c) => c.outcome === "won")).toHaveLength(0);
+    expect(bumpCalls.filter((c) => c.outcome === "lost")).toHaveLength(0);
+  });
+
+  test("the game-over broadcast and stat bumps fire exactly once on a winning move", async () => {
+    current = activeGame({
+      gameState: {
+        board: ["X", "X", null, "O", "O", null, null, null, null],
+        currentTurn: "X",
+      },
+    });
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u1");
+    await call(handleMakeMove, io, socket, {
+      gameId: CODE,
+      moveData: { row: 0, col: 2 },
+    });
+
+    expect(emits.filter((e) => e.event === "game_over")).toHaveLength(1);
+    expect(bumpCalls).toHaveLength(2);
+  });
+
+  test("does not emit game_over or bump stats on a non-terminal move", async () => {
+    current = activeGame();
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u1");
+    await call(handleMakeMove, io, socket, {
+      gameId: CODE,
+      moveData: { row: 0, col: 0 },
+    });
+
+    expect(emits.some((e) => e.event === "game_over")).toBe(false);
+    expect(bumpCalls).toHaveLength(0);
+  });
+
+  test("a final move that fills the last cell AND completes a line resolves to the winner, not a draw", async () => {
+    current = activeGame({
+      gameState: {
+        board: ["X", "X", null, "O", "O", "X", "O", "X", "O"],
+        currentTurn: "X",
+      },
+    });
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u1");
+    await call(handleMakeMove, io, socket, {
+      gameId: CODE,
+      moveData: { row: 0, col: 2 },
+    });
+
+    expect(current.status).toBe("completed");
+    expect(current.winner).toBe("u1");
+    expect(emits).toContainEqual({
+      room: `game:${CODE}`,
+      event: "game_over",
+      payload: { winner: "u1" },
+    });
+    expect(bumpCalls).toContainEqual({ userId: "u1", outcome: "won" });
+    expect(bumpCalls).toContainEqual({ userId: "u2", outcome: "lost" });
+    expect(bumpCalls.filter((c) => c.outcome === "drawn")).toHaveLength(0);
+  });
+
+  test("the per-move broadcast carries a single move delta and never moves[] or move_made", async () => {
+    current = activeGame();
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u1");
+    await call(handleMakeMove, io, socket, {
+      gameId: CODE,
+      moveData: { row: 2, col: 2 },
+    });
+
+    const stateEmits = emits.filter((e) => e.event === "game_state");
+    expect(stateEmits).toHaveLength(1);
+    const payload = stateEmits[0]?.payload as {
+      move?: unknown;
+      moves?: unknown;
+    };
+    expect(payload.move).toBeDefined();
+    expect(payload.moves).toBeUndefined();
+    expect(emits.some((e) => e.event === "move_made")).toBe(false);
+  });
+});
+
+const INVALID_IDS = [
+  "11111111-1111-1111-1111-111111111111",
+  "ABCDE",
+  "ABCDEFG",
+  "K7P2QU",
+  "K7P2Q-",
+  "",
+];
+
+describe("handleJoinRoom - code guard", () => {
+  for (const bad of INVALID_IDS) {
+    test(`rejects ${JSON.stringify(bad)} without a DB lookup or broadcast`, async () => {
+      const { io, emits } = fakeIo();
+      const { socket, emits: sockEmits } = fakeSocket("u2");
+      await call(handleJoinRoom, io, socket, { gameId: bad });
+      expect(sockEmits).toContainEqual({
+        event: "game_error",
+        payload: { message: "Invalid game id" },
+      });
+      expect(lookupCalls).toBe(0);
+      expect(seatCalls).toHaveLength(0);
+      expect(emits).toHaveLength(0);
+    });
+  }
+
+  test("accepts a lowercase code and keys the room by the stored canonical code", async () => {
+    const { io, emits } = fakeIo();
+    const { socket } = fakeSocket("u2");
+    await call(handleJoinRoom, io, socket, {
+      gameId: "k7p2qx",
+      intent: "spectate",
+    });
+    expect(lookupCalls).toBe(1);
+    expect(
+      emits.some((e) => e.room === `game:${CODE}` && e.event === "game_state"),
+    ).toBe(true);
+  });
+});
+
+describe("handleMakeMove - code guard", () => {
+  function activeGame() {
+    return freshGame({
+      status: "active",
+      players: [
+        { userId: "u1", username: "u1", role: "X" },
+        { userId: "u2", username: "u2", role: "O" },
+      ],
+    });
+  }
+
+  for (const bad of INVALID_IDS) {
+    test(`rejects ${JSON.stringify(bad)} without a DB lookup, move, or broadcast`, async () => {
+      current = activeGame();
+      const { io, emits } = fakeIo();
+      const { socket, emits: sockEmits } = fakeSocket("u1");
+      await call(handleMakeMove, io, socket, {
+        gameId: bad,
+        moveData: { row: 0, col: 0 },
+      });
+      expect(sockEmits).toContainEqual({
+        event: "game_error",
+        payload: { message: "Invalid game id" },
+      });
+      expect(lookupCalls).toBe(0);
+      expect(moves).toHaveLength(0);
+      expect(emits).toHaveLength(0);
+    });
+  }
 });

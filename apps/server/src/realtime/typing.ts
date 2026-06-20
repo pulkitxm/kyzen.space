@@ -1,9 +1,11 @@
-import { conversations, profiles } from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { TypingUser } from "@gamelobby/shared/types";
+import { conversations, profiles } from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import {
+  clientConversationRefSchema,
+  type TypingUser,
+} from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { convRoom } from "./rooms";
-import { isObj, str } from "./socket-util";
 
 type Entry = { user: TypingUser; timeout: ReturnType<typeof setTimeout> };
 const typing = new Map<string, Map<string, Entry>>();
@@ -43,10 +45,9 @@ export function attachTypingHandlers(io: IOServer, socket: Socket): void {
 
   socket.on(CHAT_EVENTS.typingStart, (payload: unknown) => {
     void (async () => {
-      const conversationId = isObj(payload)
-        ? str(payload.conversationId)
-        : null;
-      if (!conversationId) return;
+      const parsed = clientConversationRefSchema.safeParse(payload);
+      if (!parsed.success) return;
+      const { conversationId } = parsed.data;
       if (!(await conversations.isMember(conversationId, userId))) return;
       const pub = await profiles.getPublicUser(userId);
       if (!pub) return;
@@ -67,8 +68,9 @@ export function attachTypingHandlers(io: IOServer, socket: Socket): void {
   });
 
   socket.on(CHAT_EVENTS.typingStop, (payload: unknown) => {
-    const conversationId = isObj(payload) ? str(payload.conversationId) : null;
-    if (!conversationId) return;
+    const parsed = clientConversationRefSchema.safeParse(payload);
+    if (!parsed.success) return;
+    const { conversationId } = parsed.data;
     if (clearTyper(conversationId, userId)) {
       active.delete(conversationId);
       broadcast(io, conversationId);

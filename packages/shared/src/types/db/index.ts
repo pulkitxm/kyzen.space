@@ -1,4 +1,4 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import type {
   ConversationKind,
   FriendStatus,
@@ -11,6 +11,7 @@ import type {
 import type { ChatMode } from "../chat-layout";
 import type { GameType } from "../games/core";
 import type { GameStatusDto, SeatingModeDto } from "../games/wire";
+import type { GlassMode } from "../glass";
 import type { PatternId } from "../pattern";
 import type { ColorMode, ThemeId } from "../theme";
 
@@ -42,8 +43,20 @@ export type UserRow = {
   email: string;
   emailVerified: boolean;
   image: string | null;
+  isAnonymous: boolean;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type AccountMergeStatus = "pending" | "confirmed" | "discarded";
+
+export type AccountMergeRow = {
+  id: string;
+  anonUserId: string;
+  targetUserId: string;
+  status: AccountMergeStatus;
+  createdAt: Date;
+  resolvedAt: Date | null;
 };
 
 export type SessionRow = {
@@ -84,6 +97,7 @@ export type VerificationRow = {
 
 export type GameRow = {
   id: string;
+  code: string;
   gameType: string;
   status: GameStatus;
   winner: string | null;
@@ -93,6 +107,7 @@ export type GameRow = {
   creatorUserId: string | null;
   seatingMode: SeatingMode | null;
   challengedUserId: string | null;
+  seriesId: string | null;
   startedAt: Date | null;
   completedAt: Date | null;
   createdAt: Date;
@@ -127,6 +142,7 @@ export type UserProfileRow = {
   theme: ThemeId;
   colorMode: ColorMode;
   pattern: PatternId;
+  glass: GlassMode;
   chatLayout: { mode: ChatMode } | null;
   usernameChangedAt: Date | null;
   lastSeenAt: Date | null;
@@ -209,6 +225,7 @@ export type CreateGameInput = {
   creatorUserId?: string | null;
   seatingMode?: SeatingMode | null;
   challengedUserId?: string | null;
+  seriesId?: string | null;
 };
 
 export type GameUpdate = Partial<

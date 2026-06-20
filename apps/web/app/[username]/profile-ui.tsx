@@ -1,4 +1,4 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import Image from "next/image";
 import Link from "next/link";
 import { FaEllipsis, FaGamepad, FaHeart, FaRegCalendar } from "react-icons/fa6";
@@ -8,7 +8,7 @@ import { PaginatedRecentGames } from "@/app/[username]/profile-activity-client";
 import { Character } from "@/components/ui";
 import type { ProfileActivityGameRow } from "@/lib/profile-activity-games";
 
-export type ProfileStatGame = {
+type ProfileStatGame = {
   id: string;
   name: string;
   href: string;
@@ -42,16 +42,9 @@ export function ProfilePageView({
   const lineName = displayName?.trim() || username;
 
   return (
-    <div className="min-h-full bg-surface text-card-foreground">
+    <div className="min-h-screen shrink-0 bg-surface text-card-foreground">
       <div className="relative mx-auto max-w-5xl px-4 pt-8 pb-20">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1 text-muted-foreground text-sm transition hover:text-foreground"
-        >
-          ← Home
-        </Link>
-
-        <header className="mt-8">
+        <header>
           <Banner />
           <div className="relative z-10 mx-3 -mt-9 flex flex-col gap-6 rounded-2xl border border-border bg-card/95 p-4 shadow-black/5 shadow-xl backdrop-blur sm:mx-6 sm:flex-row sm:items-end sm:justify-between sm:gap-8 sm:p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-5">
@@ -88,7 +81,7 @@ export function ProfilePageView({
                 >
                   Settings
                 </Link>
-                <ProfileOverflowMenu />
+                <ProfileOverflowMenu username={username} />
               </div>
             ) : null}
           </div>
@@ -148,7 +141,7 @@ function Banner() {
   );
 }
 
-function ProfileOverflowMenu() {
+function ProfileOverflowMenu({ username }: { username: string }) {
   return (
     <details className="group relative">
       <summary className="flex size-11 cursor-pointer list-none items-center justify-center rounded-full border border-border bg-surface-overlay text-muted-foreground transition hover:border-border/80 hover:bg-surface-hover [&::-webkit-details-marker]:hidden">
@@ -157,10 +150,16 @@ function ProfileOverflowMenu() {
       </summary>
       <div className="absolute right-0 z-30 mt-2 min-w-44 overflow-hidden rounded-xl border border-border bg-card py-1 text-sm shadow-2xl ring-1 ring-black/10">
         <Link
-          href="/profile"
+          href={`/${username}`}
           className="block px-4 py-2.5 text-card-foreground transition hover:bg-surface-overlay"
         >
           My profile
+        </Link>
+        <Link
+          href="/friends"
+          className="block px-4 py-2.5 text-card-foreground transition hover:bg-surface-overlay"
+        >
+          Friends
         </Link>
         <Link
           href="/"

@@ -12,9 +12,9 @@ import {
   configsEqual,
   isHatTop,
   randomAvatarConfig,
-} from "@gamelobby/avatar";
+} from "@kyzen/avatar";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   FaChevronDown,
@@ -25,6 +25,7 @@ import {
   FaShuffle,
   FaXmark,
 } from "react-icons/fa6";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { Button, Character } from "@/components/ui";
 import { clientFetchJson } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -103,11 +104,14 @@ function AvatarEditorModal({
     setDraft((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  const onEscape = useEffectEvent(() => {
+    if (confirmOpen) setConfirmOpen(false);
+    else attemptClose();
+  });
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (confirmOpen) setConfirmOpen(false);
-      else attemptClose();
+      if (e.key === "Escape") onEscape();
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
@@ -115,7 +119,7 @@ function AvatarEditorModal({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [attemptClose, confirmOpen]);
+  }, []);
 
   useEffect(() => {
     if (!dirty) return;
@@ -152,7 +156,7 @@ function AvatarEditorModal({
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+        className="glass-scrim fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
         role="dialog"
         aria-modal="true"
         aria-label="Customize your character"
@@ -163,7 +167,7 @@ function AvatarEditorModal({
           aria-label="Close editor"
           onClick={attemptClose}
         />
-        <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:rounded-2xl">
+        <GlassPane className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:rounded-2xl">
           <header className="flex items-center justify-between border-border border-b px-5 py-4">
             <h2 className="font-semibold text-base text-card-foreground">
               Customize your character
@@ -322,16 +326,16 @@ function AvatarEditorModal({
               </Button>
             </div>
           </footer>
-        </div>
+        </GlassPane>
       </div>
       {confirmOpen ? (
         <div
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4"
+          className="glass-scrim fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4"
           role="alertdialog"
           aria-modal="true"
           aria-label="Unsaved changes"
         >
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
+          <GlassPane className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
             <h3 className="font-semibold text-base text-card-foreground">
               Unsaved changes
             </h3>
@@ -368,7 +372,7 @@ function AvatarEditorModal({
                 Save
               </Button>
             </div>
-          </div>
+          </GlassPane>
         </div>
       ) : null}
     </>,

@@ -1,13 +1,14 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { ConversationJson, MessageJson } from "@gamelobby/shared/types";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { ConversationJson, MessageJson } from "@kyzen/shared/types";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FaArrowLeft } from "react-icons/fa6";
 import { AvatarStack, PresenceAvatar } from "@/components/ui/avatar-stack";
+import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import {
   activeConversationIdAtom,
   conversationsAtom,
@@ -24,11 +25,13 @@ import { TypingIndicator } from "./typing-indicator";
 
 export function ConversationView({
   userId,
+  visible = true,
   initialConversation,
   initialMessages,
   initialNextCursor,
 }: {
   userId: string;
+  visible?: boolean;
   initialConversation: ConversationJson;
   initialMessages: MessageJson[];
   initialNextCursor: string | null;
@@ -62,14 +65,15 @@ export function ConversationView({
   }, [conversationId, initialConversation, store]);
 
   useEffect(() => {
+    if (!visible) return;
     setActive(conversationId);
     return () => setActive(null);
-  }, [conversationId, setActive]);
+  }, [conversationId, setActive, visible]);
 
   const last = messages[messages.length - 1];
   const lastId = last && !last.pending ? last.id : null;
   useEffect(() => {
-    if (!lastId) return;
+    if (!visible || !lastId) return;
     void emitAck(socket, CHAT_EVENTS.markRead, {
       conversationId,
       messageId: lastId,
@@ -77,7 +81,7 @@ export function ConversationView({
     store.set(conversationsAtom, (prev) =>
       prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c)),
     );
-  }, [lastId, conversationId, socket, store]);
+  }, [lastId, conversationId, socket, store, visible]);
 
   const presence = useAtomValue(presenceAtom);
   const me = conversation.members.find((m) => m.id === userId);
@@ -128,19 +132,25 @@ export function ConversationView({
           </button>
         ) : (
           <>
-            <PresenceAvatar
-              config={others[0]?.avatar ?? null}
-              seed={others[0]?.username ?? "?"}
-              size={36}
-              online={otherPresence?.online ? true : undefined}
-            />
+            {others[0] ? (
+              <ProfilePopupTrigger user={others[0]} className="shrink-0">
+                <PresenceAvatar
+                  config={others[0].avatar}
+                  seed={others[0].username}
+                  size={36}
+                  online={otherPresence?.online ? true : undefined}
+                />
+              </ProfilePopupTrigger>
+            ) : (
+              <PresenceAvatar config={null} seed="?" size={36} />
+            )}
             <div className="min-w-0">
               <div className="truncate font-medium text-sm">{title}</div>
               <div
                 className={
                   otherPresence?.online
-                    ? "truncate text-emerald-500 text-xs"
-                    : "truncate text-muted-foreground text-xs"
+                    ? "min-h-4 truncate text-emerald-500 text-xs"
+                    : "min-h-4 truncate text-muted-foreground text-xs"
                 }
               >
                 {subtitle}

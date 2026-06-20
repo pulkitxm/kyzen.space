@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { db, friends, games, schema } from "@gamelobby/database";
-import { ticTacToeEngine } from "@gamelobby/games-core";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { TicTacToeState } from "@gamelobby/shared/types";
+import { db, friends, games, schema } from "@kyzen/database";
+import { ticTacToeEngine } from "@kyzen/games-core";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { TicTacToeState } from "@kyzen/shared/types";
 import { eq, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";
@@ -38,6 +38,12 @@ function unwrap<T>(res: ServiceResult<T>): T {
   return res.value;
 }
 
+async function gameUuid(code: string): Promise<string> {
+  const record = await games.getGameByCode(code);
+  if (!record) throw new Error(`game ${code} not found`);
+  return record.id;
+}
+
 async function befriend(a: TestUser, b: TestUser): Promise<void> {
   await friendsService.sendFriendRequest(a.id, b.username);
   const row = await friends.getFriendshipBetween(a.id, b.id);
@@ -67,7 +73,7 @@ afterAll(async () => {
   }
 });
 
-describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
+describe.skipIf(!DB_UP)("game flows - normalized game_player", () => {
   it("creates a game in a DM, seats the creator, posts a card", async () => {
     const a = await makeUser("a");
     const b = await makeUser("b");
@@ -84,9 +90,10 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
     expect(game.players).toEqual([
       { userId: a.id, username: a.username, role: "X" },
     ]);
-    expect(message.kind).toBe("game_card");
+    expect(message?.kind).toBe("game_card");
 
-    const loaded = await games.getGameById(game.id);
+    const gameId = await gameUuid(game.id);
+    const loaded = await games.getGameById(gameId);
     expect(loaded?.players).toHaveLength(1);
     expect(loaded?.players[0]?.userId).toBe(a.id);
   });
@@ -103,20 +110,46 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
       }),
     );
 
+    const gameId = await gameUuid(game.id);
     await games.seatPlayer(
-      game.id,
+      gameId,
       { userId: b.id, username: b.username, role: "O" },
       1,
     );
-    await games.updateGame(game.id, { status: "active" });
+    await games.updateGame(gameId, { status: "active" });
 
-    const loaded = await games.getGameById(game.id);
+    const loaded = await games.getGameById(gameId);
     expect(loaded?.players.map((p) => p.role)).toEqual(["X", "O"]);
 
     const aGames = await games.gamesForUser(a.id);
     const bGames = await games.gamesForUser(b.id);
-    expect(aGames.some((g) => g.id === game.id)).toBe(true);
-    expect(bGames.some((g) => g.id === game.id)).toBe(true);
+    expect(aGames.some((g) => g.id === gameId)).toBe(true);
+    expect(bGames.some((g) => g.id === gameId)).toBe(true);
+  });
+
+  it("seats idempotently so a duplicate join never violates game_player_uq", async () => {
+    const a = await makeUser("dup_a");
+    const b = await makeUser("dup_b");
+    const convId = await dmBetween(a, b);
+    const { game } = unwrap(
+      await createGameInConversation({
+        userId: a.id,
+        conversationId: convId,
+        gameType: TIC_TAC_TOE,
+      }),
+    );
+
+    const gameId = await gameUuid(game.id);
+    const seat = { userId: b.id, username: b.username, role: "O" };
+
+    const first = await games.seatPlayer(gameId, seat, 1);
+    const second = await games.seatPlayer(gameId, seat, 1);
+
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+
+    const loaded = await games.getGameById(gameId);
+    expect(loaded?.players.filter((p) => p.userId === b.id)).toHaveLength(1);
   });
 
   it("persists moves and completes a game with a winner", async () => {
@@ -130,12 +163,13 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
         gameType: TIC_TAC_TOE,
       }),
     );
+    const gameId = await gameUuid(game.id);
     await games.seatPlayer(
-      game.id,
+      gameId,
       { userId: b.id, username: b.username, role: "O" },
       1,
     );
-    await games.updateGame(game.id, { status: "active" });
+    await games.updateGame(gameId, { status: "active" });
 
     const seq: [string, "X" | "O", number, number][] = [
       [a.id, "X", 0, 0],
@@ -145,21 +179,21 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
       [a.id, "X", 0, 2],
     ];
 
-    let state = (await games.getGameById(game.id))?.gameState as TicTacToeState;
+    let state = (await games.getGameById(gameId))?.gameState as TicTacToeState;
     const reduce = ticTacToeEngine.reduce;
     if (!reduce) throw new Error("ticTacToeEngine.reduce is undefined");
     for (const [uid, role, row, col] of seq) {
       const res = reduce(state, { role }, { row, col });
       if (!res.ok) throw new Error(res.error);
       state = res.state;
-      const moveNumber = await games.nextMoveNumber(game.id);
+      const moveNumber = await games.nextMoveNumber(gameId);
       await games.addMove({
-        gameId: game.id,
+        gameId,
         moveNumber,
         playerId: uid,
         moveData: { row, col },
       });
-      await games.updateGame(game.id, {
+      await games.updateGame(gameId, {
         gameState: state,
         ...(res.outcome.status === "completed"
           ? {
@@ -171,10 +205,10 @@ describe.skipIf(!DB_UP)("game flows — normalized game_player", () => {
       });
     }
 
-    const loaded = await games.getGameById(game.id);
+    const loaded = await games.getGameById(gameId);
     expect(loaded?.status).toBe("completed");
     expect(loaded?.winner).toBe(a.id);
-    const moves = await games.listMoves(game.id);
+    const moves = await games.listMoves(gameId);
     expect(moves).toHaveLength(5);
   });
 });

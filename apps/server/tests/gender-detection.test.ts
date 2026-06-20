@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 
 const mockEnv = {
   genderizeApiKey: "test-key",
@@ -16,31 +16,46 @@ mock.module("gender-detection-from-name", () => ({
 
 let createdAvatar: AvatarConfig | null = null;
 let existingProfile: { username: string } | null = null;
-mock.module("@gamelobby/database", () => ({
+
+type CreateProfileInput = { username: string; avatar: AvatarConfig };
+const defaultGetTaken = async (_names: string[]): Promise<Set<string>> =>
+  new Set<string>();
+const defaultCreateProfile = async (input: CreateProfileInput) => {
+  createdAvatar = input.avatar;
+  return { username: input.username };
+};
+let getTakenImpl: (names: string[]) => Promise<Set<string>> = defaultGetTaken;
+let createProfileImpl: (
+  input: CreateProfileInput,
+) => Promise<{ username: string }> = defaultCreateProfile;
+let createProfileCalls = 0;
+
+mock.module("@kyzen/database", () => ({
   games: {},
   profiles: {
     getProfileByUserId: async () => existingProfile,
-    getTakenUsernames: async () => new Set<string>(),
-    createProfile: async (input: {
-      username: string;
-      avatar: AvatarConfig;
-    }) => {
-      createdAvatar = input.avatar;
-      return { username: input.username };
+    getTakenUsernames: (names: string[]) => getTakenImpl(names),
+    createProfile: (input: CreateProfileInput) => {
+      createProfileCalls += 1;
+      return createProfileImpl(input);
     },
   },
+  accountMerge: {},
   conversations: {},
   friends: {},
   messages: {},
   notifications: {},
   db: {},
   schema: {},
+  invites: {},
+  generateInviteToken: () => "x".repeat(43),
   createDb: () => ({ db: {}, client: {} }),
 }));
 
 const { detectedToStyle, firstNameOf, genderToStyle, predictAvatarStyle } =
   await import("../src/services/gender-detection");
-const { ensureUsernameForUser } = await import("../src/username");
+const { ensureUsernameForUser, isUsernameBlocked, suggestUsernames } =
+  await import("../src/username");
 
 const realFetch = globalThis.fetch;
 let fetchCalled = false;
@@ -69,10 +84,14 @@ function genderizeFailsIfCalled(): void {
 beforeEach(() => {
   mockEnv.genderizeApiKey = "test-key";
   mockEnv.nodeEnv = "development";
+  mockEnv.notAllowedUsernames = [];
   detectedGender = "unknown";
   createdAvatar = null;
   existingProfile = null;
   fetchCalled = false;
+  getTakenImpl = defaultGetTaken;
+  createProfileImpl = defaultCreateProfile;
+  createProfileCalls = 0;
 });
 
 afterEach(() => {
@@ -181,7 +200,7 @@ describe("predictAvatarStyle", () => {
   });
 });
 
-describe("ensureUsernameForUser — avatar style", () => {
+describe("ensureUsernameForUser: avatar style", () => {
   it("threads the name-predicted style into the seeded avatar", async () => {
     genderizeReturns({ gender: "female", probability: 0.97 });
     const username = await ensureUsernameForUser("user-1", "Alice");
@@ -194,5 +213,110 @@ describe("ensureUsernameForUser — avatar style", () => {
     detectedGender = "unknown";
     await ensureUsernameForUser("user-2", "Xyzzy");
     expect(createdAvatar?.style).toBe("any");
+  });
+
+  it("skips gender detection entirely for guest provisioning", async () => {
+    genderizeFailsIfCalled();
+    detectedGender = "male";
+    const username = await ensureUsernameForUser("guest-1", "Alice", {
+      skipGenderDetection: true,
+    });
+    expect(username).toBe("alice");
+    expect(createdAvatar?.style).toBe("any");
+    expect(fetchCalled).toBe(false);
+  });
+});
+
+describe("ensureUsernameForUser: username selection", () => {
+  it("returns the existing username without provisioning a new profile", async () => {
+    existingProfile = { username: "already_here" };
+    const username = await ensureUsernameForUser("user-x", "Some Name");
+    expect(username).toBe("already_here");
+    expect(createProfileCalls).toBe(0);
+    expect(createdAvatar).toBeNull();
+  });
+
+  it("skips a taken base and falls through to a suffixed candidate", async () => {
+    mockEnv.nodeEnv = "test";
+    getTakenImpl = async (names) =>
+      new Set(names.filter((n) => n === "alice").map((n) => n.toLowerCase()));
+    const username = await ensureUsernameForUser("user-skip", "Alice");
+    expect(username).not.toBe("alice");
+    expect(username.startsWith("alice_")).toBe(true);
+  });
+
+  it("retries the next candidate when createProfile loses a unique-key race", async () => {
+    mockEnv.nodeEnv = "test";
+    createProfileImpl = async (input) => {
+      if (createProfileCalls === 1) throw new Error("duplicate key value");
+      createdAvatar = input.avatar;
+      return { username: input.username };
+    };
+    const username = await ensureUsernameForUser("user-race", "Alice");
+    expect(createProfileCalls).toBe(2);
+    expect(username).not.toBe("alice");
+    expect(username).toBeTruthy();
+  });
+
+  it("falls back to a player_ name when every candidate is taken", async () => {
+    mockEnv.nodeEnv = "test";
+    getTakenImpl = async (names) => new Set(names.map((n) => n.toLowerCase()));
+    const username = await ensureUsernameForUser("user-fallback", "Alice");
+    expect(username.startsWith("player_")).toBe(true);
+  });
+
+  it("never settles on a reserved name as the chosen username", async () => {
+    mockEnv.nodeEnv = "test";
+    const username = await ensureUsernameForUser("user-reserved", "games");
+    expect(username).not.toBe("games");
+    expect(username.startsWith("games_")).toBe(true);
+  });
+});
+
+describe("suggestUsernames", () => {
+  it("offers the bare base first when nothing is taken", async () => {
+    const out = await suggestUsernames("Alice");
+    expect(out).toHaveLength(5);
+    expect(out[0]).toBe("alice");
+    for (const s of out) expect(s.startsWith("alice")).toBe(true);
+  });
+
+  it("honors a custom count", async () => {
+    expect(await suggestUsernames("Alice", 3)).toHaveLength(3);
+  });
+
+  it("excludes a taken base from the suggestions", async () => {
+    getTakenImpl = async (names) =>
+      new Set(names.filter((n) => n === "alice").map((n) => n.toLowerCase()));
+    const out = await suggestUsernames("Alice");
+    expect(out).not.toContain("alice");
+    expect(out.length).toBeGreaterThan(0);
+  });
+
+  it("filters out a reserved base before suggesting", async () => {
+    const out = await suggestUsernames("api");
+    expect(out).not.toContain("api");
+    for (const s of out) expect(s.startsWith("api_")).toBe(true);
+  });
+});
+
+describe("isUsernameBlocked", () => {
+  it("blocks reserved top-level route names", () => {
+    expect(isUsernameBlocked("api")).toBe(true);
+    expect(isUsernameBlocked("settings")).toBe(true);
+  });
+
+  it("blocks the invite route segment so it cannot shadow /invite", () => {
+    expect(isUsernameBlocked("invite")).toBe(true);
+  });
+
+  it("allows an ordinary name", () => {
+    expect(isUsernameBlocked("alice")).toBe(false);
+  });
+
+  it("blocks names configured in NOT_ALLOWED_USERNAMES", () => {
+    mockEnv.notAllowedUsernames = ["nope"];
+    expect(isUsernameBlocked("nope")).toBe(true);
+    expect(isUsernameBlocked("fine")).toBe(false);
   });
 });

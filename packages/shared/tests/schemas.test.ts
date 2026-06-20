@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { TIC_TAC_TOE } from "../src/constants";
 import {
+  avatarConfigSchema,
   clientJoinRoomSchema,
   clientMakeMoveSchema,
   gameJsonSchema,
@@ -9,7 +10,24 @@ import {
   ticTacToeStateSchema,
 } from "../src/types";
 
-const UUID = "11111111-1111-1111-1111-111111111111";
+const CODE = "K7P2QX";
+
+const SAMPLE_AVATAR = {
+  skinColor: "edb98a",
+  top: "shortFlat",
+  hairColor: "2c1b18",
+  hatColor: "3c4f5c",
+  accessories: "none",
+  accessoriesColor: "000000",
+  facialHair: "none",
+  facialHairColor: "2c1b18",
+  clothing: "shirtCrewNeck",
+  clothesColor: "3c4f5c",
+  eyes: "default",
+  eyebrows: "default",
+  mouth: "smile",
+  backgroundColor: "b6e3f4",
+};
 
 describe("tic-tac-toe move schema (strict)", () => {
   test("accepts in-range integer coordinates", () => {
@@ -73,23 +91,29 @@ describe("tic-tac-toe state schema (strict)", () => {
 });
 
 describe("wire payload schemas", () => {
-  test("clientJoinRoom requires a uuid game id", () => {
+  test("clientJoinRoom requires a valid game code", () => {
     expect(clientJoinRoomSchema.safeParse({ gameId: "nope" }).success).toBe(
       false,
     );
-    expect(clientJoinRoomSchema.safeParse({ gameId: UUID }).success).toBe(true);
+    expect(clientJoinRoomSchema.safeParse({ gameId: CODE }).success).toBe(true);
+  });
+
+  test("clientJoinRoom normalizes a lowercase game code", () => {
+    const parsed = clientJoinRoomSchema.safeParse({ gameId: "k7p2qx" });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.gameId).toBe(CODE);
   });
 
   test("clientJoinRoom rejects unknown keys", () => {
     expect(
-      clientJoinRoomSchema.safeParse({ gameId: UUID, evil: 1 }).success,
+      clientJoinRoomSchema.safeParse({ gameId: CODE, evil: 1 }).success,
     ).toBe(false);
   });
 
-  test("clientMakeMove carries opaque moveData with a uuid id", () => {
+  test("clientMakeMove carries opaque moveData with a game code", () => {
     expect(
       clientMakeMoveSchema.safeParse({
-        gameId: UUID,
+        gameId: CODE,
         moveData: { row: 0, col: 0 },
       }).success,
     ).toBe(true);
@@ -106,6 +130,25 @@ describe("wire payload schemas", () => {
     expect(
       gamePlayerSchema.safeParse({ userId: "u1", username: "a", role: "X" })
         .success,
+    ).toBe(true);
+  });
+
+  test("gamePlayer accepts an optional or null avatar", () => {
+    expect(
+      gamePlayerSchema.safeParse({
+        userId: "u1",
+        username: "a",
+        role: "X",
+        avatar: null,
+      }).success,
+    ).toBe(true);
+    expect(
+      gamePlayerSchema.safeParse({
+        userId: "u1",
+        username: "a",
+        role: "O",
+        avatar: SAMPLE_AVATAR,
+      }).success,
     ).toBe(true);
   });
 
@@ -144,5 +187,27 @@ describe("wire payload schemas", () => {
         players: [],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("avatar config schema", () => {
+  test("accepts a full avatar config", () => {
+    expect(avatarConfigSchema.safeParse(SAMPLE_AVATAR).success).toBe(true);
+  });
+
+  test("accepts an optional style", () => {
+    expect(
+      avatarConfigSchema.safeParse({ ...SAMPLE_AVATAR, style: "feminine" })
+        .success,
+    ).toBe(true);
+    expect(
+      avatarConfigSchema.safeParse({ ...SAMPLE_AVATAR, style: "wizard" })
+        .success,
+    ).toBe(false);
+  });
+
+  test("rejects a missing required field", () => {
+    const { backgroundColor: _omit, ...partial } = SAMPLE_AVATAR;
+    expect(avatarConfigSchema.safeParse(partial).success).toBe(false);
   });
 });

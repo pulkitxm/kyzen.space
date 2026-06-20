@@ -6,7 +6,7 @@ import {
   messages,
   notifications,
   schema,
-} from "@gamelobby/database";
+} from "@kyzen/database";
 import { eq, sql } from "drizzle-orm";
 import * as conversationsService from "../src/chat/conversations-service";
 import * as friendsService from "../src/chat/friends-service";
@@ -440,6 +440,6 @@ describe.skipIf(!DB_UP)("notifications", () => {
 
 if (!DB_UP) {
   describe("chat integration", () => {
-    it.skip("skipped — database unreachable; run `bun run db:start`", () => {});
+    it.skip("skipped - database unreachable; run `bun run db:start`", () => {});
   });
 }

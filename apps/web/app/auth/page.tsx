@@ -1,8 +1,14 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { GuestButton } from "@/app/auth/guest-button";
 import { GoogleSignInButton } from "@/app/google-sign-in-button";
 import { getServerSession } from "@/lib/get-server-session";
+
+export const metadata: Metadata = {
+  title: "Sign in",
+  description: "Sign in with your Google account to play and chat on Kyzen.",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -22,13 +28,6 @@ export default async function AuthPage() {
       </div>
 
       <main className="w-full max-w-90">
-        <Link
-          href="/"
-          className="mb-10 inline-block text-muted-foreground text-xs underline-offset-4 hover:text-foreground hover:underline"
-        >
-          ← Back home
-        </Link>
-
         <div className="rounded-2xl border border-border bg-card p-8 shadow-black/5 shadow-xl">
           <h1 className="text-center font-semibold text-card-foreground text-xl tracking-tight">
             Sign in
@@ -39,6 +38,8 @@ export default async function AuthPage() {
           </p>
 
           <GoogleSignInButton googleOAuthReady={googleOAuthReady} />
+
+          <GuestButton />
 
           {!googleOAuthReady ? (
             <p className="mt-4 text-center text-muted-foreground text-xs">

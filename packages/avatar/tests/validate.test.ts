@@ -4,7 +4,7 @@ import { randomAvatarConfig, validateAvatarConfig } from "../src";
 
 const VALID: AvatarConfig = randomAvatarConfig("validate-baseline");
 
-describe("validateAvatarConfig — rejects non-objects", () => {
+describe("validateAvatarConfig: rejects non-objects", () => {
   it("rejects null / undefined / primitives / arrays", () => {
     for (const bad of [null, undefined, 0, 1, "", "x", true, false, []]) {
       expect(validateAvatarConfig(bad)).toBeNull();
@@ -12,7 +12,7 @@ describe("validateAvatarConfig — rejects non-objects", () => {
   });
 });
 
-describe("validateAvatarConfig — accepts good input", () => {
+describe("validateAvatarConfig: accepts good input", () => {
   it("returns a clean clone of a fully valid config", () => {
     const result = validateAvatarConfig(VALID);
     expect(result).toEqual(VALID);
@@ -39,7 +39,7 @@ describe("validateAvatarConfig — accepts good input", () => {
   });
 });
 
-describe("validateAvatarConfig — rejects out-of-range pieces", () => {
+describe("validateAvatarConfig: rejects out-of-range pieces", () => {
   const optionMutations: Partial<Record<keyof AvatarConfig, unknown>> = {
     top: "mohawk",
     accessories: "monocle",
@@ -67,7 +67,7 @@ describe("validateAvatarConfig — rejects out-of-range pieces", () => {
   });
 });
 
-describe("validateAvatarConfig — rejects out-of-range colors", () => {
+describe("validateAvatarConfig: rejects out-of-range colors", () => {
   const colorKeys = [
     "skinColor",
     "hairColor",
@@ -90,7 +90,7 @@ describe("validateAvatarConfig — rejects out-of-range colors", () => {
   }
 });
 
-describe("validateAvatarConfig — style coercion", () => {
+describe("validateAvatarConfig: style coercion", () => {
   it("keeps a valid style", () => {
     expect(validateAvatarConfig({ ...VALID, style: "masculine" })?.style).toBe(
       "masculine",
@@ -112,7 +112,7 @@ describe("validateAvatarConfig — style coercion", () => {
   });
 });
 
-describe("validateAvatarConfig — does not mutate input", () => {
+describe("validateAvatarConfig: does not mutate input", () => {
   it("leaves the original object untouched", () => {
     const input = { ...VALID, junk: "x" };
     const snapshot = structuredClone(input);

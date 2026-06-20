@@ -1,4 +1,15 @@
-export type { default as GameCategoryDef } from "./categories";
+export type {
+  default as GameCategoryDef,
+  GameCategoryId,
+} from "./categories";
+export {
+  GAME_CODE_ALPHABET,
+  GAME_CODE_LENGTH,
+  gameCodeSchema,
+  generateGameCode,
+  isGameCode,
+  normalizeGameCode,
+} from "./code";
 export { type GameType, gameTypeSchema } from "./core";
 export type {
   ConfigField,
@@ -61,6 +72,16 @@ export {
   utilityTileSchema,
 } from "./monopoly/schemas";
 export {
+  type SeriesDetail,
+  type SeriesGameSummary,
+  type SeriesScore,
+  type SeriesScoreEntry,
+  seriesDetailSchema,
+  seriesGameSummarySchema,
+  seriesScoreEntrySchema,
+  seriesScoreSchema,
+} from "./series";
+export {
   type Cell,
   type Mark,
   type TicTacToeConfig,
@@ -71,23 +92,37 @@ export {
   ticTacToeStateSchema,
 } from "./tic-tac-toe/schemas";
 export {
+  type ClientCreateRoom,
+  type ClientJoinByCode,
   type ClientJoinRoom,
   type ClientMakeMove,
+  type ClientQueueJoin,
+  type ClientQueueLeave,
+  clientCreateRoomSchema,
+  clientJoinByCodeSchema,
   clientJoinRoomSchema,
   clientMakeMoveSchema,
+  clientQueueJoinSchema,
+  clientQueueLeaveSchema,
   type GameJson,
   type GamePlayerDto,
   type GameStatusDto,
   gameJsonSchema,
   gamePlayerSchema,
   gameStatusSchema,
+  isGameLive,
+  isGameOver,
+  type JoinByCodeError,
+  joinByCodeErrorSchema,
   type MoveJson,
   moveJsonSchema,
+  resolveWinnerUsername,
   type SeatingModeDto,
   type ServerErrorPayload,
   type ServerGameOverPayload,
   type ServerGameStatePayload,
-  type ServerMoveMadePayload,
+  type ServerJoinByCodeResult,
+  type ServerMatchFoundPayload,
+  type ServerRoomCreatedPayload,
   seatingModeSchema,
-  uuidSchema,
 } from "./wire";

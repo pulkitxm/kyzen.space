@@ -1,11 +1,11 @@
-import * as React from "react";
+import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
+  "glass-press inline-flex items-center justify-center gap-2 rounded-xl font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:cursor-not-allowed disabled:opacity-60";
 
 const variants: Record<Variant, string> = {
   primary:
@@ -22,37 +22,35 @@ const sizes: Record<Size, string> = {
   lg: "h-12 px-5 text-sm",
 };
 
-export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+type ButtonProps = React.ComponentPropsWithRef<"button"> & {
   variant?: Variant;
   size?: Size;
   loading?: boolean;
 };
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  function Button(
-    {
-      variant = "primary",
-      size = "md",
-      loading,
-      className,
-      children,
-      disabled,
-      ...props
-    },
-    ref,
-  ) {
-    return (
-      <button
-        ref={ref}
-        className={cn(base, variants[variant], sizes[size], className)}
-        disabled={disabled || loading}
-        {...props}
-      >
-        {loading ? (
-          <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-        ) : null}
-        {children}
-      </button>
-    );
-  },
-);
+export function Button({
+  variant = "primary",
+  size = "md",
+  loading,
+  className,
+  children,
+  disabled,
+  type = "button",
+  ref,
+  ...props
+}: ButtonProps) {
+  return (
+    <button
+      ref={ref}
+      type={type}
+      className={cn(base, variants[variant], sizes[size], className)}
+      disabled={disabled || loading}
+      {...props}
+    >
+      {loading ? (
+        <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      ) : null}
+      {children}
+    </button>
+  );
+}

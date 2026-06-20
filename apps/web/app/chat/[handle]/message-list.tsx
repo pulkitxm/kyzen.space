@@ -1,6 +1,10 @@
 "use client";
 
-import type { MemberJson, MessageJson } from "@gamelobby/shared/types";
+import type {
+  GameCardMeta,
+  MemberJson,
+  MessageJson,
+} from "@kyzen/shared/types";
 import { useStore } from "jotai";
 import { useCallback, useRef, useState } from "react";
 import { FaArrowDown } from "react-icons/fa6";
@@ -35,8 +39,16 @@ export function MessageList({
   const nameOf = (id: string | null | undefined) =>
     members.find((m) => m.id === id)?.username ?? "Someone";
 
-  const rows = messages.map((m, i) => {
-    const prev = messages[i - 1];
+  const visibleMessages = messages.filter(
+    (m) =>
+      !(
+        m.kind === "game_card" &&
+        (m.metadata as GameCardMeta | null)?.seriesSuperseded
+      ),
+  );
+
+  const rows = visibleMessages.map((m, i) => {
+    const prev = visibleMessages[i - 1];
     return {
       m,
       showAvatar: m.sender?.id !== prev?.sender?.id || m.kind === "system",

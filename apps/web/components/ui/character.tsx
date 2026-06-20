@@ -4,7 +4,7 @@ import {
   type AvatarConfig,
   seedAvatarConfig,
   toDicebearOptions,
-} from "@gamelobby/avatar";
+} from "@kyzen/avatar";
 import { cn } from "@/lib/utils";
 
 export function Character({

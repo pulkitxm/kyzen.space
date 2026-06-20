@@ -6,9 +6,10 @@ import type {
   GifMeta,
   MessageMetadata,
   SystemMeta,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { ReactNode } from "react";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
+import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import type { ChatMessage } from "@/lib/chat/atoms";
 import { timeOfDay } from "@/lib/chat/format";
 import { openImageLightbox } from "@/lib/chat/lightbox";
@@ -86,13 +87,15 @@ function GifMessage({
 const URL_RE = /(https?:\/\/[^\s]+)/g;
 
 function linkify(text: string, own: boolean): ReactNode {
+  const seen = new Map<string, number>();
   return text.split(URL_RE).map((part, i) => {
     if (i % 2 === 0) return part;
     const trailing = part.match(/[.,!?)]+$/)?.[0] ?? "";
     const href = trailing ? part.slice(0, -trailing.length) : part;
+    const occurrence = seen.get(part) ?? 0;
+    seen.set(part, occurrence + 1);
     return (
-      // biome-ignore lint/suspicious/noArrayIndexKey: split output is positional and stable
-      <span key={i}>
+      <span key={`${part}#${occurrence}`}>
         <a
           href={href}
           target="_blank"
@@ -151,11 +154,17 @@ export function MessageBubble({
     >
       {!own ? (
         showAvatar ? (
-          <PresenceAvatar
-            config={message.sender?.avatar ?? null}
-            seed={message.sender?.username ?? "?"}
-            size={28}
-          />
+          message.sender ? (
+            <ProfilePopupTrigger user={message.sender} className="shrink-0">
+              <PresenceAvatar
+                config={message.sender.avatar}
+                seed={message.sender.username}
+                size={28}
+              />
+            </ProfilePopupTrigger>
+          ) : (
+            <PresenceAvatar config={null} seed="?" size={28} />
+          )
         ) : (
           <span className="w-7 shrink-0" />
         )

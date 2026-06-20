@@ -1,0 +1,116 @@
+.ttt-cell {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--surface-raised);
+  border: 2px solid var(--border);
+  border-radius: var(--ttt-cell-radius);
+}
+
+.ttt-title-chip {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 36px;
+  border-radius: 999px;
+  background-color: var(--surface-raised);
+  border: 2px solid var(--border);
+  font-size: 31px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.ttt-player-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  padding: 40px 56px;
+  border-radius: 28px;
+  background-color: var(--card);
+  border: 2px solid var(--border);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+}
+
+.ttt-first-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 28px;
+  border-radius: 999px;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.ttt-turn-pill {
+  position: relative;
+  display: flex;
+  padding: 10px;
+  border-radius: 999px;
+  background-color: var(--surface-raised);
+  border: 2px solid var(--border);
+}
+
+.ttt-turn-active {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  height: calc(100% - 20px);
+  border-radius: 999px;
+  background-color: var(--surface-overlay);
+  border: 2px solid var(--border);
+}
+
+.ttt-turn-segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 0;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.ttt-win-banner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 48px;
+  border-radius: 999px;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 44px;
+  font-weight: 800;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+}
+
+.ttt-draw-badge {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 24px 52px;
+  border-radius: 999px;
+  background-color: var(--card);
+  border: 2px solid var(--border);
+  color: var(--foreground);
+  font-size: 46px;
+  font-weight: 800;
+  box-shadow: 0 20px 64px rgba(0, 0, 0, 0.45);
+}
+
+.ttt-cta {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 30px 64px;
+  border-radius: 999px;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 46px;
+  font-weight: 700;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}

@@ -1,7 +1,7 @@
 "use client";
 
-import type { AvatarConfig } from "@gamelobby/avatar";
-import { getCategoryGroups } from "@gamelobby/games-core";
+import type { AvatarConfig } from "@kyzen/avatar";
+import { getCategoryGroups } from "@kyzen/games-core";
 import { useAtom } from "jotai";
 import { useHydrateAtoms } from "jotai/utils";
 import Link from "next/link";
@@ -10,6 +10,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   useSyncExternalStore,
@@ -24,7 +25,7 @@ import {
 import { NotificationsPopover } from "@/app/notifications-popover";
 import { SidebarSocialNav } from "@/app/sidebar-social-nav";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/ui/tooltip";
-import { Character } from "@/components/ui";
+import { Character, Logo } from "@/components/ui";
 import {
   clampWidthSafe,
   DEFAULT_SIDEBAR_WIDTH,
@@ -153,41 +154,41 @@ export function Sidebar({
     [collapsed],
   );
 
+  const onResizeMove = useEffectEvent((e: MouseEvent) => {
+    const deltaX = Math.abs(e.clientX - resizeStartXRef.current);
+    if (deltaX > 5) hasResizedThisGestureRef.current = true;
+    if (resizeStartedFromCollapsedRef.current) {
+      if (e.clientX >= MIN_SIDEBAR_WIDTH) {
+        const newWidth = Math.min(
+          MAX_SIDEBAR_WIDTH,
+          Math.max(MIN_SIDEBAR_WIDTH, e.clientX),
+        );
+        setWidth(newWidth);
+        setCollapsed(false);
+        resizeStartedFromCollapsedRef.current = false;
+      }
+      return;
+    }
+    if (e.clientX < MIN_SIDEBAR_WIDTH) return;
+    const newWidth = Math.min(
+      MAX_SIDEBAR_WIDTH,
+      Math.max(MIN_SIDEBAR_WIDTH, e.clientX),
+    );
+    setWidth(newWidth);
+  });
+
+  const onResizeUp = useEffectEvent((e: MouseEvent) => {
+    if (!resizeStartedFromCollapsedRef.current && e.clientX < MIN_SIDEBAR_WIDTH)
+      toggleCollapsed();
+    resizeStartedFromCollapsedRef.current = false;
+    setIsResizing(false);
+  });
+
   useEffect(() => {
     if (!isResizing) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = Math.abs(e.clientX - resizeStartXRef.current);
-      if (deltaX > 5) hasResizedThisGestureRef.current = true;
-      if (resizeStartedFromCollapsedRef.current) {
-        if (e.clientX >= MIN_SIDEBAR_WIDTH) {
-          const newWidth = Math.min(
-            MAX_SIDEBAR_WIDTH,
-            Math.max(MIN_SIDEBAR_WIDTH, e.clientX),
-          );
-          setWidth(newWidth);
-          setCollapsed(false);
-          resizeStartedFromCollapsedRef.current = false;
-        }
-        return;
-      }
-      if (e.clientX < MIN_SIDEBAR_WIDTH) return;
-      const newWidth = Math.min(
-        MAX_SIDEBAR_WIDTH,
-        Math.max(MIN_SIDEBAR_WIDTH, e.clientX),
-      );
-      setWidth(newWidth);
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      if (
-        !resizeStartedFromCollapsedRef.current &&
-        e.clientX < MIN_SIDEBAR_WIDTH
-      )
-        toggleCollapsed();
-      resizeStartedFromCollapsedRef.current = false;
-      setIsResizing(false);
-    };
+    const handleMouseMove = (e: MouseEvent) => onResizeMove(e);
+    const handleMouseUp = (e: MouseEvent) => onResizeUp(e);
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
@@ -199,7 +200,7 @@ export function Sidebar({
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isResizing, setCollapsed, setWidth, toggleCollapsed]);
+  }, [isResizing]);
 
   const collapsedWidth = 68;
   const navPx = 8;
@@ -265,17 +266,12 @@ export function Sidebar({
             paddingLeft: displayCollapsed ? 8 : 0,
           }}
         >
-          <span className="flex size-7 shrink-0 select-none items-center justify-center rounded-lg bg-sidebar-primary font-bold text-sidebar-primary-foreground text-sm">
-            GL
-          </span>
-          <span
-            className={cn(
-              "font-semibold text-sidebar-foreground text-sm",
-              textClasses,
-            )}
-          >
-            GameLobby
-          </span>
+          <Logo variant="icon" iconClassName="size-7" label="Kyzen" />
+          <Logo
+            variant="text"
+            decorative
+            className={cn("text-sidebar-foreground text-sm", textClasses)}
+          />
         </Link>
         <div className="flex-1" />
         <button

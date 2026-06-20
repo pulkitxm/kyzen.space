@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
-import { FaCompress, FaExpand, FaXmark } from "react-icons/fa6";
+import { useGlassPaneRef } from "@/components/glass/glass-pane";
 import {
   type ChatMode,
   clampGeometry,
@@ -9,7 +9,9 @@ import {
   MIN_CHAT_POPOUT_W,
   type PopoutGeometry,
 } from "@/lib/chat-layout";
+import { startPointerDrag } from "@/lib/pointer-drag";
 import { cn } from "@/lib/utils";
+import { ChatWindowControls } from "./chat-window-controls";
 
 export function ChatPopoutWindow({
   mode,
@@ -20,6 +22,7 @@ export function ChatPopoutWindow({
   onPopOut,
   onDock,
   onMinimize,
+  onClose,
   onGeometryChange,
   onCommit,
   children,
@@ -32,42 +35,37 @@ export function ChatPopoutWindow({
   onPopOut: () => void;
   onDock: () => void;
   onMinimize: () => void;
+  onClose: () => void;
   onGeometryChange: (next: PopoutGeometry) => void;
   onCommit: () => void;
   children: ReactNode;
 }) {
   const geomRef = useRef(geometry);
   geomRef.current = geometry;
+  const paneRef = useGlassPaneRef<HTMLDivElement>();
 
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
       if (mode !== "popout") return;
-      e.preventDefault();
       const startX = e.clientX;
       const startY = e.clientY;
       const orig = geomRef.current;
-      const onMove = (ev: MouseEvent) => {
-        onGeometryChange(
-          clampGeometry(
-            {
-              ...geomRef.current,
-              x: orig.x + (ev.clientX - startX),
-              y: orig.y + (ev.clientY - startY),
-            },
-            window.innerWidth,
-            window.innerHeight,
-          ),
-        );
-      };
-      const onUp = () => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        document.body.style.userSelect = "";
-        onCommit();
-      };
-      document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+      startPointerDrag(e, {
+        onMove: (ev) => {
+          onGeometryChange(
+            clampGeometry(
+              {
+                ...geomRef.current,
+                x: orig.x + (ev.clientX - startX),
+                y: orig.y + (ev.clientY - startY),
+              },
+              window.innerWidth,
+              window.innerHeight,
+            ),
+          );
+        },
+        onEnd: onCommit,
+      });
     },
     [mode, onGeometryChange, onCommit],
   );
@@ -75,34 +73,53 @@ export function ChatPopoutWindow({
   const startResize = useCallback(
     (e: React.MouseEvent) => {
       if (mode !== "popout") return;
-      e.preventDefault();
       e.stopPropagation();
       const startX = e.clientX;
       const startY = e.clientY;
       const orig = geomRef.current;
-      const onMove = (ev: MouseEvent) => {
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
-        const w = Math.max(MIN_CHAT_POPOUT_W, orig.w - dx);
-        const h = Math.max(MIN_CHAT_POPOUT_H, orig.h + dy);
-        const x = orig.x + (orig.w - w);
-        onGeometryChange(
-          clampGeometry(
-            { x, y: orig.y, w, h },
-            window.innerWidth,
-            window.innerHeight,
-          ),
-        );
+      startPointerDrag(e, {
+        onMove: (ev) => {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          const w = Math.max(MIN_CHAT_POPOUT_W, orig.w - dx);
+          const h = Math.max(MIN_CHAT_POPOUT_H, orig.h + dy);
+          const x = orig.x + (orig.w - w);
+          onGeometryChange(
+            clampGeometry(
+              { x, y: orig.y, w, h },
+              window.innerWidth,
+              window.innerHeight,
+            ),
+          );
+        },
+        onEnd: onCommit,
+      });
+    },
+    [mode, onGeometryChange, onCommit],
+  );
+
+  const nudge = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (mode !== "popout") return;
+      const step = e.shiftKey ? 20 : 5;
+      const deltas: Record<string, { dx: number; dy: number }> = {
+        ArrowLeft: { dx: -step, dy: 0 },
+        ArrowRight: { dx: step, dy: 0 },
+        ArrowUp: { dx: 0, dy: -step },
+        ArrowDown: { dx: 0, dy: step },
       };
-      const onUp = () => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        document.body.style.userSelect = "";
-        onCommit();
-      };
-      document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+      const delta = deltas[e.key];
+      if (!delta) return;
+      e.preventDefault();
+      const orig = geomRef.current;
+      onGeometryChange(
+        clampGeometry(
+          { ...orig, x: orig.x + delta.dx, y: orig.y + delta.dy },
+          window.innerWidth,
+          window.innerHeight,
+        ),
+      );
+      onCommit();
     },
     [mode, onGeometryChange, onCommit],
   );
@@ -125,72 +142,60 @@ export function ChatPopoutWindow({
 
   return (
     <div
+      ref={isPopout ? paneRef : undefined}
       style={style}
       className={cn(
         "min-h-0 flex-col bg-background",
         minimized
           ? "hidden"
           : isPopout
-            ? "fixed z-50 flex rounded-xl border border-border shadow-2xl"
+            ? "glass-pane fixed z-50 flex overflow-hidden rounded-xl border border-border shadow-2xl"
             : cn(
                 "relative border-border max-md:w-full! md:shrink-0 md:border-l",
                 mountedVisible ? "flex" : "hidden md:flex",
               ),
       )}
     >
-      {}
-      {/** biome-ignore lint/a11y/noStaticElementInteractions: drag surface */}
       <div
-        onMouseDown={startDrag}
         className={cn(
-          "shrink-0 cursor-move select-none items-center justify-between rounded-t-xl border-border border-b bg-muted/40 px-3 py-2",
+          "relative shrink-0 select-none items-center rounded-t-xl border-border border-b bg-muted/40 px-3 py-2",
           isPopout ? "flex" : "hidden",
         )}
       >
-        <span className="font-medium text-muted-foreground text-xs">Chat</span>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onDock}
-            className="text-muted-foreground outline-none transition hover:text-foreground"
-            aria-label="Dock chat"
-          >
-            <FaCompress className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onMinimize}
-            className="text-muted-foreground outline-none transition hover:text-foreground"
-            aria-label="Minimize chat"
-          >
-            <FaXmark className="size-4" />
-          </button>
+        <button
+          type="button"
+          tabIndex={isPopout ? 0 : -1}
+          aria-label="Move chat window"
+          onMouseDown={startDrag}
+          onKeyDown={nudge}
+          className="absolute inset-0 cursor-move rounded-t-xl"
+        />
+        <div className="relative z-10 flex items-center">
+          <ChatWindowControls
+            isPopout
+            onClose={onClose}
+            onMinimize={onMinimize}
+            onZoom={onDock}
+          />
         </div>
+        <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 font-medium text-muted-foreground text-xs">
+          Chat
+        </span>
       </div>
 
       {}
       <div
         className={cn(
-          "absolute top-3 right-3 z-10 flex items-center gap-1.5",
-          isPopout ? "hidden" : "hidden md:flex",
+          "absolute top-3 right-3 z-10 rounded-full bg-background/80 px-2 py-1.5 backdrop-blur",
+          isPopout ? "hidden" : "hidden md:block",
         )}
       >
-        <button
-          type="button"
-          onClick={onPopOut}
-          aria-label="Pop out chat"
-          className="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground outline-none backdrop-blur transition hover:text-foreground"
-        >
-          <FaExpand className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={onMinimize}
-          aria-label="Minimize chat"
-          className="rounded-md border border-border bg-background/80 p-1.5 text-muted-foreground outline-none backdrop-blur transition hover:text-foreground"
-        >
-          <FaXmark className="size-3.5" />
-        </button>
+        <ChatWindowControls
+          isPopout={false}
+          onClose={onClose}
+          onMinimize={onMinimize}
+          onZoom={onPopOut}
+        />
       </div>
 
       {}

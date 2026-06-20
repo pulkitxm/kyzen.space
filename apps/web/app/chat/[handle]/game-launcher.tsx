@@ -1,15 +1,12 @@
 "use client";
 
-import { listGameMeta } from "@gamelobby/games-core";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type {
-  ConversationJson,
-  GameMeta,
-  GameType,
-} from "@gamelobby/shared/types";
+import { listGameMeta } from "@kyzen/games-core";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { ConversationJson, GameMeta, GameType } from "@kyzen/shared/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FaGamepad } from "react-icons/fa6";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 
 export function GameLauncher({
@@ -69,7 +66,7 @@ export function GameLauncher({
             className="fixed inset-0 z-10 cursor-default"
             onClick={handleClose}
           />
-          <div className="absolute bottom-full left-0 z-20 mb-2 w-60 rounded-xl border border-border bg-card p-1 shadow-xl">
+          <GlassPane className="absolute bottom-full left-0 z-20 mb-2 w-60 rounded-xl border border-border bg-card p-1 shadow-xl">
             {!selectedGame ? (
               <>
                 <div className="px-2 py-1.5 font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
@@ -125,7 +122,7 @@ export function GameLauncher({
                 ))}
               </>
             )}
-          </div>
+          </GlassPane>
         </>
       ) : null}
       <button

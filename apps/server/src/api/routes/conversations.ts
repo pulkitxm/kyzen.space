@@ -1,5 +1,5 @@
-import { conversations, messages, profiles } from "@gamelobby/database";
-import { gameTypeSchema } from "@gamelobby/shared/types";
+import { conversations, messages, profiles } from "@kyzen/database";
+import { gameTypeSchema } from "@kyzen/shared/types";
 import { Hono } from "hono";
 import {
   assembleConversation,
@@ -66,6 +66,16 @@ export const conversationsRouter = new Hono<AuthEnv>()
     const res = await conversationsService.createDm(userId, profile.userId);
     if (!res.ok) return c.json({ error: res.error }, res.status);
     return c.json({ conversation: res.value });
+  })
+
+  .get("/group/:name", async (c) => {
+    const userId = c.get("userId");
+    const group = await conversations.findGroupByName(c.req.param("name"));
+    if (!group) return c.json({ error: "Not found" }, 404);
+    if (!(await conversations.isMember(group.id, userId))) {
+      return c.json({ error: "Not found" }, 404);
+    }
+    return c.json({ conversation: await assembleConversation(group, userId) });
   })
 
   .get("/:id", async (c) => {

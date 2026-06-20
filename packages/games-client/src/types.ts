@@ -1,3 +1,4 @@
+import type { AvatarConfig } from "@kyzen/shared/types";
 import type { Socket } from "socket.io-client";
 
 export type GameClientProps = {
@@ -9,8 +10,18 @@ export type GameClientProps = {
     id: string;
     status: string;
     winner: string | null;
-    players: { userId: string; username: string; role: string }[];
+    players: {
+      userId: string;
+      username: string;
+      role: string;
+      avatar?: AvatarConfig | null;
+    }[];
     gameState?: unknown;
   };
   initialMoves: Record<string, unknown>[];
+  onViewProfile?: (user: {
+    username: string;
+    displayName?: string | null;
+    avatar?: AvatarConfig | null;
+  }) => void;
 };

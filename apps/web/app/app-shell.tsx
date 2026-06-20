@@ -1,20 +1,25 @@
 "use client";
 
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import type {
   ConversationJson,
   FriendshipJson,
   NotificationJson,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { Provider } from "jotai";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { FaChevronRight } from "react-icons/fa6";
 
 import { ChatSocketBridge } from "@/app/chat-socket-bridge";
+import { GuestNudge } from "@/app/guest-nudge";
+import { MergeConsent } from "@/app/merge-consent";
 import { Sidebar } from "@/app/sidebar";
 import { TooltipProvider } from "@/app/ui/tooltip";
+import { LayeredPopupHost, ProfilePopupHost } from "@/components/ui";
+import { AppearanceSync } from "@/lib/appearance";
 import type { SidebarPrefs } from "@/lib/sidebar-prefs";
 import { SocketProvider } from "@/lib/socket/socket-context";
+import { useScrollRestoration } from "@/lib/use-scroll-restoration";
 
 export function AppShellClient({
   children,
@@ -22,6 +27,7 @@ export function AppShellClient({
   avatar,
   userId,
   signedIn,
+  isAnonymous,
   profileHref,
   sidebarPrefsTrusted,
   sidebarPrefs,
@@ -37,6 +43,7 @@ export function AppShellClient({
   avatar: AvatarConfig | null;
   userId: string | null;
   signedIn: boolean;
+  isAnonymous: boolean;
   profileHref: string;
   sidebarPrefsTrusted: boolean;
   sidebarPrefs: SidebarPrefs;
@@ -50,10 +57,16 @@ export function AppShellClient({
   const [mobileOpen, setMobileOpen] = useState(false);
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
+  const mainRef = useRef<HTMLElement>(null);
+  useScrollRestoration(mainRef);
+
   return (
     <TooltipProvider delayDuration={300}>
       <Provider>
+        <AppearanceSync />
         <SocketProvider enabled={signedIn}>
+          {isAnonymous ? <GuestNudge /> : null}
+          <MergeConsent enabled={signedIn && !isAnonymous} />
           {signedIn && userId ? (
             <ChatSocketBridge
               userId={userId}
@@ -96,10 +109,15 @@ export function AppShellClient({
               profileHref={profileHref}
             />
 
-            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
+            <main
+              ref={mainRef}
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
+            >
               {children}
             </main>
           </div>
+          <LayeredPopupHost />
+          <ProfilePopupHost />
         </SocketProvider>
       </Provider>
     </TooltipProvider>

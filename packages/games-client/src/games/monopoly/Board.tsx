@@ -2,14 +2,14 @@
 
 import { avataaars } from "@dicebear/collection";
 import { createAvatar } from "@dicebear/core";
-import { seedAvatarConfig, toDicebearOptions } from "@gamelobby/avatar";
+import { seedAvatarConfig, toDicebearOptions } from "@kyzen/avatar";
 import type {
   MonopolyMove,
   MonopolyState,
   Player,
   PropertyTile,
   Tile,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type React from "react";
 import { positionToCell } from "./useGamePhase";
 

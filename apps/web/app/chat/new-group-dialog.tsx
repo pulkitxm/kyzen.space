@@ -1,10 +1,11 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import { useAtomValue } from "jotai";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { Button } from "@/components/ui";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
 import { friendsAtom } from "@/lib/chat/atoms";
@@ -40,13 +41,13 @@ export function NewGroupDialog({
     if (!trimmed || selected.size === 0) return;
     setCreating(true);
     try {
-      const res = await emitAck<{ conversation: { id: string } }>(
+      await emitAck<{ conversation: { id: string } }>(
         socket,
         CHAT_EVENTS.createGroup,
         { name: trimmed, memberIds: [...selected] },
       );
       onClose();
-      router.push(`/chat/${res.conversation.id}`);
+      router.push(`/chat/group/${encodeURIComponent(trimmed)}`);
     } catch {
       setCreating(false);
     }
@@ -57,15 +58,16 @@ export function NewGroupDialog({
       <button
         type="button"
         aria-label="Close"
-        className="absolute inset-0 bg-black/50"
+        className="glass-scrim absolute inset-0 bg-black/50"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-4 shadow-xl">
+      <GlassPane className="relative w-full max-w-md rounded-2xl border border-border bg-card p-4 shadow-xl">
         <h2 className="mb-3 font-semibold text-lg">New group</h2>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Group name"
+          aria-label="Group name"
           className="mb-3 w-full rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <div className="mb-3 max-h-64 overflow-y-auto rounded-xl border border-border">
@@ -132,7 +134,7 @@ export function NewGroupDialog({
             </Button>
           </div>
         </div>
-      </div>
+      </GlassPane>
     </div>
   );
 }

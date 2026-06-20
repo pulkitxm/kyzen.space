@@ -1,11 +1,11 @@
-import { GAME_CATEGORIES } from "@gamelobby/shared/constants";
+import { GAME_CATEGORIES } from "@kyzen/shared/constants";
 import type {
   GameCategoryDef,
   GameDefinition,
   GameEngine,
   GameMeta,
   GameType,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { GAMES } from "./games";
 
 const byType: Map<string, GameDefinition> = new Map(
@@ -42,10 +42,12 @@ export function getCategoryGroups(): {
   category: GameCategoryDef;
   games: GameMeta[];
 }[] {
-  return GAME_CATEGORIES.map((category) => ({
-    category,
-    games: GAMES.filter((def) => def.meta.categoryId === category.id).map(
-      (def) => def.meta,
-    ),
-  })).filter((group) => group.games.length > 0);
+  return Object.values(GAME_CATEGORIES)
+    .map((category) => ({
+      category,
+      games: GAMES.filter((def) => def.meta.categoryId === category.id).map(
+        (def) => def.meta,
+      ),
+    }))
+    .filter((group) => group.games.length > 0);
 }

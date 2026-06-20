@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { games } from "@gamelobby/database";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { games } from "@kyzen/database";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { createGameInConversation } from "../src/chat/games-in-chat-service";
 import { createHarness, DB_UP, expectErr, unwrap } from "./harness";
 
@@ -9,7 +9,7 @@ const h = createHarness("gi");
 afterAll(h.cleanup);
 
 describe.skipIf(!DB_UP)(
-  "createGameInConversation — error and branch matrix",
+  "createGameInConversation - error and branch matrix",
   () => {
     it("returns 404 for a non-existent conversation", async () => {
       const a = await h.makeUser("noconv");
@@ -162,10 +162,10 @@ describe.skipIf(!DB_UP)(
       expect(game.players).toEqual([
         { userId: owner.id, username: owner.username, role: "X" },
       ]);
-      expect(message.kind).toBe("game_card");
-      expect(message.gameId).toBe(game.id);
+      expect(message?.kind).toBe("game_card");
+      expect(message?.gameId).toBe(game.id);
 
-      const loaded = await games.getGameById(game.id);
+      const loaded = await games.getGameByCode(game.id);
       expect(loaded?.seatingMode).toBe("challenge");
       expect(loaded?.challengedUserId).toBe(member.id);
       expect(loaded?.players).toHaveLength(1);
@@ -194,9 +194,9 @@ describe.skipIf(!DB_UP)(
       expect(game.players).toEqual([
         { userId: owner.id, username: owner.username, role: "X" },
       ]);
-      expect(message.kind).toBe("game_card");
+      expect(message?.kind).toBe("game_card");
 
-      const loaded = await games.getGameById(game.id);
+      const loaded = await games.getGameByCode(game.id);
       expect(loaded?.seatingMode).toBe("open");
       expect(loaded?.challengedUserId).toBeNull();
       expect(loaded?.players).toHaveLength(1);

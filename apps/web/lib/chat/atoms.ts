@@ -5,7 +5,7 @@ import type {
   MessageJson,
   NotificationJson,
   TypingUser,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import { atomFamily } from "jotai-family";
@@ -47,10 +47,14 @@ export const typingAtomFamily = atomFamily((_conversationId: string) =>
 export const totalUnreadAtom = atom((get) =>
   get(conversationsAtom).reduce((sum, c) => sum + (c.unreadCount ?? 0), 0),
 );
-export const pendingRequestCountAtom = atom(
-  (get) => get(incomingRequestsAtom).length,
+export const conversationUnreadAtomFamily = atomFamily(
+  (conversationId: string) =>
+    atom(
+      (get) =>
+        get(conversationsAtom).find((c) => c.id === conversationId)
+          ?.unreadCount ?? 0,
+    ),
 );
-
 export function upsertMessage(
   list: ChatMessage[],
   incoming: ChatMessage,
@@ -72,18 +76,6 @@ export function upsertMessage(
     return copy;
   }
   return [...list, incoming];
-}
-
-export function bumpConversation(
-  list: ConversationJson[],
-  conversationId: string,
-  patch: Partial<ConversationJson>,
-): ConversationJson[] {
-  const idx = list.findIndex((c) => c.id === conversationId);
-  const existing = idx < 0 ? undefined : list[idx];
-  if (!existing) return list;
-  const updated = { ...existing, ...patch };
-  return [updated, ...list.filter((_, i) => i !== idx)];
 }
 
 export function upsertFriend(

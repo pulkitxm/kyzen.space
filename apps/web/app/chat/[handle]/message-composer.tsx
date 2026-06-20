@@ -1,12 +1,12 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import type {
   ConversationJson,
   GifJson,
   GifMeta,
   MemberJson,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { useStore } from "jotai";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -230,29 +230,31 @@ export function MessageComposer({
   }, [text, conversationId, me, socket, store, stopTyping]);
 
   return (
-    <div className="relative border-border border-t px-4 py-3">
-      {pickerOpen ? (
-        <button
-          type="button"
-          aria-label="Close picker"
-          className="fixed inset-0 z-10 cursor-default"
-          onClick={() => setPickerOpen(false)}
-        />
-      ) : null}
-      {pickerOpen ? (
-        <div className="absolute right-3 bottom-full z-20 mb-2">
-          <ComposerPicker onEmoji={insertEmoji} onGif={sendGif} />
-        </div>
-      ) : null}
+    <div className="border-border border-t px-4 py-3">
       <div className="flex items-end gap-2">
-        <button
-          type="button"
-          onClick={() => setPickerOpen((o) => !o)}
-          aria-label="Emoji & GIFs"
-          className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-surface-overlay hover:text-foreground"
-        >
-          <FaRegFaceSmile className="size-5" />
-        </button>
+        <div className="relative">
+          {pickerOpen ? (
+            <button
+              type="button"
+              aria-label="Close picker"
+              className="fixed inset-0 z-10 cursor-default"
+              onClick={() => setPickerOpen(false)}
+            />
+          ) : null}
+          {pickerOpen ? (
+            <div className="absolute bottom-full left-0 z-20 mb-2">
+              <ComposerPicker onEmoji={insertEmoji} onGif={sendGif} />
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setPickerOpen((o) => !o)}
+            aria-label="Emoji & GIFs"
+            className="flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-surface-overlay hover:text-foreground"
+          >
+            <FaRegFaceSmile className="size-5" />
+          </button>
+        </div>
         {me ? (
           <GameLauncher conversation={conversation} userId={me.id} />
         ) : null}
@@ -273,6 +275,7 @@ export function MessageComposer({
           }}
           rows={1}
           placeholder="Message…"
+          aria-label="Message"
           className="max-h-40 min-h-11 flex-1 resize-none overflow-y-hidden rounded-2xl border border-border bg-surface-raised px-4 py-2.5 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <button

@@ -23,9 +23,24 @@ export type {
   TypingUser,
 } from "./dto";
 export {
+  clientAddMembersSchema,
+  clientConversationRefSchema,
+  clientCreateDmSchema,
   clientCreateGameInConversationSchema,
+  clientCreateGroupSchema,
+  clientFriendRemoveSchema,
+  clientFriendRequestSchema,
+  clientFriendRespondSchema,
+  clientMarkReadSchema,
+  clientNotificationReadSchema,
+  clientRematchSchema,
+  clientRemoveMemberSchema,
+  clientRenameGroupSchema,
+  clientSendMessageSchema,
   gameCardMetaSchema,
+  gifMetaSchema,
   notificationPayloadSchema,
+  notificationTypeSchema,
 } from "./schemas";
 export type {
   Ack,
@@ -40,6 +55,7 @@ export type {
   ClientFriendRespond,
   ClientMarkRead,
   ClientNotificationRead,
+  ClientRematch,
   ClientRemoveMember,
   ClientRenameGroup,
   ClientSendMessage,
@@ -57,5 +73,6 @@ export type {
   ServerPresenceSnapshot,
   ServerPresenceUpdate,
   ServerReadReceipt,
+  ServerRematchCreated,
   ServerTypingUpdate,
 } from "./socket-events";

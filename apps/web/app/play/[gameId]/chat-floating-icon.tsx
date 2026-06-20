@@ -8,6 +8,7 @@ import {
   FaChevronUp,
   FaCommentDots,
 } from "react-icons/fa6";
+import { useGlassMode } from "@/lib/appearance";
 import {
   clampIcon,
   EDGE_TAB_LENGTH,
@@ -18,6 +19,7 @@ import {
   type IconPos,
   type StashEdge,
 } from "@/lib/chat-layout";
+import { startPointerDrag } from "@/lib/pointer-drag";
 import { cn } from "@/lib/utils";
 
 const DRAG_THRESHOLD = 4;
@@ -57,51 +59,48 @@ export function ChatFloatingIcon({
   const edgeRef = useRef(stashEdge);
   edgeRef.current = stashEdge;
   const justDraggedRef = useRef(false);
+  const { glass } = useGlassMode();
+  const glassOn = glass !== "off";
 
   const startDrag = useCallback(
     (e: React.MouseEvent) => {
-      e.preventDefault();
       const rect = e.currentTarget.getBoundingClientRect();
       const orig = { x: rect.left, y: rect.top };
       const startX = e.clientX;
       const startY = e.clientY;
       let moved = false;
       let lastInBounds = orig;
-      const onMove = (ev: MouseEvent) => {
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
-        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)
-          moved = true;
-        const raw = { x: orig.x + dx, y: orig.y + dy };
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const edge = edgeForIcon(raw, vw, vh);
-        if (edge) {
-          if (edgeRef.current !== edge) onStashChange(edge);
-        } else {
-          if (edgeRef.current !== null) onStashChange(null);
-          lastInBounds = clampIcon(raw, vw, vh);
+      startPointerDrag(e, {
+        onMove: (ev) => {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)
+            moved = true;
+          const raw = { x: orig.x + dx, y: orig.y + dy };
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          const edge = edgeForIcon(raw, vw, vh);
+          if (edge) {
+            if (edgeRef.current !== edge) onStashChange(edge);
+          } else {
+            if (edgeRef.current !== null) onStashChange(null);
+            lastInBounds = clampIcon(raw, vw, vh);
+            onIconChange(lastInBounds);
+          }
+        },
+        onEnd: () => {
+          if (!moved) {
+            onRestore();
+            return;
+          }
+          justDraggedRef.current = true;
+          requestAnimationFrame(() => {
+            justDraggedRef.current = false;
+          });
           onIconChange(lastInBounds);
-        }
-      };
-      const onUp = () => {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        document.body.style.userSelect = "";
-        if (!moved) {
-          onRestore();
-          return;
-        }
-        justDraggedRef.current = true;
-        requestAnimationFrame(() => {
-          justDraggedRef.current = false;
-        });
-        onIconChange(lastInBounds);
-        onCommit();
-      };
-      document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+          onCommit();
+        },
+      });
     },
     [onIconChange, onStashChange, onRestore, onCommit],
   );
@@ -134,13 +133,15 @@ export function ChatFloatingIcon({
         type="button"
         onClick={() => {
           if (justDraggedRef.current) return;
-          onStashChange(null);
-          onCommit();
+          onRestore();
         }}
-        aria-label="Show chat icon"
+        aria-label="Restore chat"
         style={style}
         className={cn(
-          "fixed z-50 flex items-center justify-center bg-primary text-primary-foreground shadow-lg outline-none transition hover:bg-primary-hover",
+          "fixed z-50 flex items-center justify-center shadow-lg outline-none transition",
+          glassOn
+            ? "glass-pane glass-press text-foreground"
+            : "bg-primary text-primary-foreground hover:bg-primary-hover",
           stashEdge === "left" && "rounded-r-lg",
           stashEdge === "right" && "rounded-l-lg",
           stashEdge === "top" && "rounded-b-lg",
@@ -163,7 +164,12 @@ export function ChatFloatingIcon({
         width: ICON_SIZE,
         height: ICON_SIZE,
       }}
-      className="fixed z-50 flex cursor-grab items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl outline-none transition hover:bg-primary-hover active:cursor-grabbing"
+      className={cn(
+        "fixed z-50 flex cursor-grab items-center justify-center rounded-full shadow-xl outline-none transition active:cursor-grabbing",
+        glassOn
+          ? "glass-pane glass-press text-foreground"
+          : "bg-primary text-primary-foreground hover:bg-primary-hover",
+      )}
     >
       <FaCommentDots className="size-6" />
       {unread > 0 && (

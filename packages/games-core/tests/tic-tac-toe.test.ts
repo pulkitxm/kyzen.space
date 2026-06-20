@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type {
-  Mark,
-  TicTacToeMove,
-  TicTacToeState,
-} from "@gamelobby/shared/types";
+import type { Mark, TicTacToeMove, TicTacToeState } from "@kyzen/shared/types";
 import {
   emptyBoard,
   getEngine,
@@ -45,7 +41,7 @@ function playSequence(moves: [Mark, number, number][]): TicTacToeState {
   return state;
 }
 
-describe("tic-tac-toe — initial state", () => {
+describe("tic-tac-toe: initial state", () => {
   test("empty board, X to move", () => {
     const s = initial();
     expect(s.board).toEqual(emptyBoard());
@@ -61,7 +57,7 @@ describe("tic-tac-toe — initial state", () => {
   });
 });
 
-describe("tic-tac-toe — turn & role enforcement", () => {
+describe("tic-tac-toe: turn & role enforcement", () => {
   test("O cannot move first", () => {
     const res = reduce(initial(), { role: "O" }, { row: 0, col: 0 });
     expect(res.ok).toBe(false);
@@ -87,7 +83,7 @@ describe("tic-tac-toe — turn & role enforcement", () => {
   });
 });
 
-describe("tic-tac-toe — move validity", () => {
+describe("tic-tac-toe: move validity", () => {
   test.each([
     ["row < 0", { row: -1, col: 0 }],
     ["row > 2", { row: 3, col: 0 }],
@@ -115,7 +111,7 @@ describe("tic-tac-toe — move validity", () => {
   });
 });
 
-describe("tic-tac-toe — win detection (all 8 lines)", () => {
+describe("tic-tac-toe: win detection (all 8 lines)", () => {
   const lineCases: { name: string; xCells: number[]; oCells: number[] }[] = [
     { name: "row 0", xCells: [0, 1, 2], oCells: [3, 4] },
     { name: "row 1", xCells: [3, 4, 5], oCells: [0, 1] },
@@ -131,7 +127,7 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
 
   test.each(lineCases)("X wins on $name", ({ xCells, oCells }) => {
     let state = initial();
-    let outcome: import("@gamelobby/shared/types").Outcome | undefined;
+    let outcome: import("@kyzen/shared/types").Outcome | undefined;
     for (let i = 0; i < 3; i++) {
       const xCell = xCells[i];
       expect(xCell).toBeDefined();
@@ -185,7 +181,7 @@ describe("tic-tac-toe — win detection (all 8 lines)", () => {
   });
 });
 
-describe("tic-tac-toe — draw", () => {
+describe("tic-tac-toe: draw", () => {
   test("full board with no line is a draw", () => {
     const state = playSequence([
       ["X", 0, 0],
@@ -209,7 +205,50 @@ describe("tic-tac-toe — draw", () => {
   });
 });
 
-describe("tic-tac-toe — post-game", () => {
+describe("tic-tac-toe: winner takes priority over a full board", () => {
+  test("a final move that fills the board AND completes a line is a win, not a draw", () => {
+    const state = playSequence([
+      ["X", 0, 0],
+      ["O", 0, 2],
+      ["X", 0, 1],
+      ["O", 1, 2],
+      ["X", 1, 0],
+      ["O", 2, 0],
+      ["X", 1, 1],
+      ["O", 2, 1],
+    ]);
+    const res = reduce(state, { role: "X" }, { row: 2, col: 2 });
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error(res.error);
+    expect(isBoardFull(res.state.board)).toBe(true);
+    expect(lineWinner(res.state.board)).toBe("X");
+    expect(res.outcome).toEqual({
+      status: "completed",
+      winnerRole: "X",
+      draw: false,
+    });
+  });
+});
+
+describe("tic-tac-toe: board helpers", () => {
+  test("lineWinner is null on an empty and on a non-winning board", () => {
+    expect(lineWinner(emptyBoard())).toBeNull();
+    const board = emptyBoard();
+    board[0] = "X";
+    board[1] = "O";
+    expect(lineWinner(board)).toBeNull();
+  });
+
+  test("isBoardFull is false for empty/partial boards and true when filled", () => {
+    expect(isBoardFull(emptyBoard())).toBe(false);
+    const partial = emptyBoard();
+    partial[0] = "X";
+    expect(isBoardFull(partial)).toBe(false);
+    expect(isBoardFull(emptyBoard().fill("X"))).toBe(true);
+  });
+});
+
+describe("tic-tac-toe: post-game", () => {
   test("no move accepted after a win", () => {
     let state = playSequence([
       ["X", 0, 0],
@@ -227,7 +266,7 @@ describe("tic-tac-toe — post-game", () => {
   });
 });
 
-describe("tic-tac-toe — full playthroughs", () => {
+describe("tic-tac-toe: full playthroughs", () => {
   test("X-win playthrough tracks state at every step", () => {
     let state = initial();
     const seq: [Mark, number, number][] = [
@@ -237,7 +276,7 @@ describe("tic-tac-toe — full playthroughs", () => {
       ["O", 0, 1],
       ["X", 0, 2],
     ];
-    let lastOutcome: import("@gamelobby/shared/types").Outcome | undefined;
+    let lastOutcome: import("@kyzen/shared/types").Outcome | undefined;
     let placed = 0;
     for (const [role, row, col] of seq) {
       const res = reduce(state, { role }, { row, col });
@@ -260,7 +299,7 @@ describe("tic-tac-toe — full playthroughs", () => {
       ["O", 1, 1],
       ["X", 0, 2],
     ];
-    let outcome: import("@gamelobby/shared/types").Outcome | undefined;
+    let outcome: import("@kyzen/shared/types").Outcome | undefined;
     for (const [role, row, col] of seq) {
       const res = reduce(state, { role }, { row, col });
       expect(res.ok).toBe(true);

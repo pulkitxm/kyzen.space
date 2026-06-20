@@ -5,19 +5,29 @@ import type {
   CreateProfileInput,
   GameStat,
   GameType,
+  GlassMode,
   PatternId,
   ProfileStats,
   PublicUserRow,
   ThemeId,
   UserProfileRow,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import {
   appearancePatchSchema,
   createProfileInputSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "../client";
 import { user, userProfile } from "../schema";
+
+export async function isAnonymousUser(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ isAnonymous: user.isAnonymous })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  return row?.isAnonymous ?? false;
+}
 
 export async function getDisplayName(userId: string): Promise<string | null> {
   const [row] = await db
@@ -121,13 +131,19 @@ export async function updateUsername(
 
 export async function updateAppearance(
   userId: string,
-  patch: { theme?: ThemeId; colorMode?: ColorMode; pattern?: PatternId },
+  patch: {
+    theme?: ThemeId;
+    colorMode?: ColorMode;
+    pattern?: PatternId;
+    glass?: GlassMode;
+  },
 ): Promise<void> {
   appearancePatchSchema.parse(patch);
   const set: {
     theme?: ThemeId;
     colorMode?: ColorMode;
     pattern?: PatternId;
+    glass?: GlassMode;
     updatedAt: Date;
   } = {
     updatedAt: new Date(),
@@ -135,6 +151,7 @@ export async function updateAppearance(
   if (patch.theme !== undefined) set.theme = patch.theme;
   if (patch.colorMode !== undefined) set.colorMode = patch.colorMode;
   if (patch.pattern !== undefined) set.pattern = patch.pattern;
+  if (patch.glass !== undefined) set.glass = patch.glass;
   await db.update(userProfile).set(set).where(eq(userProfile.userId, userId));
 }
 

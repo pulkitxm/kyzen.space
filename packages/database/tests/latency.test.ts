@@ -3,13 +3,19 @@ import { resolveDbLatencyMs, withLatency } from "../src/latency";
 
 type Pending<T> = PromiseLike<T> & {
   values: () => Pending<T>;
+  execute: () => Pending<T>;
+  marker: string;
   executed: boolean;
 };
 
-function makePending<T>(result: T): Pending<T> {
+function makePending<T>(result: T, reject = false): Pending<T> {
   const pending = {
     executed: false,
+    marker: "pending-prop",
     values() {
+      return this;
+    },
+    execute() {
       return this;
     },
     // biome-ignore lint/suspicious/noThenProperty: intentional thenable fake mimicking drizzle's lazy query
@@ -18,7 +24,8 @@ function makePending<T>(result: T): Pending<T> {
       onRejected?: ((reason: unknown) => unknown) | null,
     ) {
       pending.executed = true;
-      return Promise.resolve(result).then(onFulfilled, onRejected);
+      const settled = reject ? Promise.reject(result) : Promise.resolve(result);
+      return settled.then(onFulfilled, onRejected);
     },
   } as Pending<T>;
   return pending;
@@ -33,21 +40,21 @@ type FakeSql = {
   calls: string[];
 };
 
-function fakeSql(): FakeSql {
+function fakeSql(reject = false): FakeSql {
   const sql: FakeSql = {
     calls: [],
     options: { host: "localhost" },
     unsafe(query) {
       sql.calls.push(query);
-      const pending = makePending([{ ok: true }]);
+      const pending = makePending([{ ok: true }], reject);
       sql.lastPending = pending;
       return pending;
     },
     begin(fn) {
-      return fn(sql);
+      return typeof fn === "function" ? fn(sql) : "begin-no-fn";
     },
     savepoint(fn) {
-      return fn(sql);
+      return typeof fn === "function" ? fn(sql) : "savepoint-no-fn";
     },
   };
   return sql;
@@ -56,7 +63,7 @@ function fakeSql(): FakeSql {
 const DELAY = 60;
 const TOLERANCE = 15;
 
-describe("resolveDbLatencyMs — production safety", () => {
+describe("resolveDbLatencyMs - production safety", () => {
   it("forces 0 in production regardless of the requested value", () => {
     expect(resolveDbLatencyMs("production", 800)).toBe(0);
     expect(resolveDbLatencyMs("production", 999999)).toBe(0);
@@ -70,7 +77,7 @@ describe("resolveDbLatencyMs — production safety", () => {
   });
 });
 
-describe("withLatency — disabled", () => {
+describe("withLatency - disabled", () => {
   it("returns the same client untouched when ms is 0", () => {
     const sql = fakeSql();
     expect(withLatency(sql, 0)).toBe(sql);
@@ -83,7 +90,7 @@ describe("withLatency — disabled", () => {
   });
 });
 
-describe("withLatency — enabled", () => {
+describe("withLatency - enabled", () => {
   it("delays an `unsafe` query and preserves its result", async () => {
     const slow = withLatency(fakeSql(), DELAY);
     const start = performance.now();
@@ -145,5 +152,41 @@ describe("withLatency — enabled", () => {
   it("passes through non-query properties unchanged", () => {
     const slow = withLatency(fakeSql(), DELAY);
     expect(slow.options).toEqual({ host: "localhost" });
+  });
+
+  it("delays the `.execute()` chained form too", async () => {
+    const slow = withLatency(fakeSql(), DELAY);
+    const start = performance.now();
+    const result = await slow.unsafe("SELECT 1").execute();
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeGreaterThanOrEqual(DELAY - TOLERANCE);
+    expect(result).toEqual([{ ok: true }]);
+  });
+
+  it("propagates a rejection from the underlying query after the delay", async () => {
+    const slow = withLatency(fakeSql(true), DELAY);
+    const start = performance.now();
+    let caught: unknown;
+    try {
+      await slow.unsafe("SELECT 1");
+    } catch (e) {
+      caught = e;
+    }
+    const elapsed = performance.now() - start;
+
+    expect(caught).toEqual([{ ok: true }]);
+    expect(elapsed).toBeGreaterThanOrEqual(DELAY - TOLERANCE);
+  });
+
+  it("passes through a non-function property on the pending query object", () => {
+    const slow = withLatency(fakeSql(), DELAY);
+    expect(slow.unsafe("SELECT 1").marker).toBe("pending-prop");
+  });
+
+  it("calls begin/savepoint through untouched when the last arg is not a function", () => {
+    const slow = withLatency(fakeSql(), DELAY);
+    expect(slow.begin("not-a-fn" as unknown as never)).toBe("begin-no-fn");
+    expect(slow.savepoint(123 as unknown as never)).toBe("savepoint-no-fn");
   });
 });

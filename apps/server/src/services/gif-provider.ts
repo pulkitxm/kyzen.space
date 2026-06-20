@@ -1,4 +1,4 @@
-import type { GifJson } from "@gamelobby/shared/types";
+import type { GifJson } from "@kyzen/shared/types";
 import { env } from "../env";
 
 type KlipyVariant = { url?: string; width?: number; height?: number };
@@ -16,10 +16,6 @@ type KlipyResponse = {
 };
 
 export type GifPage = { gifs: GifJson[]; hasNext: boolean };
-
-export function isGifConfigured(): boolean {
-  return Boolean(env.klipyApiKey);
-}
 
 function normalize(item: KlipyItem): GifJson | null {
   const file = item.file ?? {};

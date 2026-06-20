@@ -1,6 +1,6 @@
 "use client";
 
-import { TILE_BY_ID } from "@gamelobby/games-core";
+import { TILE_BY_ID } from "@kyzen/games-core";
 import type {
   Card,
   MonopolyMove,
@@ -10,7 +10,7 @@ import type {
   RailroadTile,
   Tile,
   UtilityTile,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type React from "react";
 import { useState } from "react";
 import { FaLock, FaMinus, FaPlus, FaUnlock } from "react-icons/fa6";
@@ -658,7 +658,8 @@ export function Controls({
                   style={{
                     fontSize: 11,
                     fontWeight: 750,
-                    color: turnSecondsLeft <= 5 ? "var(--danger)" : "var(--warning)",
+                    color:
+                      turnSecondsLeft <= 5 ? "var(--danger)" : "var(--warning)",
                     marginTop: 6,
                     display: "flex",
                     alignItems: "center",

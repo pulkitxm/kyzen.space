@@ -1,5 +1,5 @@
-import { listGameMeta } from "@gamelobby/games-core";
-import type { GameType } from "@gamelobby/shared/types";
+import { listGameMeta } from "@kyzen/games-core";
+import type { GameType } from "@kyzen/shared/types";
 
 export const PROFILE_ACTIVITY_PAGE_SIZE = 5;
 
@@ -19,7 +19,7 @@ export type ProfileActivityGameRow = {
   updatedAt: string;
 };
 
-export function mapApiRowToActivity(
+function mapApiRowToActivity(
   row: ProfileActivityApiRow,
 ): ProfileActivityGameRow {
   const entry = listGameMeta().find((m) => m.type === row.gameType);

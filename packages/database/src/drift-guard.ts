@@ -1,4 +1,5 @@
 import type {
+  AccountMergeRow,
   AccountRow,
   ConversationMemberRow,
   ConversationRow,
@@ -12,9 +13,10 @@ import type {
   UserProfileRow,
   UserRow,
   VerificationRow,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type {
   account,
+  accountMerge,
   conversation,
   conversationMember,
   friendship,
@@ -50,4 +52,5 @@ export type SchemaDriftChecks = [
   Expect<Equal<typeof conversationMember.$inferSelect, ConversationMemberRow>>,
   Expect<Equal<typeof message.$inferSelect, MessageRow>>,
   Expect<Equal<typeof notification.$inferSelect, NotificationRow>>,
+  Expect<Equal<typeof accountMerge.$inferSelect, AccountMergeRow>>,
 ];

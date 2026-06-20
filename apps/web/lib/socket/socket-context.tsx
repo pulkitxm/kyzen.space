@@ -1,10 +1,12 @@
 "use client";
 
+import { atom, useSetAtom } from "jotai";
 import {
   createContext,
   type ReactNode,
-  useContext,
+  use,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -12,12 +14,11 @@ import { io, type Socket } from "socket.io-client";
 
 export type SocketStatus = "connecting" | "connected" | "disconnected";
 
-type SocketContextValue = { socket: Socket | null; status: SocketStatus };
+export const socketStatusAtom = atom<SocketStatus>("disconnected");
 
-const SocketContext = createContext<SocketContextValue>({
-  socket: null,
-  status: "disconnected",
-});
+type SocketContextValue = { socket: Socket | null };
+
+const SocketContext = createContext<SocketContextValue>({ socket: null });
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -30,7 +31,7 @@ export function SocketProvider({
   children: ReactNode;
 }) {
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [status, setStatus] = useState<SocketStatus>("disconnected");
+  const setStatus = useSetAtom(socketStatusAtom);
 
   useEffect(() => {
     if (!enabled) {
@@ -60,17 +61,17 @@ export function SocketProvider({
       setSocket(null);
       setStatus("disconnected");
     };
-  }, [enabled]);
+  }, [enabled, setStatus]);
+
+  const value = useMemo(() => ({ socket }), [socket]);
 
   return (
-    <SocketContext.Provider value={{ socket, status }}>
-      {children}
-    </SocketContext.Provider>
+    <SocketContext.Provider value={value}>{children}</SocketContext.Provider>
   );
 }
 
 export function useSocket(): SocketContextValue {
-  return useContext(SocketContext);
+  return use(SocketContext);
 }
 
 export function useSocketEvent<T = unknown>(

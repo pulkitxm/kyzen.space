@@ -1,5 +1,5 @@
-import { USERNAME_MAX_LENGTH } from "@gamelobby/shared/constants";
-import { normalizeUsername } from "@gamelobby/shared/types";
+import { USERNAME_MAX_LENGTH } from "@kyzen/shared/constants";
+import { normalizeUsername } from "@kyzen/shared/types";
 
 export function parseUsernameCsv(raw: string): string[] {
   return raw

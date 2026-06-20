@@ -27,24 +27,24 @@ Let a signed-in user change their **display name** and **username** from the Set
 
 Both must be added to `apps/server/src/env.ts`, `turbo.json` `globalEnv`, and `.env.example`.
 
-- `NOT_ALLOWED_USERNAMES` — comma-separated blocklist, e.g. `pulkit,kanak,admin`. Parsed by a new `list(name)` helper in `env.ts` (split on `,`, trim, lowercase, drop empties). Default `[]`.
-- `USERNAME_CHANGE_COOLDOWN_DAYS` — integer days between username changes, parsed via the existing `number()` helper. Default `30`. `0` disables the cooldown.
+- `NOT_ALLOWED_USERNAMES`: comma-separated blocklist, e.g. `pulkit,kanak,admin`. Parsed by a new `list(name)` helper in `env.ts` (split on `,`, trim, lowercase, drop empties). Default `[]`.
+- `USERNAME_CHANGE_COOLDOWN_DAYS`: integer days between username changes, parsed via the existing `number()` helper. Default `30`. `0` disables the cooldown.
 
 ## Schema change
 
 Add one nullable column to `user_profile` (`apps/server/src/db/schema.ts`):
 
-- `usernameChangedAt: timestamp("username_changed_at")` — nullable; `null` means "never changed" so the first change is always allowed.
+- `usernameChangedAt: timestamp("username_changed_at")`: nullable; `null` means "never changed" so the first change is always allowed.
 
 Applied via `db:push` (dev DB is push-managed; `db:migrate` is not used here).
 
-## `apps/server/src/username.ts` — shared helpers
+## `apps/server/src/username.ts`: shared helpers
 
 Extract pure, unit-testable helpers and reuse them in provisioning so behavior is consistent:
 
 - `normalizeUsername(raw: string): string` → `raw.trim().toLowerCase()`.
 - `isValidUsernameFormat(name: string): boolean` → `/^[a-z0-9_]{3,30}$/.test(name)` (expects already-normalized input).
-- `RESERVED_USERNAMES: ReadonlySet<string>` — centralized. Seeded with the current top-level route segments and server namespaces so a username can never shadow a route:
+- `RESERVED_USERNAMES: ReadonlySet<string>` - centralized. Seeded with the current top-level route segments and server namespaces so a username can never shadow a route:
   `api`, `auth`, `account`, `chat`, `friends`, `games`, `play`, `profile`, `settings`, `ui`.
   (Implementation audits `apps/web/app/` for the real navigable segments; non-route folders like `fonts` are excluded. `account`/`api` are server/API namespaces kept for safety.)
 - `isUsernameBlocked(normalized: string): boolean` → `RESERVED_USERNAMES.has(normalized) || env.notAllowedUsernames.includes(normalized)`.
@@ -54,8 +54,8 @@ Extract pure, unit-testable helpers and reuse them in provisioning so behavior i
 
 ## Repository writes (`apps/server/src/db/repositories/profiles.ts`)
 
-- `setDisplayName(userId: string, name: string): Promise<void>` — `update(user).set({ name, updatedAt: now }).where(eq(user.id, userId))`.
-- `updateUsername(userId: string, username: string): Promise<void>` — sets `username` + `usernameChangedAt = now` on `user_profile`.
+- `setDisplayName(userId: string, name: string): Promise<void>` - `update(user).set({ name, updatedAt: now }).where(eq(user.id, userId))`.
+- `updateUsername(userId: string, username: string): Promise<void>` - sets `username` + `usernameChangedAt = now` on `user_profile`.
 
 ## Endpoints (`apps/server/src/api/routes/profiles.ts`, all `requireAuth`)
 
@@ -65,7 +65,7 @@ Extract pure, unit-testable helpers and reuse them in provisioning so behavior i
 2. `PUT /me/username` `{ username }` → validates in order: format (`400`), reserved/blocked (`400`), cooldown (`429` with `nextChangeAt` ISO date), availability (`409`). On success: `updateUsername`, return `{ username }`.
    - Cooldown: if `usernameChangedAt` is set and `now - usernameChangedAt < USERNAME_CHANGE_COOLDOWN_DAYS`, reject `429`.
 3. `PUT /me/name` `{ name }` → trim; validate length 1–50 (`400` otherwise); `setDisplayName`; return `{ name }`.
-4. Extend `GET /me` to include `usernameEditableAt` (ISO string or `null`) in the `profile` object — computed server-side as `usernameChangedAt + USERNAME_CHANGE_COOLDOWN_DAYS`, or `null` when the username is editable now (never changed, or cooldown elapsed, or cooldown disabled). The client locks the field whenever `usernameEditableAt` is in the future. This keeps the cooldown policy server-only (no `NEXT_PUBLIC_*` mirror needed).
+4. Extend `GET /me` to include `usernameEditableAt` (ISO string or `null`) in the `profile` object - computed server-side as `usernameChangedAt + USERNAME_CHANGE_COOLDOWN_DAYS`, or `null` when the username is editable now (never changed, or cooldown elapsed, or cooldown disabled). The client locks the field whenever `usernameEditableAt` is in the future. This keeps the cooldown policy server-only (no `NEXT_PUBLIC_*` mirror needed).
 
 Error responses follow the existing `c.json({ error }, status)` convention.
 
@@ -85,11 +85,11 @@ New client component `apps/web/app/settings/account-identity-form.tsx`, rendered
 
 ## Docs & conventions to sync (part of this change)
 
-- **`CLAUDE.md` + `AGENTS.md`** — add the reserved-routes rule:
-  > **Reserved usernames vs. top-level routes.** The profile page is a catch-all `/[username]` route, so every top-level segment under `apps/web/app/` is a potential username collision. When you add a new top-level route, add its segment to `RESERVED_USERNAMES` in `apps/server/src/username.ts` if a user claiming that name would shadow the route. User-specific blocklisting is separate — that's the `NOT_ALLOWED_USERNAMES` env var.
-- **`docs/architecture/database.md`** — document the new `username_changed_at` column.
-- **Profiles routes / web settings docs** — document the new endpoints and the settings Account identity form.
-- **`.env.example`** — the two new env vars with example values.
+- **`CLAUDE.md` + `AGENTS.md`**: add the reserved-routes rule:
+  > **Reserved usernames vs. top-level routes.** The profile page is a catch-all `/[username]` route, so every top-level segment under `apps/web/app/` is a potential username collision. When you add a new top-level route, add its segment to `RESERVED_USERNAMES` in `apps/server/src/username.ts` if a user claiming that name would shadow the route. User-specific blocklisting is separate - that's the `NOT_ALLOWED_USERNAMES` env var.
+- **`docs/architecture/database.md`**: document the new `username_changed_at` column.
+- **Profiles routes / web settings docs**: document the new endpoints and the settings Account identity form.
+- **`.env.example`**: the two new env vars with example values.
 
 ## Out of scope (YAGNI)
 

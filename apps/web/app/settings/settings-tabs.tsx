@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/settings/account", label: "Account", Icon: FaUser },
-  { href: "/settings/appearance", label: "Appearance", Icon: FaPalette },
+  { href: "/settings/appearance/theme", label: "Appearance", Icon: FaPalette },
 ] as const;
 
 export function SettingsTabs() {

@@ -1,6 +1,6 @@
-import { conversations, friends, profiles } from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { ConversationJson } from "@gamelobby/shared/types";
+import { conversations, friends, profiles } from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { ConversationJson } from "@kyzen/shared/types";
 import { getIO } from "../realtime/io";
 import { convRoom, emitToUser, userRoom } from "../realtime/rooms";
 import { assembleConversation } from "./assemble";
@@ -57,6 +57,9 @@ export async function createGroup(
 ): Promise<ServiceResult<ConversationJson>> {
   const trimmed = name.trim();
   if (!trimmed) return fail("Group name is required");
+  if (await conversations.findGroupByName(trimmed)) {
+    return fail("A group with this name already exists");
+  }
 
   const candidates = Array.from(new Set(memberIds)).filter(
     (id) => id !== userId,
@@ -161,6 +164,10 @@ export async function renameGroup(
   }
   const trimmed = name.trim();
   if (!trimmed) return fail("Group name is required");
+  const existing = await conversations.findGroupByName(trimmed);
+  if (existing && existing.id !== conversationId) {
+    return fail("A group with this name already exists");
+  }
 
   await conversations.renameGroup(conversationId, trimmed);
   const memberIds = await conversations.getMemberIds(conversationId);

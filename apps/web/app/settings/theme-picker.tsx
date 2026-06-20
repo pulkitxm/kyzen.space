@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import { FaCheck, FaDesktop, FaMoon, FaSun } from "react-icons/fa6";
 
 import { useColorModeSetting, usePalette } from "@/lib/appearance";
@@ -40,8 +46,12 @@ export function ThemePicker({ signedIn }: { signedIn: boolean }) {
     committedRef.current = palette;
   }, [palette]);
 
+  const restoreCommitted = useEffectEvent(() =>
+    previewPalette(committedRef.current),
+  );
+
   useEffect(() => {
-    return () => previewPalette(committedRef.current);
+    return () => restoreCommitted();
   }, []);
 
   const restore = useCallback(() => previewPalette(committedRef.current), []);

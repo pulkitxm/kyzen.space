@@ -23,6 +23,10 @@ export interface GameEngine<State, Input> {
 
   reduce?(state: State, ctx: MoveContext, input: Input): ReduceResult<State>;
 
+  autoMove?(state: State, role: string): Input;
+
+  currentRole?(state: State): string | null;
+
   step?(
     state: State,
     inputs: Map<string, Input>,

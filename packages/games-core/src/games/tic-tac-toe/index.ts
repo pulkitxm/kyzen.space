@@ -6,7 +6,7 @@ import {
   ticTacToeConfigSchema,
   ticTacToeMoveSchema,
   ticTacToeStateSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { ticTacToeEngine } from "./engine";
 import { ticTacToeMeta } from "./meta";
 

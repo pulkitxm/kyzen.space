@@ -1,4 +1,4 @@
-import type { Tile } from "@gamelobby/shared/types";
+import type { Tile } from "@kyzen/shared/types";
 
 export const BOARD_SIZE = 32;
 export const GO_POSITION = 0;

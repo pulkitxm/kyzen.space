@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { GAME_CATEGORIES, GAME_TYPES } from "@gamelobby/shared/constants";
-import type { GameDefinition, Seat } from "@gamelobby/shared/types";
+import { GAME_CATEGORIES, GAME_TYPES } from "@kyzen/shared/constants";
+import type { GameDefinition, Seat } from "@kyzen/shared/types";
 import { GAMES, listGameTypes } from "../src/index";
 
-const CATEGORY_IDS = new Set(GAME_CATEGORIES.map((category) => category.id));
+const CATEGORY_IDS = new Set<string>(
+  Object.values(GAME_CATEGORIES).map((category) => category.id),
+);
 
 function minSeats(def: GameDefinition): Seat[] {
   return def.engine.roles
@@ -23,7 +25,7 @@ describe("GAMES registry", () => {
   });
 });
 
-for (const def of GAMES) {
+for (const def of GAMES as GameDefinition[]) {
   describe(`conformance: ${def.meta.type}`, () => {
     test("meta.type matches engine.type", () => {
       expect(def.engine.type).toBe(def.meta.type);
@@ -104,6 +106,33 @@ for (const def of GAMES) {
       if (def.meta.coverImage === undefined) return;
       expect(typeof def.meta.coverImage).toBe("string");
       expect(def.meta.coverImage.startsWith("/games/")).toBe(true);
+    });
+
+    test("tutorialVideo, when set, is a /games/ path", () => {
+      if (def.meta.tutorialVideo === undefined) return;
+      expect(typeof def.meta.tutorialVideo).toBe("string");
+      expect(def.meta.tutorialVideo.startsWith("/games/")).toBe(true);
+    });
+
+    test("howToPlay, when set, is a non-empty list of non-empty steps", () => {
+      if (def.meta.howToPlay === undefined) return;
+      expect(def.meta.howToPlay.length).toBeGreaterThan(0);
+      for (const step of def.meta.howToPlay) {
+        expect(typeof step).toBe("string");
+        expect(step.trim().length).toBeGreaterThan(0);
+      }
+    });
+
+    test("turn-based engine provides a legal autoMove", () => {
+      if (def.engine.mode !== "turn-based" || !def.engine.autoMove) return;
+      const state = def.engine.createInitialState(minSeats(def));
+      const role = def.engine.roles[0];
+      if (role === undefined) throw new Error("engine must declare a role");
+      const move = def.engine.autoMove(state, role);
+      expect(def.moveSchema.safeParse(move).success).toBe(true);
+      if (def.engine.reduce) {
+        expect(def.engine.reduce(state, { role }, move).ok).toBe(true);
+      }
     });
   });
 }

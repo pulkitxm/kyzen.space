@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   addMoveInputSchema,
   type CreateGameInput,
@@ -8,10 +9,24 @@ import {
   type GameType,
   type GameUpdate,
   type MoveRow,
-} from "@gamelobby/shared/types";
-import { desc, eq, getTableColumns, sql } from "drizzle-orm";
+  normalizeGameCode,
+} from "@kyzen/shared/types";
+import { and, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
 import { db } from "../client";
 import { game, gamePlayer, move, userProfile } from "../schema";
+
+const GAME_CODE_MAX_ATTEMPTS = 5;
+
+function isGameCodeCollision(error: unknown): boolean {
+  const e = error as {
+    code?: string;
+    constraint_name?: string;
+    cause?: { code?: string; constraint_name?: string };
+  };
+  const code = e?.code ?? e?.cause?.code;
+  const constraint = e?.constraint_name ?? e?.cause?.constraint_name;
+  return code === "23505" && constraint === "game_code_uq";
+}
 
 function toGameRecord(row: GameRow, players: GamePlayer[]): GameRecord {
   return { ...row, gameType: row.gameType as GameType, players };
@@ -19,36 +34,46 @@ function toGameRecord(row: GameRow, players: GamePlayer[]): GameRecord {
 
 export async function createGame(input: CreateGameInput): Promise<GameRecord> {
   createGameInputSchema.parse(input);
-  return db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(game)
-      .values({
-        gameType: input.gameType,
-        status: input.status ?? "waiting",
-        gameState: input.gameState,
-        config: input.config ?? null,
-        winner: null,
-        conversationId: input.conversationId ?? null,
-        creatorUserId: input.creatorUserId ?? null,
-        seatingMode: input.seatingMode ?? null,
-        challengedUserId: input.challengedUserId ?? null,
-      })
-      .returning();
-    if (!row) throw new Error("Failed to create game");
-    const created = row;
-    if (input.players.length) {
-      await tx.insert(gamePlayer).values(
-        input.players.map((p, i) => ({
-          gameId: created.id,
-          userId: p.userId,
-          username: p.username,
-          role: p.role,
-          seatOrder: i,
-        })),
-      );
+  for (let attempt = 1; attempt <= GAME_CODE_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await db.transaction(async (tx) => {
+        const id = randomUUID();
+        const [row] = await tx
+          .insert(game)
+          .values({
+            id,
+            gameType: input.gameType,
+            status: input.status ?? "waiting",
+            gameState: input.gameState,
+            config: input.config ?? null,
+            winner: null,
+            seriesId: input.seriesId ?? id,
+            conversationId: input.conversationId ?? null,
+            creatorUserId: input.creatorUserId ?? null,
+            seatingMode: input.seatingMode ?? null,
+            challengedUserId: input.challengedUserId ?? null,
+          })
+          .returning();
+        if (!row) throw new Error("Failed to create game");
+        const created = row;
+        if (input.players.length) {
+          await tx.insert(gamePlayer).values(
+            input.players.map((p, i) => ({
+              gameId: created.id,
+              userId: p.userId,
+              username: p.username,
+              role: p.role,
+              seatOrder: i,
+            })),
+          );
+        }
+        return toGameRecord(created, input.players);
+      });
+    } catch (error) {
+      if (!isGameCodeCollision(error)) throw error;
     }
-    return toGameRecord(created, input.players);
-  });
+  }
+  throw new Error("Failed to allocate a unique game code");
 }
 
 export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
@@ -67,7 +92,7 @@ export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
     userId: r.userId,
     username: r.username,
     role: r.role,
-    avatar: r.avatar,
+    avatar: r.avatar ?? null,
   }));
 }
 
@@ -78,18 +103,69 @@ export async function getGameById(id: string): Promise<GameRecord | null> {
   return toGameRecord(row, players);
 }
 
+export async function getGameByCode(code: string): Promise<GameRecord | null> {
+  const [row] = await db
+    .select()
+    .from(game)
+    .where(eq(game.code, normalizeGameCode(code)))
+    .limit(1);
+  if (!row) return null;
+  const players = await getPlayers(row.id);
+  return toGameRecord(row, players);
+}
+
+export async function getSeriesGames(seriesId: string): Promise<GameRecord[]> {
+  const rows = await db
+    .select()
+    .from(game)
+    .where(eq(game.seriesId, seriesId))
+    .orderBy(game.createdAt);
+  const records: GameRecord[] = [];
+  for (const row of rows) {
+    const players = await getPlayers(row.id);
+    records.push(toGameRecord(row, players));
+  }
+  return records;
+}
+
+export async function findLiveGameInConversation(
+  conversationId: string,
+  gameType: GameType,
+): Promise<GameRecord | null> {
+  const [row] = await db
+    .select()
+    .from(game)
+    .where(
+      and(
+        eq(game.conversationId, conversationId),
+        eq(game.gameType, gameType),
+        inArray(game.status, ["waiting", "active"]),
+      ),
+    )
+    .orderBy(desc(game.createdAt))
+    .limit(1);
+  if (!row) return null;
+  const players = await getPlayers(row.id);
+  return toGameRecord(row, players);
+}
+
 export async function seatPlayer(
   gameId: string,
   player: GamePlayer,
   seatOrder: number,
-): Promise<void> {
-  await db.insert(gamePlayer).values({
-    gameId,
-    userId: player.userId,
-    username: player.username,
-    role: player.role,
-    seatOrder,
-  });
+): Promise<boolean> {
+  const rows = await db
+    .insert(gamePlayer)
+    .values({
+      gameId,
+      userId: player.userId,
+      username: player.username,
+      role: player.role,
+      seatOrder,
+    })
+    .onConflictDoNothing({ target: [gamePlayer.gameId, gamePlayer.userId] })
+    .returning({ id: gamePlayer.id });
+  return rows.length > 0;
 }
 
 export async function updateGame(

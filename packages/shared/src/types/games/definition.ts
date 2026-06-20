@@ -1,4 +1,5 @@
 import type { ZodType } from "zod";
+import type { GameCategoryId } from "./categories";
 import type { GameType } from "./core";
 import type { GameEngine } from "./engine";
 
@@ -6,9 +7,10 @@ export interface GameMeta {
   type: GameType;
   name: string;
   description: string;
-  categoryId: string;
+  categoryId: GameCategoryId;
   coverImage?: string;
-  layoutWidth?: string;
+  tutorialVideo?: string;
+  howToPlay?: string[];
 }
 
 export type ConfigFieldType = "select" | "number" | "toggle";

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 
 type Conv = { id: string; kind: "dm" | "group"; name: string | null } | null;
 
@@ -9,21 +9,25 @@ let profile: { username: string } | null = { username: "alice" };
 // biome-ignore lint/suspicious/noExplicitAny: test capture of repo input
 let createGameInput: any = null;
 const notifyCalls: Array<{ userId: string; type: string }> = [];
+const notifyArgs: Array<{ userId: string; type: string; payload: unknown }> =
+  [];
 // biome-ignore lint/suspicious/noExplicitAny: test capture of sent message
 const sentMessages: any[] = [];
 
-mock.module("@gamelobby/database", () => ({
+mock.module("@kyzen/database", () => ({
   conversations: {
     getById: async () => conv,
     isMember: async (_cid: string, uid: string) => members.includes(uid),
     getMemberIds: async () => members,
   },
   games: {
+    findLiveGameInConversation: async () => null,
     // biome-ignore lint/suspicious/noExplicitAny: test stub
     createGame: async (input: any) => {
       createGameInput = input;
       return {
         id: "game-1",
+        code: "GAMECODE",
         gameType: input.gameType,
         status: input.status ?? "waiting",
         players: input.players,
@@ -43,11 +47,25 @@ mock.module("@gamelobby/database", () => ({
   profiles: {
     getProfileByUserId: async () => profile,
   },
+  messages: {},
+  accountMerge: {},
+  friends: {},
+  notifications: {},
+  db: {},
+  schema: {},
+  invites: {},
+  generateInviteToken: () => "x".repeat(43),
+  createDb: () => ({ db: {}, client: {} }),
 }));
 
 mock.module("../src/realtime/notify", () => ({
-  notify: async (userId: string, type: string) => {
+  notify: async (
+    userId: string,
+    type: string,
+    opts?: { payload?: unknown },
+  ) => {
     notifyCalls.push({ userId, type });
+    notifyArgs.push({ userId, type, payload: opts?.payload });
   },
 }));
 
@@ -70,6 +88,7 @@ describe("createGameInConversation", () => {
     profile = { username: "alice" };
     createGameInput = null;
     notifyCalls.length = 0;
+    notifyArgs.length = 0;
     sentMessages.length = 0;
   });
 
@@ -168,6 +187,24 @@ describe("createGameInConversation", () => {
     );
     expect(byUser).toEqual({ bob: "game_challenge", carol: "game_started" });
     expect(notifyCalls.find((n) => n.userId === "alice")).toBeUndefined();
+  });
+
+  test("card metadata + notification carry the code while the message FK carries the UUID", async () => {
+    conv = { id: "c1", kind: "dm", name: null };
+    members = ["alice", "bob"];
+    const res = await createGameInConversation({
+      userId: "alice",
+      conversationId: "c1",
+      gameType: TIC_TAC_TOE,
+    });
+    expect(res.ok).toBe(true);
+    expect(sentMessages[0].gameId).toBe("game-1");
+    expect((sentMessages[0].metadata as { gameId: string }).gameId).toBe(
+      "GAMECODE",
+    );
+    const payload = notifyArgs[0]?.payload as { gameId?: string };
+    expect(payload?.gameId).toBe("GAMECODE");
+    if (res.ok) expect(res.value.game.id).toBe("GAMECODE");
   });
 
   test("group open seating notifies every other member as game_started", async () => {

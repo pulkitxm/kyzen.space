@@ -1,10 +1,21 @@
-import { conversations, notifications } from "@gamelobby/database";
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
+import { conversations, notifications } from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import {
+  clientAddMembersSchema,
+  clientConversationRefSchema,
+  clientCreateDmSchema,
+  clientCreateGroupSchema,
+  clientMarkReadSchema,
+  clientNotificationReadSchema,
+  clientRemoveMemberSchema,
+  clientRenameGroupSchema,
+  clientSendMessageSchema,
+} from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import * as conversationsService from "../chat/conversations-service";
 import * as messagesService from "../chat/messages-service";
 import { convRoom, joinConvRoom, leaveConvRoom, userRoom } from "./rooms";
-import { ack, ackErr, isObj, register, str, strArray } from "./socket-util";
+import { ack, ackErr, register } from "./socket-util";
 
 export async function joinUserRooms(socket: Socket): Promise<void> {
   const userId = socket.data.userId;
@@ -17,41 +28,41 @@ export function attachChatHandlers(io: IOServer, socket: Socket): void {
   const userId = socket.data.userId;
 
   register(socket, CHAT_EVENTS.conversationJoin, async (payload, cb) => {
-    const id = isObj(payload) ? str(payload.conversationId) : null;
-    if (!id) return ackErr(cb, "conversationId required");
-    if (!(await conversations.isMember(id, userId))) {
+    const parsed = clientConversationRefSchema.safeParse(payload);
+    if (!parsed.success) return ackErr(cb, "conversationId required");
+    const { conversationId } = parsed.data;
+    if (!(await conversations.isMember(conversationId, userId))) {
       return ackErr(cb, "Not a member of this conversation");
     }
-    joinConvRoom(socket, id);
+    joinConvRoom(socket, conversationId);
     cb?.({ ok: true });
   });
 
   register(socket, CHAT_EVENTS.conversationLeave, async (payload, cb) => {
-    const id = isObj(payload) ? str(payload.conversationId) : null;
-    if (id) leaveConvRoom(socket, id);
+    const parsed = clientConversationRefSchema.safeParse(payload);
+    if (parsed.success) leaveConvRoom(socket, parsed.data.conversationId);
     cb?.({ ok: true });
   });
 
   register(socket, CHAT_EVENTS.sendMessage, async (payload, cb) => {
-    if (!isObj(payload)) return ackErr(cb, "Invalid payload");
-    const conversationId = str(payload.conversationId);
-    if (!conversationId) return ackErr(cb, "conversationId required");
+    const parsed = clientSendMessageSchema.safeParse(payload);
+    if (!parsed.success) return ackErr(cb, "Invalid payload");
+    const { conversationId, kind, body, metadata, clientId } = parsed.data;
     const res = await messagesService.sendMessage({
       conversationId,
       senderId: userId,
-      kind: payload.kind === "gif" ? "gif" : "text",
-      body: str(payload.body),
-      metadata: isObj(payload.metadata) ? (payload.metadata as never) : null,
-      clientId: str(payload.clientId) ?? undefined,
+      kind: kind === "gif" ? "gif" : "text",
+      body: body ?? null,
+      metadata: metadata ?? null,
+      clientId,
     });
     ack(cb, res, "message");
   });
 
   register(socket, CHAT_EVENTS.markRead, async (payload, cb) => {
-    if (!isObj(payload)) return ackErr(cb, "Invalid payload");
-    const conversationId = str(payload.conversationId);
-    const messageId = str(payload.messageId);
-    if (!conversationId || !messageId) return ackErr(cb, "Invalid payload");
+    const parsed = clientMarkReadSchema.safeParse(payload);
+    if (!parsed.success) return ackErr(cb, "Invalid payload");
+    const { conversationId, messageId } = parsed.data;
     ack(
       cb,
       await messagesService.markRead(userId, conversationId, messageId),
@@ -60,49 +71,49 @@ export function attachChatHandlers(io: IOServer, socket: Socket): void {
   });
 
   register(socket, CHAT_EVENTS.createDm, async (payload, cb) => {
-    const otherId = isObj(payload) ? str(payload.userId) : null;
-    if (!otherId) return ackErr(cb, "userId required");
+    const parsed = clientCreateDmSchema.safeParse(payload);
+    if (!parsed.success) return ackErr(cb, "userId required");
     ack(
       cb,
-      await conversationsService.createDm(userId, otherId),
+      await conversationsService.createDm(userId, parsed.data.userId),
       "conversation",
     );
   });
 
   register(socket, CHAT_EVENTS.createGroup, async (payload, cb) => {
-    if (!isObj(payload)) return ackErr(cb, "Invalid payload");
-    const name = str(payload.name) ?? "";
+    const parsed = clientCreateGroupSchema.safeParse(payload);
+    if (!parsed.success) return ackErr(cb, "Invalid payload");
+    const { name, memberIds } = parsed.data;
     ack(
       cb,
       await conversationsService.createGroup(
         userId,
-        name,
-        strArray(payload.memberIds),
+        name ?? "",
+        memberIds ?? [],
       ),
       "conversation",
     );
   });
 
   register(socket, CHAT_EVENTS.addMembers, async (payload, cb) => {
-    if (!isObj(payload)) return ackErr(cb, "Invalid payload");
-    const conversationId = str(payload.conversationId);
-    if (!conversationId) return ackErr(cb, "conversationId required");
+    const parsed = clientAddMembersSchema.safeParse(payload);
+    if (!parsed.success) return ackErr(cb, "conversationId required");
+    const { conversationId, userIds } = parsed.data;
     ack(
       cb,
       await conversationsService.addMembers(
         userId,
         conversationId,
-        strArray(payload.userIds),
+        userIds ?? [],
       ),
       "conversation",
     );
   });
 
   register(socket, CHAT_EVENTS.removeMember, async (payload, cb) => {
-    if (!isObj(payload)) return ackErr(cb, "Invalid payload");
-    const conversationId = str(payload.conversationId);
-    const targetUserId = str(payload.userId);
-    if (!conversationId || !targetUserId) return ackErr(cb, "Invalid payload");
+    const parsed = clientRemoveMemberSchema.safeParse(payload);
+    if (!parsed.success) return ackErr(cb, "Invalid payload");
+    const { conversationId, userId: targetUserId } = parsed.data;
     ack(
       cb,
       await conversationsService.removeMember(
@@ -115,22 +126,27 @@ export function attachChatHandlers(io: IOServer, socket: Socket): void {
   });
 
   register(socket, CHAT_EVENTS.renameGroup, async (payload, cb) => {
-    if (!isObj(payload)) return ackErr(cb, "Invalid payload");
-    const conversationId = str(payload.conversationId);
-    const name = str(payload.name) ?? "";
-    if (!conversationId) return ackErr(cb, "conversationId required");
+    const parsed = clientRenameGroupSchema.safeParse(payload);
+    if (!parsed.success) return ackErr(cb, "conversationId required");
+    const { conversationId, name } = parsed.data;
     ack(
       cb,
-      await conversationsService.renameGroup(userId, conversationId, name),
+      await conversationsService.renameGroup(
+        userId,
+        conversationId,
+        name ?? "",
+      ),
       "conversation",
     );
   });
 
   register(socket, CHAT_EVENTS.notificationRead, async (payload, cb) => {
-    const id = isObj(payload) ? str(payload.id) : null;
-    if (id) {
-      await notifications.markRead(id, userId);
-      io.to(userRoom(userId)).emit(CHAT_EVENTS.notificationReadEvent, { id });
+    const parsed = clientNotificationReadSchema.safeParse(payload);
+    if (parsed.success) {
+      await notifications.markRead(parsed.data.id, userId);
+      io.to(userRoom(userId)).emit(CHAT_EVENTS.notificationReadEvent, {
+        id: parsed.data.id,
+      });
     }
     cb?.({ ok: true });
   });

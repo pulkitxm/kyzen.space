@@ -1,12 +1,14 @@
 "use client";
 
-import { CHAT_EVENTS } from "@gamelobby/shared/constants";
-import type { ConversationJson } from "@gamelobby/shared/types";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import type { ConversationJson } from "@kyzen/shared/types";
 import { useAtomValue, useStore } from "jotai";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { GlassPane } from "@/components/glass/glass-pane";
 import { Button } from "@/components/ui";
 import { PresenceAvatar } from "@/components/ui/avatar-stack";
+import { ProfilePopupTrigger } from "@/components/ui/profile-popup";
 import { conversationsAtom, friendsAtom, presenceAtom } from "@/lib/chat/atoms";
 import { presenceLabel } from "@/lib/chat/presence";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
@@ -90,10 +92,10 @@ export function GroupSettingsDialog({
       <button
         type="button"
         aria-label="Close"
-        className="absolute inset-0 bg-black/50"
+        className="glass-scrim absolute inset-0 bg-black/50"
         onClick={onClose}
       />
-      <div className="relative flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-border bg-card p-4 shadow-xl">
+      <GlassPane className="relative flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-border bg-card p-4 shadow-xl">
         <h2 className="mb-3 font-semibold text-lg">Group settings</h2>
 
         {isOwner ? (
@@ -101,6 +103,7 @@ export function GroupSettingsDialog({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
+              aria-label="Group name"
               className="flex-1 rounded-xl border border-border bg-surface-raised px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <Button
@@ -128,12 +131,23 @@ export function GroupSettingsDialog({
                   : presence.get(m.id);
               return (
                 <li key={m.id} className="flex items-center gap-3 px-1 py-1.5">
-                  <PresenceAvatar
-                    config={m.avatar}
-                    seed={m.username}
-                    size={32}
-                    online={p?.online ? true : undefined}
-                  />
+                  {m.id === userId ? (
+                    <PresenceAvatar
+                      config={m.avatar}
+                      seed={m.username}
+                      size={32}
+                      online={p?.online ? true : undefined}
+                    />
+                  ) : (
+                    <ProfilePopupTrigger user={m} className="shrink-0">
+                      <PresenceAvatar
+                        config={m.avatar}
+                        seed={m.username}
+                        size={32}
+                        online={p?.online ? true : undefined}
+                      />
+                    </ProfilePopupTrigger>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm">
                       {m.displayName ?? m.username}
@@ -142,8 +156,8 @@ export function GroupSettingsDialog({
                     <div
                       className={
                         p?.online
-                          ? "truncate text-emerald-500 text-xs"
-                          : "truncate text-muted-foreground text-xs"
+                          ? "min-h-4 truncate text-emerald-500 text-xs"
+                          : "min-h-4 truncate text-muted-foreground text-xs"
                       }
                     >
                       {presenceLabel(p)}
@@ -227,7 +241,7 @@ export function GroupSettingsDialog({
             Done
           </Button>
         </div>
-      </div>
+      </GlassPane>
     </div>
   );
 }

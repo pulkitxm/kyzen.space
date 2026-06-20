@@ -1,21 +1,16 @@
 import { z } from "zod";
+import { notificationTypeSchema } from "../chat/schemas";
 import { gameTypeSchema } from "../games/core";
 import {
   gamePlayerSchema,
   gameStatusSchema,
   seatingModeSchema,
 } from "../games/wire";
+import { glassModeSchema } from "../glass";
 import { patternIdSchema } from "../pattern";
 import { colorModeSchema, themeIdSchema } from "../theme";
 
 export const messageKindSchema = z.enum(["text", "gif", "game_card", "system"]);
-
-export const notificationTypeSchema = z.enum([
-  "friend_request",
-  "friend_accepted",
-  "game_started",
-  "game_challenge",
-]);
 
 export const createGameInputSchema = z.object({
   gameType: gameTypeSchema,
@@ -27,6 +22,7 @@ export const createGameInputSchema = z.object({
   creatorUserId: z.string().nullable().optional(),
   seatingMode: seatingModeSchema.nullable().optional(),
   challengedUserId: z.string().nullable().optional(),
+  seriesId: z.string().nullable().optional(),
 });
 
 export const addMoveInputSchema = z.object({
@@ -52,6 +48,21 @@ export const createNotificationInputSchema = z.object({
   payload: z.unknown().optional(),
 });
 
+export const accountMergeStatusSchema = z.enum([
+  "pending",
+  "confirmed",
+  "discarded",
+]);
+
+export const recordAccountMergeInputSchema = z
+  .object({
+    anonUserId: z.string().min(1),
+    targetUserId: z.string().min(1),
+  })
+  .refine((v) => v.anonUserId !== v.targetUserId, {
+    message: "anonUserId and targetUserId must differ",
+  });
+
 export const createProfileInputSchema = z.object({
   userId: z.string(),
   username: z.string(),
@@ -63,5 +74,6 @@ export const appearancePatchSchema = z
     theme: themeIdSchema.optional(),
     colorMode: colorModeSchema.optional(),
     pattern: patternIdSchema.optional(),
+    glass: glassModeSchema.optional(),
   })
   .strict();

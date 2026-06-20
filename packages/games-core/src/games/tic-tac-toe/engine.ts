@@ -1,4 +1,4 @@
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import {
   type Cell,
   type GameEngine,
@@ -9,7 +9,7 @@ import {
   type TicTacToeMove,
   type TicTacToeState,
   ticTacToeMoveSchema,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 
 const BOARD_SIZE = 9;
 
@@ -94,5 +94,18 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
       currentTurn: ctx.role === "X" ? "O" : "X",
     };
     return { ok: true, state: nextState, outcome: outcomeFor(nextState) };
+  },
+
+  autoMove(state, _role): TicTacToeMove {
+    const empties: number[] = [];
+    for (let i = 0; i < state.board.length; i++) {
+      if (state.board[i] === null) empties.push(i);
+    }
+    const pick = empties[Math.floor(Math.random() * empties.length)] ?? 0;
+    return { row: Math.floor(pick / 3), col: pick % 3 };
+  },
+
+  currentRole(state): string | null {
+    return isTerminal(state) ? null : state.currentTurn;
   },
 };

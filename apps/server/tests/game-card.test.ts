@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@gamelobby/shared/constants";
-import type { GameCardMeta } from "@gamelobby/shared/types";
+import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { GameCardMeta } from "@kyzen/shared/types";
 import { enrichGameCardMeta } from "../src/chat/game-card";
 import * as rooms from "../src/realtime/rooms";
+import { dbState, gameCardDbMock } from "./support/game-card-state";
 
 const realRooms = { ...rooms };
 
@@ -82,25 +83,9 @@ describe("enrichGameCardMeta", () => {
   });
 });
 
-// biome-ignore lint/suspicious/noExplicitAny: test capture of the card row
-let gameCard: any = null;
 const emitted: Array<{ event: string; payload: unknown }> = [];
 
-mock.module("@gamelobby/database", () => ({
-  games: {},
-  profiles: {},
-  conversations: {},
-  friends: {},
-  messages: { getGameCardByGameId: async () => gameCard },
-  notifications: {},
-  db: {},
-  schema: {},
-  createDb: () => ({ db: {}, client: {} }),
-}));
-mock.module("../src/chat/assemble", () => ({
-  // biome-ignore lint/suspicious/noExplicitAny: test stub
-  assembleMessage: async (row: any) => ({ id: row.id, kind: "game_card" }),
-}));
+mock.module("@kyzen/database", gameCardDbMock);
 mock.module("../src/realtime/rooms", () => ({
   ...realRooms,
   // biome-ignore lint/suspicious/noExplicitAny: test stub
@@ -113,22 +98,36 @@ const { broadcastGameCard } = await import("../src/chat/game-card-broadcast");
 
 describe("broadcastGameCard", () => {
   beforeEach(() => {
-    gameCard = null;
+    dbState.game = null;
+    dbState.card = null;
     emitted.length = 0;
   });
 
   test("re-broadcasts the card as message_updated to its conversation", async () => {
-    gameCard = { id: "msg-1", conversationId: "c1" };
+    dbState.card = {
+      id: "msg-1",
+      conversationId: "c1",
+      senderId: null,
+      kind: "game_card",
+      body: null,
+      metadata: null,
+      gameId: null,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      editedAt: null,
+      deletedAt: null,
+    };
     await broadcastGameCard({} as never, "g1");
     expect(emitted).toHaveLength(1);
     expect(emitted[0]?.event).toBe("message_updated");
-    expect(emitted[0]?.payload).toEqual({
-      message: { id: "msg-1", kind: "game_card" },
-    });
+    // biome-ignore lint/suspicious/noExplicitAny: test payload assertion
+    const message = (emitted[0]?.payload as any).message;
+    expect(message.id).toBe("msg-1");
+    expect(message.conversationId).toBe("c1");
+    expect(message.kind).toBe("game_card");
   });
 
   test("no-ops when the game has no card (not started from a conversation)", async () => {
-    gameCard = null;
+    dbState.card = null;
     await broadcastGameCard({} as never, "g1");
     expect(emitted).toHaveLength(0);
   });

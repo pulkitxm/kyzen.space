@@ -4,7 +4,7 @@
 
 **Goal:** Make Socket.IO presence correct across multiple server nodes by storing live "who's online" in Redis (self-healing via a short heartbeat) and persisting a durable `last_seen_at` to Postgres on a slower cadence.
 
-**Architecture:** A `PresenceStore` interface with two implementations — `RedisPresenceStore` (a per-user sorted set keyed by heartbeat time, so crashed nodes' entries age out of reads) and `InMemoryPresenceStore` (single-node dev, no Redis). Two per-node timers refresh Redis (~10s) and write `last_seen_at` to the DB (~60s). Presence handlers read/write through the store; `last_seen` always comes from the DB.
+**Architecture:** A `PresenceStore` interface with two implementations: `RedisPresenceStore` (a per-user sorted set keyed by heartbeat time, so crashed nodes' entries age out of reads) and `InMemoryPresenceStore` (single-node dev, no Redis). Two per-node timers refresh Redis (~10s) and write `last_seen_at` to the DB (~60s). Presence handlers read/write through the store; `last_seen` always comes from the DB.
 
 **Tech Stack:** Bun, TypeScript, Socket.IO v4, `@socket.io/redis-adapter` + `ioredis` (already deps), Drizzle ORM + Postgres, `bun:test`.
 
@@ -13,23 +13,23 @@
 ## File Structure
 
 **Create:**
-- `apps/server/src/realtime/redis-client.ts` — lazily-created shared `ioredis` command client (`getRedis()`), separate from the adapter's pub/sub.
-- `apps/server/src/realtime/presence-store.ts` — `PresenceStore` interface, `InMemoryPresenceStore`, `RedisPresenceStore`, `createPresenceStore()` factory, and the `presenceStore` singleton.
-- `apps/server/src/realtime/presence-heartbeat.ts` — `refreshPresence(io)`, `persistLastSeen(io)`, `startPresenceHeartbeats(io)`.
-- `apps/server/tests/presence-store.test.ts` — store unit tests.
-- `apps/server/tests/presence.test.ts` — handler transition tests.
-- `apps/server/tests/presence-heartbeat.test.ts` — heartbeat tick tests.
+- `apps/server/src/realtime/redis-client.ts`: lazily-created shared `ioredis` command client (`getRedis()`), separate from the adapter's pub/sub.
+- `apps/server/src/realtime/presence-store.ts`: `PresenceStore` interface, `InMemoryPresenceStore`, `RedisPresenceStore`, `createPresenceStore()` factory, and the `presenceStore` singleton.
+- `apps/server/src/realtime/presence-heartbeat.ts`: `refreshPresence(io)`, `persistLastSeen(io)`, `startPresenceHeartbeats(io)`.
+- `apps/server/tests/presence-store.test.ts`: store unit tests.
+- `apps/server/tests/presence.test.ts`: handler transition tests.
+- `apps/server/tests/presence-heartbeat.test.ts`: heartbeat tick tests.
 
 **Modify:**
-- `apps/server/src/env.ts` — three `PRESENCE_*_MS` vars.
-- `turbo.json` — same three vars in `globalEnv`.
-- `.env.example` — document them.
-- `apps/server/src/db/schema.ts:178` — add `last_seen_at` column to `userProfile`.
-- `apps/server/src/db/repositories/profiles.ts` — add `touchLastSeen` + `getLastSeen`.
-- `apps/server/src/realtime/presence.ts` — rewrite to use the store + DB last-seen.
-- `apps/server/src/realtime/index.ts:31` — start the heartbeats.
-- `docs/architecture/realtime.md` — update presence gotcha + scale-out section.
-- `docs/architecture/database.md` — note the new column.
+- `apps/server/src/env.ts`: three `PRESENCE_*_MS` vars.
+- `turbo.json`: same three vars in `globalEnv`.
+- `.env.example`: document them.
+- `apps/server/src/db/schema.ts:178`: add `last_seen_at` column to `userProfile`.
+- `apps/server/src/db/repositories/profiles.ts`: add `touchLastSeen` + `getLastSeen`.
+- `apps/server/src/realtime/presence.ts`: rewrite to use the store + DB last-seen.
+- `apps/server/src/realtime/index.ts:31`: start the heartbeats.
+- `docs/architecture/realtime.md`: update presence gotcha + scale-out section.
+- `docs/architecture/database.md`: note the new column.
 
 ---
 
@@ -270,7 +270,7 @@ describe("InMemoryPresenceStore", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/server && bun test tests/presence-store.test.ts`
-Expected: FAIL — cannot find module `../src/realtime/presence-store` (or `InMemoryPresenceStore` is not exported).
+Expected: FAIL - cannot find module `../src/realtime/presence-store` (or `InMemoryPresenceStore` is not exported).
 
 - [ ] **Step 3: Write the interface + in-memory implementation**
 
@@ -461,7 +461,7 @@ describe("RedisPresenceStore", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/server && bun test tests/presence-store.test.ts`
-Expected: FAIL — `RedisPresenceStore` is not exported.
+Expected: FAIL - `RedisPresenceStore` is not exported.
 
 - [ ] **Step 3: Implement `RedisPresenceStore`**
 
@@ -590,7 +590,7 @@ Expected: PASS.
 - [ ] **Step 3: Verify the factory picks in-memory without `REDIS_URL`**
 
 Run: `cd apps/server && bun test tests/presence-store.test.ts`
-Expected: PASS — importing the module (which now constructs the singleton at load) does not throw. The test env has no `REDIS_URL`, so `createPresenceStore()` returns the in-memory store and `getRedis()` is never called.
+Expected: PASS - importing the module (which now constructs the singleton at load) does not throw. The test env has no `REDIS_URL`, so `createPresenceStore()` returns the in-memory store and `getRedis()` is never called.
 
 - [ ] **Step 4: Commit**
 
@@ -775,14 +775,14 @@ describe("handlePresenceDisconnect", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/server && bun test tests/presence.test.ts`
-Expected: FAIL — the current `presence.ts` still uses the in-memory map, so `presence_update` payloads include the wrong shape / `touchLastSeen` is never called.
+Expected: FAIL - the current `presence.ts` still uses the in-memory map, so `presence_update` payloads include the wrong shape / `touchLastSeen` is never called.
 
 - [ ] **Step 3: Rewrite `presence.ts`**
 
 Replace the entire contents of `apps/server/src/realtime/presence.ts` with:
 
 ```ts
-import { CHAT_EVENTS, type PresenceStatus } from "@gamelobby/chat-core";
+import { CHAT_EVENTS, type PresenceStatus } from "@kyzen/chat-core";
 import type { Server as IOServer, Socket } from "socket.io";
 import { conversations, friends, profiles } from "../db";
 import { childLogger } from "../logger";
@@ -980,7 +980,7 @@ describe("persistLastSeen", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd apps/server && bun test tests/presence-heartbeat.test.ts`
-Expected: FAIL — cannot find module `../src/realtime/presence-heartbeat`.
+Expected: FAIL - cannot find module `../src/realtime/presence-heartbeat`.
 
 - [ ] **Step 3: Implement the heartbeat module**
 
@@ -1101,7 +1101,7 @@ In `docs/architecture/realtime.md`, replace the bullet:
 with:
 
 ```markdown
-- **Presence is Redis-backed; typing is still an in-process map.** Presence reads/writes go through a `PresenceStore` (`presence-store.ts`): a Redis sorted set per user (`presence:<userId>`, scored by heartbeat time) when `REDIS_URL` is set, or an in-process map for single-node dev. A per-node timer refreshes the live entries every `PRESENCE_HEARTBEAT_MS`, so a crashed node's users age out of reads within `PRESENCE_STALE_MS`. Durable last-seen lives in `user_profile.last_seen_at`, written on graceful disconnect and on a slower `PRESENCE_LASTSEEN_PERSIST_MS` timer while online. The live "went offline" push on a hard crash is not yet implemented (online reads still self-correct within the stale window). Typing (`typing.ts:8`) is still a per-node in-process map — treat it as best-effort, single-node-accurate.
+- **Presence is Redis-backed; typing is still an in-process map.** Presence reads/writes go through a `PresenceStore` (`presence-store.ts`): a Redis sorted set per user (`presence:<userId>`, scored by heartbeat time) when `REDIS_URL` is set, or an in-process map for single-node dev. A per-node timer refreshes the live entries every `PRESENCE_HEARTBEAT_MS`, so a crashed node's users age out of reads within `PRESENCE_STALE_MS`. Durable last-seen lives in `user_profile.last_seen_at`, written on graceful disconnect and on a slower `PRESENCE_LASTSEEN_PERSIST_MS` timer while online. The live "went offline" push on a hard crash is not yet implemented (online reads still self-correct within the stale window). Typing (`typing.ts:8`) is still a per-node in-process map - treat it as best-effort, single-node-accurate.
 ```
 
 - [ ] **Step 2: Extend the Scale-out section**
@@ -1117,7 +1117,7 @@ In `docs/architecture/realtime.md`, in the "Scale-out via Redis" section, after 
 In `docs/architecture/database.md`, find the `user_profile` table description and add a line noting the new column. Add this sentence to that table's description:
 
 ```markdown
-`last_seen_at` (nullable timestamp) records when the user was last online — written on graceful disconnect and periodically while connected by the realtime presence heartbeat; see [realtime.md](./realtime.md).
+`last_seen_at` (nullable timestamp) records when the user was last online - written on graceful disconnect and periodically while connected by the realtime presence heartbeat; see [realtime.md](./realtime.md).
 ```
 
 - [ ] **Step 4: Commit**

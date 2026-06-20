@@ -1,12 +1,12 @@
 "use client";
 
-// import { applyAction, monopolyEngine } from "@gamelobby/games-core";
+// import { applyAction, monopolyEngine } from "@kyzen/games-core";
 import type {
   GamePlayer,
   MonopolyMove,
   MonopolyState,
   Tile,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 /*
 import {

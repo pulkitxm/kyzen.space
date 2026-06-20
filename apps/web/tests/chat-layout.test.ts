@@ -5,6 +5,7 @@ import {
   clampIcon,
   DEFAULT_CHAT_LAYOUT,
   DEFAULT_ICON,
+  DEFAULT_STASH_EDGE,
   edgeForIcon,
   ICON_MARGIN,
   ICON_SIZE,
@@ -64,11 +65,12 @@ describe("parseChatLayout", () => {
   });
 });
 
-describe("parseChatLayout — minimize fields", () => {
+describe("parseChatLayout - minimize fields", () => {
   it("defaults the new fields", () => {
     const out = parseChatLayout(JSON.stringify({ mode: "popout" }));
     expect(out.minimized).toBe(false);
     expect(out.stashEdge).toBeNull();
+    expect(out.lastStashEdge).toBe(DEFAULT_STASH_EDGE);
     expect(out.icon).toEqual(DEFAULT_ICON);
   });
 
@@ -78,11 +80,13 @@ describe("parseChatLayout — minimize fields", () => {
         mode: "mounted",
         minimized: true,
         stashEdge: "right",
+        lastStashEdge: "top",
         icon: { x: 40, y: 60 },
       }),
     );
     expect(out.minimized).toBe(true);
     expect(out.stashEdge).toBe("right");
+    expect(out.lastStashEdge).toBe("top");
     expect(out.icon).toEqual({ x: 40, y: 60 });
   });
 
@@ -90,6 +94,13 @@ describe("parseChatLayout — minimize fields", () => {
     expect(
       parseChatLayout(JSON.stringify({ stashEdge: "diagonal" })).stashEdge,
     ).toBeNull();
+  });
+
+  it("falls back lastStashEdge to the default when invalid", () => {
+    expect(
+      parseChatLayout(JSON.stringify({ lastStashEdge: "diagonal" }))
+        .lastStashEdge,
+    ).toBe(DEFAULT_STASH_EDGE);
   });
 });
 

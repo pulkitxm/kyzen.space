@@ -20,8 +20,22 @@ export type {
   PublicUserRow,
   SeatingMode,
   UserProfileRow,
-} from "@gamelobby/shared/types";
-export { createDb, type DB, db, schema } from "./client";
+} from "@kyzen/shared/types";
+
+import {
+  createDb as createDbImpl,
+  db as dbImpl,
+  ping as pingImpl,
+  schema as schemaImpl,
+} from "./client";
+
+export type { DB } from "./client";
+
+export const createDb = createDbImpl;
+export const db = dbImpl;
+export const ping = pingImpl;
+export const schema = schemaImpl;
+export * as accountMerge from "./repositories/account-merge";
 export * as conversations from "./repositories/conversations";
 export * as friends from "./repositories/friends";
 export * as games from "./repositories/games";

@@ -1,9 +1,9 @@
-import type { AvatarConfig } from "@gamelobby/avatar";
+import type { AvatarConfig } from "@kyzen/avatar";
 import type {
   ConversationJson,
   FriendshipJson,
   NotificationJson,
-} from "@gamelobby/shared/types";
+} from "@kyzen/shared/types";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
@@ -14,10 +14,12 @@ import { Providers } from "@/app/providers";
 import { serverFetchJson } from "@/lib/api-server";
 import { CHAT_LAYOUT_BOOT_SCRIPT } from "@/lib/chat-layout";
 import { getServerSession } from "@/lib/get-server-session";
+import { GLASS_BOOT_SCRIPT, type GlassMode } from "@/lib/glass";
 import {
   DEFAULT_PATTERN,
   PATTERN_BOOT_SCRIPT,
   type PatternId,
+  patternVars,
 } from "@/lib/patterns";
 import {
   parseSidebarPrefsCookieValue,
@@ -49,7 +51,7 @@ const gamePaused = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "GameLobby",
+  title: "Kyzen",
   description: "Play live multiplayer games",
 };
 
@@ -60,12 +62,14 @@ export default async function RootLayout({
 }>) {
   const session = await getServerSession();
   const signedIn = Boolean(session?.user);
+  const isAnonymous = Boolean(session?.user?.isAnonymous);
 
   let username: string | null = null;
   let avatar: AvatarConfig | null = null;
   let userTheme: ThemeId | null = null;
   let userMode: ColorMode | null = null;
   let userPattern: PatternId | null = null;
+  let userGlass: GlassMode | null = null;
   let initialConversations: ConversationJson[] = [];
   let initialFriends: FriendshipJson[] = [];
   let initialIncoming: FriendshipJson[] = [];
@@ -81,6 +85,7 @@ export default async function RootLayout({
           theme: ThemeId;
           colorMode: ColorMode;
           pattern: PatternId;
+          glass: GlassMode;
         };
       }>("/api/profiles/me"),
       serverFetchJson<{ conversations: ConversationJson[] }>(
@@ -101,6 +106,7 @@ export default async function RootLayout({
     userTheme = me?.profile.theme ?? null;
     userMode = me?.profile.colorMode ?? null;
     userPattern = me?.profile.pattern ?? null;
+    userGlass = me?.profile.glass ?? null;
     initialConversations = convs?.conversations ?? [];
     initialFriends = fr?.friends ?? [];
     initialIncoming = reqs?.incoming ?? [];
@@ -110,6 +116,14 @@ export default async function RootLayout({
   }
 
   const profileHref = signedIn ? "/profile" : "/auth";
+
+  const initialPatternVars = patternVars(userPattern ?? DEFAULT_PATTERN);
+  const patternStyle = initialPatternVars
+    ? ({
+        "--pattern-url": initialPatternVars.url,
+        "--pattern-tile": initialPatternVars.tile,
+      } as React.CSSProperties)
+    : undefined;
 
   const cookieStore = await cookies();
   const prefCookieRaw = cookieStore.get(SIDEBAR_PREFS_COOKIE)?.value;
@@ -123,6 +137,8 @@ export default async function RootLayout({
       suppressHydrationWarning
       data-theme={userTheme ?? DEFAULT_THEME}
       data-pattern={userPattern ?? DEFAULT_PATTERN}
+      data-glass={userGlass && userGlass !== "off" ? userGlass : undefined}
+      style={patternStyle}
       className={`${geistSans.variable} ${geistMono.variable} ${gamePaused.variable} h-full antialiased`}
     >
       <head>
@@ -147,12 +163,18 @@ export default async function RootLayout({
           // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline boot script
           dangerouslySetInnerHTML={{ __html: PATTERN_BOOT_SCRIPT }}
         />
+        <script
+          id="gl-glass-bootstrap"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted inline boot script
+          dangerouslySetInnerHTML={{ __html: GLASS_BOOT_SCRIPT }}
+        />
       </head>
       <body className="min-h-full text-foreground">
         <Providers
           initialPalette={userTheme}
           initialMode={userMode}
           initialPattern={userPattern}
+          initialGlass={userGlass}
           signedIn={signedIn}
         >
           <AppShellClient
@@ -160,6 +182,7 @@ export default async function RootLayout({
             avatar={avatar}
             userId={session?.user?.id ?? null}
             signedIn={signedIn}
+            isAnonymous={isAnonymous}
             profileHref={profileHref}
             sidebarPrefsTrusted={sidebarPrefsTrusted}
             sidebarPrefs={sidebarPrefs}
