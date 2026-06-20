@@ -23,12 +23,18 @@ import {
 } from "@kyzen/shared/types";
 import { Hono } from "hono";
 import { env } from "../../env";
-import { isUsernameBlocked, suggestUsernames } from "../../username";
+import { childLogger } from "../../logger";
+import {
+  ensureUsernameForUser,
+  isUsernameBlocked,
+  suggestUsernames,
+} from "../../username";
 import { usernameEditableAt } from "../../username-rules";
 import { readJson } from "../auth-context";
 import { type AuthEnv, requireAuth } from "../middleware/auth";
 
 const RECENT_PAGE_SIZE = 5;
+const log = childLogger({ mod: "profiles-api" });
 
 type UnavailableReason = "format" | "reserved" | "taken";
 
@@ -61,7 +67,22 @@ export const profilesRouter = new Hono<AuthEnv>()
   .get("/me", requireAuth, async (c) => {
     const user = c.get("user");
 
-    const profile = await profiles.getProfileByUserId(user.id);
+    let profile = await profiles.getProfileByUserId(user.id);
+    if (!profile) {
+      try {
+        const username = await ensureUsernameForUser(user.id, user.name);
+        profile = await profiles.getProfileByUserId(user.id);
+        log.info(
+          { userId: user.id, username },
+          "lazy-provisioned profile on /me request",
+        );
+      } catch (err) {
+        log.error(
+          { err, userId: user.id },
+          "failed to lazy-provision profile on /me request",
+        );
+      }
+    }
     if (!profile) return c.json({ error: "Profile not found" }, 404);
 
     const editableAt = usernameEditableAt(
