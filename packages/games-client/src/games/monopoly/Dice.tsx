@@ -95,6 +95,17 @@ const rotationMap: Record<number, { rx: number; ry: number }> = {
   6: { rx: 180, ry: 0 },
 };
 
+const DIE_FACE_STYLE: React.CSSProperties = {
+  position: "absolute",
+  width: "100%",
+  height: "100%",
+  borderRadius: 10,
+  overflow: "hidden",
+  backfaceVisibility: "hidden",
+  WebkitBackfaceVisibility: "hidden",
+  background: "var(--card)",
+};
+
 const FACE_TRANSFORMS: Record<number, string> = {
   1: "rotateY(0deg) translateZ(26px)",
   2: "rotateX(90deg) translateZ(26px)",
@@ -149,14 +160,7 @@ function Die({
             key={num}
             className={`die-face face-${num}`}
             style={{
-              position: "absolute",
-              width: "100%",
-              height: "100%",
-              borderRadius: 10,
-              overflow: "hidden",
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
-              background: "var(--card)",
+              ...DIE_FACE_STYLE,
               transform: FACE_TRANSFORMS[num],
             }}
           >

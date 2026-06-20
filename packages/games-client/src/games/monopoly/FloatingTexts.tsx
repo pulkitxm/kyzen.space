@@ -11,6 +11,16 @@ const FLOAT_STYLE = `
 }
 `;
 
+const FLOATING_TEXT_STYLE: React.CSSProperties = {
+  position: "absolute",
+  transform: "translate(-50%, -50%)",
+  fontWeight: 800,
+  fontSize: 15,
+  animation: "floatUp 0.3s ease-out forwards",
+  whiteSpace: "nowrap",
+  fontFamily: "'Inter', sans-serif",
+};
+
 let styleInjected = false;
 function injectStyle() {
   if (styleInjected || typeof document === "undefined") return;
@@ -47,17 +57,11 @@ export function FloatingTexts({ texts, boardSize }: FloatingTextsProps) {
           <div
             key={ft.id}
             style={{
-              position: "absolute",
+              ...FLOATING_TEXT_STYLE,
               left,
               top,
-              transform: "translate(-50%, -50%)",
               color: ft.color,
-              fontWeight: 800,
-              fontSize: 15,
               textShadow: `0 0 8px ${ft.color}88`,
-              animation: "floatUp 1.8s ease-out forwards",
-              whiteSpace: "nowrap",
-              fontFamily: "'Inter', sans-serif",
             }}
           >
             {ft.text}

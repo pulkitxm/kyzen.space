@@ -9,7 +9,59 @@ import type {
   Tile,
   UtilityTile,
 } from "@kyzen/shared/types";
+import type React from "react";
 import { GROUP_COLORS } from "./board-constants";
+
+const BUTTON_RESET: React.CSSProperties = {
+  appearance: "none",
+  border: "none",
+  background: "transparent",
+  padding: 0,
+  margin: 0,
+  font: "inherit",
+  color: "inherit",
+  textAlign: "inherit",
+  cursor: "pointer",
+  boxSizing: "border-box",
+};
+
+const RENT_ROW_STYLE: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "5px 10px",
+  borderRadius: 6,
+  transition: "background 0.2s, border-color 0.2s",
+};
+
+const BACKDROP_STYLE: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.4)",
+  zIndex: 200,
+  backdropFilter: "blur(2px)",
+};
+
+const BUY_BUTTON_STYLE: React.CSSProperties = {
+  flex: 1,
+  padding: "10px 0",
+  borderRadius: 10,
+  border: "none",
+  fontWeight: 700,
+  fontSize: 13,
+};
+
+const SKIP_BUTTON_STYLE: React.CSSProperties = {
+  flex: 1,
+  padding: "10px 0",
+  borderRadius: 10,
+  border: "1px solid var(--border)",
+  background: "transparent",
+  color: "var(--muted-foreground)",
+  fontWeight: 600,
+  fontSize: 13,
+  cursor: "pointer",
+};
 
 const PANEL_STYLE = `
 @keyframes panelSlideIn {
@@ -43,18 +95,13 @@ function RentRow({
   return (
     <div
       style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "5px 10px",
-        borderRadius: 6,
+        ...RENT_ROW_STYLE,
         background: highlight
           ? "color-mix(in srgb, var(--primary) 15%, transparent)"
           : "transparent",
         border: highlight
           ? "1px solid color-mix(in srgb, var(--primary) 40%, transparent)"
           : "1px solid transparent",
-        transition: "all 0.2s",
       }}
     >
       <span
@@ -126,17 +173,10 @@ export function PropertyPanel({
 
   return (
     <>
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop closes panel on click */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: clickable backdrop */}
-      <div
+      <button
+        type="button"
         onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.4)",
-          zIndex: 200,
-          backdropFilter: "blur(2px)",
-        }}
+        style={{ ...BUTTON_RESET, ...BACKDROP_STYLE }}
       />
       <div
         style={{
@@ -189,7 +229,7 @@ export function PropertyPanel({
               </div>
               <div
                 style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   color: "var(--muted-foreground)",
                   marginTop: 2,
                 }}
@@ -277,7 +317,7 @@ export function PropertyPanel({
                 {ownedProp?.isMortgaged && (
                   <span
                     style={{
-                      fontSize: 10,
+                      fontSize: 12,
                       color: "var(--danger)",
                       background:
                         "color-mix(in srgb, var(--danger) 15%, transparent)",
@@ -305,7 +345,7 @@ export function PropertyPanel({
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 12,
                   color: "var(--muted-foreground)",
                   letterSpacing: 1,
                   marginBottom: 4,
@@ -350,7 +390,7 @@ export function PropertyPanel({
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: 12,
                   color: "var(--muted-foreground)",
                   letterSpacing: 1,
                   marginBottom: 4,
@@ -378,10 +418,7 @@ export function PropertyPanel({
                 }}
                 disabled={currentPlayer.balance < price}
                 style={{
-                  flex: 1,
-                  padding: "10px 0",
-                  borderRadius: 10,
-                  border: "none",
+                  ...BUY_BUTTON_STYLE,
                   background:
                     currentPlayer.balance < price
                       ? "var(--surface-hover)"
@@ -390,8 +427,6 @@ export function PropertyPanel({
                     currentPlayer.balance < price
                       ? "var(--muted-foreground)"
                       : "var(--success-foreground)",
-                  fontWeight: 700,
-                  fontSize: 13,
                   cursor:
                     currentPlayer.balance < price ? "not-allowed" : "pointer",
                 }}
@@ -404,17 +439,7 @@ export function PropertyPanel({
                   dispatch({ type: "DECLINE_PURCHASE" });
                   onClose();
                 }}
-                style={{
-                  flex: 1,
-                  padding: "10px 0",
-                  borderRadius: 10,
-                  border: "1px solid var(--border)",
-                  background: "transparent",
-                  color: "var(--muted-foreground)",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
+                style={SKIP_BUTTON_STYLE}
               >
                 Skip
               </button>

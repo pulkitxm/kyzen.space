@@ -39,19 +39,31 @@ export function PlayerAvatar({
       className={className}
       style={{ ...AVATAR_FRAME_STYLE, width: size, height: size }}
     >
-      <div
-        role="img"
-        aria-label={`${username}'s avatar`}
+      <img
+        src={dataUri}
+        alt={`${username}'s avatar`}
         style={{
           ...AVATAR_IMAGE_STYLE,
           width: size,
           height: size,
-          backgroundImage: `url(${dataUri})`,
         }}
       />
     </div>
   );
 }
+
+const BUTTON_RESET: React.CSSProperties = {
+  appearance: "none",
+  border: "none",
+  background: "transparent",
+  padding: 0,
+  margin: 0,
+  font: "inherit",
+  color: "inherit",
+  textAlign: "inherit",
+  cursor: "pointer",
+  boxSizing: "border-box",
+};
 
 const AVATAR_FRAME_STYLE: React.CSSProperties = {
   borderRadius: "50%",
@@ -67,15 +79,13 @@ const AVATAR_FRAME_STYLE: React.CSSProperties = {
 
 const AVATAR_IMAGE_STYLE: React.CSSProperties = {
   display: "block",
-  backgroundSize: "cover",
-  backgroundPosition: "center",
-  backgroundRepeat: "no-repeat",
+  objectFit: "cover",
+  objectPosition: "center",
 };
 
 const CORNER_IMAGE_STYLE: React.CSSProperties = {
-  backgroundSize: "contain",
-  backgroundPosition: "center",
-  backgroundRepeat: "no-repeat",
+  objectFit: "contain",
+  objectPosition: "center",
 };
 
 const TILE_CELL_STYLE: React.CSSProperties = {
@@ -95,6 +105,17 @@ const TILE_CELL_STYLE: React.CSSProperties = {
   transition: "background 0.15s",
 };
 
+const TILE_NAME_STYLE: React.CSSProperties = {
+  textAlign: "center",
+  lineHeight: 1.15,
+  fontWeight: 600,
+  padding: "0 1px",
+  color: "var(--foreground)",
+  flex: 1,
+  display: "flex",
+  alignItems: "center",
+};
+
 const CARD_STACK_STYLE: React.CSSProperties = {
   position: "absolute",
   pointerEvents: "all",
@@ -105,6 +126,11 @@ const CARD_STACK_STYLE: React.CSSProperties = {
   gap: 2,
 };
 
+const TOKEN_STYLE: React.CSSProperties = {
+  position: "absolute",
+  transform: "translate(-50%, -50%)",
+};
+
 const CARD_LAYER_STYLE: React.CSSProperties = {
   position: "absolute",
   inset: 0,
@@ -112,6 +138,18 @@ const CARD_LAYER_STYLE: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
+};
+
+const TITLE_STYLE: React.CSSProperties = {
+  fontWeight: 900,
+  letterSpacing: -1,
+  background:
+    "linear-gradient(135deg, var(--primary) 0%, var(--accent-warm) 100%)",
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  textAlign: "center",
+  lineHeight: 1,
+  userSelect: "none",
 };
 
 const CARD_HINT_STYLE: React.CSSProperties = {
@@ -184,11 +222,15 @@ function tileOwner(state: MonopolyState, tileId: string): Player | undefined {
 }
 
 function tileHouses(state: MonopolyState, tileId: string): number {
+  const housesByTile = new Map<string, number>();
   for (const p of state.players) {
-    const op = p.ownedProperties.find((o) => o.tileId === tileId);
-    if (op) return op.houses;
+    for (const op of p.ownedProperties) {
+      if (!housesByTile.has(op.tileId)) {
+        housesByTile.set(op.tileId, op.houses);
+      }
+    }
   }
-  return 0;
+  return housesByTile.get(tileId) ?? 0;
 }
 
 interface TileCellProps {
@@ -243,27 +285,25 @@ function TileCell({
     tile.type === "Go" ? (
       "🚦"
     ) : tile.type === "Jail" ? (
-      <div
-        role="img"
-        aria-label="Jail"
+      <img
+        src="/games/monopoly/jail.png"
+        alt="Jail"
         style={{
           ...CORNER_IMAGE_STYLE,
           width: Math.max(28, Math.floor(cellSize * 0.65)),
           height: Math.max(28, Math.floor(cellSize * 0.65)),
-          backgroundImage: "url(/games/monopoly/jail.png)",
         }}
       />
     ) : tile.type === "FreeParking" ? (
       "🅿️"
     ) : tile.type === "GoToJail" ? (
-      <div
-        role="img"
-        aria-label="Go to Jail"
+      <img
+        src="/games/monopoly/go-to-jail.png"
+        alt="Go to Jail"
         style={{
           ...CORNER_IMAGE_STYLE,
           width: Math.max(28, Math.floor(cellSize * 0.65)),
           height: Math.max(28, Math.floor(cellSize * 0.65)),
-          backgroundImage: "url(/games/monopoly/go-to-jail.png)",
         }}
       />
     ) : null;
@@ -272,19 +312,12 @@ function TileCell({
   const scaledFontSize = Math.max(7, Math.floor(cellSize * 0.13));
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: tile cell is a styled grid square, not a button
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
       title={tile.name}
       style={{
+        ...BUTTON_RESET,
         ...TILE_CELL_STYLE,
         padding: scaledPadding,
         fontSize: scaledFontSize,
@@ -326,15 +359,8 @@ function TileCell({
       {!cornerIcon && (
         <div
           style={{
-            textAlign: "center",
-            lineHeight: 1.15,
-            fontWeight: 600,
+            ...TILE_NAME_STYLE,
             fontSize: Math.max(6.5, Math.floor(cellSize * 0.12)),
-            padding: "0 1px",
-            color: "var(--foreground)",
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
           }}
         >
           {tile.name}
@@ -377,7 +403,7 @@ function TileCell({
           <PlayerAvatar username={owner.name} size={cellSize * 0.22} />
         </div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -469,10 +495,9 @@ function TokensOverlay({
           <div
             key={player.id}
             style={{
-              position: "absolute",
+              ...TOKEN_STYLE,
               left: x,
               top: y,
-              transform: "translate(-50%, -50%)",
               transition: isAnimating
                 ? "left 0.12s ease-in-out, top 0.12s ease-in-out"
                 : "none",
@@ -545,16 +570,8 @@ function CenterOverlay({
       >
         <div
           style={{
+            ...TITLE_STYLE,
             fontSize: Math.floor(cellSize * 1.1),
-            fontWeight: 900,
-            letterSpacing: -1,
-            background:
-              "linear-gradient(135deg, var(--primary) 0%, var(--accent-warm) 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            textAlign: "center",
-            lineHeight: 1,
-            userSelect: "none",
           }}
         >
           MONO
@@ -563,27 +580,20 @@ function CenterOverlay({
         </div>
       </div>
 
-      {/* biome-ignore lint/a11y/useSemanticElements: animated card stack is a styled overlay, not a button */}
-      <div
-        role="button"
-        tabIndex={canDrawChance ? 0 : -1}
+      <button
+        type="button"
         onClick={
           canDrawChance ? () => dispatch({ type: "DRAW_CARD" }) : undefined
         }
-        onKeyDown={(e) => {
-          if (canDrawChance && (e.key === "Enter" || e.key === " ")) {
-            e.preventDefault();
-            dispatch({ type: "DRAW_CARD" });
-          }
-        }}
         style={{
+          ...BUTTON_RESET,
           ...CARD_STACK_STYLE,
           right: cellSize * 0.3,
           top: cellSize * 0.3,
           width: cellSize * 1.4,
           height: cellSize * 1.0,
           cursor: canDrawChance ? "pointer" : "default",
-          animation: "cardStackFloat 3s ease-in-out infinite",
+          animation: "cardStackFloat 0.3s ease-in-out infinite",
         }}
       >
         <div
@@ -648,27 +658,20 @@ function CenterOverlay({
             Click to draw!
           </div>
         )}
-      </div>
+      </button>
 
-      {/* biome-ignore lint/a11y/useSemanticElements: animated card stack is a styled overlay, not a button */}
-      <div
-        role="button"
-        tabIndex={canDrawCC ? 0 : -1}
+      <button
+        type="button"
         onClick={canDrawCC ? () => dispatch({ type: "DRAW_CARD" }) : undefined}
-        onKeyDown={(e) => {
-          if (canDrawCC && (e.key === "Enter" || e.key === " ")) {
-            e.preventDefault();
-            dispatch({ type: "DRAW_CARD" });
-          }
-        }}
         style={{
+          ...BUTTON_RESET,
           ...CARD_STACK_STYLE,
           left: cellSize * 0.3,
           bottom: cellSize * 0.3,
           width: cellSize * 1.4,
           height: cellSize * 1.0,
           cursor: canDrawCC ? "pointer" : "default",
-          animation: "cardStackFloat 3.5s ease-in-out infinite 0.5s",
+          animation: "cardStackFloat 0.3s ease-in-out infinite 0.5s",
         }}
       >
         <div
@@ -733,7 +736,7 @@ function CenterOverlay({
             Click to draw!
           </div>
         )}
-      </div>
+      </button>
     </div>
   );
 }

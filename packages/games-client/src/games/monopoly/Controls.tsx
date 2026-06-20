@@ -136,6 +136,27 @@ const CONFIRM_DETAIL_ROW_STYLE: React.CSSProperties = {
   border: "1px solid var(--border)",
 };
 
+const CONFIRM_ACTION_BUTTON_STYLE: React.CSSProperties = {
+  flex: 1,
+  padding: "10px 0",
+  borderRadius: 10,
+  fontWeight: 700,
+  fontSize: 13,
+  cursor: "pointer",
+};
+
+const CONFIRM_CANCEL_BUTTON_STYLE: React.CSSProperties = {
+  flex: 1,
+  padding: "10px 0",
+  borderRadius: 10,
+  border: "1px solid var(--border)",
+  background: "transparent",
+  color: "var(--muted-foreground)",
+  fontWeight: 600,
+  fontSize: 13,
+  cursor: "pointer",
+};
+
 function ConfirmDialog({
   pending,
   onConfirm,
@@ -208,15 +229,10 @@ function ConfirmDialog({
               type="button"
               onClick={onConfirm}
               style={{
-                flex: 1,
-                padding: "10px 0",
-                borderRadius: 10,
+                ...CONFIRM_ACTION_BUTTON_STYLE,
                 border: "none",
                 background: pending.confirmColor,
                 color: confirmTextCol,
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: "pointer",
               }}
             >
               {pending.confirmLabel}
@@ -224,17 +240,7 @@ function ConfirmDialog({
             <button
               type="button"
               onClick={onCancel}
-              style={{
-                flex: 1,
-                padding: "10px 0",
-                borderRadius: 10,
-                border: "1px solid var(--border)",
-                background: "transparent",
-                color: "var(--muted-foreground)",
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: "pointer",
-              }}
+              style={CONFIRM_CANCEL_BUTTON_STYLE}
             >
               Cancel
             </button>
@@ -279,6 +285,17 @@ const DICE_PANEL_STYLE: React.CSSProperties = {
   alignItems: "center",
   gap: 12,
   flexShrink: 0,
+};
+
+const CONTROLS_COLUMN_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  width: 240,
+  flexShrink: 0,
+  fontFamily: "'Inter','Segoe UI',sans-serif",
+  height: "100%",
+  paddingRight: 4,
 };
 
 export function Controls({
@@ -449,18 +466,7 @@ export function Controls({
         />
       )}
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          width: 240,
-          flexShrink: 0,
-          fontFamily: "'Inter','Segoe UI',sans-serif",
-          height: "100%",
-          paddingRight: 4,
-        }}
-      >
+      <div style={CONTROLS_COLUMN_STYLE}>
         <div style={TURN_PANEL_STYLE}>
           <div
             style={{

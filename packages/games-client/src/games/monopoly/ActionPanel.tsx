@@ -57,6 +57,28 @@ const PRIMARY_BUTTON_STYLE: React.CSSProperties = {
   transition: "transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease",
 };
 
+const CARD_TEXT_STYLE: React.CSSProperties = {
+  flex: 1,
+  padding: "8px 10px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  fontSize: 12,
+  fontWeight: 600,
+  color: "var(--foreground)",
+  lineHeight: 1.4,
+};
+
+const DRAW_CARD_BUTTON_STYLE: React.CSSProperties = {
+  width: "100%",
+  padding: "8px 0",
+  borderRadius: 8,
+  border: "none",
+  fontWeight: 800,
+  fontSize: 12,
+};
+
 interface ActionPanelProps {
   state: MonopolyState;
   dispatch: (action: MonopolyMove) => void;
@@ -112,22 +134,7 @@ export function ActionPanel({
         >
           {drawnCard.type === "Chance" ? "❓ Chance" : "🏛️ Community Chest"}
         </div>
-        <div
-          style={{
-            flex: 1,
-            padding: "8px 10px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            textAlign: "center",
-            fontSize: 12,
-            fontWeight: 600,
-            color: "var(--foreground)",
-            lineHeight: 1.4,
-          }}
-        >
-          {drawnCard.card.text}
-        </div>
+        <div style={CARD_TEXT_STYLE}>{drawnCard.card.text}</div>
       </div>
     );
   }
@@ -162,7 +169,7 @@ export function ActionPanel({
               height: 4,
               background: "var(--primary)",
               borderRadius: 2,
-              animation: "playerPulse 1.5s infinite",
+              animation: "playerPulse 0.3s infinite",
             }}
           />
         </div>
@@ -282,18 +289,13 @@ export function ActionPanel({
                 onClick={onDrawCard}
                 disabled={!isMyTurn}
                 style={{
-                  width: "100%",
-                  padding: "8px 0",
-                  borderRadius: 8,
-                  border: "none",
+                  ...DRAW_CARD_BUTTON_STYLE,
                   background: isMyTurn
                     ? "var(--warning)"
                     : "var(--surface-hover)",
                   color: isMyTurn
                     ? "var(--warning-foreground)"
                     : "var(--muted-foreground)",
-                  fontWeight: 800,
-                  fontSize: 12,
                   cursor: isMyTurn ? "pointer" : "not-allowed",
                   boxShadow: isMyTurn
                     ? "0 4px 12px var(--page-ambient)"
