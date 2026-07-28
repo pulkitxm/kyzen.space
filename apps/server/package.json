@@ -16,7 +16,7 @@
     "@kyzen/database": "workspace:*",
     "@kyzen/games-core": "workspace:*",
     "@kyzen/shared": "workspace:*",
-    "@hono/node-server": "^1.13.7",
+    "@hono/node-server": "^2.0.12",
     "@socket.io/redis-adapter": "^8.3.0",
     "better-auth": "^1.6.9",
     "cors": "^2.8.5",
