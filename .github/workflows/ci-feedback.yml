@@ -19,7 +19,7 @@ on:
 permissions:
   actions: read
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 concurrency:
   group: ci-feedback-${{ github.event.workflow_run.name }}-${{ github.event.workflow_run.head_branch }}
