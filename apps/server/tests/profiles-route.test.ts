@@ -68,6 +68,18 @@ mock.module("@kyzen/database", () => ({
     updateUsername: async (userId: string, username: string) => {
       updateUsernameCalls.push({ userId, username });
     },
+    createProfile: async (input: {
+      userId: string;
+      username: string;
+      avatar?: AvatarConfig | null;
+    }) => {
+      storedProfile = makeProfile({
+        userId: input.userId,
+        username: input.username,
+        avatar: input.avatar ?? VALID_AVATAR,
+      });
+      return storedProfile;
+    },
   },
   games: {
     gamesForUser: async () => [],
@@ -314,11 +326,14 @@ describe("GET /me", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 404 when the user has no profile", async () => {
+  it("provisions a profile when the user has a session but no row yet", async () => {
     currentSession = { user: { id: "user-1", name: "T", email: "t@e.com" } };
     storedProfile = null;
     const res = await profilesRouter.request("/me");
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { profile: { username: string } };
+    expect(json.profile.username.length).toBeGreaterThan(0);
+    expect(storedProfile).not.toBeNull();
   });
 
   it("returns the stored avatar when present", async () => {

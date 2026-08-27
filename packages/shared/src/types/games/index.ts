@@ -26,6 +26,19 @@ export type {
   StepResult,
 } from "./engine";
 export {
+  buildGameResultViewModel,
+  type GameResultOutcome,
+  type GameResultPhase,
+  type GameResultPlayer,
+  type GameResultPrimaryAction,
+  type GameResultViewModel,
+  isMatchSeriesComplete,
+  type MatchConfig,
+  type MatchFormat,
+  type PlayerSessionStats,
+  resolveMatchConfig,
+} from "./result";
+export {
   type SeriesDetail,
   type SeriesGameSummary,
   type SeriesScore,

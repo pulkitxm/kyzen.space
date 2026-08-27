@@ -149,12 +149,19 @@ describe("displayNameSchema (max-length boundary)", () => {
   });
 });
 
-describe("ticTacToeConfigSchema (empty strict object)", () => {
-  test("accepts an empty object", () => {
-    expect(ticTacToeConfigSchema.safeParse({}).success).toBe(true);
+describe("ticTacToeConfigSchema", () => {
+  test("defaults bestOf to 3 for an empty object", () => {
+    const parsed = ticTacToeConfigSchema.safeParse({});
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.bestOf).toBe(3);
   });
 
-  test("rejects any key (strict)", () => {
+  test("accepts explicit best-of values", () => {
+    expect(ticTacToeConfigSchema.safeParse({ bestOf: 1 }).success).toBe(true);
+    expect(ticTacToeConfigSchema.safeParse({ bestOf: 5 }).success).toBe(true);
+  });
+
+  test("rejects unknown keys (strict)", () => {
     expect(ticTacToeConfigSchema.safeParse({ firstMove: "X" }).success).toBe(
       false,
     );

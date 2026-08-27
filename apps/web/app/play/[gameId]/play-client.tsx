@@ -62,6 +62,7 @@ export function PlayClient({
         <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
           <Suspense fallback={<GameSkeleton />}>
             <GameClient
+              key={gameId}
               gameId={gameId}
               userId={userId}
               socket={socket}
@@ -94,6 +95,7 @@ export function PlayClient({
     <>
       <WaitingForOpponentOverlay gameId={gameId} initialGame={initialGame} />
       <GameOverOverlay
+        key={gameId}
         gameId={gameId}
         userId={userId}
         initialGame={initialGame}

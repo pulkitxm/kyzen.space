@@ -100,6 +100,7 @@ export const gameJsonSchema = z.object({
   creatorUserId: z.string().nullable().optional(),
   seatingMode: seatingModeSchema.nullable().optional(),
   challengedUserId: z.string().nullable().optional(),
+  config: z.unknown().optional(),
   startedAt: z.string().nullable().optional(),
   completedAt: z.string().nullable().optional(),
   createdAt: z.string().nullable().optional(),

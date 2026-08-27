@@ -1,9 +1,10 @@
 import type { AvatarConfig } from "@kyzen/avatar";
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { ProfilePageView } from "@/app/[username]/profile-ui";
 import { serverFetchJson } from "@/lib/api-server";
+import { getServerSession } from "@/lib/get-server-session";
 import {
   mapApiRowsToActivity,
   PROFILE_ACTIVITY_PAGE_SIZE,
@@ -23,6 +24,16 @@ export const metadata: Metadata = {
   title: "Your profile · Kyzen",
 };
 
+type MeResponse = {
+  profile: {
+    userId: string;
+    username: string;
+    stats: ProfileStats;
+    avatar: AvatarConfig | null;
+    createdAt: string;
+  };
+};
+
 type ProfileResponse = {
   profile: {
     userId: string;
@@ -36,17 +47,21 @@ type ProfileResponse = {
 };
 
 export default async function ProfilePage() {
-  const me = await serverFetchJson<{ profile: { username: string } }>(
-    "/api/profiles/me",
-  );
-  if (!me?.profile?.username) redirect("/auth");
+  const session = await getServerSession();
+  if (!session?.user) redirect("/auth");
+
+  const me = await serverFetchJson<MeResponse>("/api/profiles/me");
+  if (!me?.profile?.username) notFound();
 
   const data = await serverFetchJson<ProfileResponse>(
     `/api/profiles/${encodeURIComponent(me.profile.username)}`,
   );
-  if (!data) redirect("/auth");
 
-  const { profile, games } = data;
+  const profile = data?.profile ?? {
+    ...me.profile,
+    displayName: session.user.name ?? null,
+  };
+  const games = data?.games ?? [];
   const stats = profile.stats ?? {};
   const statGames = buildStatGames(stats);
 

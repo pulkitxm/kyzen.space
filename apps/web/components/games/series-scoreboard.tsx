@@ -1,32 +1,28 @@
 "use client";
 
 import type { SeriesScore } from "@kyzen/shared/types";
-import { Character } from "@/components/ui";
+import { SessionScoreboard } from "@/components/games/session-scoreboard";
 
 export function SeriesScoreboard({ score }: { score: SeriesScore }) {
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="flex flex-wrap items-start justify-center gap-6">
-        {score.entries.map((entry) => (
-          <div key={entry.userId} className="flex flex-col items-center gap-1">
-            <Character
-              config={entry.avatar ?? null}
-              fallbackSeed={entry.username}
-              size={48}
-              className="rounded-full border-2 border-card bg-surface-overlay"
-            />
-            <span className="max-w-24 truncate text-muted-foreground text-sm">
-              {entry.username}
-            </span>
-            <span className="font-bold text-2xl">{entry.wins}</span>
-          </div>
-        ))}
-      </div>
-      {score.draws > 0 ? (
-        <span className="text-muted-foreground text-xs">
-          draws: {score.draws}
-        </span>
-      ) : null}
-    </div>
-  );
+  const stats = score.entries.map((entry) => {
+    let losses = Math.max(0, score.completedGames - entry.wins);
+    if (score.entries.length === 2) {
+      const opponent = score.entries.find(
+        (other) => other.userId !== entry.userId,
+      );
+      losses = opponent?.wins ?? 0;
+    } else {
+      losses = Math.max(0, score.completedGames - entry.wins - score.draws);
+    }
+    return {
+      userId: entry.userId,
+      username: entry.username,
+      avatar: entry.avatar ?? null,
+      played: score.completedGames,
+      wins: entry.wins,
+      losses,
+    };
+  });
+
+  return <SessionScoreboard stats={stats} draws={score.draws} />;
 }

@@ -1,4 +1,4 @@
-import type { ZodType } from "zod";
+import type { ZodType } from "../z";
 import type { GameCategoryId } from "./categories";
 import type { GameType } from "./core";
 import type { GameEngine } from "./engine";

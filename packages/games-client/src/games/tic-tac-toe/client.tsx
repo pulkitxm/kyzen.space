@@ -330,12 +330,6 @@ export function TicTacToeGameClient({
     [userId, canMove, gameId, socket],
   );
 
-  const winnerLabel = game.winner
-    ? game.winner === "draw"
-      ? "Draw"
-      : `Winner: ${game.players.find((p) => p.userId === game.winner)?.username ?? game.winner}`
-    : null;
-
   const winningLine =
     game.winner && game.winner !== "draw" ? findWinningLine(state.board) : null;
   const winLineKey = winningLine ? winningLine.join(",") : null;
@@ -469,10 +463,6 @@ export function TicTacToeGameClient({
       )}
 
       {error ? <p className="mb-4 text-danger text-sm">{error}</p> : null}
-
-      {winnerLabel ? (
-        <p className="mb-4 font-medium text-primary text-sm">{winnerLabel}</p>
-      ) : null}
 
       <div className="relative grid w-fit grid-cols-3 gap-3">
         {CELL_KEYS.map((cellKey, idx) => {

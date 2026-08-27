@@ -2,19 +2,20 @@
 
 import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
+  buildGameResultViewModel,
   type ConversationJson,
   type GameJson,
   isGameOver,
   type SeriesDetail,
 } from "@kyzen/shared/types";
-import { AnimatePresence, domAnimation, LazyMotion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { FaTrophy } from "react-icons/fa6";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import {
+  GameResultModal,
+  GameResultReopenChip,
+} from "@/components/games/game-result-modal";
 import { SeriesDetailModal } from "@/components/games/series-detail-modal";
-import { SeriesScoreboard } from "@/components/games/series-scoreboard";
-import { GlassMotionPane } from "@/components/glass/glass-pane";
-import { Button, Character } from "@/components/ui";
 import { clientFetchJson } from "@/lib/api-client";
 import { conversationHref } from "@/lib/chat/conversation-href";
 import { useLayeredPopup } from "@/lib/popups/use-layered-popup";
@@ -23,49 +24,83 @@ import {
   useSocket,
   useSocketEvent,
 } from "@/lib/socket/socket-context";
-import { cn } from "@/lib/utils";
 
-function outcomeLabel(game: GameJson, userId: string): string {
-  if (game.status === "abandoned") return "Game abandoned";
-  if (game.winner === "draw") return "It's a draw";
-  if (!game.winner) return "Game over";
-  return game.winner === userId ? "You won! 🎉" : "You lost";
+type RematchState = {
+  busy: boolean;
+  error: string | null;
+  code: string | null;
+};
+
+type OverlayState = {
+  game: GameJson;
+  dismissed: boolean;
+  detail: SeriesDetail | null;
+  rematch: RematchState;
+};
+
+type OverlayAction =
+  | { type: "reset"; game: GameJson }
+  | { type: "game_state"; game: GameJson }
+  | { type: "series_loaded"; detail: SeriesDetail }
+  | { type: "dismiss" }
+  | { type: "reopen" }
+  | { type: "rematch_start" }
+  | { type: "rematch_fail"; error: string }
+  | { type: "rematch_created"; code: string };
+
+function emptyRematch(): RematchState {
+  return { busy: false, error: null, code: null };
 }
 
-function PlayersRow({ game }: { game: GameJson }) {
-  return (
-    <div className="flex items-start justify-center gap-8">
-      {game.players.map((p) => {
-        const won = game.winner === p.userId;
-        return (
-          <div key={p.userId} className="flex flex-col items-center gap-1">
-            <div
-              className={cn(
-                "rounded-full",
-                won &&
-                  "ring-2 ring-amber-500 ring-offset-2 ring-offset-surface-raised",
-              )}
-            >
-              <Character
-                config={p.avatar ?? null}
-                fallbackSeed={p.username}
-                size={56}
-                className="rounded-full border-2 border-card bg-surface-overlay"
-              />
-            </div>
-            <span className="max-w-24 truncate text-sm">{p.username}</span>
-            {won ? (
-              <FaTrophy
-                className="text-amber-500"
-                size={14}
-                aria-hidden="true"
-              />
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
+function initialOverlayState(game: GameJson): OverlayState {
+  return {
+    game,
+    dismissed: false,
+    detail: null,
+    rematch: emptyRematch(),
+  };
+}
+
+function overlayReducer(
+  state: OverlayState,
+  action: OverlayAction,
+): OverlayState {
+  switch (action.type) {
+    case "reset":
+      return initialOverlayState(action.game);
+    case "game_state": {
+      const ended = isGameOver(action.game.status);
+      return {
+        ...state,
+        game: action.game,
+        dismissed: ended ? false : state.dismissed,
+        rematch: ended ? { ...state.rematch, busy: false } : state.rematch,
+      };
+    }
+    case "series_loaded":
+      return { ...state, detail: action.detail };
+    case "dismiss":
+      return { ...state, dismissed: true };
+    case "reopen":
+      return { ...state, dismissed: false };
+    case "rematch_start":
+      return {
+        ...state,
+        rematch: { busy: true, error: null, code: state.rematch.code },
+      };
+    case "rematch_fail":
+      return {
+        ...state,
+        rematch: { ...state.rematch, busy: false, error: action.error },
+      };
+    case "rematch_created":
+      return {
+        ...state,
+        rematch: { busy: false, error: null, code: action.code },
+      };
+    default:
+      return state;
+  }
 }
 
 export function GameOverOverlay({
@@ -83,144 +118,146 @@ export function GameOverOverlay({
   const { socket } = useSocket();
   const { openLayer, layers } = useLayeredPopup();
   const cardRef = useRef<HTMLDivElement>(null);
-  const [game, setGame] = useState<GameJson>(initialGame);
-  const [open, setOpen] = useState(() => isGameOver(initialGame.status));
-  const [detail, setDetail] = useState<SeriesDetail | null>(null);
-  const [rematch, setRematch] = useState<{
-    busy: boolean;
-    error: string | null;
-    code: string | null;
-  }>({ busy: false, error: null, code: null });
+  const [state, dispatch] = useReducer(
+    overlayReducer,
+    initialGame,
+    initialOverlayState,
+  );
+
+  const prevGameIdRef = useRef(gameId);
+  if (gameId !== prevGameIdRef.current) {
+    prevGameIdRef.current = gameId;
+    dispatch({ type: "reset", game: initialGame });
+  }
 
   useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
-    setGame(payload.game);
-    if (isGameOver(payload.game.status)) setOpen(true);
+    dispatch({ type: "game_state", game: payload.game });
   });
+
   useSocketEvent<{ newGameId: string }>(
     CHAT_EVENTS.rematchCreated,
     (payload) => {
-      setRematch((r) => ({ ...r, code: payload.newGameId }));
+      dispatch({ type: "rematch_created", code: payload.newGameId });
     },
   );
 
   useEffect(() => {
-    if (!open || !isGameOver(game.status)) return;
+    if (!isGameOver(state.game.status)) return;
     let active = true;
     clientFetchJson<SeriesDetail>(`/api/games/${gameId}/series`)
-      .then((d) => {
-        if (active) setDetail(d);
+      .then((series) => {
+        if (active) dispatch({ type: "series_loaded", detail: series });
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, [open, gameId, game.status]);
+  }, [gameId, state.game.status]);
 
+  const modalOpen = isGameOver(state.game.status) && !state.dismissed;
   const layerCount = layers.length;
+
   useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: MouseEvent) {
+    if (!modalOpen) return;
+    function onPointerDown(event: MouseEvent) {
       if (layerCount > 0) return;
       const card = cardRef.current;
-      if (card && !card.contains(e.target as Node)) setOpen(false);
+      if (card && !card.contains(event.target as Node)) {
+        dispatch({ type: "dismiss" });
+      }
     }
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [open, layerCount]);
+  }, [modalOpen, layerCount]);
 
-  const isPlayer = game.players.some((p) => p.userId === userId);
-  const canRematch =
-    isPlayer && game.status === "completed" && !!game.conversationId;
-  const showSeries = (detail?.score.totalGames ?? 0) >= 2;
+  const { game, detail, rematch } = state;
 
-  const onRematch = useCallback(async () => {
+  const canContinue =
+    game.players.some((player) => player.userId === userId) &&
+    game.status === "completed";
+
+  const viewModel = useMemo(
+    () =>
+      buildGameResultViewModel({
+        game,
+        userId,
+        series: detail,
+        canContinue,
+      }),
+    [game, userId, detail, canContinue],
+  );
+
+  const onContinue = useCallback(async () => {
     if (rematch.code) {
       router.push(`/play/${rematch.code}`);
       return;
     }
-    setRematch((r) => ({ ...r, busy: true, error: null }));
+    dispatch({ type: "rematch_start" });
     try {
-      const res = await emitAck<{ gameId: string }>(
+      const res = await emitAck<{ ok?: boolean; gameId?: string }>(
         socket,
         CHAT_EVENTS.rematch,
         { gameId },
       );
-      router.push(`/play/${res.gameId}`);
-    } catch (e) {
-      setRematch((r) => ({
-        ...r,
-        busy: false,
-        error: e instanceof Error ? e.message : "Couldn't start the rematch",
-      }));
+      const nextCode = res.gameId;
+      if (!nextCode) throw new Error("No game code returned");
+      router.push(`/play/${nextCode}`);
+    } catch (error) {
+      dispatch({
+        type: "rematch_fail",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Couldn't continue the match",
+      });
     }
   }, [socket, gameId, rematch.code, router]);
 
+  if (!viewModel) return null;
+
+  const pendingLabel = rematch.code
+    ? viewModel.primaryAction === "nextRound"
+      ? "Go to next round"
+      : "Go to rematch"
+    : null;
+
+  const showReopen = state.dismissed && isGameOver(game.status);
+
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
-      <LazyMotion features={domAnimation}>
-        <AnimatePresence>
-          {open && isGameOver(game.status) ? (
-            <GlassMotionPane
-              ref={cardRef}
-              className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6"
-              initial={{ opacity: 0, y: 8, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.97 }}
-              transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.18 }}
-            >
-              <h2 className="mb-4 text-center font-bold text-xl">
-                {outcomeLabel(game, userId)}
-              </h2>
-              <div className="mb-4">
-                {showSeries && detail ? (
-                  <SeriesScoreboard score={detail.score} />
-                ) : (
-                  <PlayersRow game={game} />
-                )}
-              </div>
-              {rematch.error ? (
-                <p className="mb-2 text-center text-danger text-sm">
-                  {rematch.error}
-                </p>
-              ) : null}
-              <div className="flex flex-col gap-2">
-                {canRematch ? (
-                  <Button onClick={onRematch} disabled={rematch.busy}>
-                    {rematch.code ? "Go to rematch" : "Rematch"}
-                  </Button>
-                ) : null}
-                {conversation ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      router.push(conversationHref(conversation, userId))
-                    }
-                  >
-                    Chat
-                  </Button>
-                ) : null}
-                {showSeries ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      openLayer({
-                        title: "Series",
-                        content: <SeriesDetailModal gameId={gameId} />,
-                        size: "md",
-                      })
-                    }
-                  >
-                    View series
-                  </Button>
-                ) : null}
-                <Button variant="ghost" onClick={() => setOpen(false)}>
-                  Close
-                </Button>
-              </div>
-            </GlassMotionPane>
-          ) : null}
-        </AnimatePresence>
-      </LazyMotion>
-    </div>
+    <>
+      <GameResultModal
+        open={modalOpen}
+        model={viewModel}
+        userId={userId}
+        draws={detail?.score.draws ?? (game.winner === "draw" ? 1 : 0)}
+        cardRef={cardRef}
+        actions={{
+          onPrimary: canContinue ? onContinue : undefined,
+          onChat: conversation
+            ? () => router.push(conversationHref(conversation, userId))
+            : undefined,
+          onViewSeries: viewModel.showSeriesHistory
+            ? () =>
+                openLayer({
+                  title: "Series",
+                  content: <SeriesDetailModal gameId={gameId} />,
+                  size: "md",
+                })
+            : undefined,
+          onClose: () => dispatch({ type: "dismiss" }),
+          primaryBusy: rematch.busy,
+          primaryError: rematch.error,
+          primaryPendingLabel: pendingLabel,
+        }}
+      />
+      <AnimatePresence>
+        {showReopen ? (
+          <GameResultReopenChip
+            headline={viewModel.headline}
+            onClick={() => dispatch({ type: "reopen" })}
+          />
+        ) : null}
+      </AnimatePresence>
+    </>
   );
 }
