@@ -14,14 +14,15 @@ describe("getGameClient fallthrough", () => {
     expect(getGameClient(" tic-tac-toe ")).toBeNull();
   });
 
-  test("documents that inherited Object.prototype keys leak through the bracket lookup", () => {
-    expect(getGameClient("toString")).toBe(Object.prototype.toString);
-    expect(getGameClient("constructor")).toBe(
-      Object.prototype.constructor as never,
-    );
-    expect(getGameClient("hasOwnProperty")).toBe(
-      Object.prototype.hasOwnProperty as never,
-    );
+  test("prototype keys never resolve to a board", () => {
+    for (const key of [
+      "toString",
+      "constructor",
+      "hasOwnProperty",
+      "__proto__",
+    ]) {
+      expect(getGameClient(key)).toBeNull();
+    }
   });
 
   test("a registered type resolves to a component", () => {
@@ -39,11 +40,15 @@ describe("getGameSkeleton fallthrough", () => {
     expect(getGameSkeleton("TIC-TAC-TOE")).toBe(DefaultGameSkeleton);
   });
 
-  test("documents that an inherited Object.prototype key shadows the default skeleton", () => {
-    expect(getGameSkeleton("toString")).not.toBe(DefaultGameSkeleton);
-    expect(getGameSkeleton("toString")).toBe(
-      Object.prototype.toString as never,
-    );
+  test("prototype keys use the default skeleton", () => {
+    for (const key of [
+      "toString",
+      "constructor",
+      "hasOwnProperty",
+      "__proto__",
+    ]) {
+      expect(getGameSkeleton(key)).toBe(DefaultGameSkeleton);
+    }
   });
 
   test("a registered type resolves to its own skeleton, not the default", () => {

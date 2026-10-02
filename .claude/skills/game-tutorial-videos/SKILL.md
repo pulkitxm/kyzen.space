@@ -95,7 +95,7 @@ static assets are available via `staticFile()` with **no copying**:
 ## Background music - required
 
 Every tutorial plays the **game's own bg music** (the track registered in
-`apps/web/lib/audio/music-sources.ts`, file under `apps/web/public/sounds/`).
+the game's `meta.backgroundMusic`, file under `apps/web/public/sounds/`).
 Render it once at the top of the composition:
 
 ```tsx

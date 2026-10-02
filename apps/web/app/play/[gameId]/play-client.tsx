@@ -1,15 +1,16 @@
 "use client";
 
 import {
-  type GameClientProps,
   getGameClient,
   getGameSkeleton,
+  useGameSession,
 } from "@kyzen/games-client";
 import type {
   ConversationJson,
   GameJson,
   GameType,
   MessageJson,
+  MoveJson,
 } from "@kyzen/shared/types";
 import { useAtomValue } from "jotai";
 import { Suspense, useMemo } from "react";
@@ -40,7 +41,7 @@ export function PlayClient({
   userId: string;
   gameType: GameType;
   initialGame: GameJson;
-  initialMoves: GameClientProps["initialMoves"];
+  initialMoves: MoveJson[];
   conversation: ConversationJson | null;
   initialMessages: MessageJson[];
   initialNextCursor: string | null;
@@ -52,6 +53,12 @@ export function PlayClient({
   const { socket } = useSocket();
   const status = useAtomValue(socketStatusAtom);
   const openProfile = useProfilePopup();
+  const { game, moves, error, makeMove } = useGameSession({
+    socket,
+    userId,
+    initialGame,
+    initialMoves,
+  });
 
   useGameAudioBridge(gameMusicSource(gameType));
 
@@ -62,12 +69,11 @@ export function PlayClient({
         <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
           <Suspense fallback={<GameSkeleton />}>
             <GameClient
-              gameId={gameId}
               userId={userId}
-              socket={socket}
               connected={connected}
-              initialGame={initialGame}
-              initialMoves={initialMoves}
+              game={game}
+              moves={moves}
+              makeMove={makeMove}
               onViewProfile={openProfile}
             />
           </Suspense>
@@ -80,23 +86,30 @@ export function PlayClient({
     [
       GameClient,
       GameSkeleton,
-      gameId,
       userId,
-      socket,
       connected,
-      initialGame,
-      initialMoves,
+      game,
+      moves,
+      makeMove,
       openProfile,
     ],
   );
 
   const overlay = (
     <>
-      <WaitingForOpponentOverlay gameId={gameId} initialGame={initialGame} />
+      {error ? (
+        <p
+          role="alert"
+          className="absolute top-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-card p-3 text-danger text-sm"
+        >
+          {error}
+        </p>
+      ) : null}
+      <WaitingForOpponentOverlay gameId={gameId} game={game} />
       <GameOverOverlay
         gameId={gameId}
         userId={userId}
-        initialGame={initialGame}
+        game={game}
         conversation={conversation}
       />
     </>

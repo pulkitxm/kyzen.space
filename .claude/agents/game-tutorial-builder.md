@@ -72,7 +72,7 @@ on-brand motion graphics over the game's own background music.
    `COMPONENTS` in `registry.tsx`. The duration is derived from the chapter
    sum.
 4. **Music**: confirm `apps/web/public/sounds/<type>-bg.ogg` exists (see
-   `apps/web/lib/audio/music-sources.ts`). If the game has no track, omit
+   the game's `meta.backgroundMusic`). If the game has no track, omit
    `<TutorialMusic>` and flag it prominently in your report - never borrow
    another game's track.
 

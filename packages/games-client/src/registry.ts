@@ -6,22 +6,25 @@ import { TicTacToeSkeleton } from "./games/tic-tac-toe/skeleton";
 import { DefaultGameSkeleton } from "./skeletons";
 import type { GameClientProps } from "./types";
 
-const REGISTRY: Record<GameType, ComponentType<GameClientProps>> = {
-  [TIC_TAC_TOE]: TicTacToeGameClient,
+const REGISTRY: Record<
+  GameType,
+  { Board: ComponentType<GameClientProps>; Skeleton?: ComponentType }
+> = {
+  [TIC_TAC_TOE]: { Board: TicTacToeGameClient, Skeleton: TicTacToeSkeleton },
 };
 
-const SKELETON_REGISTRY: Record<GameType, ComponentType> = {
-  [TIC_TAC_TOE]: TicTacToeSkeleton,
-};
+function getEntry(gameType: string) {
+  return Object.hasOwn(REGISTRY, gameType)
+    ? REGISTRY[gameType as GameType]
+    : null;
+}
 
 export function getGameClient(
   gameType: string,
 ): ComponentType<GameClientProps> | null {
-  const registry: Record<string, ComponentType<GameClientProps>> = REGISTRY;
-  return registry[gameType] ?? null;
+  return getEntry(gameType)?.Board ?? null;
 }
 
 export function getGameSkeleton(gameType: string): ComponentType {
-  const registry: Record<string, ComponentType> = SKELETON_REGISTRY;
-  return registry[gameType] ?? DefaultGameSkeleton;
+  return getEntry(gameType)?.Skeleton ?? DefaultGameSkeleton;
 }
