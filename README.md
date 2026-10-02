@@ -59,3 +59,9 @@ bun run start
 For host development, copy `.env.example` to `.env`, start the local databases with `bun run db:start`, apply the development schema with `bun run db:push`, and seed with `bun run db:seed`. `bun run dev` starts the combined app on port 3000. Use `bun run fix` for formatting and lint autofixes.
 
 Start with the [repository walkthrough](docs/repository-walkthrough.md) for the full flow, then [adding a game](docs/adding-a-game.md) for the implementation checklist. The [wiki](https://github.com/pulkitxm/kyzen.space/wiki) mirrors the current reference docs after they reach `main`.
+
+## License
+
+Kyzen is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). You may use, modify, and redistribute it for permitted noncommercial purposes, provided you preserve the license and required notices. Commercial redistribution, sale of modified copies, and monetized hosting are not authorized by this license and require separate permission from the relevant rights holders. The license also expressly permits uses by the organizations listed in its Noncommercial Organizations section; the full license governs.
+
+Third-party dependencies and assets retain their own licenses, including the [Game Paused font](apps/web/app/fonts/game-paused-LICENSE.txt).
