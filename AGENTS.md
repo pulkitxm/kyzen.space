@@ -1,6 +1,6 @@
 # Working on Kyzen
 
-Read [README.md](README.md) for commands and [docs/architecture/README.md](docs/architecture/README.md) for the map. For a game, start with [docs/adding-a-game.md](docs/adding-a-game.md). Read subsystem docs only when changing that subsystem.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow, [README.md](README.md) for commands and [docs/architecture/README.md](docs/architecture/README.md) for the map. For a game, start with [docs/adding-a-game.md](docs/adding-a-game.md). Read subsystem docs only when changing that subsystem.
 
 ## Boundaries
 
