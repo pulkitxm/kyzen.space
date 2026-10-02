@@ -1,6 +1,6 @@
 # Architecture
 
-Kyzen has one shared platform and registered games. The default runtime serves Next.js, the API, and Socket.IO together; the same backend can also run separately for a Vercel frontend.
+Kyzen has one shared platform and registered games. The default runtime serves Next.js, the API, and Socket.IO together; Vercel services deploy the frontend and backend separately with shared public routing and a frontend-to-backend binding.
 
 For a guided first read, start with the [repository walkthrough](../repository-walkthrough.md).
 
@@ -24,7 +24,7 @@ Start with [adding a game](../adding-a-game.md). The server imports engines and 
 
 `apps/web/server.ts` creates the shared HTTP server through `apps/server/src/http.ts` and attaches Next.js. Requests under `/api` go to Hono, `/health` checks readiness, and all other HTTP requests go to Next.js. Socket.IO attaches to that same HTTP server at `/socket.io`.
 
-`apps/server/src/index.ts` runs the same API and realtime mount without Next.js. This is the persistent backend used with a separately hosted frontend. [Deployment](../deployment.md) explains both layouts and the timer limitation for function-only hosting.
+`apps/server/src/index.ts` runs the same API and realtime mount without Next.js. The Vercel `app` container uses this backend-only entry point; `web` runs Next.js independently. [Deployment](../deployment.md) explains both layouts and the timer limitation for function-only hosting.
 
 ## A move
 
@@ -56,6 +56,6 @@ A conversation-backed game also mounts the existing chat view through `GameChatS
 | [audio.md](audio.md) | Sound engine and preferences |
 | [playing-cards.md](playing-cards.md) | Reusable card rendering |
 | [testing.md](testing.md) | Unit and integration suites |
-| [deployment.md](../deployment.md) | Compose, external databases, Vercel frontend |
+| [deployment.md](../deployment.md) | Compose, external databases, Vercel services |
 
 Detailed subsystem guides contain implementation references. Historical plans in `docs/superpowers` record earlier decisions; current code and these guides define the implementation.

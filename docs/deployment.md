@@ -55,28 +55,49 @@ The app listens on container port 3000. `APP_PORT` changes the host binding. Pla
 
 Use one realtime instance for now: turn timers are process-local. Redis shares rooms, presence, and matchmaking, but does not make those timers durable across process restarts or multiple timer owners.
 
-## Vercel frontend with the shared backend
+## Vercel services
 
-Deploy `apps/web` as a normal Next.js project on Vercel, using its `next build` command. Vercel runs the Next.js frontend rather than the custom `server.ts` entry point. Build dependencies must be installed from the workspace root.
+The root `vercel.json` deploys two services in one Vercel project. Set the project's Root Directory to the repository root so Vercel can read that configuration and build the Bun workspaces.
 
-Run the shared backend from the same image separately:
+| Service | Build and runtime | Public paths |
+| --- | --- | --- |
+| `app` | Backend-only Bun container from `Dockerfile.vercel`, running `apps/server/src/index.ts` | `/api`, `/api/*`, `/socket.io`, `/socket.io/*`, `/health` |
+| `web` | Next.js in `apps/web`, installed from the workspace root and built with `next build` | All remaining paths, including pages and Next.js assets |
+
+The specific rewrites precede the frontend catch-all. Vercel preserves the original request path, so Hono keeps its `/api` base path and Socket.IO keeps `/socket.io`. Both services have public routes; neither service is entirely internal. Postgres and Redis remain external managed databases, not HTTP services or binding targets.
+
+`web` declares one service binding to `app`, which injects `APP_URL`. Server Components read it at request time through `lib/api-server.ts`, forward the session cookie, and request the existing `/api/*` endpoints. The backend does not call the frontend, so it has no binding. Never set `APP_URL` manually, include it in a public variable, or resolve it in a build or middleware. Missing bindings on Vercel fail explicitly instead of fetching localhost. Host development continues to use `API_URL` or the combined server's local port.
+
+Browser API, Better Auth, and Socket.IO calls use the shared public origin. Leave `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` unset or empty in Vercel, and remove old split-host values. Set these project environment variables for each deployment environment:
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | External Postgres connection URL |
+| `REDIS_URL` | External Redis connection URL for coordination across backend instances |
+| `BETTER_AUTH_SECRET` | Random secret of at least 32 characters |
+| `BETTER_AUTH_URL` | Public deployment origin |
+| `WEB_URL` | Same public deployment origin |
+| `PUBLIC_REALTIME_URL` | Same public deployment origin, or omit to use `BETTER_AUTH_URL` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional OAuth credentials |
+
+Use origins that match the production or preview domain, never the internal binding URL. Configure Google OAuth callbacks as `<BETTER_AUTH_URL>/api/auth/callback/google`. Run `bun run db:migrate` separately against the intended database before serving traffic; the container does not migrate or seed on startup. The container listens on `0.0.0.0:80` by default and honors an injected `PORT`.
+
+For local services development, start the local databases and apply the schema as described above, then run from the repository root:
 
 ```bash
-docker compose run --service-ports app bun run --cwd apps/server start
+bunx vercel@latest dev --local
 ```
 
-Use same-site HTTPS custom domains, for example `play.example.com` for Vercel and `api.example.com` for the backend, so the session cookie can also authenticate the socket. Set the backend's `WEB_URL` to the frontend origin and `BETTER_AUTH_URL` to the backend origin.
+`vercel dev` also works with a linked project. Both modes inject the service binding. Vercel builds and runs the backend container while the frontend development command runs Next.js on a Vercel-assigned port. The frontend command honors the assigned `PORT` instead of starting the combined custom server. Export the database and auth variables from the local setup in the shell before starting Vercel, with auth origins matching its public listener, usually `http://localhost:3000`. Binding variables are provided by Vercel. Docker and its daemon are required for `vercel dev` and for building and testing `Dockerfile.vercel`.
 
-Set these frontend variables on Vercel:
+Run `bun run --cwd apps/web smoke:game` against the local Vercel listener to exercise the homepage, guest auth, two authenticated players, reconnect recovery, and persisted completion. Set `SMOKE_ORIGIN` when using a different public port.
 
-```dotenv
-API_URL=https://api.example.com
-NEXT_PUBLIC_API_URL=https://api.example.com
-NEXT_PUBLIC_SOCKET_URL=https://api.example.com
-```
+Vercel CLI 62.1.0 routed `/socket.io` upgrade requests to the frontend during a local host-backend services check, despite the backend rewrite. HTTP routing and guest sign-in worked in that check. Verify WebSocket routing with a corrected CLI and the container runtime before claiming the complete services smoke flow passes.
 
-`API_URL` is the server-side fetch target. The public variables are compiled into the browser bundle, so changing them requires a new frontend build. Set OAuth credentials on the frontend too if Google sign-in should be shown.
+### Realtime production limitation
 
-Vercel now documents WebSocket support in public beta, including a Next.js upgrade API. That is different from running the custom server and does not make process-local turn timers durable. This repository's Vercel path therefore uses the separate persistent backend. A function-only runtime needs durable timer execution and a separate upgrade adapter before it can be claimed as supported. See the [Vercel WebSocket guide](https://vercel.com/kb/guide/do-vercel-serverless-functions-support-websocket-connections) and [Next.js custom-server guide](https://nextjs.org/docs/app/guides/custom-server).
+This configuration establishes builds, routing, and service communication. It does not make the existing process-local turn timers durable. Vercel container services run as Functions, can scale across instances, and scale down when idle. WebSocket connections also close at the function duration limit. The browser already uses WebSocket-only Socket.IO transport and reconnects; Redis coordinates rooms, presence, and matchmaking, but does not restore turn deadlines or assign durable timer ownership.
 
-For a local split-runtime check, set `BETTER_AUTH_URL`, `PUBLIC_REALTIME_URL`, `API_URL`, `NEXT_PUBLIC_API_URL`, and `NEXT_PUBLIC_SOCKET_URL` to `http://localhost:4000`, keep `WEB_URL=http://localhost:3000`, run `PORT=4000 bun run dev:server`, and run `bun run dev:web` in a second terminal. Restore the same-origin settings before using the combined runtime.
+Before relying on this deployment for production timed games, move deadline execution and timer ownership into durable infrastructure and verify recovery across instance restarts and scale-out. A successful local services smoke test only verifies one backend process. For the current timed-game implementation, the persistent single-instance Docker deployment remains the supported production option.
+
+See [Vercel services](https://vercel.com/docs/services), [service bindings](https://vercel.com/docs/services/bindings), [service routing](https://vercel.com/docs/services/routing), [container images](https://vercel.com/docs/functions/container-images), and [WebSockets](https://vercel.com/docs/functions/websockets).

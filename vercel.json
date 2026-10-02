@@ -1,0 +1,31 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "runtime": "container",
+      "entrypoint": "Dockerfile.vercel"
+    },
+    "web": {
+      "root": "apps/web",
+      "framework": "nextjs",
+      "installCommand": "cd ../.. && bun install --frozen-lockfile",
+      "buildCommand": "bun run build",
+      "devCommand": "bunx next dev --port $PORT",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "app",
+          "format": "url",
+          "env": "APP_URL"
+        }
+      ]
+    }
+  },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": { "service": "app" } },
+    { "source": "/socket.io/:path*", "destination": { "service": "app" } },
+    { "source": "/health", "destination": { "service": "app" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
+}
