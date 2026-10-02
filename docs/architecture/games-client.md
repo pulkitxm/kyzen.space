@@ -41,7 +41,7 @@ Game sound effects use `src/audio/use-game-audio.ts`. The web audio bridge suppl
 
 ## Tic-tac-toe
 
-`src/games/tic-tac-toe/client.tsx` renders marks and player bars, calculates legal UI actions, calls `makeMove({ row, col })`, and reconstructs finished positions from move history for replay. Its server engine remains responsible for legality and outcomes.
+`src/games/tic-tac-toe/client.tsx` renders marks and player bars, calculates legal UI actions, calls `makeMove({ row, col })`, and reconstructs finished positions from move history for replay. Private hooks own replay controls and keyboard listeners (`useReplay`), live move and outcome sounds (`useBoardAudio`), and winning-line animation (`useWinningStrike`). `BoardCells` renders the grid, while `GameConnectionNotice` renders connection guidance. Replay setters remain pure, and the current step ref updates in a layout effect. Its server engine remains responsible for legality and outcomes.
 
 ## Verification
 

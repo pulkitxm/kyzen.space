@@ -187,6 +187,118 @@ export function TicTacToeGameClient({
 }: GameClientProps) {
   const audio = useGameAudio();
 
+  const {
+    replayStep,
+    replayPlaying,
+    sortedLen,
+    goFirst,
+    goPrev,
+    goNext,
+    goLast,
+    toggleReplayPlay,
+  } = useReplay(game, moves, audio);
+  const isLive = isGameLive(game.status);
+  const isPast = isGameOver(game.status);
+
+  const liveState = (game.gameState as TicState | null) ?? {
+    board: emptyBoard(),
+    currentTurn: "X" as const,
+  };
+
+  const replayState = useMemo(
+    () =>
+      buildStateAtStep(moves, Math.min(replayStep, sortedLen), game.players),
+    [moves, replayStep, sortedLen, game.players],
+  );
+
+  const state = isPast ? replayState : liveState;
+
+  const myRole = playerMark(game, userId);
+  const canMove =
+    Boolean(userId) &&
+    game.status === "active" &&
+    myRole !== null &&
+    liveState.currentTurn === myRole;
+
+  const makeMove = useCallback(
+    (row: number, col: number) => {
+      if (!userId || !canMove) return;
+      if (!connected) return;
+      submitMove({ row, col });
+    },
+    [userId, canMove, connected, submitMove],
+  );
+
+  const winnerLabel = gameWinnerLabel(game);
+  const { winningLine, winMark, animateWin } = useWinningStrike(game, state);
+
+  useBoardAudio(game, liveState, myRole, audio);
+
+  return (
+    <div className="mt-8">
+      <TttMarkDefs />
+      <PlayerBar
+        players={game.players}
+        currentTurn={state.currentTurn}
+        myUserId={userId}
+        active={game.status === "active"}
+        turnDeadline={game.turnDeadline ?? null}
+        onViewProfile={onViewProfile}
+      />
+      <GameConnectionNotice
+        isPast={isPast}
+        userId={userId}
+        online={Boolean(userId) && isLive && connected}
+      />
+
+      {winnerLabel ? (
+        <p className="mb-4 font-medium text-primary text-sm">{winnerLabel}</p>
+      ) : null}
+
+      <div className="relative grid w-fit grid-cols-3 gap-3">
+        <BoardCells
+          state={state}
+          canMove={!isPast && canMove && game.status === "active"}
+          myRole={myRole}
+          audio={audio}
+          makeMove={makeMove}
+        />
+        {winningLine && winMark ? (
+          <WinStrike line={winningLine} mark={winMark} animate={animateWin} />
+        ) : null}
+      </div>
+
+      {isPast ? (
+        <>
+          <ReplayToolbar
+            step={Math.min(replayStep, sortedLen)}
+            maxStep={sortedLen}
+            isPlaying={replayPlaying}
+            onFirst={goFirst}
+            onPrev={goPrev}
+            onTogglePlay={toggleReplayPlay}
+            onNext={goNext}
+            onLast={goLast}
+          />
+          <p className="mt-3 text-muted-foreground text-xs">
+            Position after {Math.min(replayStep, sortedLen)} of {sortedLen}{" "}
+            moves
+          </p>
+        </>
+      ) : (
+        <p className="mt-6 text-muted-foreground text-xs">
+          Moves logged: {moves.length}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function useReplay(
+  game: GameJson,
+  moves: MoveJson[],
+  audio: ReturnType<typeof useGameAudio>,
+) {
   const pastInitially = isGameOver(game.status);
   const [replayStep, setReplayStep] = useState(() =>
     pastInitially ? moves.length : 0,
@@ -226,81 +338,6 @@ export function TicTacToeGameClient({
       setReplayPlaying(false);
     }
   }
-
-  const liveState = (game.gameState as TicState | null) ?? {
-    board: emptyBoard(),
-    currentTurn: "X" as const,
-  };
-
-  const replayState = useMemo(
-    () =>
-      buildStateAtStep(moves, Math.min(replayStep, sortedLen), game.players),
-    [moves, replayStep, sortedLen, game.players],
-  );
-
-  const state = isPast ? replayState : liveState;
-
-  const myRole = game.players.find((p) => p.userId === userId)?.role ?? null;
-  const canMove =
-    Boolean(userId) &&
-    game.status === "active" &&
-    myRole !== null &&
-    liveState.currentTurn === myRole;
-
-  const makeMove = useCallback(
-    (row: number, col: number) => {
-      if (!userId || !canMove) return;
-      if (!connected) return;
-      submitMove({ row, col });
-    },
-    [userId, canMove, connected, submitMove],
-  );
-
-  const winnerLabel = game.winner
-    ? game.winner === "draw"
-      ? "Draw"
-      : `Winner: ${game.players.find((p) => p.userId === game.winner)?.username ?? game.winner}`
-    : null;
-
-  const winningLine =
-    game.winner && game.winner !== "draw" ? findWinningLine(state.board) : null;
-  const winLineKey = winningLine ? winningLine.join(",") : null;
-  const winMark = winningLine ? state.board[winningLine[0]] : null;
-
-  const [winState, setWinState] = useState<{
-    key: string | null;
-    animate: boolean;
-  }>(() => ({ key: winLineKey, animate: false }));
-  if (winLineKey !== winState.key) {
-    setWinState({ key: winLineKey, animate: winLineKey !== null });
-  }
-
-  const prevStatusRef = useRef(game.status);
-  const endSoundPlayedRef = useRef(false);
-  useEffect(() => {
-    const prevStatus = prevStatusRef.current;
-    prevStatusRef.current = game.status;
-    if (endSoundPlayedRef.current) return;
-    const wasLive = isGameLive(prevStatus);
-    if (wasLive && game.status === "completed" && game.winner) {
-      endSoundPlayedRef.current = true;
-      if (game.winner === "draw") audio.playDraw();
-      else audio.playWin();
-    }
-  }, [game.status, game.winner, audio]);
-
-  const liveFilled = useMemo(
-    () => liveState.board.reduce((n, cell) => (cell ? n + 1 : n), 0),
-    [liveState.board],
-  );
-  const prevLiveFilledRef = useRef(liveFilled);
-  useEffect(() => {
-    const prev = prevLiveFilledRef.current;
-    prevLiveFilledRef.current = liveFilled;
-    if (isPast || liveFilled <= prev) return;
-    if (myRole && liveState.currentTurn !== myRole) return;
-    audio.playTouch();
-  }, [liveFilled, isPast, myRole, liveState.currentTurn, audio]);
 
   const goFirst = useCallback(() => {
     setReplayPlaying(false);
@@ -371,98 +408,155 @@ export function TicTacToeGameClient({
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [isPast]);
 
+  return {
+    replayStep,
+    replayPlaying,
+    sortedLen,
+    goFirst,
+    goPrev,
+    goNext,
+    goLast,
+    toggleReplayPlay,
+  };
+}
+
+function useBoardAudio(
+  game: GameJson,
+  liveState: TicState,
+  myRole: string | null,
+  audio: ReturnType<typeof useGameAudio>,
+) {
+  const isPast = isGameOver(game.status);
+  const prevStatusRef = useRef(game.status);
+  const endSoundPlayedRef = useRef(false);
+  useEffect(() => {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = game.status;
+    if (endSoundPlayedRef.current) return;
+    const wasLive = isGameLive(prevStatus);
+    if (wasLive && game.status === "completed" && game.winner) {
+      endSoundPlayedRef.current = true;
+      if (game.winner === "draw") audio.playDraw();
+      else audio.playWin();
+    }
+  }, [game.status, game.winner, audio]);
+
+  const liveFilled = useMemo(
+    () => liveState.board.reduce((n, cell) => (cell ? n + 1 : n), 0),
+    [liveState.board],
+  );
+  const prevLiveFilledRef = useRef(liveFilled);
+  useEffect(() => {
+    const prev = prevLiveFilledRef.current;
+    prevLiveFilledRef.current = liveFilled;
+    if (isPast || liveFilled <= prev) return;
+    if (myRole && liveState.currentTurn !== myRole) return;
+    audio.playTouch();
+  }, [liveFilled, isPast, myRole, liveState.currentTurn, audio]);
+}
+
+function gameWinnerLabel(game: GameJson) {
+  return game.winner
+    ? game.winner === "draw"
+      ? "Draw"
+      : `Winner: ${game.players.find((p) => p.userId === game.winner)?.username ?? game.winner}`
+    : null;
+}
+
+function useWinningStrike(game: GameJson, state: TicState) {
+  const winningLine =
+    game.winner && game.winner !== "draw" ? findWinningLine(state.board) : null;
+  const winLineKey = winningLine ? winningLine.join(",") : null;
+  const winMark = winningLine ? state.board[winningLine[0]] : null;
+
+  const [winState, setWinState] = useState<{
+    key: string | null;
+    animate: boolean;
+  }>(() => ({ key: winLineKey, animate: false }));
+  if (winLineKey !== winState.key) {
+    setWinState({ key: winLineKey, animate: winLineKey !== null });
+  }
+
+  return { winningLine, winMark, animateWin: winState.animate };
+}
+
+function BoardCells({
+  state,
+  canMove,
+  myRole,
+  audio,
+  makeMove,
+}: {
+  state: TicState;
+  canMove: boolean;
+  myRole: Cell;
+  audio: ReturnType<typeof useGameAudio>;
+  makeMove: (row: number, col: number) => void;
+}) {
   return (
-    <div className="mt-8">
-      <TttMarkDefs />
-      <PlayerBar
-        players={game.players}
-        currentTurn={state.currentTurn}
-        myUserId={userId}
-        active={game.status === "active"}
-        turnDeadline={game.turnDeadline ?? null}
-        onViewProfile={onViewProfile}
-      />
-      {isPast ? null : !userId ? (
-        <p className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
-          Sign in to join this table and play. Open the same link while signed
-          in as the second player to fill the match.
-        </p>
-      ) : (
-        <div className="mb-4 flex items-center">
-          <StatusDot online={Boolean(userId) && isLive && connected} />
-        </div>
-      )}
+    <>
+      {CELL_KEYS.map((cellKey, idx) => {
+        const row = Math.floor(idx / 3);
+        const col = idx % 3;
+        const mark = state.board[idx];
+        const playable = canMove && mark === null;
+        const ghostMark = playable ? myRole : null;
+        return (
+          <button
+            key={cellKey}
+            type="button"
+            disabled={!playable}
+            onMouseEnter={() => {
+              if (playable) audio.playHover();
+            }}
+            onClick={() => {
+              if (!playable) return;
+              audio.playTouch();
+              makeMove(row, col);
+            }}
+            className="group flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised outline-none transition focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-surface-overlay disabled:cursor-default sm:size-28"
+          >
+            {mark ? (
+              <TttMark mark={mark} className="size-16 sm:size-20" />
+            ) : ghostMark ? (
+              <TttMark
+                mark={ghostMark}
+                decorative
+                className="size-16 opacity-0 transition-opacity duration-150 group-hover:opacity-40 group-focus-visible:opacity-40 sm:size-20"
+              />
+            ) : null}
+          </button>
+        );
+      })}
+    </>
+  );
+}
 
-      {winnerLabel ? (
-        <p className="mb-4 font-medium text-primary text-sm">{winnerLabel}</p>
-      ) : null}
+function playerMark(game: GameJson, userId: string | null): Cell {
+  const role = game.players.find((player) => player.userId === userId)?.role;
+  return role === "X" || role === "O" ? role : null;
+}
 
-      <div className="relative grid w-fit grid-cols-3 gap-3">
-        {CELL_KEYS.map((cellKey, idx) => {
-          const row = Math.floor(idx / 3);
-          const col = idx % 3;
-          const mark = state.board[idx];
-          const playable =
-            !isPast && canMove && mark === null && game.status === "active";
-          const ghostMark = playable ? myRole : null;
-          return (
-            <button
-              key={cellKey}
-              type="button"
-              disabled={!playable}
-              onMouseEnter={() => {
-                if (playable) audio.playHover();
-              }}
-              onClick={() => {
-                if (!playable) return;
-                audio.playTouch();
-                makeMove(row, col);
-              }}
-              className="group flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised outline-none transition focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-surface-overlay disabled:cursor-default sm:size-28"
-            >
-              {mark ? (
-                <TttMark mark={mark} className="size-16 sm:size-20" />
-              ) : ghostMark ? (
-                <TttMark
-                  mark={ghostMark}
-                  decorative
-                  className="size-16 opacity-0 transition-opacity duration-150 group-hover:opacity-40 group-focus-visible:opacity-40 sm:size-20"
-                />
-              ) : null}
-            </button>
-          );
-        })}
-        {winningLine && winMark ? (
-          <WinStrike
-            line={winningLine}
-            mark={winMark}
-            animate={winState.animate}
-          />
-        ) : null}
-      </div>
-
-      {isPast ? (
-        <>
-          <ReplayToolbar
-            step={Math.min(replayStep, sortedLen)}
-            maxStep={sortedLen}
-            isPlaying={replayPlaying}
-            onFirst={goFirst}
-            onPrev={goPrev}
-            onTogglePlay={toggleReplayPlay}
-            onNext={goNext}
-            onLast={goLast}
-          />
-          <p className="mt-3 text-muted-foreground text-xs">
-            Position after {Math.min(replayStep, sortedLen)} of {sortedLen}{" "}
-            moves
-          </p>
-        </>
-      ) : (
-        <p className="mt-6 text-muted-foreground text-xs">
-          Moves logged: {moves.length}
-        </p>
-      )}
+function GameConnectionNotice({
+  isPast,
+  userId,
+  online,
+}: {
+  isPast: boolean;
+  userId: string | null;
+  online: boolean;
+}) {
+  if (isPast) return null;
+  if (!userId)
+    return (
+      <p className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
+        Sign in to join this table and play. Open the same link while signed in
+        as the second player to fill the match.
+      </p>
+    );
+  return (
+    <div className="mb-4 flex items-center">
+      <StatusDot online={online} />
     </div>
   );
 }
