@@ -39,3 +39,7 @@ next-env.d.ts
 
 .wiki-build/
 .wiki-clone/
+
+.ci-tools/
+__pycache__/
+.ruff_cache/
