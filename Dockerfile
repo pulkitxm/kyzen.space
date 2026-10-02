@@ -1,4 +1,5 @@
-FROM oven/bun:1.3.11 AS dependencies
+ARG BUN_VERSION=1.4.2
+FROM oven/bun:${BUN_VERSION} AS dependencies
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY apps/web/package.json apps/web/package.json
@@ -24,7 +25,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SOCKET_URL=$NEXT_PUBLIC_SOCKET_URL
 RUN bun run --bun --cwd apps/web build
 
-FROM oven/bun:1.3.11 AS production
+FROM oven/bun:${BUN_VERSION} AS production
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
