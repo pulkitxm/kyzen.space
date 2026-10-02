@@ -107,7 +107,7 @@ jobs:
               "No leftovers": "run the failing step's git grep from .github/workflows/no-leftovers.yml",
               "No secrets": "gitleaks dir . (https://github.com/gitleaks/gitleaks)",
               "Dependency audit": "bun audit --audit-level=high",
-              "Smoke": "bun run build, start apps/server and apps/web, then curl /health and /",
+              "Smoke": "bun run build, start apps/web (combined runtime), then curl /health and /",
               "Workflow lint": "actionlint (https://github.com/rhysd/actionlint)",
             };
 

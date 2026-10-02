@@ -19,8 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.11
       - run: bun install --frozen-lockfile
       - name: Run tests
         run: bun run test
@@ -57,12 +55,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.11
       - run: bun install --frozen-lockfile
       - name: Provide env for integration run
         run: |
           cp .env.example .env
+          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/gamelobby" >> .env
           echo "REDIS_URL=redis://localhost:6379" >> .env
       - name: Apply database schema
         run: bun run db:push -- --force

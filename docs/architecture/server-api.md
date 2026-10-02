@@ -1,4 +1,4 @@
-# Server: Express + Hono + Socket.IO Wiring & REST API
+# Server: HTTP, Hono, and Socket.IO
 
 ## What this is / why it matters
 
@@ -8,15 +8,17 @@
 2. Speak WebSocket for everything live: chat messages, presence, typing, friend events, and - critically - the **game lane** where moves are made and validated in real time.
 3. Share the exact same game/chat logic the browser uses, so that the *client is never the authority*. The browser imports `@kyzen/games-core` to render a board and predict legality; the server imports the **same** `GameEngine` + Zod schemas to authoritatively validate and apply each move. A tampered client cannot smuggle an illegal move past the server because the server re-validates against the identical schema.
 
-The wiring that makes this work is deliberately layered. Express owns the raw HTTP socket and CORS; it hands `/api/*` to a **Hono** app (router-per-feature); Hono routes are thin and delegate to a **service layer** (`src/chat/*`, `src/services/*`) that returns a typed `ServiceResult`; services call **repositories** (`@kyzen/database`) and never touch raw SQL. Socket.IO is attached to the *same* underlying Node HTTP server so realtime shares the process, the auth cookie, and the in-memory `io` reference.
+The shared HTTP mount in `apps/server/src/http.ts` sends `/api/*` to Hono, exposes `/health`, and attaches Socket.IO. The combined runtime passes Next.js as the fallback; the separate backend entry point leaves other paths as 404. Hono owns CORS and feature routing. Services call the database repositories.
 
-This doc explains how that process is assembled (`index.ts`), how the REST surface is shaped (the Hono app + every route), how rows become DTOs (`serialize.ts`), and how the `routes -> services -> repositories` + `ServiceResult` pattern keeps HTTP plumbing out of business logic. It also explains the single most surprising design decision: **the only game REST endpoints are reads** (`GET /api/games/:gameId` for the game + moves, and `GET /api/games/:gameId/series` for its rematch series) - games are created, played, and rematched over the socket lane, not over HTTP.
+See [deployment](../deployment.md) for runtime entry points and environment settings. Game REST endpoints remain reads; creation and moves use the socket lane.
 
 ## Files at a glance
 
 | Path | Responsibility |
 | --- | --- |
-| `apps/server/src/index.ts` | Process entry: Express + CORS + `/health` (DB + Redis readiness), forwards `/api/*` to Hono via `getRequestListener`, attaches Socket.IO to the same HTTP server, installs crash handlers. |
+| `apps/server/src/index.ts` | Separate backend entry point, using the shared HTTP mount. |
+| `apps/server/src/http.ts` | Shared Node HTTP server, API dispatch, readiness, Socket.IO, and shutdown. |
+| `apps/web/server.ts` | Combined runtime: mounts the shared server and Next.js on one port. |
 | `apps/server/src/env.ts` | Reads/validates env vars into a frozen `env` object; `googleConfigured()` gate for OAuth. |
 | `apps/server/src/api/index.ts` | The Hono app: `basePath("/api")`, request-logger middleware, mounts Better Auth + one router per feature, global `onError`. |
 | `apps/server/src/api/middleware/logger.ts` | Per-request pino child logger with a request id; logs method/path/status/duration at the right level. |
@@ -50,62 +52,11 @@ This doc explains how that process is assembled (`index.ts`), how the REST surfa
 | `apps/server/src/realtime/rooms.ts` | Room-name helpers (`gameRoom`/`convRoom`/`userRoom`) + `emitTo*`. |
 | `apps/server/src/realtime/health.ts` | `runHealthProbe`: broadcasts a nonce-carrying `health_probe` event into the no-member `health:probe` room and verifies the publish lands on Redis (a one-shot subscriber watches the adapter channel for the nonce); returns `ok`/`off` (no Redis configured)/`error`. |
 
-## How the process is assembled (`index.ts`)
+## How the process is assembled
 
-The whole backend boots from one file. The ordering matters, so read it top-to-bottom.
+`createPlatformServer` creates the Node HTTP server and attaches realtime. `/health` concurrently checks Postgres, Redis, and the adapter probe; `/api` paths dispatch through `getRequestListener(app.fetch)`. Other paths reach the optional Next.js fallback. SIGTERM and SIGINT close the socket and HTTP server.
 
-```ts
-const server = express();
-
-server.use(
-  cors({
-    origin: env.webUrl,
-    credentials: true,
-  }),
-);
-
-server.get("/health", async (_req, res) => {
-  const db = await withTimeout(ping(), HEALTH_CHECK_TIMEOUT_MS)
-    .then(() => "ok" as const)
-    .catch((err) => {
-      logger.warn({ err }, "health check: db ping failed");
-      return "error" as const;
-    });
-  const redis = await withTimeout(redisStatus(), HEALTH_CHECK_TIMEOUT_MS).catch(
-    (err) => {
-      logger.warn({ err }, "health check: redis status failed");
-      return "error" as const;
-    },
-  );
-  const probe = await runHealthProbe(HEALTH_CHECK_TIMEOUT_MS);
-  const ok = db === "ok" && redis !== "error" && probe !== "error";
-  res
-    .status(ok ? 200 : 503)
-    .json({ ok, service: "kyzen-server", db, redis, probe });
-});
-
-const honoListener = getRequestListener(honoApp.fetch);
-server.all(/^\/api(\/.*)?$/, (req, res) => {
-  void honoListener(req, res);
-});
-```
-
-Things to notice (`apps/server/src/index.ts:16`):
-
-- **Express is the outer shell.** It owns CORS (`apps/server/src/index.ts:18`) with `credentials: true` so the browser will send the Better Auth session cookie cross-origin (`apps/server/src/env.ts:37` supplies `env.webUrl`). It serves `/health` directly (`apps/server/src/index.ts:25`) - a readiness check, not just liveness. It pings Postgres via `ping()` from `@kyzen/database` (a `select 1` through the Drizzle client, keeping all SQL inside the database package) and reports the realtime Redis status via `redisStatus()` (`apps/server/src/realtime/redis.ts:33`): `ok` when the adapter's pub connection answers `PING`, `off` when no `REDIS_URL` is configured (healthy by design - Redis is optional), `error` otherwise. Each check is capped at 2s by `withTimeout` (`apps/server/src/lib/with-timeout.ts`) and failures are logged at `warn`. The handler also runs `runHealthProbe()` (`apps/server/src/realtime/health.ts`): it emits a nonce-carrying `health_probe` event into the `health:probe` room, which no client ever joins - users receive nothing, but with the Redis adapter attached the broadcast is published to Redis, and a one-shot subscriber (a `duplicate()` of the adapter's pub connection, torn down in `finally`) watches the adapter's room channel (`socket.io#/#health:probe#`) until the nonce shows up. That proves the Socket.IO emit -> redis-adapter -> Redis `PUBLISH` pipeline from inside the process on every check. `probe` is `ok` (publish observed), `off` (no `REDIS_URL` - the event is still emitted locally, nothing to verify), or `error` (subscribe failed or the nonce never appeared within the timeout). The endpoint answers `200` with `{ ok, service, db, redis, probe }` when ready, `503` when the DB is unreachable, a configured Redis stops answering, or the probe publish is never observed.
-- **Hono is mounted as a sub-application, not as Express middleware.** `getRequestListener(honoApp.fetch)` (`apps/server/src/index.ts:45`) adapts Hono's web-standard `fetch` handler into a Node `(req, res)` listener via `@hono/node-server`. Every request whose path matches `^/api(/.*)?$` is forwarded to Hono (`apps/server/src/index.ts:46`). Why this split? Hono gives us a clean web-standard `Request`/`Response` model (which Better Auth's `handler(c.req.raw)` consumes directly) while Express remains the boring, battle-tested HTTP front door. The two never fight over the same path because Express only delegates `/api/*`.
-- **Socket.IO rides the *same* Node HTTP server.** `createServer(server)` wraps the Express app into a raw `http.Server` (`apps/server/src/index.ts:50`), and `attachRealtime(httpServer)` (`apps/server/src/index.ts:52`) attaches Socket.IO to it. That is why REST and WebSocket share one port (`env.port`, default 4000) and one cookie: the socket handshake carries the same Better Auth cookie the REST calls do.
-- **Listen + crash safety.** The server binds `env.port`/`env.host` (`apps/server/src/index.ts:59`) and logs readiness. A `once("error")` handler exits on bind failure, and process-level `unhandledRejection`/`uncaughtException` handlers (`apps/server/src/index.ts:66`) log and (for uncaught exceptions) hard-exit so a supervisor can restart cleanly.
-
-### Environment (`env.ts`)
-
-`env.ts` is the single typed gateway to `process.env`. It exposes three tiny parsers - `required` (throws if missing, `apps/server/src/env.ts:3`), `optional` (trims, defaults, `apps/server/src/env.ts:11`), and `number` (`apps/server/src/env.ts:15`) - and assembles one frozen `as const` object (`apps/server/src/env.ts:22`). Two of these required vars (`DATABASE_URL`, `BETTER_AUTH_SECRET`) make the process refuse to start if absent, which is the desired fail-fast behavior.
-
-Two username vars feed profile editing: `NOT_ALLOWED_USERNAMES` (a comma-separated blocklist parsed by `parseUsernameCsv` from `username-rules.ts` into `env.notAllowedUsernames`) and `USERNAME_CHANGE_COOLDOWN_DAYS` (default `30`, `0` disables the cooldown). Both are optional. The realtime layer adds its own optional vars: `REDIS_URL` (enables the Socket.IO Redis adapter and the Redis-backed presence store), `PUBLIC_REALTIME_URL`, and the presence-timer tunables `PRESENCE_HEARTBEAT_MS` (default `10000`), `PRESENCE_STALE_MS` (default `25000`), and `PRESENCE_LASTSEEN_PERSIST_MS` (default `60000`) - see [realtime.md](./realtime.md).
-
-`googleConfigured()` (`apps/server/src/env.ts:58`) returns whether both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. This is the gate `auth.ts` uses to decide whether to register the Google social provider at all (`apps/server/src/auth.ts:40`) - Google OAuth is optional, so a dev `.env` without Google keys still boots with email/session auth.
-
-Per the repo's CLAUDE.md, Turbo declares all env vars in `globalEnv`; adding a new var here without adding it to `turbo.json` means builds won't see it.
+`apps/web/server.ts` prepares Next.js against that server and then starts listening. `apps/server/src/index.ts` calls the same factory without the frontend. Neither path needs an Express wrapper.
 
 ## The Hono app (`api/index.ts`)
 
@@ -128,7 +79,7 @@ export const app = new Hono<LoggerEnv>()
 
 Key points (`apps/server/src/api/index.ts:15`):
 
-- **`basePath("/api")`** means every mounted route is implicitly prefixed, e.g. `conversationsRouter`'s `.get("/")` becomes `GET /api/conversations`. The Express regex forwards `/api/*` here, so the prefixes line up exactly.
+- **`basePath("/api")`** means every mounted route is implicitly prefixed, e.g. `conversationsRouter`'s `.get("/")` becomes `GET /api/conversations`. The shared HTTP mount forwards `/api` paths here, so the prefixes line up exactly.
 - **Better Auth is a catch-all sub-app.** `authApp` (`apps/server/src/api/index.ts:15`) forwards *every* method+path under `/api/auth/*` straight into Better Auth's own handler via `getAuth().handler(c.req.raw)`. Better Auth implements its own routing internally (sign-in, OAuth callback, session, etc.), so the server just gives it the raw web `Request`. The session cookie it sets is what every other route later reads.
 - **Router-per-feature.** Each domain is an isolated `Hono` instance imported and `.route()`-mounted. This keeps each file small and lets routers carry their own typed env (`gamesRouter` is `new Hono<LoggerEnv>()`, `apps/server/src/api/routes/games.ts:8`).
 - **One global error boundary.** `app.onError` (`apps/server/src/api/index.ts:31`) catches any thrown error, logs it with the request-scoped logger if present (`c.get("log") ?? logger`), and returns a generic `500` - never leaking internals to the client.
@@ -373,7 +324,7 @@ Identity edits share the same pure-helper discipline. The format/normalize/reser
 A concrete trace from HTTP request to broadcast, showing every layer:
 
 1. Browser `POST /api/conversations/<uuid>/messages` with `{ body: "hi" }` and the session cookie.
-2. Express CORS + the `/api/*` regex forward it to Hono - `apps/server/src/index.ts:46`.
+2. The shared HTTP mount forwards the request to Hono, where CORS is applied - `apps/server/src/http.ts` and `apps/server/src/api/index.ts`.
 3. `requestLogger` mints a request id and attaches the child logger - `apps/server/src/api/middleware/logger.ts:13`.
 4. `conversationsRouter`'s `requireAuth` middleware reads the Better Auth session from the cookie and stashes `userId` on the context - `apps/server/src/api/middleware/auth.ts`. (`401` if absent.)
 5. Hono matches the `POST /:id/messages` handler, which reads `c.get("userId")` - `apps/server/src/api/routes/conversations.ts`.
@@ -390,7 +341,7 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 
 ## Gotchas, invariants & conventions
 
-- **`/api` prefix lives in two places that must agree.** Express forwards `^/api(/.*)?$` (`apps/server/src/index.ts:46`) and Hono declares `basePath("/api")` (`apps/server/src/api/index.ts:18`). Route files use *un-prefixed* paths (`.get("/")`, `.get("/:id")`) - the prefix is added by the basePath, not by the router.
+- **`/api` prefix lives in two places that must agree.** The HTTP mount forwards `^/api(/.*)?$` (`apps/server/src/index.ts:46`) and Hono declares `basePath("/api")` (`apps/server/src/api/index.ts:18`). Route files use *un-prefixed* paths (`.get("/")`, `.get("/:id")`) - the prefix is added by the basePath, not by the router.
 - **Auth is `requireAuth` middleware, applied per router.** Fully-authed routers call `.use("*", requireAuth)` once at the top (so any route added to them is guarded by default); `profiles` opts in per-route on `/me*` and leaves its public routes open; `games` is public. A *new* router is only protected if it applies the middleware - declaring `Hono<AuthEnv>` types `c.get("userId")` as `string`, but the runtime guarantee comes from the `.use`/per-route `requireAuth`, so the two must go together.
 - **Better Auth owns `/api/auth/*` entirely.** Don't add routes under that prefix - `authApp` (`apps/server/src/api/index.ts`) swallows all methods/paths there. To read the session elsewhere, go through `requireAuth` (or `getSession` directly, as `account` does for session management), never re-implement cookie parsing.
 - **`fail()`'s status is the HTTP status.** The route does `c.json({ error: res.error }, res.status)` verbatim, so a service returning the wrong `ErrorStatus` produces the wrong HTTP code. Statuses are constrained to the `ErrorStatus` union (`apps/server/src/chat/result.ts:1`) - you can't return a 418.

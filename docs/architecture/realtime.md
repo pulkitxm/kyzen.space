@@ -37,7 +37,7 @@ The reason this matters - and the single most important idea in the whole subsys
 
 ## Setup: `attachRealtime`
 
-`apps/server/src/index.ts` creates a Node HTTP server around the Express/Hono app and hands it to `attachRealtime` (`apps/server/src/index.ts:52`). Everything in this doc hangs off that one call.
+`apps/server/src/http.ts` creates the shared Node HTTP server and hands it to `attachRealtime`. Everything in this doc hangs off that one call.
 
 ```ts
 export function attachRealtime(httpServer: HTTPServer): IOServer {
@@ -511,7 +511,7 @@ export function attachRedisAdapter(io: IOServer): void {
 ## Gotchas, invariants & conventions
 
 - **The client is never the authority.** The browser runs the same engine for prediction, but `make_move` is re-validated by `moveSchema`, by `stateSchema`, and finally by `engine.reduce` on the server (`turn-based.ts:320`). If the three disagree with the client, the server wins. Do not "optimize" by trusting client-supplied state.
-- **One socket per tab carries both lanes.** The browser opens a single authenticated Socket.IO connection in the web app's `SocketProvider`; game boards receive it as a prop (`socket` / `connected`) and emit `join_room` / `make_move` / `leave_room` over it - they do **not** call `io()` themselves. So the chat lane and the game lane always share one connection, one auth check, and one `socket.data.userId`. See [games-client](./games-client.md).
+- **One socket per tab carries both lanes.** The browser opens a single authenticated Socket.IO connection in the web app's `SocketProvider`; the shared game session owns `join_room` / `make_move` / `leave_room`, while boards receive state and a move callback - they do **not** call `io()` themselves. So the chat lane and the game lane always share one connection, one auth check, and one `socket.data.userId`. See [games-client](./games-client.md).
 - **Identity comes from `socket.data.userId`, never from a payload.** Set once in the `io.use` middleware (`index.ts:51`). Any handler that reads a `userId` off the wire would be a security bug.
 - **Two error/result conventions, one per lane.** Chat lane: ack callbacks shaped `{ ok, ... }` via `ack`/`ackErr`, wrapped by `register` (`socket-util.ts:26`). Game lane: a `"game_error"` emit *and* a string ack `cb?.(msg)`, wrapped by `registerGameEvent` (`socket-util.ts:46`). Follow the lane you are in.
 - **Both lanes validate inbound payloads with shared Zod schemas.** The chat lane `safeParse`s every payload against a `client*Schema` from `@kyzen/shared/types` (`clientSendMessageSchema`, `clientFriendRequestSchema`, …) - there is no longer any hand-rolled `isObj`/`str`/`strArray` coercion. The game lane does the same with `clientJoinRoomSchema` / `clientMakeMoveSchema` inside `registerGameEvent`. In the game lane there is a *second* layer: the envelope schema only guarantees `{ gameId, moveData: unknown }`; the real move shape is the game's `moveSchema`, checked inside `handleMakeMove`. Skipping either game-lane layer is a hole.
@@ -535,6 +535,12 @@ export function attachRedisAdapter(io: IOServer): void {
 - [games-core engine](./games-core-engine.md) - the `GameEngine` interface, `reduce`, `Outcome`, roles, and seat counts the driver depends on.
 - [games-client](./games-client.md) - the React boards that take the shared socket as a prop and emit `join_room`/`make_move`/`leave_room`, rendering from `game_state`.
 - [chat-core](./chat-core.md) - `CHAT_EVENTS`, the chat DTOs, and the socket event contract shared by both ends.
-- [Server API](./server-api.md) - the Express/Hono REST side that mounts `attachRealtime`.
+- [Server API](./server-api.md) - the shared Hono REST side that mounts `attachRealtime`.
 - [Web](./web.md) - how the Next.js client connects the socket and wires Jotai state to these events.
 - [Testing](./testing.md) - the `integration/game-driver.test.ts` suite drives the real `handleJoinRoom`/`handleMakeMove` against a live DB via a mock io/socket.
+
+## Runtime mount and client ownership
+
+`apps/server/src/http.ts` mounts this realtime layer on the same HTTP server as Next.js in the default runtime. The separate backend uses that same mount. See [deployment](../deployment.md).
+
+Boards no longer join rooms or subscribe directly. `packages/games-client/src/use-game-session.ts` owns one session per play view, uses the application socket, filters snapshots by room, merges move history, and resynchronizes on reconnect. The board and overlays receive that session as props. Turn timers remain process-local, so deployment currently requires one persistent realtime instance.

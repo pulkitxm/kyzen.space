@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "bun run --bun nodemon server.ts",
     "build": "next build",
-    "start": "next start --port 3000",
+    "start": "NODE_ENV=production bun --env-file=../../.env server.ts",
     "test": "bun test tests",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "dev:frontend": "next dev --port 3000",
+    "smoke:game": "bun scripts/smoke-game.ts"
   },
   "dependencies": {
     "@dicebear/collection": "^9.0.0",
@@ -15,15 +17,16 @@
     "@kyzen/avatar": "workspace:*",
     "@kyzen/games-client": "workspace:*",
     "@kyzen/games-core": "workspace:*",
+    "@kyzen/server": "workspace:*",
     "@kyzen/shared": "workspace:*",
     "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@slidoapp/emoji-mart-data": "^1.2.4",
-    "better-auth": "^1.6.9",
+    "better-auth": "^1.7.7",
     "jotai": "^2.19.1",
     "jotai-family": "^1.0.2",
     "motion": "^12.40.0",
-    "next": "16.2.6",
+    "next": "16.3.8",
     "next-themes": "^0.4.6",
     "photoswipe": "^5.4.4",
     "plyr": "^3.8.4",
@@ -31,7 +34,7 @@
     "react-dom": "19.2.4",
     "react-icons": "^5.6.0",
     "server-only": "^0.0.1",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -39,7 +42,22 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "nodemon": "^3.1.14",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "nodemonConfig": {
+    "watch": [
+      "server.ts",
+      "../server/src",
+      "../../packages/database/src",
+      "../../packages/games-core/src",
+      "../../packages/shared/src",
+      "../../packages/avatar/src",
+      "../../.env"
+    ],
+    "ext": "ts,json,env",
+    "exec": "bun --env-file=../../.env",
+    "signal": "SIGTERM"
   }
 }

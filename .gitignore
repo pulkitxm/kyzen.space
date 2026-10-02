@@ -39,9 +39,6 @@ yarn-error.log*
 # env files (single root .env is gitignored; .env.example is committed)
 .env*
 !.env.example
-# apps/web/.env is a committed symlink → ../../.env so Next loads the single
-# root env natively (Next only reads .env from its own cwd).
-!apps/web/.env
 
 # local-only dev scratch (seed scripts, throwaway tooling)
 /extras/

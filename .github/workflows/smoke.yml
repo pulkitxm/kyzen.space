@@ -45,22 +45,23 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.11
       - run: bun install --frozen-lockfile
       - name: Provide env
         run: |
           cp .env.example .env
+          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/gamelobby" >> .env
           echo "REDIS_URL=redis://localhost:6379" >> .env
       - name: Apply database schema
         run: bun run db:push -- --force
-      - name: Build all workspaces
-        run: bun run build
-      - name: Start server and web in the background
+      - name: Validate deployment configurations
         run: |
-          (cd apps/server && bun run start > /tmp/server.log 2>&1 &)
-          (cd apps/web && bun run start > /tmp/web.log 2>&1 &)
-      - name: Wait for both apps to come up
+          docker compose -f compose.yaml config --quiet
+          docker compose -f compose.dev.yaml config --quiet
+      - name: Build the production image
+        run: docker build --target production --tag kyzen:smoke .
+      - name: Start the combined app container
+        run: docker run --detach --network host --name kyzen-smoke --env-file .env kyzen:smoke
+      - name: Wait for the app to come up
         run: |
           wait_for() {
             name="$1"
@@ -77,16 +78,18 @@ jobs:
             echo "::error::$name never became ready at $url"
             return 1
           }
-          wait_for "server" "http://localhost:4000/health"
+          wait_for "health" "http://localhost:3000/health"
           wait_for "web" "http://localhost:3000/"
       - name: Realtime websocket handshake succeeds
         run: |
           bun -e '
-            const ws = new WebSocket("ws://localhost:4000/socket.io/?EIO=4&transport=websocket");
+            const ws = new WebSocket("ws://localhost:3000/socket.io/?EIO=4&transport=websocket");
             const timer = setTimeout(() => { console.error("ws timeout"); process.exit(1); }, 8000);
             ws.onopen = () => { clearTimeout(timer); console.log("ws handshake ok"); process.exit(0); };
             ws.onerror = () => { clearTimeout(timer); console.error("ws handshake failed"); process.exit(1); };
           '
+      - name: Two authenticated players complete a game and reconnect
+        run: bun run --cwd apps/web smoke:game
       - name: Health probe is published through the redis adapter
         working-directory: apps/server
         run: |
@@ -96,7 +99,7 @@ jobs:
             const seen = [];
             sub.on("pmessage", (_pattern, channel) => { seen.push(channel); });
             await sub.psubscribe("socket.io#*");
-            const res = await fetch("http://localhost:4000/health");
+            const res = await fetch("http://localhost:3000/health");
             const body = await res.json();
             if (body.probe !== "ok") {
               console.error("health did not verify its probe round-trip:", JSON.stringify(body));
@@ -120,10 +123,26 @@ jobs:
             exit 1
           fi
           echo "Homepage returned HTML ($(printf "%s" "$html" | wc -c) bytes)."
+      - name: Stop the production app before testing local development
+        run: docker stop kyzen-smoke
+      - name: Start the seeded local Compose stack
+        env:
+          POSTGRES_HOST_PORT: 15432
+          REDIS_HOST_PORT: 16379
+        run: docker compose -f compose.dev.yaml up --build --detach
+      - name: Wait for local development readiness
+        run: curl --retry 90 --retry-delay 1 --retry-connrefused --retry-all-errors --fail --silent --show-error http://localhost:3000/health
+      - name: Reseed local fixtures and complete a development game
+        run: |
+          docker compose -f compose.dev.yaml exec -T app bun run db:seed
+          bun run --cwd apps/web smoke:game
       - name: Dump app logs on failure
         if: failure()
         run: |
-          echo "===== apps/server log (tail) ====="
-          tail -n 150 /tmp/server.log || true
-          echo "===== apps/web log (tail) ====="
-          tail -n 150 /tmp/web.log || true
+          docker logs --tail 150 kyzen-smoke || true
+          docker compose -f compose.dev.yaml logs --tail 150 || true
+      - name: Stop the app containers
+        if: always()
+        run: |
+          docker compose -f compose.dev.yaml down --volumes || true
+          docker rm --force kyzen-smoke || true

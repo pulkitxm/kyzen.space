@@ -1,5 +1,7 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { getAuth } from "../auth";
+import { env } from "../env";
 import { logger } from "../logger";
 import { type LoggerEnv, requestLogger } from "./middleware/logger";
 import { accountRouter } from "./routes/account";
@@ -15,6 +17,7 @@ const authApp = new Hono().all("*", (c) => getAuth().handler(c.req.raw));
 
 export const app = new Hono<LoggerEnv>()
   .basePath("/api")
+  .use("*", cors({ origin: env.webUrl, credentials: true }))
   .use("*", requestLogger)
   .route("/auth", authApp)
   .route("/account", accountRouter)
