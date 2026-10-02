@@ -37,7 +37,7 @@ Next.js, the API, and Socket.IO share one HTTP server. A Vercel frontend with th
 
 ## Contribute
 
-Start with [adding a game](docs/adding-a-game.md). It lists every file and registration needed, the board contract, and verification commands. Boards receive current game state and a move callback; the shell owns sockets, chat placement, profile popups, settings, and results.
+Read the [contribution guide](CONTRIBUTING.md) for setup, reporting issues, verification, and the pull request process. For a new game, start with [adding a game](docs/adding-a-game.md). It lists every file and registration needed, the board contract, and verification commands. Boards receive current game state and a move callback; the shell owns sockets, chat placement, profile popups, settings, and results.
 
 For platform work, use the [architecture map](docs/architecture/README.md). Repository conventions are in [AGENTS.md](AGENTS.md). Role adapters use the same guides rather than duplicating instructions.
 
