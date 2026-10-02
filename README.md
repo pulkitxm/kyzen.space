@@ -43,10 +43,11 @@ For platform work, use the [architecture map](docs/architecture/README.md). Repo
 
 ## Commands
 
-Requires Bun 1.3.11 or newer. Docker is needed only for the local containers.
+Use the Bun version in `package.json`. `make ci` runs the complete CI suite locally, including disposable Docker runtime checks. See [CI checks and local scheduling](docs/ci.md) for prerequisites, individual targets, and resource limits.
 
 ```bash
 bun install
+make ci
 bun run dev
 bun run type-check
 bun run test

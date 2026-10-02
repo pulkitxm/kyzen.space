@@ -17,18 +17,22 @@ for (const file of trackedFiles()) {
   )
     problems.push("tracked environment file");
   if (
-    /(?:^|\/)(?:\.husky|\.githooks|hooks)\//.test(file.path) ||
-    /(?:^|\/)(?:\.?lefthook\.[^/]+|\.pre-commit-config\.[^/]+|\.lintstagedrc[^/]*)$/.test(
+    /(?:^|\/)(?:\.husky|\.githooks)\//.test(file.path) ||
+    /(?:^|\/)(?:\.?lefthook\.[^/]+|\.pre-commit-config\.[^/]+|\.lintstagedrc[^/]*|\.huskyrc[^/]*|\.simple-git-hooks[^/]*)$/.test(
       file.path,
     )
   )
     problems.push("local hook configuration");
   if (/(?:^|\/)package\.json$/.test(file.path)) {
     const pkg = JSON.parse(content);
-    for (const name of Object.keys(pkg.scripts ?? {})) {
+    const scripts = Object.keys(pkg.scripts ?? {});
+    for (const name of scripts) {
       if (
         /^(?:preinstall|install|postinstall|prepare|prepublish|prepublishOnly|precommit|pre-commit|prepush|pre-push)$/.test(
           name,
+        ) ||
+        scripts.some(
+          (other) => name === `pre${other}` || name === `post${other}`,
         )
       )
         problems.push(`automatic lifecycle or hook script: ${name}`);

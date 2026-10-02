@@ -31,7 +31,7 @@ Only turn-based games currently have a server runner. Adding a `step` engine alo
 
 ## Verification
 
-All quality gates run in CI. Do not install local Git hooks or automatic package lifecycle checks. `bun run check` fails on Biome warnings, formatting, imports, or lint errors. Run `bun run test:policies` after changing an enforcement script.
+Use `make ci` for the complete suite or the individual `ci-*` targets in [docs/ci.md](docs/ci.md). Heavy local checks queue for CPU and memory; GitHub Actions bypasses that scheduler. All quality gates run in CI. Do not install local Git hooks or automatic package lifecycle checks. `bun run check` fails on Biome warnings, formatting, imports, or lint errors. Run `bun run test:policies` after changing an enforcement script.
 
 Run `bun run type-check`, the touched workspaces' tests, `bun run check`, and `bun run strip-comments -- --check`. For runtime changes, also build and exercise HTTP, auth, and an authenticated two-player game. Document missing environment dependencies instead of claiming a check passed.
 
