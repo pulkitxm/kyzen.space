@@ -27,7 +27,7 @@ Only turn-based games currently have a server runner. Adding a `step` engine alo
 - Use Jotai for cross-feature application state. A mounted session can own state in its shell and pass props to children; keep private UI state local.
 - Use the existing glass and popup primitives for popup surfaces.
 - Add new top-level route names to `RESERVED_USERNAMES` in shared constants.
-- Before changing Next.js APIs, read the matching guide in `node_modules/next/dist/docs/`.
+- Before changing Next.js APIs, read the matching guide in the installed package's `dist/docs/` folder when available, or use the official Next.js documentation.
 
 ## Verification
 
