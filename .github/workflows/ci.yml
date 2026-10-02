@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - ci-policies
+          - ci-lint
+          - ci-format
+          - ci-types
+          - ci-test
+          - ci-scripts
+          - ci-dead-code
+          - ci-audit
+          - ci-workflows
+          - ci-secrets
+          - ci-build
+          - ci-react
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      - run: make ci-install
+      - run: make ${{ matrix.target }}
+
+  runtime:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ci-integration, ci-smoke]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      - run: make ci-install
+      - run: make ${{ matrix.target }}
+
+  required:
+    name: CI required
+    if: always()
+    needs: [checks, runtime]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          CHECKS: ${{ needs.checks.result }}
+          RUNTIME: ${{ needs.runtime.result }}
+        run: test "$CHECKS" = success && test "$RUNTIME" = success

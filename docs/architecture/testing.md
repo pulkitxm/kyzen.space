@@ -131,26 +131,9 @@ This is the testing half of the "adding a game needs no new routes, endpoints, o
 
 ## CI
 
-`.github/workflows/test.yml` runs on every push to `main` and every pull request, and defines **two jobs**:
+`.github/workflows/ci.yml` runs the same Make targets used locally on every pull request and push to `main`, with no path filters. It separates lint, formatting, types, unit tests, policy/scheduler tests, dead code, audit, workflow lint, secret scanning, and build results. Runtime jobs run the Postgres/Redis integration suite and production/development smoke flows in disposable synthetic environments. The aggregate `CI required` check fails when any mandatory job fails or is cancelled or skipped.
 
-- **`test`** - checks out, installs the Bun version from the root `packageManager`, runs `bun install --frozen-lockfile`, then `bun run test` (the unit suites; no DB, so any `integration/` files it touches self-skip).
-- **`integration`** - spins up a `postgres:16` service (health-checked, on `localhost:5432`) **and** a `redis:7` service (health-checked, on `localhost:6379`), sets `DATABASE_URL` + `REDIS_URL`, copies `.env.example` to `.env`, applies the schema non-interactively with `bun run db:push -- --force`, then runs `cd apps/server && bun run test:integration`. Because the DB is reachable, `_preflight.test.ts` does **not** skip - a broken setup fails the job; and because Redis is reachable, the presence Redis tests run instead of skipping.
-
-Separate workflows cover the other gates - `lint.yml` (Biome `bun run check`, Tailwind canonical classes, `type-check`), `build.yml`, `no-comments.yml`, `dead-code.yml` (`bun run dead-code`), `no-em-dashes.yml`, and `react-doctor.yml` (the `millionco/react-doctor` action, which posts advisory inline review comments on a PR and reposts them on each push).
-
-Four further gates guard against the classic agentic-coding failure modes:
-
-- **`no-leftovers.yml`** - zero-dependency `git grep` checks: no `console.log` in app/package source (scripts and tests excluded), no `debugger` statements, no `.only` focused tests, no merge conflict markers, and no tracked `.env` files beyond `.env.example`.
-- **`secrets.yml`** - runs gitleaks (`gitleaks dir`) over the working tree; `.gitleaks.toml` at the repo root extends the default rules and allowlists `.env.example`.
-- **`dep-audit.yml`** - `bun audit --audit-level=high` whenever `bun.lock` or any `package.json` changes, plus a weekly Monday cron so new advisories surface without a code change.
-- **`smoke.yml`** - validates both Compose configurations, builds the production Docker image, and runs the combined app container against synthetic Postgres and Redis services. It checks readiness, a WebSocket handshake, the Redis health-probe round trip, rendered HTML, and an authenticated two-player game with reconnect recovery and persisted moves. It then boots the seeded local Compose stack, reseeds to check idempotency, and repeats the game flow in development. On failure it dumps the container logs.
-
-Two meta workflows keep the feedback loop tight:
-
-- **`ci-feedback.yml`** - listens for every gate's `workflow_run` completion on PRs. On failure it posts (or updates) one comment per workflow with the failing job, the failing step, the last lines of its log, and the local repro command; when that gate goes green again the comment flips to passing. An agent iterating on a PR can read everything it needs from `gh pr view --comments` without opening the Actions UI.
-- **`actionlint.yml`** - lints the workflow files themselves (actionlint, which also shellchecks embedded `run:` scripts) whenever `.github/workflows/**` changes.
-
-All workflows set least-privilege `permissions`, a per-PR `concurrency` group with `cancel-in-progress` on pull requests (rapid pushes cancel stale runs instead of queueing behind them), and `timeout-minutes` so a hung job cannot block the queue.
+Run `make ci` for all checks, or `make ci-test`, `make ci-integration`, and `make ci-smoke` separately. Heavy local targets wait for available CPU and memory across concurrent worktrees; GitHub bypasses the scheduler. Full commands, tool requirements, resource settings, and isolation rules are in [docs/ci.md](../ci.md).
 
 ## Where to go next
 
