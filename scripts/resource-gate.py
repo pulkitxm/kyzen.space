@@ -168,7 +168,11 @@ def execute(goals, command):
                 jobs = []
                 waiting = []
                 for path in directory.glob("*.json"):
-                    job = json.loads(path.read_text())
+                    try:
+                        job = json.loads(path.read_text())
+                    except json.JSONDecodeError:
+                        path.unlink(missing_ok=True)
+                        continue
                     process = processes.get(job["pid"])
                     if not process or process["started"] != job["started"]:
                         path.unlink(missing_ok=True)

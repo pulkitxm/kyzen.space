@@ -167,6 +167,11 @@ describe("local resource scheduling", () => {
     expect((await start("raise SystemExit(0)").done).code).toBe(0);
     expect(existsSync(join(directory, "stale.json"))).toBe(false);
   });
+  test("recovers from an interrupted reservation write", async () => {
+    writeFileSync(join(directory, "partial.json"), '{"pid":');
+    expect((await start("raise SystemExit(0)").done).code).toBe(0);
+    expect(existsSync(join(directory, "partial.json"))).toBe(false);
+  });
   test("queues concurrent work until its predecessor releases capacity", async () => {
     const host = { ...quiet, cpus: 4 };
     const marker = join(directory, "ready");
