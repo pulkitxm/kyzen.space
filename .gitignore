@@ -1,57 +1,41 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
 node_modules/
 /.pnp
 .pnp.*
 
-# testing
 /coverage
 
-# brainstorming visual companion
 .superpowers/
 
-# next.js (any workspace)
 .next/
 /out/
 
-# remotion render scratch
 vid-tutorials/out/
 
-# production
 /build
 dist/
 
-# turborepo
 .turbo
 
-# misc
 .DS_Store
 *.pem
 *.tsbuildinfo
 
-# debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (single root .env is gitignored; .env.example is committed)
 .env*
 !.env.example
 
-# local-only dev scratch (seed scripts, throwaway tooling)
 /extras/
 
-# vercel
 .vercel
 
-# Next.js generated
 next-env.d.ts
 
-# Claude Code worktrees (full repo copies; keeps Biome from seeing a nested root config)
 .claude/worktrees/
 
-# wiki sync scratch (generated pages + cloned wiki repo)
 .wiki-build/
 .wiki-clone/

@@ -3,7 +3,7 @@
   "ignoreBinaries": ["cloc"],
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.{mjs,ts}"],
+      "entry": ["scripts/*.{mjs,ts}", "scripts/tests/**/*.test.mjs"],
       "ignore": [".claude/**"]
     },
     "apps/server": {

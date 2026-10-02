@@ -167,3 +167,13 @@ All workflows set least-privilege `permissions`, a per-PR `concurrency` group wi
 `packages/games-client/tests/session.test.ts` verifies reconnect joins, room isolation, listener cleanup, and move-history resync. The waiting-overlay tests consume game props, matching the single session in the play shell.
 
 Use `docker compose -f compose.dev.yaml up --build` for the local fixture environment. It creates only synthetic profiles, conversation text, and a completed replay. Production Compose uses external databases and does not seed. CI builds and runs the production container against Postgres and Redis, then boots the local Compose stack and repeats seeding to check idempotence. Both modes exercise homepage rendering, guest authentication, two authenticated WebSocket players, game completion, reconnect recovery, and persisted move history on port 3000.
+
+## Tracked-file policies
+
+`bun run check` uses Biome CI mode with warnings treated as failures. `bun run lint` checks lint and imports; `bun run format:check` checks formatting. Focused tests, statically skipped tests, debugger statements, explicit `any`, unused declarations, and non-null assertions are errors. Source code cannot use console logging except warnings and errors; command-line entry points write their results to stdout.
+
+`bun run check:comments` checks all tracked code and configuration, including SQL migrations, SVG and Markdown markup comments, TOML, shell/Python scripts, environment examples, and workflow scripts. It preserves functional directives and migration statement breakpoints. Markdown headings and documentation prose remain valid. `bun run strip-comments` removes disallowed comments; its `--check` mode never rewrites files. The generated pattern SVGs retain their Lucide ISC attribution in metadata.
+
+`bun run check:em-dashes` checks tracked text and symlink target names for U+2014. `bun run check:repository` rejects local hook tooling, automatic lifecycle scripts, stray tracked environment files, and merge markers. These checks inspect Git's tracked paths with NUL delimiters and never follow symlinks into local data. `bun run test:policies` exercises the commands in disposable Git repositories, including failure cases and read-only checks.
+
+There are no local Git hooks. Run these commands explicitly when useful; CI enforces them on pull requests and `main`.

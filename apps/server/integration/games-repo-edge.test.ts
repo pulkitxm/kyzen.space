@@ -177,9 +177,3 @@ describe.skipIf(!DB_UP)("findLiveGameInConversation status filter", () => {
     ).toBeNull();
   });
 });
-
-if (!DB_UP) {
-  describe("games repo edge cases", () => {
-    it.skip("skipped - database unreachable; run `bun run db:start`", () => {});
-  });
-}

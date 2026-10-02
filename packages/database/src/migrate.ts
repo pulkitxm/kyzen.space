@@ -6,5 +6,5 @@ const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
 
 await migrate(db, { migrationsFolder });
 await client.end();
-console.log("> Migrations applied from", migrationsFolder);
+process.stdout.write(`Migrations applied from ${migrationsFolder}\n`);
 process.exit(0);

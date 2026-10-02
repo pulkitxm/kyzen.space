@@ -6,11 +6,16 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/drizzle", "!**/bun.lock"]
+    "includes": ["**", "!**/drizzle", "!**/bun.lock", "!**/.env"]
   },
   "css": {
-    "formatter": { "enabled": true },
-    "parser": { "cssModules": false, "tailwindDirectives": true }
+    "formatter": {
+      "enabled": true
+    },
+    "parser": {
+      "cssModules": false,
+      "tailwindDirectives": true
+    }
   },
   "formatter": {
     "enabled": true,
@@ -35,7 +40,10 @@
       },
       "suspicious": {
         "noExplicitAny": "error",
-        "noArrayIndexKey": "error"
+        "noArrayIndexKey": "error",
+        "noFocusedTests": "error",
+        "noSkippedTests": "error",
+        "noDebugger": "error"
       },
       "complexity": {
         "useOptionalChain": "error"
@@ -62,5 +70,28 @@
       "semicolons": "always",
       "trailingCommas": "all"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "apps/server/src/**",
+        "apps/web/app/**",
+        "apps/web/components/**",
+        "apps/web/lib/**",
+        "packages/*/src/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": {
+              "level": "error",
+              "options": {
+                "allow": ["warn", "error"]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

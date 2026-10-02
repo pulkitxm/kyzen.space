@@ -26,7 +26,7 @@
     "fix": "biome check --write --unsafe --only=correctness/noUnusedImports --only=nursery/useSortedClasses . && biome check --write . && bun run fix:tw",
     "fix:tw": "cd apps/web && tailwind-suggest-canonical-classes \"app/**/*.{tsx,jsx,ts,js}\" \"components/**/*.{tsx,jsx,ts,js}\" \"lib/**/*.{tsx,jsx,ts,js}\" \"../../packages/games-client/src/**/*.{tsx,jsx,ts,js}\" --css app/globals.css",
     "fix:tw:check": "cd apps/web && tailwind-suggest-canonical-classes \"app/**/*.{tsx,jsx,ts,js}\" \"components/**/*.{tsx,jsx,ts,js}\" \"lib/**/*.{tsx,jsx,ts,js}\" \"../../packages/games-client/src/**/*.{tsx,jsx,ts,js}\" --css app/globals.css --check",
-    "check": "biome check .",
+    "check": "biome ci --error-on-warnings .",
     "dead-code": "knip",
     "dead-code:fix": "knip --fix",
     "strip-comments": "bun scripts/strip-comments.mjs",
@@ -40,7 +40,13 @@
     "doctor": "npx react-doctor@latest",
     "dev:web": "bun --env-file=.env run --cwd apps/web dev:frontend",
     "dev:server": "bun run --cwd apps/server dev",
-    "db:seed": "bun --env-file=.env packages/database/src/seed.ts"
+    "db:seed": "bun --env-file=.env packages/database/src/seed.ts",
+    "lint": "biome ci --formatter-enabled=false --error-on-warnings .",
+    "format:check": "biome ci --linter-enabled=false --assist-enabled=false --error-on-warnings .",
+    "check:comments": "bun scripts/strip-comments.mjs --check",
+    "check:em-dashes": "bun scripts/check-em-dashes.mjs",
+    "check:repository": "bun scripts/check-repository.mjs",
+    "test:policies": "bun test scripts/tests"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.16",
@@ -48,7 +54,9 @@
     "drizzle-kit": "^0.30.6",
     "knip": "^6.39.0",
     "turbo": "^2.11.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "yaml": "2.9.1",
+    "postcss": "8.5.28"
   },
   "overrides": {
     "browserslist": "4.29.3",
