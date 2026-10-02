@@ -437,9 +437,3 @@ describe.skipIf(!DB_UP)("notifications", () => {
     expect(await notifications.unreadCount(b.id)).toBeLessThan(beforeUnread);
   });
 });
-
-if (!DB_UP) {
-  describe("chat integration", () => {
-    it.skip("skipped - database unreachable; run `bun run db:start`", () => {});
-  });
-}

@@ -354,9 +354,3 @@ describe.skipIf(!DB_UP)("messages edge cases", () => {
     expect(again.deletedAt).not.toBeNull();
   });
 });
-
-if (!DB_UP) {
-  describe("messages edge cases", () => {
-    it.skip("skipped - database unreachable; run `bun run db:start`", () => {});
-  });
-}

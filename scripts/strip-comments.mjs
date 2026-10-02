@@ -1,6 +1,9 @@
-import { execSync } from "node:child_process";
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { isUtf8 } from "node:buffer";
+import { appendFileSync, writeFileSync } from "node:fs";
+import postcss from "postcss";
 import ts from "typescript";
+import { Parser } from "yaml";
+import { trackedContent, trackedFiles } from "./tracked-files.mjs";
 
 const args = process.argv.slice(2);
 const CHECK = args.some(
@@ -95,37 +98,12 @@ function tsComments(file, text) {
 function cssComments(text) {
   const remove = [];
   let kept = 0;
-  let i = 0;
-  const n = text.length;
-  let str = null;
-  while (i < n) {
-    const c = text[i];
-    if (str) {
-      if (c === "\\") {
-        i += 2;
-        continue;
-      }
-      if (c === str) str = null;
-      i++;
-      continue;
-    }
-    if (c === '"' || c === "'") {
-      str = c;
-      i++;
-      continue;
-    }
-    if (c === "/" && text[i + 1] === "*") {
-      const start = i;
-      let j = i + 2;
-      while (j < n && !(text[j] === "*" && text[j + 1] === "/")) j++;
-      const end = Math.min(n, j + 2);
-      if (text.slice(start, end).startsWith("/*!")) kept++;
-      else remove.push({ pos: start, end });
-      i = end;
-      continue;
-    }
-    i++;
-  }
+  postcss.parse(text).walkComments((comment) => {
+    const pos = comment.source.start.offset;
+    const end = comment.source.end.offset + 1;
+    if (text.slice(pos, end).startsWith("/*!")) kept++;
+    else remove.push({ pos, end });
+  });
   return { remove, kept };
 }
 
@@ -172,81 +150,143 @@ function jsoncComments(text) {
   return { remove, kept: 0 };
 }
 
-function keepYaml(t) {
-  if (/^yaml-language-server\b/.test(t)) return true;
-  if (/^yamllint\b/.test(t)) return true;
-  return false;
+function hashComments(text) {
+  const remove = [];
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === "\\" && quote[0] !== "'") i++;
+      else if (text.startsWith(quote, i)) {
+        i += quote.length - 1;
+        quote = null;
+      }
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") {
+      quote = text.startsWith(c.repeat(3), i) ? c.repeat(3) : c;
+      i += quote.length - 1;
+    } else if (c === "#" && (i === 0 || /\s/.test(text[i - 1]))) {
+      const end = text.indexOf("\n", i);
+      const stop = end === -1 ? text.length : end;
+      if (!(i === 0 && text.startsWith("#!")))
+        remove.push({ pos: i, end: stop });
+      i = stop - 1;
+    } else if (c === "\\") i++;
+  }
+  return { remove, kept: 0 };
 }
 
 function yamlComments(text) {
   const remove = [];
   let kept = 0;
-  const lines = text.split("\n");
-  let pos = 0;
-  let blockIndent = null;
-  let str = null;
-  for (const line of lines) {
-    const lineStart = pos;
-    pos += line.length + 1;
-    const firstNonWs = line.search(/\S/);
-    const isBlank = firstNonWs === -1;
-    const indent = isBlank ? 0 : firstNonWs;
-    if (str === null && blockIndent !== null) {
-      if (isBlank || indent > blockIndent) continue;
-      blockIndent = null;
+  const visit = (node) => {
+    if (!node || typeof node !== "object") return;
+    if (node.type === "comment") {
+      if (/^#\s*(yaml-language-server|yamllint)\b/.test(node.source)) kept++;
+      else
+        remove.push({
+          pos: node.offset,
+          end: node.offset + node.source.length,
+        });
     }
-    if (str === null && isBlank) continue;
-    let commentAt = -1;
-    let prevWs = true;
-    for (let k = 0; k < line.length; k++) {
-      const c = line[k];
-      if (str === '"') {
-        if (c === "\\") {
-          k++;
-          prevWs = false;
-          continue;
+    if (node.key?.source && node.value?.type === "block-scalar") {
+      const value = node.value;
+      const last = value.props[value.props.length - 1];
+      const offset = last.offset + last.source.length;
+      const comments =
+        node.key.source === "script"
+          ? tsComments("embedded.js", value.source)
+          : node.key.source === "run"
+            ? hashComments(value.source)
+            : { remove: [], kept: 0 };
+      kept += comments.kept;
+      remove.push(
+        ...comments.remove.map((r) => ({
+          pos: offset + r.pos,
+          end: offset + r.end,
+        })),
+      );
+    }
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === "object") visit(value);
+    }
+  };
+  for (const token of new Parser().parse(text)) visit(token);
+  return { remove, kept };
+}
+
+function sqlComments(text) {
+  const remove = [];
+  let kept = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === "'" || c === '"') {
+      const quote = c;
+      while (++i < text.length) {
+        if (text[i] === "\\" && quote === "'") i++;
+        else if (text[i] === quote) {
+          if (text[i + 1] === quote) i++;
+          else break;
         }
-        if (c === '"') str = null;
-        prevWs = false;
-        continue;
       }
-      if (str === "'") {
-        if (c === "'" && line[k + 1] === "'") {
-          k++;
-          prevWs = false;
-          continue;
-        }
-        if (c === "'") str = null;
-        prevWs = false;
-        continue;
+    } else if (
+      c === "$" &&
+      /^\$(?:[A-Za-z_][A-Za-z_0-9]*)?\$/.test(text.slice(i))
+    ) {
+      const tag = text.slice(i).match(/^\$(?:[A-Za-z_][A-Za-z_0-9]*)?\$/)[0];
+      const end = text.indexOf(tag, i + tag.length);
+      i = end === -1 ? text.length : end + tag.length - 1;
+    } else if (text.startsWith("--", i)) {
+      const newline = text.indexOf("\n", i);
+      const end = newline === -1 ? text.length : newline;
+      if (text.slice(i, end).trim() === "--> statement-breakpoint") kept++;
+      else remove.push({ pos: i, end });
+      i = end - 1;
+    } else if (text.startsWith("/*", i)) {
+      const pos = i;
+      let depth = 1;
+      i += 2;
+      while (i < text.length && depth) {
+        if (text.startsWith("/*", i)) {
+          depth++;
+          i += 2;
+        } else if (text.startsWith("*/", i)) {
+          depth--;
+          i += 2;
+        } else i++;
       }
-      if (c === '"' || c === "'") {
-        str = c;
-        prevWs = false;
-        continue;
-      }
-      if (c === "#" && prevWs) {
-        commentAt = k;
-        break;
-      }
-      prevWs = c === " " || c === "\t";
+      remove.push({ pos, end: i });
+      i--;
     }
-    if (str === null) {
-      const code = (
-        commentAt === -1 ? line : line.slice(0, commentAt)
-      ).trimEnd();
-      if (/(?:^|\s)[|>](?:[1-9][+-]?|[+-][1-9]?)?$/.test(code))
-        blockIndent = indent;
-    }
-    if (commentAt === -1) continue;
-    const inner = line.slice(commentAt + 1).trim();
-    if (keepYaml(inner)) {
-      kept++;
-      continue;
-    }
-    remove.push({ pos: lineStart + commentAt, end: lineStart + line.length });
   }
   return { remove, kept };
+}
+
+function markupComments(text) {
+  return {
+    remove: [...text.matchAll(/<!--.*?(?:-->|$)/gs)].map((match) => ({
+      pos: match.index,
+      end: match.index + match[0].length,
+    })),
+    kept: 0,
+  };
+}
+
+function comments(file, text) {
+  if (/\.(?:[cm]?[jt]s|[jt]sx)$/.test(file)) return tsComments(file, text);
+  if (/\.css$/.test(file)) return cssComments(text);
+  if (/\.(?:jsonc?|lock)$/.test(file)) return jsoncComments(text);
+  if (/\.ya?ml$/.test(file)) return yamlComments(text);
+  if (/\.sql$/.test(file)) return sqlComments(text);
+  if (/\.(?:md|mdx|html|xml|svg)$/.test(file)) return markupComments(text);
+  if (
+    /\.(?:toml|sh|bash|zsh|py)$/.test(file) ||
+    /(?:^|\/)(?:Makefile|Dockerfile|\.gitignore|\.env(?:\.[^/]+)?)$/.test(file)
+  )
+    return hashComments(text);
+  return { remove: [], kept: 0 };
 }
 
 function expand(text, pos, end) {
@@ -276,6 +316,13 @@ function build(text, ranges) {
   let cursor = 0;
   for (const r of merged) {
     out += text.slice(cursor, r.start);
+    if (
+      r.start > 0 &&
+      r.end < text.length &&
+      !/\s/.test(text[r.start - 1]) &&
+      !/\s/.test(text[r.end])
+    )
+      out += " ";
     cursor = r.end;
   }
   return out + text.slice(cursor);
@@ -355,33 +402,20 @@ function reportGithub(findings, stats) {
   appendFileSync(out, `${md}\n`);
 }
 
-const files = execSync(
-  "git ls-files '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.css' '*.json' '*.jsonc' '*.yml' '*.yaml'",
-  {
-    encoding: "utf8",
-  },
-)
-  .split("\n")
-  .map((s) => s.trim())
-  .filter(Boolean)
-  .filter((f) => !/(^|\/)next-env\.d\.ts$/.test(f) && !/\/drizzle\//.test(f));
+const files = trackedFiles().filter((file) => file.mode !== "120000");
 
 let changedFiles = 0;
 let totalRemoved = 0;
 let totalKept = 0;
 const findings = [];
 
-for (const f of files) {
-  const text = readFileSync(f, "utf8");
+for (const file of files) {
+  const f = file.path;
+  const content = trackedContent(file);
+  if (content.includes(0) || !isUtf8(content)) continue;
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(content);
   const ext = f.slice(f.lastIndexOf("."));
-  const { remove, kept } =
-    ext === ".css"
-      ? cssComments(text)
-      : ext === ".json" || ext === ".jsonc"
-        ? jsoncComments(text)
-        : ext === ".yml" || ext === ".yaml"
-          ? yamlComments(text)
-          : tsComments(f, text);
+  const { remove, kept } = comments(f, text);
   totalKept += kept;
   if (remove.length === 0) continue;
   changedFiles++;

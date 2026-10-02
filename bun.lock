@@ -9,8 +9,10 @@
         "@laststance/tailwind-suggest-canonical-classes": "^0.1.2",
         "drizzle-kit": "^0.30.6",
         "knip": "^6.39.0",
+        "postcss": "8.5.28",
         "turbo": "^2.11.6",
         "typescript": "^5.9.3",
+        "yaml": "2.9.1",
       },
     },
     "apps/server": {
