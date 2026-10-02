@@ -37,7 +37,9 @@ describe("server API routing", () => {
     process.env.APP_URL = backend.url.toString();
     process.env.API_URL = "http://127.0.0.1:1";
 
-    const result = await serverFetchJson("/api/games/DEMO42?limit=5");
+    const result = await serverFetchJson<Record<string, string>>(
+      "/api/games/DEMO42?limit=5",
+    );
     expect(result).toEqual({
       path: "/api/games/DEMO42",
       query: "?limit=5",
@@ -60,7 +62,10 @@ describe("server API routing", () => {
     delete process.env.APP_URL;
     process.env.API_URL = backend.url.toString();
 
-    expect(await serverFetchJson("/api/auth/get-session")).toEqual({
+    const result = await serverFetchJson<Record<string, string>>(
+      "/api/auth/get-session",
+    );
+    expect(result).toEqual({
       path: "/api/auth/get-session",
       query: "",
       cookie: "session=synthetic-session",
