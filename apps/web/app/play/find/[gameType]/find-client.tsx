@@ -6,7 +6,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { FaMagnifyingGlass } from "react-icons/fa6";
 import { matchmakingAtom } from "@/lib/matchmaking-atoms";
-import { useSocket, useSocketEvent } from "@/lib/socket/socket-context";
+import {
+  emitAck,
+  useSocket,
+  useSocketEvent,
+} from "@/lib/socket/socket-context";
 import { SearchingScreen } from "../../_shared/searching-screen";
 
 function formatElapsed(seconds: number): string {
@@ -26,6 +30,7 @@ export function FindClient({
   const { socket } = useSocket();
   const setMatchmaking = useSetAtom(matchmakingAtom);
   const [elapsed, setElapsed] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const matchedRef = useRef(false);
 
   useSocketEvent<ServerMatchFoundPayload>("match_found", (payload) => {
@@ -37,13 +42,39 @@ export function FindClient({
 
   useEffect(() => {
     if (!socket) return;
-    socket.emit("game:queue_join", { gameType });
+    const join = async () => {
+      if (!socket.connected || matchedRef.current) return;
+      try {
+        const result = await emitAck<{ ok: true; gameId: string | null }>(
+          socket,
+          "game:queue_join",
+          { gameType },
+        );
+        setError(null);
+        if (result.gameId && !matchedRef.current) {
+          matchedRef.current = true;
+          setMatchmaking({ searching: null });
+          router.replace(`/play/${result.gameId}`);
+        }
+      } catch (failure) {
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Matchmaking failed. Retrying...",
+        );
+      }
+    };
+    void join();
+    socket.on("connect", join);
+    const heartbeat = setInterval(join, 10000);
     setMatchmaking({ searching: gameType });
     return () => {
+      clearInterval(heartbeat);
+      socket.off("connect", join);
       socket.emit("game:queue_leave", { gameType });
       setMatchmaking({ searching: null });
     };
-  }, [socket, gameType, setMatchmaking]);
+  }, [socket, gameType, setMatchmaking, router]);
 
   useEffect(() => {
     const id = setInterval(() => setElapsed((e) => e + 1), 1000);
@@ -60,7 +91,10 @@ export function FindClient({
   return (
     <SearchingScreen
       title="Finding you an opponent..."
-      subtitle={`${gameName} · ${formatElapsed(elapsed)}`}
+      subtitle={
+        error ??
+        `${gameName} · ${formatElapsed(elapsed)} · Anonymous public match`
+      }
       icon={<FaMagnifyingGlass size={26} aria-hidden="true" />}
       onCancel={cancel}
     />

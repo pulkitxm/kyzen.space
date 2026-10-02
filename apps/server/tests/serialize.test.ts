@@ -29,6 +29,7 @@ import {
 const baseRow: GameRecord = {
   id: "g1",
   code: "K7P2QX",
+  publicMatch: false,
   gameType: TIC_TAC_TOE,
   status: "active",
   winner: null,

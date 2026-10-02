@@ -108,6 +108,7 @@ export const game = pgTable(
       .notNull()
       .unique("game_code_uq")
       .$defaultFn(() => generateGameCode()),
+    publicMatch: boolean("public_match").notNull().default(false),
     gameType: text("game_type").notNull(),
     status: text("status").$type<GameStatus>().notNull().default("waiting"),
     winner: text("winner"),
@@ -319,4 +320,19 @@ export const accountMerge = pgTable(
   (t) => [
     index("account_merge_target_status_idx").on(t.targetUserId, t.status),
   ],
+);
+
+export const matchmakingTicket = pgTable(
+  "matchmaking_ticket",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    owner: text("owner").notNull(),
+    gameType: text("game_type").notNull(),
+    config: jsonb("config").$type<unknown>().notNull(),
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (t) => [index("matchmaking_ticket_pool_idx").on(t.gameType, t.joinedAt)],
 );
