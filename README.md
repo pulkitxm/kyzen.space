@@ -57,3 +57,5 @@ bun run start
 ```
 
 For host development, copy `.env.example` to `.env`, start the local databases with `bun run db:start`, apply the development schema with `bun run db:push`, and seed with `bun run db:seed`. `bun run dev` starts the combined app on port 3000. Use `bun run fix` for formatting and lint autofixes.
+
+Start with the [repository walkthrough](docs/repository-walkthrough.md) for the full flow, then [adding a game](docs/adding-a-game.md) for the implementation checklist. The [wiki](https://github.com/pulkitxm/kyzen.space/wiki) mirrors the current reference docs after they reach `main`.

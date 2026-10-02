@@ -22,6 +22,16 @@ const SECTIONS = [
 
 const GUIDES = [
   {
+    src: "docs/repository-walkthrough.md",
+    slug: "Repository-Walkthrough",
+    title: "Repository Walkthrough",
+  },
+  {
+    src: "docs/deployment.md",
+    slug: "Deployment",
+    title: "Deployment",
+  },
+  {
     src: "docs/adding-a-game.md",
     slug: "Adding-a-Game",
     title: "Adding a Game",
@@ -181,6 +191,8 @@ function endWithNewline(text) {
 function buildHome() {
   const lines = [
     "Reference documentation for **Kyzen**, auto-generated from the `docs/` directory of the main repository. Edit the docs in the repo - these pages are overwritten on every push to `main`.",
+    "",
+    "Start with [Repository Walkthrough](Repository-Walkthrough), then [Adding a Game](Adding-a-Game). [Deployment](Deployment) covers local development and hosting.",
     "",
   ];
   for (const section of SECTIONS) {

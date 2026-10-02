@@ -2,6 +2,8 @@
 
 Kyzen has one shared platform and registered games. The default runtime serves Next.js, the API, and Socket.IO together; the same backend can also run separately for a Vercel frontend.
 
+For a guided first read, start with the [repository walkthrough](../repository-walkthrough.md).
+
 ## Ownership
 
 | Area | Owner | New game work? |
