@@ -169,13 +169,18 @@ export async function updateGame(
 
 export async function gamesForUser(
   userId: string,
-  opts: { offset?: number; limit?: number } = {},
+  opts: { offset?: number; limit?: number; includePublic?: boolean } = {},
 ): Promise<GameRow[]> {
   return db
     .select(getTableColumns(game))
     .from(game)
     .innerJoin(gamePlayer, eq(gamePlayer.gameId, game.id))
-    .where(eq(gamePlayer.userId, userId))
+    .where(
+      and(
+        eq(gamePlayer.userId, userId),
+        opts.includePublic ? undefined : eq(game.publicMatch, false),
+      ),
+    )
     .orderBy(desc(game.updatedAt))
     .offset(opts.offset ?? 0)
     .limit(opts.limit ?? 20);
@@ -274,12 +279,12 @@ export async function joinMatchmaking(input: {
     if (active) return { code: active.code, userIds: [input.userId] };
     const expiresAt = new Date(Date.now() + 45000);
     const [ticket] = await tx
-      .select()
+      .select({
+        joinedAt: matchmakingTicket.joinedAt,
+        samePool: sql<boolean>`${matchmakingTicket.gameType} = ${input.gameType} and ${matchmakingTicket.config} = ${JSON.stringify(input.config)}::jsonb and ${matchmakingTicket.expiresAt} > now()`,
+      })
       .from(matchmakingTicket)
       .where(eq(matchmakingTicket.userId, input.userId));
-    const samePool =
-      ticket?.gameType === input.gameType &&
-      JSON.stringify(ticket.config) === JSON.stringify(input.config);
     await tx
       .insert(matchmakingTicket)
       .values({ ...input, expiresAt })
@@ -290,7 +295,7 @@ export async function joinMatchmaking(input: {
           gameType: input.gameType,
           config: input.config,
           expiresAt,
-          joinedAt: samePool ? ticket.joinedAt : new Date(),
+          joinedAt: ticket?.samePool ? ticket.joinedAt : new Date(),
         },
       });
     const [opponent] = await tx

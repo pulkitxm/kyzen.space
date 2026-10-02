@@ -39,6 +39,7 @@ export * as accountMerge from "./repositories/account-merge";
 export * as conversations from "./repositories/conversations";
 export * as friends from "./repositories/friends";
 export * as games from "./repositories/games";
+export * as matchChat from "./repositories/match-chat";
 export * as messages from "./repositories/messages";
 export * as notifications from "./repositories/notifications";
 export * as profiles from "./repositories/profiles";

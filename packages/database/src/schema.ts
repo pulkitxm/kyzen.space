@@ -336,3 +336,39 @@ export const matchmakingTicket = pgTable(
   },
   (t) => [index("matchmaking_ticket_pool_idx").on(t.gameType, t.joinedAt)],
 );
+
+export const matchMessage = pgTable(
+  "match_message",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => game.id, { onDelete: "cascade" }),
+    senderId: text("sender_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (t) => [
+    unique("match_message_client_uq").on(t.gameId, t.senderId, t.clientId),
+    index("match_message_game_idx").on(t.gameId, t.createdAt),
+    index("match_message_expiry_idx").on(t.expiresAt),
+  ],
+);
+
+export const matchFriendChoice = pgTable(
+  "match_friend_choice",
+  {
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => game.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique("match_friend_choice_uq").on(t.gameId, t.userId)],
+);

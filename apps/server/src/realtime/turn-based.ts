@@ -14,7 +14,7 @@ import {
   type ServerGameStatePayload,
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
-import { serializeGame, serializeMove } from "../api/serialize";
+import { publicPlayerId, serializeGame, serializeMove } from "../api/serialize";
 import { broadcastGameCard } from "../chat/game-card-broadcast";
 import { emitToGame, joinGameRoom } from "./rooms";
 import {
@@ -70,7 +70,7 @@ async function emitFullState(io: IOServer, gameRow: GameRecord) {
   const moves = await games.listMoves(gameRow.id);
   const payload: ServerGameStatePayload = {
     game: withTimerFields(serializeGame(gameRow), gameRow.id),
-    moves: moves.map((m) => serializeMove(m, gameRow.code)),
+    moves: moves.map((m) => serializeMove(m, gameRow.code, gameRow)),
   };
   emitToGame(io, gameRow.code, "game_state", payload);
 }
@@ -185,7 +185,7 @@ async function applyMove(
   if (!opts.auto) turnTimers.resetStrikes(gameRow.id, player.role);
   scheduleNext(io, updated);
 
-  const move = serializeMove(moveRow, gameRow.code);
+  const move = serializeMove(moveRow, gameRow.code, gameRow);
   const statePayload: ServerGameStatePayload = {
     game: withTimerFields(serializeGame(updated), updated.id),
     move: opts.auto ? { ...move, auto: true } : move,
@@ -194,7 +194,9 @@ async function applyMove(
 
   if (updated.status === "completed") {
     turnTimers.dispose(updated.id);
-    emitToGame(io, gameRow.code, "game_over", { winner: updated.winner });
+    emitToGame(io, gameRow.code, "game_over", {
+      winner: publicPlayerId(updated, updated.winner),
+    });
     await broadcastGameCard(io, updated.id);
   }
 }
@@ -224,7 +226,9 @@ async function abortGame(
   emitToGame(io, gameRow.code, "game_state", {
     game: withTimerFields(serializeGame(updated), updated.id),
   });
-  emitToGame(io, gameRow.code, "game_over", { winner: updated.winner });
+  emitToGame(io, gameRow.code, "game_over", {
+    winner: publicPlayerId(updated, updated.winner),
+  });
   await broadcastGameCard(io, updated.id);
 }
 
@@ -282,6 +286,12 @@ export async function handleJoinRoom(
   const gameRow = await games.getGameByCode(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
 
+  if (
+    gameRow.publicMatch &&
+    !gameRow.players.some((player) => player.userId === userId)
+  )
+    return err(socket, "Game not found");
+
   const { game, changed } = await ensureSeated(
     gameRow,
     userId,
@@ -289,7 +299,11 @@ export async function handleJoinRoom(
   );
 
   joinGameRoom(socket, game.code);
-  if (changed && game.status === "active") scheduleNext(io, game);
+  if (
+    game.status === "active" &&
+    (changed || turnTimers.deadline(game.id) === null)
+  )
+    scheduleNext(io, game);
   await emitFullState(io, game);
   if (changed) await broadcastGameCard(io, game.id);
 }

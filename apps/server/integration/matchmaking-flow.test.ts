@@ -85,7 +85,7 @@ describe.skipIf(!DB_UP)("transactional public matchmaking", () => {
     expect(new Set(results.map((result) => result?.code)).size).toBe(5);
     for (const user of users) {
       expect(
-        (await games.gamesForUser(user.id)).filter(
+        (await games.gamesForUser(user.id, { includePublic: true })).filter(
           (game) => game.status === "active",
         ),
       ).toHaveLength(1);

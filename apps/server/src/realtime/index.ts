@@ -1,4 +1,5 @@
 import type { Server as HTTPServer } from "node:http";
+import { matchChat } from "@kyzen/database";
 import {
   clientJoinRoomSchema,
   clientMakeMoveSchema,
@@ -11,6 +12,7 @@ import { attachChatHandlers, joinUserRooms } from "./chat";
 import { attachFriendHandlers } from "./friends";
 import { attachGameChatHandlers } from "./games-in-chat";
 import { setIO } from "./io";
+import { attachMatchChatHandlers } from "./match-chat";
 import { attachMatchmakingHandlers } from "./matchmaking";
 import { handlePresenceConnect, handlePresenceDisconnect } from "./presence";
 import { startPresenceHeartbeats } from "./presence-heartbeat";
@@ -33,6 +35,15 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
   attachRedisAdapter(io);
   setIO(io);
   startPresenceHeartbeats(io);
+  const purge = () => {
+    void matchChat
+      .purgeExpiredMatchData()
+      .catch((err: unknown) => log.error({ err }, "match data cleanup failed"));
+  };
+  purge();
+  const cleanupTimer = setInterval(purge, 3600000);
+  cleanupTimer.unref();
+  io.engine.on("close", () => clearInterval(cleanupTimer));
 
   io.use(async (socket, next) => {
     try {
@@ -63,6 +74,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
     attachTypingHandlers(io, socket);
     attachGameChatHandlers(io, socket);
     attachMatchmakingHandlers(io, socket);
+    attachMatchChatHandlers(io, socket);
     attachRoomHandlers(socket);
     void handlePresenceConnect(io, socket);
 

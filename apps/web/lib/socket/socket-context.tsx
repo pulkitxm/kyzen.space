@@ -107,18 +107,24 @@ export function emitAck<T = Record<string, unknown>>(
       reject(new Error("Not connected"));
       return;
     }
-    socket.emit(event, payload, (res: unknown) => {
-      if (
-        res &&
-        typeof res === "object" &&
-        (res as { ok?: boolean }).ok === false
-      ) {
-        reject(
-          new Error((res as { error?: string }).error ?? "Request failed"),
-        );
-      } else {
-        resolve(res as T);
-      }
-    });
+    socket
+      .timeout(8000)
+      .emit(event, payload, (error: Error | null, res: unknown) => {
+        if (error) {
+          reject(new Error("Connection timed out. Please retry."));
+          return;
+        }
+        if (
+          res &&
+          typeof res === "object" &&
+          (res as { ok?: boolean }).ok === false
+        ) {
+          reject(
+            new Error((res as { error?: string }).error ?? "Request failed"),
+          );
+        } else {
+          resolve(res as T);
+        }
+      });
   });
 }

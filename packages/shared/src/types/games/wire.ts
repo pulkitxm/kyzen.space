@@ -90,6 +90,8 @@ export type ServerJoinByCodeResult =
   | { ok: false; error: JoinByCodeError };
 
 export const gameJsonSchema = z.object({
+  publicMatch: z.boolean().optional(),
+  viewerId: z.string().nullable().optional(),
   id: z.string(),
   gameType: gameTypeSchema,
   status: gameStatusSchema,
@@ -151,3 +153,19 @@ export function resolveWinnerUsername(
     ? (players.find((p) => p.userId === winner)?.username ?? null)
     : null;
 }
+
+export const matchMessageSchema = z.object({
+  id: z.string(),
+  gameId: gameCodeSchema,
+  authorId: z.string(),
+  body: z.string(),
+  createdAt: z.string(),
+});
+export type MatchMessage = z.infer<typeof matchMessageSchema>;
+export const clientMatchMessageSchema = z
+  .object({
+    gameId: gameCodeSchema,
+    clientId: z.string().uuid(),
+    body: z.string().trim().min(1).max(1000),
+  })
+  .strict();
