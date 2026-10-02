@@ -79,9 +79,7 @@ export function GameOverOverlay({
   game: GameJson;
   conversation: ConversationJson | null;
 }) {
-  const router = useRouter();
-  const { socket } = useSocket();
-  const { openLayer, layers } = useLayeredPopup();
+  const { layers } = useLayeredPopup();
   const cardRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(() => isGameOver(game.status));
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
@@ -129,32 +127,7 @@ export function GameOverOverlay({
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [open, layerCount]);
 
-  const isPlayer = game.players.some((p) => p.userId === userId);
-  const canRematch =
-    isPlayer && game.status === "completed" && !!game.conversationId;
   const showSeries = (detail?.score.totalGames ?? 0) >= 2;
-
-  const onRematch = useCallback(async () => {
-    if (rematch.code) {
-      router.push(`/play/${rematch.code}`);
-      return;
-    }
-    setRematch((r) => ({ ...r, busy: true, error: null }));
-    try {
-      const res = await emitAck<{ gameId: string }>(
-        socket,
-        CHAT_EVENTS.rematch,
-        { gameId },
-      );
-      router.push(`/play/${res.gameId}`);
-    } catch (e) {
-      setRematch((r) => ({
-        ...r,
-        busy: false,
-        error: e instanceof Error ? e.message : "Couldn't start the rematch",
-      }));
-    }
-  }, [socket, gameId, rematch.code, router]);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -184,44 +157,110 @@ export function GameOverOverlay({
                   {rematch.error}
                 </p>
               ) : null}
-              <div className="flex flex-col gap-2">
-                {canRematch ? (
-                  <Button onClick={onRematch} disabled={rematch.busy}>
-                    {rematch.code ? "Go to rematch" : "Rematch"}
-                  </Button>
-                ) : null}
-                {conversation ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      router.push(conversationHref(conversation, userId))
-                    }
-                  >
-                    Chat
-                  </Button>
-                ) : null}
-                {showSeries ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      openLayer({
-                        title: "Series",
-                        content: <SeriesDetailModal gameId={gameId} />,
-                        size: "md",
-                      })
-                    }
-                  >
-                    View series
-                  </Button>
-                ) : null}
-                <Button variant="ghost" onClick={() => setOpen(false)}>
-                  Close
-                </Button>
-              </div>
+              <GameOverActions
+                gameId={gameId}
+                userId={userId}
+                game={game}
+                conversation={conversation}
+                rematch={rematch}
+                setRematch={setRematch}
+                showSeries={showSeries}
+                onClose={() => setOpen(false)}
+              />
             </GlassMotionPane>
           ) : null}
         </AnimatePresence>
       </LazyMotion>
+    </div>
+  );
+}
+
+type RematchState = {
+  busy: boolean;
+  error: string | null;
+  code: string | null;
+};
+
+function GameOverActions({
+  gameId,
+  userId,
+  game,
+  conversation,
+  rematch,
+  setRematch,
+  showSeries,
+  onClose,
+}: {
+  gameId: string;
+  userId: string;
+  game: GameJson;
+  conversation: ConversationJson | null;
+  rematch: RematchState;
+  setRematch: React.Dispatch<React.SetStateAction<RematchState>>;
+  showSeries: boolean;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const { socket } = useSocket();
+  const { openLayer } = useLayeredPopup();
+  const isPlayer = game.players.some((p) => p.userId === userId);
+  const canRematch =
+    isPlayer && game.status === "completed" && !!game.conversationId;
+
+  const onRematch = useCallback(async () => {
+    if (rematch.code) {
+      router.push(`/play/${rematch.code}`);
+      return;
+    }
+    setRematch((r) => ({ ...r, busy: true, error: null }));
+    try {
+      const res = await emitAck<{ gameId: string }>(
+        socket,
+        CHAT_EVENTS.rematch,
+        { gameId },
+      );
+      router.push(`/play/${res.gameId}`);
+    } catch (e) {
+      setRematch((r) => ({
+        ...r,
+        busy: false,
+        error: e instanceof Error ? e.message : "Couldn't start the rematch",
+      }));
+    }
+  }, [socket, gameId, rematch.code, router, setRematch]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      {canRematch ? (
+        <Button onClick={onRematch} disabled={rematch.busy}>
+          {rematch.code ? "Go to rematch" : "Rematch"}
+        </Button>
+      ) : null}
+      {conversation ? (
+        <Button
+          variant="secondary"
+          onClick={() => router.push(conversationHref(conversation, userId))}
+        >
+          Chat
+        </Button>
+      ) : null}
+      {showSeries ? (
+        <Button
+          variant="secondary"
+          onClick={() =>
+            openLayer({
+              title: "Series",
+              content: <SeriesDetailModal gameId={gameId} />,
+              size: "md",
+            })
+          }
+        >
+          View series
+        </Button>
+      ) : null}
+      <Button variant="ghost" onClick={onClose}>
+        Close
+      </Button>
     </div>
   );
 }

@@ -159,6 +159,54 @@ function GifResults({
   );
 }
 
+function searchEmojis(groups: EmojiGroup[] | null, query: string): EmojiCell[] {
+  if (!query || !groups) return [];
+  const lower = query.toLowerCase();
+  return groups
+    .flatMap((group) => group.emojis)
+    .filter((emoji) => emoji.keywords.join(" ").toLowerCase().includes(lower))
+    .slice(0, EMOJI_STRIP)
+    .map(({ id, native }) => ({ id, native }));
+}
+
+function EmojiBrowser({
+  groups,
+  recents,
+  onPick,
+}: {
+  groups: EmojiGroup[] | null;
+  recents: string[];
+  onPick: (native: string) => void;
+}) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      {!groups ? (
+        <div className="p-4 text-center text-muted-foreground text-xs">
+          Loading…
+        </div>
+      ) : (
+        <>
+          {recents.length ? (
+            <div className="mb-2">
+              <StickyLabel>Frequently used</StickyLabel>
+              <EmojiGrid
+                emojis={recents.map((native) => ({ id: native, native }))}
+                onPick={onPick}
+              />
+            </div>
+          ) : null}
+          {groups.map((g) => (
+            <div key={g.id} className="mb-2">
+              <StickyLabel>{CATEGORY_LABELS[g.id] ?? g.id}</StickyLabel>
+              <EmojiGrid emojis={g.emojis} onPick={onPick} />
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function ComposerPicker({
   onEmoji,
   onGif,
@@ -199,31 +247,10 @@ export function ComposerPicker({
     };
   }, []);
 
-  const haystacks = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!groups) return map;
-    for (const g of groups) {
-      for (const e of g.emojis) {
-        map.set(e.id, e.keywords.join(" "));
-      }
-    }
-    return map;
-  }, [groups]);
-
-  const emojiStrip = useMemo<EmojiCell[]>(() => {
-    if (!searching || !groups) return [];
-    const lower = query.toLowerCase();
-    const out: EmojiCell[] = [];
-    for (const g of groups) {
-      for (const e of g.emojis) {
-        if (haystacks.get(e.id)?.toLowerCase().includes(lower)) {
-          out.push({ id: e.id, native: e.native });
-          if (out.length >= EMOJI_STRIP) return out;
-        }
-      }
-    }
-    return out;
-  }, [searching, query, groups, haystacks]);
+  const emojiStrip = useMemo(
+    () => searchEmojis(groups, query),
+    [groups, query],
+  );
 
   const pickEmoji = (native: string) => {
     setRecents((prev) =>
@@ -273,31 +300,7 @@ export function ComposerPicker({
           />
         </>
       ) : tab === "emoji" ? (
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          {!groups ? (
-            <div className="p-4 text-center text-muted-foreground text-xs">
-              Loading…
-            </div>
-          ) : (
-            <>
-              {recents.length ? (
-                <div className="mb-2">
-                  <StickyLabel>Frequently used</StickyLabel>
-                  <EmojiGrid
-                    emojis={recents.map((native) => ({ id: native, native }))}
-                    onPick={pickEmoji}
-                  />
-                </div>
-              ) : null}
-              {groups.map((g) => (
-                <div key={g.id} className="mb-2">
-                  <StickyLabel>{CATEGORY_LABELS[g.id] ?? g.id}</StickyLabel>
-                  <EmojiGrid emojis={g.emojis} onPick={pickEmoji} />
-                </div>
-              ))}
-            </>
-          )}
-        </div>
+        <EmojiBrowser groups={groups} recents={recents} onPick={pickEmoji} />
       ) : (
         <GifResults
           label="Trending GIFs"

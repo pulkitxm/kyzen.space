@@ -17,6 +17,37 @@ function gameName(gameType: GameType): string {
   return listGameMeta().find((m) => m.type === gameType)?.name ?? gameType;
 }
 
+function gameCardPresentation(
+  gameId: string,
+  meta: GameCardMeta,
+  userId: string,
+) {
+  const status = meta.status ?? "waiting";
+  const isPlayer = (meta.players ?? []).some(
+    (player) => player.userId === userId,
+  );
+  const isChallenged = meta.challengedUserId === userId;
+  let action = "Open";
+  if (status === "completed") action = "View";
+  else if (isPlayer) action = "Open";
+  else if (status === "active") action = "Spectate";
+  else if (meta.seatingMode === "challenge")
+    action = isChallenged ? "Accept" : "Spectate";
+  else action = "Join";
+
+  let statusText = "Waiting for a player";
+  let tone = "bg-amber-500/15 text-amber-600";
+  if (status === "active") {
+    statusText = "In progress";
+    tone = "bg-emerald-500/15 text-emerald-600";
+  }
+
+  const href =
+    action === "Spectate" ? `/play/${gameId}?spectate=1` : `/play/${gameId}`;
+
+  return { action, statusText, tone, href };
+}
+
 export function GameCardMessage({
   gameId,
   meta,
@@ -35,29 +66,15 @@ export function GameCardMessage({
   const status = meta.status ?? "waiting";
   const players = meta.players ?? [];
   const isPlayer = players.some((p) => p.userId === userId);
-  const isChallenged = meta.challengedUserId === userId;
-
   const seriesScore = meta.seriesScore;
   const showSeries = (seriesScore?.totalGames ?? 0) >= 2;
+
   const canRematch = status === "completed" && isPlayer;
-
-  let action = "Open";
-  if (status === "completed") action = "View";
-  else if (isPlayer) action = "Open";
-  else if (status === "active") action = "Spectate";
-  else if (meta.seatingMode === "challenge")
-    action = isChallenged ? "Accept" : "Spectate";
-  else action = "Join";
-
-  let statusText = "Waiting for a player";
-  let tone = "bg-amber-500/15 text-amber-600";
-  if (status === "active") {
-    statusText = "In progress";
-    tone = "bg-emerald-500/15 text-emerald-600";
-  }
-
-  const href =
-    action === "Spectate" ? `/play/${gameId}?spectate=1` : `/play/${gameId}`;
+  const { action, statusText, tone, href } = gameCardPresentation(
+    gameId,
+    meta,
+    userId,
+  );
 
   async function onRematch() {
     setBusy(true);

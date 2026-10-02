@@ -64,56 +64,20 @@ export default async function RootLayout({
   const signedIn = Boolean(session?.user);
   const isAnonymous = Boolean(session?.user?.isAnonymous);
 
-  let username: string | null = null;
-  let avatar: AvatarConfig | null = null;
-  let userTheme: ThemeId | null = null;
-  let userMode: ColorMode | null = null;
-  let userPattern: PatternId | null = null;
-  let userGlass: GlassMode | null = null;
-  let initialConversations: ConversationJson[] = [];
-  let initialFriends: FriendshipJson[] = [];
-  let initialIncoming: FriendshipJson[] = [];
-  let initialOutgoing: FriendshipJson[] = [];
-  let initialNotifications: NotificationJson[] = [];
-  let initialUnreadNotifications = 0;
-  if (session?.user?.id) {
-    const [me, convs, fr, reqs, notif, notifList] = await Promise.all([
-      serverFetchJson<{
-        profile: {
-          username: string;
-          avatar: AvatarConfig | null;
-          theme: ThemeId;
-          colorMode: ColorMode;
-          pattern: PatternId;
-          glass: GlassMode;
-        };
-      }>("/api/profiles/me"),
-      serverFetchJson<{ conversations: ConversationJson[] }>(
-        "/api/conversations",
-      ),
-      serverFetchJson<{ friends: FriendshipJson[] }>("/api/friends"),
-      serverFetchJson<{
-        incoming: FriendshipJson[];
-        outgoing: FriendshipJson[];
-      }>("/api/friends/requests"),
-      serverFetchJson<{ count: number }>("/api/notifications/unread-count"),
-      serverFetchJson<{ notifications: NotificationJson[] }>(
-        "/api/notifications?limit=50",
-      ),
-    ]);
-    username = me?.profile.username ?? null;
-    avatar = me?.profile.avatar ?? null;
-    userTheme = me?.profile.theme ?? null;
-    userMode = me?.profile.colorMode ?? null;
-    userPattern = me?.profile.pattern ?? null;
-    userGlass = me?.profile.glass ?? null;
-    initialConversations = convs?.conversations ?? [];
-    initialFriends = fr?.friends ?? [];
-    initialIncoming = reqs?.incoming ?? [];
-    initialOutgoing = reqs?.outgoing ?? [];
-    initialUnreadNotifications = notif?.count ?? 0;
-    initialNotifications = notifList?.notifications ?? [];
-  }
+  const {
+    username,
+    avatar,
+    userTheme,
+    userMode,
+    userPattern,
+    userGlass,
+    initialConversations,
+    initialFriends,
+    initialIncoming,
+    initialOutgoing,
+    initialNotifications,
+    initialUnreadNotifications,
+  } = await loadShellState(session?.user?.id);
 
   const profileHref = signedIn ? "/profile" : "/auth";
 
@@ -199,4 +163,72 @@ export default async function RootLayout({
       </body>
     </html>
   );
+}
+
+async function loadShellState(userId: string | undefined) {
+  let username: string | null = null;
+  let avatar: AvatarConfig | null = null;
+  let userTheme: ThemeId | null = null;
+  let userMode: ColorMode | null = null;
+  let userPattern: PatternId | null = null;
+  let userGlass: GlassMode | null = null;
+  let initialConversations: ConversationJson[] = [];
+  let initialFriends: FriendshipJson[] = [];
+  let initialIncoming: FriendshipJson[] = [];
+  let initialOutgoing: FriendshipJson[] = [];
+  let initialNotifications: NotificationJson[] = [];
+  let initialUnreadNotifications = 0;
+  if (userId) {
+    const [me, convs, fr, reqs, notif, notifList] = await Promise.all([
+      serverFetchJson<{
+        profile: {
+          username: string;
+          avatar: AvatarConfig | null;
+          theme: ThemeId;
+          colorMode: ColorMode;
+          pattern: PatternId;
+          glass: GlassMode;
+        };
+      }>("/api/profiles/me"),
+      serverFetchJson<{ conversations: ConversationJson[] }>(
+        "/api/conversations",
+      ),
+      serverFetchJson<{ friends: FriendshipJson[] }>("/api/friends"),
+      serverFetchJson<{
+        incoming: FriendshipJson[];
+        outgoing: FriendshipJson[];
+      }>("/api/friends/requests"),
+      serverFetchJson<{ count: number }>("/api/notifications/unread-count"),
+      serverFetchJson<{ notifications: NotificationJson[] }>(
+        "/api/notifications?limit=50",
+      ),
+    ]);
+    username = me?.profile.username ?? null;
+    avatar = me?.profile.avatar ?? null;
+    userTheme = me?.profile.theme ?? null;
+    userMode = me?.profile.colorMode ?? null;
+    userPattern = me?.profile.pattern ?? null;
+    userGlass = me?.profile.glass ?? null;
+    initialConversations = convs?.conversations ?? [];
+    initialFriends = fr?.friends ?? [];
+    initialIncoming = reqs?.incoming ?? [];
+    initialOutgoing = reqs?.outgoing ?? [];
+    initialUnreadNotifications = notif?.count ?? 0;
+    initialNotifications = notifList?.notifications ?? [];
+  }
+
+  return {
+    username,
+    avatar,
+    userTheme,
+    userMode,
+    userPattern,
+    userGlass,
+    initialConversations,
+    initialFriends,
+    initialIncoming,
+    initialOutgoing,
+    initialNotifications,
+    initialUnreadNotifications,
+  };
 }

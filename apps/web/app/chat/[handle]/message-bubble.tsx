@@ -133,6 +133,57 @@ export function MessageBubble({
   }
 
   const own = message.sender?.id === userId;
+
+  return (
+    <div
+      className={cn(
+        "mb-1 flex items-end gap-2",
+        own ? "justify-end" : "justify-start",
+      )}
+    >
+      {own ? null : <MessageAvatar message={message} showAvatar={showAvatar} />}
+      <div
+        className={cn(
+          "flex max-w-[min(42rem,85%)] flex-col gap-0.5",
+          own ? "items-end" : "items-start",
+        )}
+      >
+        <MessageContent message={message} userId={userId} own={own} />
+      </div>
+    </div>
+  );
+}
+
+function MessageAvatar({
+  message,
+  showAvatar,
+}: {
+  message: ChatMessage;
+  showAvatar: boolean;
+}) {
+  if (!showAvatar) return <span className="w-7 shrink-0" />;
+  if (!message.sender)
+    return <PresenceAvatar config={null} seed="?" size={28} />;
+  return (
+    <ProfilePopupTrigger user={message.sender} className="shrink-0">
+      <PresenceAvatar
+        config={message.sender.avatar}
+        seed={message.sender.username}
+        size={28}
+      />
+    </ProfilePopupTrigger>
+  );
+}
+
+function MessageContent({
+  message,
+  userId,
+  own,
+}: {
+  message: ChatMessage;
+  userId: string;
+  own: boolean;
+}) {
   const gif =
     message.kind === "gif" ? (message.metadata as GifMeta | null) : null;
   const stamp = message.pending ? "Sending…" : timeOfDay(message.createdAt);
@@ -145,63 +196,34 @@ export function MessageBubble({
     message.pending && "opacity-60",
   );
 
+  if (message.deletedAt)
+    return (
+      <div className={bubbleClass}>
+        <em className="opacity-70">Message deleted</em>
+      </div>
+    );
+  if (message.kind === "game_card" && message.gameId)
+    return (
+      <GameCardMessage
+        gameId={message.gameId}
+        meta={message.metadata as GameCardMeta}
+        userId={userId}
+      />
+    );
+  if (gif)
+    return <GifMessage gif={gif} pending={message.pending} stamp={stamp} />;
   return (
-    <div
-      className={cn(
-        "mb-1 flex items-end gap-2",
-        own ? "justify-end" : "justify-start",
-      )}
-    >
-      {!own ? (
-        showAvatar ? (
-          message.sender ? (
-            <ProfilePopupTrigger user={message.sender} className="shrink-0">
-              <PresenceAvatar
-                config={message.sender.avatar}
-                seed={message.sender.username}
-                size={28}
-              />
-            </ProfilePopupTrigger>
-          ) : (
-            <PresenceAvatar config={null} seed="?" size={28} />
-          )
-        ) : (
-          <span className="w-7 shrink-0" />
-        )
-      ) : null}
+    <div className={bubbleClass}>
+      <span className="wrap-break-word whitespace-pre-wrap">
+        {linkify(message.body ?? "", own)}
+      </span>
       <div
         className={cn(
-          "flex max-w-[min(42rem,85%)] flex-col gap-0.5",
-          own ? "items-end" : "items-start",
+          "mt-0.5 text-[10px]",
+          own ? "text-primary-foreground/70" : "text-muted-foreground",
         )}
       >
-        {message.deletedAt ? (
-          <div className={bubbleClass}>
-            <em className="opacity-70">Message deleted</em>
-          </div>
-        ) : message.kind === "game_card" && message.gameId ? (
-          <GameCardMessage
-            gameId={message.gameId}
-            meta={message.metadata as GameCardMeta}
-            userId={userId}
-          />
-        ) : gif ? (
-          <GifMessage gif={gif} pending={message.pending} stamp={stamp} />
-        ) : (
-          <div className={bubbleClass}>
-            <span className="wrap-break-word whitespace-pre-wrap">
-              {linkify(message.body ?? "", own)}
-            </span>
-            <div
-              className={cn(
-                "mt-0.5 text-[10px]",
-                own ? "text-primary-foreground/70" : "text-muted-foreground",
-              )}
-            >
-              {stamp}
-            </div>
-          </div>
-        )}
+        {stamp}
       </div>
     </div>
   );
