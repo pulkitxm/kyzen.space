@@ -73,6 +73,13 @@ mock.module("@kyzen/database", () => ({
     gamesForUser: async () => [],
   },
   accountMerge: {},
+  conversations: {},
+  friends: {},
+  messages: {},
+  notifications: {},
+  db: {},
+  schema: {},
+  createDb: () => ({ db: {}, client: {} }),
   invites: {},
   generateInviteToken: () => "x".repeat(43),
 }));

@@ -1,269 +1,76 @@
 # Adding a game
 
-Games on this platform are **data-driven**. A game is a single self-describing
-`GameDefinition` object - its engine, mode, roles, player bounds, strict Zod
-schemas, metadata, and optional setup fields - plus one React client component.
-Every generic part of the platform (the realtime game-lane handlers, the
-database, the serializers, the web lobby, the conformance tests) reads a game
-*only* through its definition. **Adding a game requires zero changes to platform
-plumbing**: no new web route, API endpoint, database table/column, or socket
-event.
+A turn-based game supplies schemas, a pure engine, metadata, and a board. The platform supplies authentication, room creation, matchmaking, state synchronization, move persistence, chat layouts, profiles, results, rematches, and audio preferences.
 
-## The three places a game lives
+Use tic-tac-toe as the working example. Change game-specific files and the three small registrations below. Do not edit app routes or server handlers to add an ordinary turn-based game.
 
-| Concern | Package | What you add |
+## Files to add
+
+| Concern | Location | Contract |
 | --- | --- | --- |
-| Strict Zod schemas + inferred types (the source of truth) | `@kyzen/shared` | the slug in `src/constants/games.ts` and `stateSchema`/`moveSchema`/`configSchema` + `z.infer` types in `src/types/games/<type>/schemas.ts` |
-| Engine, metadata, definition (server-safe, **no React**) | `@kyzen/games-core` | a `GameEngine` + `GameMeta` + a `GameDefinition` in `src/games/<type>/`, appended to the single `GAMES` array |
-| React board UI (web-only) | `@kyzen/games-client` | a `"use client"` board component (and an optional loading skeleton), registered by `type` |
+| State, move, config | `packages/shared/src/types/games/<slug>/schemas.ts` | Strict Zod schemas and inferred types |
+| Rules | `packages/games-core/src/games/<slug>/engine.ts` | `GameEngine<State, Move>` |
+| Presentation metadata | `packages/games-core/src/games/<slug>/meta.ts` | `GameMeta` |
+| Definition | `packages/games-core/src/games/<slug>/index.ts` | Engine, metadata, schemas, optional config fields |
+| Board | `packages/games-client/src/games/<slug>/client.tsx` | `GameClientProps` |
+| Optional skeleton | Same client folder | A component with no props |
+| Rules document | `docs/games/<slug>.md` | Rules, roles, state, moves, config |
+| Engine tests | `packages/games-core/tests/<slug>.test.ts` | Rules and terminal outcomes |
 
-The split matters: the schemas and types live in `@kyzen/shared` so the
-**server**, the **web app**, `games-core`, and `games-client` all validate against
-the very same Zod schemas - `@kyzen/shared` is the only package that declares
-`zod`. `games-core` imports those schemas to assemble each `GameDefinition` and run
-engines, so it must never import React. All UI lives in `games-client`.
+## Register it
 
-## The single source of truth
+1. Add a slug constant to `packages/shared/src/constants/games.ts` and append it to `GAME_TYPES`. Re-export the schemas in `packages/shared/src/types/games/index.ts`.
+2. Append the definition to `GAMES` in `packages/games-core/src/games/index.ts`. Export public game symbols in the package's `src/index.ts` if needed.
+3. Add one entry to `REGISTRY` in `packages/games-client/src/registry.ts`, with `Board` and optionally `Skeleton`. There is no separate skeleton map. The generic skeleton is the fallback.
 
-`packages/games-core/src/games/index.ts` exports the one array:
+Registration is explicit so both the server and Next.js can import only the code they need. The conformance suite checks slug/engine parity, and the client suite checks that every engine has a board.
 
-```ts
-export const GAMES = [ticTacToeDefinition] satisfies GameDefinition[];
-```
+## Schemas and engine
 
-Everything derives from it via `src/registry.ts`: `getDefinition(type)`,
-`getEngine(type)`, `hasEngine(type)`, `listGameTypes()`, `listDefinitions()`,
-`listGameMeta()`, `getCategoryGroups()`. There is **no** separate catalog,
-metadata list, or client map to keep in sync - do not reintroduce one.
+Import `z` from `zod` inside shared. Elsewhere import types and schemas from `@kyzen/shared/types`. Use strict objects, bounded integers, and exact enums; infer the corresponding TypeScript types.
 
-## A `GameDefinition` (see `packages/shared/src/types/games/definition.ts`)
+The engine owns game rules. Its initial state comes from seats. Its `reduce(state, { role }, move)` returns either `{ ok: false, error }` or `{ ok: true, state, outcome }`. Reject wrong roles, wrong turns, illegal moves, and moves after a terminal state. Structural input validation belongs in the move schema.
 
-```ts
-export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
-  meta: GameMeta;
-  engine: GameEngine<S, I>;
-  stateSchema: ZodType<S>;
-  moveSchema: ZodType<I>;
-  configSchema: ZodType<C>;
-  configFields?: ConfigField[];
+Optional `currentRole` and `autoMove` hooks enable the platform's turn clock. `currentRole` returns the current role or null when the game ends. `autoMove` returns a legal move for that role.
+
+The deployed runner supports turn-based games. The type contract also describes realtime engines, but no server loop currently runs `step`. A realtime game needs platform work before it can be registered as playable.
+
+## Board contract
+
+```tsx
+"use client";
+
+import type { GameClientProps } from "@kyzen/games-client";
+
+export function GameBoard({ game, connected, makeMove }: GameClientProps) {
+  return (
+    <button type="button" disabled={!connected || game.status !== "active"} onClick={() => makeMove({ position: 0 })}>
+      Play
+    </button>
+  );
 }
 ```
 
-- `meta` - `type` (a `GameType`, not `string`), `name`, `description`,
-  `categoryId`, an optional `coverImage`, an optional `tutorialVideo`, and an
-  optional `howToPlay`. Image and video are `/games/...` paths under
-  `apps/web/public/`; the game page renders the cover and, beside it (the
-  right column on desktop, stacked below on mobile), a "How to play" panel
-  showing the `howToPlay` steps with - when `tutorialVideo` is set - a "Watch
-  tutorial" button that opens a Plyr modal over the local mp4 (tic-tac-toe
-  sets `tutorialVideo: "/games/tic-tac-toe-tutorial.mp4"`, `meta.ts:10`).
-  `howToPlay` is 3-5 short player-facing steps (plain strings, no markdown);
-  the conformance suite rejects an empty list or blank steps.
-- `engine` - `mode`, `roles`, `min`/`maxPlayers`, `createInitialState`,
-  `reduce`/`step`, and the two optional turn-timer hooks `currentRole` and
-  `autoMove` (see below).
-- `stateSchema` validates the `game_state` JSONB; `moveSchema` validates
-  `move_data` JSONB **and** the `make_move` payload; `configSchema` validates the
-  `config` JSONB **and** the lobby setup form.
-- `configFields` - declarative setup inputs; `[]` for none.
+Adapt the move and rendering to your game. `game.gameState` is opaque at the generic boundary; validate or narrow it with your game's schema. `moves` is ordered history. `makeMove` sends an intent to the authoritative server. Use `userId` and the game's roles to show available actions. Use `onViewProfile` for a player's profile popup.
 
-### Strict Zod is mandatory
+The shell calls `useGameSession` once per play view. It joins the room, receives snapshots and move deltas, resynchronizes after reconnect, filters other rooms, and leaves on unmount. Boards never call `io`, add socket listeners, join rooms, or disconnect the shared connection. The shell displays transport errors and supplies the same current game to waiting and result overlays.
 
-The database stores game state, moves, and config as opaque JSONB. The Zod
-schemas are the guardrails that make that JSON safe and strongly typed:
+Keep game-specific animations and replay presentation in the board. Reuse the audio hook, player primitives, cards, and skeleton building blocks already in `games-client`.
 
-- Use `.strict()` (reject unknown keys), exact `z.enum`s, and integer/range
-  bounds (`z.number().int().min().max()`).
-- **Derive TS types from the schemas** with `z.infer` - never hand-write a type
-  that parallels a schema.
-- Put **structural** move validation in `moveSchema`; keep only game *rules*
-  (turns, legality, terminal state) in the engine's `reduce`/`step`. The
-  turn-based handler validates `moveSchema` and `stateSchema` before calling the
-  engine.
+## Metadata and assets
 
-### Optional turn-timer hooks: `currentRole` and `autoMove`
+Metadata supplies name, description, category, optional cover, tutorial, how-to-play steps, and `backgroundMusic`. Put public assets under `apps/web/public/games/` or `apps/web/public/sounds/`. Background music comes from metadata, so no app-level audio registration is needed.
 
-The server runs a per-player turn clock (`apps/server/src/realtime/turn-timer.ts`)
-on every `active` turn-based game. A game opts into it by implementing two optional
-`GameEngine` methods (`packages/shared/src/types/games/engine.ts:26`); a game that
-implements neither simply has no clock.
+## Verify
 
-```ts
-autoMove?(state: State, role: string): Input;
-
-currentRole?(state: State): string | null;
+```bash
+bun run type-check
+bun run --cwd packages/games-core test
+bun run --cwd packages/games-client test
+bun run check
+bun run strip-comments -- --check
 ```
 
-- `currentRole(state)` tells the timer **whose turn it is** (the role on the
-  clock), or `null` when the game is terminal. Tic-tac-toe returns
-  `state.currentTurn` unless the board is won/full (`engine.ts:108`).
-- `autoMove(state, role)` returns a **random legal move** for `role`. When a
-  player's deadline passes, the timer plays this move through the same
-  `moveSchema` → `engine.reduce` → persist → broadcast path (flagged
-  `auto: true`). Tic-tac-toe picks a random empty cell (`engine.ts:99`).
+Add focused tests for legal turns, each terminal outcome, invalid moves, and schema strictness. Existing conformance, registry, and game-document tests automatically cover the newly registered game. Then run local development, use two authenticated browser sessions, create a room, join, finish a game, and reconnect one player. If the game was started in a conversation, also verify docked, floating, and minimized chat.
 
-The mechanism is generic; the move is game-specific. See [realtime.md](architecture/realtime.md)
-for the strike/abort schedule the timer enforces on top of these hooks.
-
-## Worked example: tic-tac-toe
-
-```
-packages/shared/src/constants/games.ts                       # TIC_TAC_TOE slug + GAME_TYPES tuple
-packages/shared/src/types/games/core.ts                      # GameType union + gameTypeSchema (z.enum(GAME_TYPES))
-packages/shared/src/types/games/tic-tac-toe/schemas.ts       # cell/mark + strict state/move/config schemas, z.infer types
-packages/shared/src/types/games/index.ts                     # re-exports the tic-tac-toe schemas + types
-packages/games-core/src/games/tic-tac-toe/
-  engine.ts    # ticTacToeEngine: createInitialState + reduce (rules only); imports TIC_TAC_TOE from @kyzen/shared/constants
-  meta.ts      # ticTacToeMeta: GameMeta; imports TIC_TAC_TOE from @kyzen/shared/constants
-  index.ts     # ticTacToeDefinition: GameDefinition (engine + meta + the shared schemas)
-packages/games-core/src/games/index.ts                       # GAMES array includes ticTacToeDefinition
-packages/games-client/src/games/tic-tac-toe/client.tsx       # board UI
-packages/games-client/src/games/tic-tac-toe/skeleton.tsx     # loading skeleton (optional)
-packages/games-client/src/registry.ts                        # Record<GameType, ...> maps: board + skeleton keyed by TIC_TAC_TOE
-```
-
-## The type-safe slug: `constants/games.ts` + `types/games/core.ts`
-
-Every game's string slug lives **only** in
-`packages/shared/src/constants/games.ts`. That file is the single source of
-truth for the slug constant and the `GAME_TYPES` tuple:
-
-```ts
-export const TIC_TAC_TOE = "tic-tac-toe";
-
-export const GAME_TYPES = [TIC_TAC_TOE] as const;
-```
-
-`packages/shared/src/types/games/core.ts` then derives the `GameType` union and
-the `gameTypeSchema` Zod validator from that tuple - so the union and the schema
-never drift from the slug list:
-
-```ts
-import { z } from "zod";
-import { GAME_TYPES } from "../../constants/games";
-
-export const gameTypeSchema = z.enum(GAME_TYPES);
-export type GameType = z.infer<typeof gameTypeSchema>;
-```
-
-When adding a game:
-1. Declare `export const <SLUG> = "<type>";` in
-   `packages/shared/src/constants/games.ts`.
-2. Append it to `GAME_TYPES`: `export const GAME_TYPES = [TIC_TAC_TOE, <SLUG>] as const;`.
-3. Import `<SLUG>` from `@kyzen/shared/constants` in the game's `meta.ts` and
-   `engine.ts` (and anywhere else that references the slug). `GameType` /
-   `gameTypeSchema` pick up the new entry automatically.
-   **Never redeclare the string literal in a per-game file.**
-
-`gameTypeSchema` is a `z.enum(GAME_TYPES)` - every wire boundary that carries a
-`gameType` value is validated against it (`gameJsonSchema`, `gameCardMetaSchema`,
-and `clientCreateGameInConversationSchema`, all in `@kyzen/shared/types`). The
-conformance suite asserts `GAME_TYPES` matches the `GAMES` registry exactly
-(`"GAME_TYPES matches the registry exactly"` test in
-`packages/games-core/tests/conformance.test.ts`) so the tuple and the array can
-never drift. `GameMeta.type` is `GameType` - not `string` - and the registry
-helpers reflect this: `hasEngine(type: string): type is GameType` narrows the
-type, `listGameTypes(): GameType[]` returns the narrowed list.
-
-## Steps to add a game
-
-1. **shared (slug + schemas)** - declare the slug constant and append it to
-   `GAME_TYPES` in `packages/shared/src/constants/games.ts` (see above). Then
-   create `packages/shared/src/types/games/<type>/schemas.ts` with the strict Zod
-   schemas + `z.infer` types (no slug here) and re-export them from
-   `packages/shared/src/types/games/index.ts`. Inside `@kyzen/shared` import
-   `z` directly (`import { z } from "zod"`) - it is the only package that declares
-   `zod`. Add a category to `src/constants/categories.ts` (`GAME_CATEGORIES`) only
-   if you need a new one.
-2. **games-core** - create `src/games/<type>/{engine,meta,index}.ts`.
-   In `engine.ts` and `meta.ts` import the slug from `@kyzen/shared/constants`
-   and the schemas/types from `@kyzen/shared/types`; `index.ts` assembles the
-   `GameDefinition` from the engine, meta, and the shared schemas. Append the
-   definition to `GAMES` (`src/games/index.ts`) and export the public symbols from
-   `src/index.ts`.
-3. **games-client** - add `src/games/<type>/client.tsx` (`"use client"`, typed
-   `GameClientProps`). Model it on `src/games/tic-tac-toe/client.tsx`: the host
-   app passes the **one shared Socket.IO connection** plus a `connected` flag via
-   props (`props.socket`, `props.connected`) - **never call `io()`** to open your
-   own. Emit `join_room` on mount and on the socket's `connect`, `make_move` on a
-   move, and `leave_room` on cleanup; render from the `game_state` event (the
-   server emits exactly one per move). On unmount remove your listeners with
-   `socket.off(...)` only - never
-   `socket.disconnect()` (that would kill the shared chat lane). Register the board
-   in `src/registry.ts` (`REGISTRY`) using the imported slug constant as the key -
-   both `REGISTRY` and `SKELETON_REGISTRY` are `Record<GameType, …>`, so a missing
-   entry is a **compile error**, not a runtime surprise.
-   Then register a **skeleton**: either add `src/games/<type>/skeleton.tsx` - a
-   prop-less component that mirrors your board's layout (built from the shared
-   `SkeletonBox`, no `"use client"` needed, no import of the board) and add it to
-   `SKELETON_REGISTRY` - or rely on the generic fallback. Either way
-   `getGameSkeleton(type)` resolves to your skeleton or `DefaultGameSkeleton`
-   (never `null`); it renders as the board's `<Suspense>` fallback while the lazy
-   board chunk loads.
-4. **Tests** - the conformance suite (`packages/games-core/tests/conformance.test.ts`)
-   covers your game automatically once it's in `GAMES`; the `"GAME_TYPES matches
-   the registry exactly"` assertion also catches a missing `GAME_TYPES` entry.
-   Add a focused engine test `packages/games-core/tests/<type>.test.ts`
-   (turn/role enforcement, every win condition, draws, illegal moves, post-terminal
-   rejection) and schema-strictness cases. The registry parity tests are
-   **enforced**: `packages/games-client/tests/registry.test.ts` fails if a game
-   type has no board or no skeleton, and `packages/games-core/tests/game-docs.test.ts`
-   fails if it has no `docs/games/<type>.md`.
-5. **Document** - add `docs/games/<type>.md`, named after the `type` slug (e.g.
-   `docs/games/tic-tac-toe.md`): how to play, player count and roles,
-   win/draw/illegal-move rules, the state and move shapes (mirroring the Zod
-   schemas in `packages/shared/src/types/games/<type>/schemas.ts`), any
-   `configFields`, and a link to `packages/games-core/src/games/<type>/`.
-   Every new game ships this doc.
-6. **Verify** - `bun run type-check`, `bun test` (games-core incl. conformance),
-   `bun run check`. Then `bun run dev` and play a full game two-up on `/play/:code`
-   (the play route's id segment is the game's short public room code, not the UUID).
-   See `docs/architecture/testing.md` for the suites the new game must keep green
-   (registry parity, game-docs, conformance).
-
-## What you reuse (never recreate)
-
-These already work for every game - do not duplicate them:
-
-- **Game page** - `apps/web/app/games/[gameType]/page.tsx` renders the game's
-  category eyebrow, name, description, cover image,
-  `app/games/_shared/room-actions.tsx` - the
-  **Play now / Create room / Join by code** buttons - and the `HowToPlay`
-  panel (`app/games/_shared/how-to-play.tsx`): the `meta.howToPlay` steps plus
-  a "Watch tutorial" button (only when `meta.tutorialVideo` is set). Play now
-  routes to `/play/find/<type>` (matchmaking), Create room to
-  `/play/new/<type>` (which emits `room:create`), and Join by code validates a
-  code via the `room:join` socket ack. Any `configFields` the
-  game declares are read off the `GameDefinition`; you add nothing here. The URL
-  stays `/games/<type>`; the legacy `/games/<type>/<id>` redirects to
-  `/play/<code>` (the game's short public room code, which is `GameJson.id`).
-- **Friend-challenge flow** - `app/chat/[handle]/game-launcher.tsx` (takes a
-  `gameType`) creates a game in a conversation via the
-  `game:create_in_conversation` socket event from the chat surface.
-- **Play view** - `app/play/[gameId]/page.tsx` (the `[gameId]` segment is the
-  game's public room code) loads the game by code and renders the registered
-  client via `getGameClient(type)` inside `<Suspense>`, with
-  `getGameSkeleton(type)` as the fallback. The route-level `loading.tsx` reads the
-  `gl_chat_layout` cookie to render the matching chat shell (docked / popout /
-  minimized) while the game data is still being fetched, but its board area stays a
-  generic placeholder - it can't pick a per-game board skeleton there because the
-  game `type` isn't known until the fetch resolves.
-- **In-chat card** - `app/chat/[handle]/game-card-message.tsx` renders the live
-  card for any game.
-- **Realtime** - the turn-based handlers (`apps/server/src/realtime/turn-based.ts`,
-  `handleJoinRoom`/`handleMakeMove`) serve any turn-based engine; they are bound to
-  the `join_room`/`make_move` socket events in `realtime/index.ts` via the
-  `registerGameEvent` helper (defined in `realtime/socket-util.ts`), which validates
-  the payload envelope before calling the handler. Write a new handler module and
-  wire it up there **only** for a genuinely different `mode` (e.g. realtime
-  `step`-based games).
-- **Database** - the generic `game` (+ `config` JSONB), `move`, and `game_player`
-  tables in `@kyzen/database` (`packages/database/src/schema.ts`) store every
-  game. Never add a per-game table; the engine owns the typed shape and Zod
-  validates it.
-
-## Automating it
-
-The `game-builder` agent (`.claude/agents/game-builder.md`) follows this guide to
-implement a game end-to-end from a spec or doc - including the tests and
-verification. Keep that agent and this document in sync.
+No game-specific database migration is needed. The existing JSONB state/config/move columns store the game's validated shapes. Tutorials are optional and follow [video-tutorials.md](video-tutorials.md).

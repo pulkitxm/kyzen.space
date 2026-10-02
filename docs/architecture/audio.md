@@ -37,7 +37,7 @@ Because jotai is a singleton across the workspace (`transpilePackages`, see
 | `packages/games-client/src/audio/use-game-audio.ts` | `useGameAudio()` → stable `{ playHover, playTouch, playWin, playDraw, unlock }` bound to the singleton. |
 | `apps/web/lib/audio/atoms.ts` | `gameSfxAtom` / `gameMusicAtom` (`atomWithStorage`, SSR-safe noop storage), seeded from the shared defaults. |
 | `apps/web/lib/audio/use-audio-bridge.ts` | `useGameAudioBridge(musicUrl?)` - registers the SFX file URLs, sets the per-game music source, syncs both atoms into the engine, marks music active for the play screen's lifetime, and registers gesture-`unlock` listeners that live for the screen's lifetime. |
-| `apps/web/lib/audio/music-sources.ts` | `gameMusicSource(gameType)` - maps a game type to its background-music asset URL (tic-tac-toe → `/sounds/tic-tac-toe-bg.ogg`); `null` (no music) for the rest. |
+| `apps/web/lib/audio/music-sources.ts` | `gameMusicSource(gameType)` - reads the registered game's `meta.backgroundMusic` asset URL (tic-tac-toe → `/sounds/tic-tac-toe-bg.ogg`); `null` (no music) for the rest. |
 | `apps/web/public/sounds/` | The Opus `.ogg` audio assets: `tic-tac-toe-bg.ogg` (background music) and `hover.ogg` / `click.ogg` / `win.ogg` / `draw.ogg` (SFX), each served at `/sounds/<name>`. |
 | `apps/web/app/play/[gameId]/game-settings-gear.tsx` | The `FaGear` button; CSS slide via the `md:gear-shift` utility + `--gear-shift` var and opens the settings popup. |
 | `apps/web/app/play/[gameId]/game-settings-panel.tsx` | Modal body: per-channel mute toggle, −/+ buttons, range slider, % readout. |

@@ -8,6 +8,7 @@ export const ticTacToeMeta: GameMeta = {
   categoryId: GAME_CATEGORIES.BOARD_CLASSICS.id,
   coverImage: "/games/tic-tac-toe-cover.png",
   tutorialVideo: "/games/tic-tac-toe-tutorial.mp4",
+  backgroundMusic: "/sounds/tic-tac-toe-bg.ogg",
   howToPlay: [
     "You play as X or O. X always makes the first move.",
     "On your turn, tap any empty cell to place your mark.",

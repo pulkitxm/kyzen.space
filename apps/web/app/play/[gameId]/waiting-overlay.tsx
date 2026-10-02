@@ -4,31 +4,24 @@ import type { GameJson } from "@kyzen/shared/types";
 import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
 import { useEffect, useState } from "react";
 import { FaCheck, FaRegCopy, FaUserCheck } from "react-icons/fa6";
-import { useSocketEvent } from "@/lib/socket/socket-context";
 
 export function WaitingForOpponentOverlay({
   gameId,
-  initialGame,
+  game,
 }: {
   gameId: string;
-  initialGame: GameJson;
+  game: GameJson;
 }) {
-  const [game, setGame] = useState<GameJson>(initialGame);
+  const [previousStatus, setPreviousStatus] = useState(game.status);
   const [justJoined, setJustJoined] = useState(false);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
 
-  useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
-    setGame((prev) => {
-      if (
-        prev.status === "waiting" &&
-        payload.game.status === "active" &&
-        payload.game.players.length >= 2
-      ) {
-        setJustJoined(true);
-      }
-      return payload.game;
-    });
-  });
+  if (previousStatus !== game.status) {
+    setPreviousStatus(game.status);
+    if (previousStatus === "waiting" && game.status === "active") {
+      setJustJoined(true);
+    }
+  }
 
   useEffect(() => {
     if (!justJoined) return;
@@ -36,7 +29,7 @@ export function WaitingForOpponentOverlay({
     return () => clearTimeout(timer);
   }, [justJoined]);
 
-  const waiting = game.status === "waiting" && game.players.length < 2;
+  const waiting = game.status === "waiting";
   const open = waiting || justJoined;
 
   const copy = async (kind: "code" | "link") => {
@@ -74,7 +67,7 @@ export function WaitingForOpponentOverlay({
                     aria-hidden="true"
                   />
                   <p className="font-semibold text-foreground text-lg">
-                    Opponent joined!
+                    Game ready!
                   </p>
                 </div>
               ) : (
@@ -102,7 +95,7 @@ export function WaitingForOpponentOverlay({
                     />
                   </div>
                   <h2 className="font-bold text-foreground text-xl">
-                    Waiting for your opponent...
+                    Waiting for players...
                   </h2>
                   <p className="mt-1 text-muted-foreground text-sm">
                     Share this code so a friend can join.

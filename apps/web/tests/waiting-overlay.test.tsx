@@ -29,12 +29,26 @@ function game(over: any) {
 describe("WaitingForOpponentOverlay", () => {
   it("shows the room code and share buttons while waiting for an opponent", () => {
     const html = renderToStaticMarkup(
-      <WaitingForOpponentOverlay gameId="A2K9P7" initialGame={game({})} />,
+      <WaitingForOpponentOverlay gameId="A2K9P7" game={game({})} />,
     );
     expect(html).toContain("A2K9P7");
-    expect(html).toContain("Waiting for your opponent");
+    expect(html).toContain("Waiting for players");
     expect(html).toContain("Copy code");
     expect(html).toContain("Copy link");
+  });
+
+  it("keeps waiting visible when a game needs more seats", () => {
+    const waiting = game({
+      status: "waiting",
+      players: [
+        { userId: "u1", username: "alice", role: "one" },
+        { userId: "u2", username: "bob", role: "two" },
+      ],
+    });
+    const html = renderToStaticMarkup(
+      <WaitingForOpponentOverlay gameId="A2K9P7" game={waiting} />,
+    );
+    expect(html).toContain("Waiting for players");
   });
 
   it("renders no overlay once the game is active with two players", () => {
@@ -46,8 +60,8 @@ describe("WaitingForOpponentOverlay", () => {
       ],
     });
     const html = renderToStaticMarkup(
-      <WaitingForOpponentOverlay gameId="A2K9P7" initialGame={active} />,
+      <WaitingForOpponentOverlay gameId="A2K9P7" game={active} />,
     );
-    expect(html).not.toContain("Waiting for your opponent");
+    expect(html).not.toContain("Waiting for players");
   });
 });

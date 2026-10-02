@@ -71,20 +71,19 @@ function PlayersRow({ game }: { game: GameJson }) {
 export function GameOverOverlay({
   gameId,
   userId,
-  initialGame,
+  game,
   conversation,
 }: {
   gameId: string;
   userId: string;
-  initialGame: GameJson;
+  game: GameJson;
   conversation: ConversationJson | null;
 }) {
   const router = useRouter();
   const { socket } = useSocket();
   const { openLayer, layers } = useLayeredPopup();
   const cardRef = useRef<HTMLDivElement>(null);
-  const [game, setGame] = useState<GameJson>(initialGame);
-  const [open, setOpen] = useState(() => isGameOver(initialGame.status));
+  const [open, setOpen] = useState(() => isGameOver(game.status));
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
   const [rematch, setRematch] = useState<{
     busy: boolean;
@@ -92,10 +91,12 @@ export function GameOverOverlay({
     code: string | null;
   }>({ busy: false, error: null, code: null });
 
-  useSocketEvent<{ game: GameJson }>("game_state", (payload) => {
-    setGame(payload.game);
-    if (isGameOver(payload.game.status)) setOpen(true);
-  });
+  const [previousStatus, setPreviousStatus] = useState(game.status);
+  if (previousStatus !== game.status) {
+    setPreviousStatus(game.status);
+    if (isGameOver(game.status)) setOpen(true);
+  }
+
   useSocketEvent<{ newGameId: string }>(
     CHAT_EVENTS.rematchCreated,
     (payload) => {

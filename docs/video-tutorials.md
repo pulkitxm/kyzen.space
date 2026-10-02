@@ -81,7 +81,7 @@ video.
 `remotion.config.ts` sets Remotion's `publicDir` to `apps/web/public`, so the
 app's static assets are addressable via `staticFile()` with no copying:
 `sounds/<type>-bg.ogg` (bg music, the same files
-`apps/web/lib/audio/music-sources.ts` registers), `games/<type>-cover.png`
+the game's `meta.backgroundMusic` references), `games/<type>-cover.png`
 (cover art), and `patterns/*.svg` (the doodle tiles `<PatternBackdrop>` masks,
 mirroring `.app-canvas::before`).
 

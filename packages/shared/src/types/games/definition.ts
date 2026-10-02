@@ -10,6 +10,7 @@ export interface GameMeta {
   categoryId: GameCategoryId;
   coverImage?: string;
   tutorialVideo?: string;
+  backgroundMusic?: string;
   howToPlay?: string[];
 }
 
