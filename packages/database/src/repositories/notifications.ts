@@ -4,7 +4,7 @@ import {
   type NotificationRow,
   type NotificationType,
 } from "@kyzen/shared/types";
-import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "../client";
 import { notification } from "../schema";
 import { decodeCursor, encodeCursor } from "./cursor";
@@ -47,14 +47,7 @@ export async function listForUser(
     const c = decodeCursor(opts.cursor);
     if (c) {
       conds.push(
-        // biome-ignore lint/style/noNonNullAssertion: drizzle or() returns SQL given non-empty args
-        or(
-          lt(notification.createdAt, c.createdAt),
-          and(
-            eq(notification.createdAt, c.createdAt),
-            lt(notification.id, c.id),
-          ),
-        )!,
+        sql`(${notification.createdAt}, ${notification.id}) < (select created_at, id from "notification" where id::text = ${c.id} and user_id = ${userId})`,
       );
     }
   }

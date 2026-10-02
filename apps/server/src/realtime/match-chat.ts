@@ -1,9 +1,11 @@
-import { matchChat } from "@kyzen/database";
+import { friends, matchChat, profiles } from "@kyzen/database";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
   clientJoinRoomSchema,
   clientMatchMessageSchema,
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
+import { assembleFriendship } from "../chat/assemble";
 import { createDm } from "../chat/conversations-service";
 import { emitToGame, emitToUser } from "./rooms";
 import { register } from "./socket-util";
@@ -40,9 +42,34 @@ export function attachMatchChatHandlers(io: IOServer, socket: Socket): void {
         const dm = await createDm(socket.data.userId, other);
         if (!dm.ok) throw new Error(dm.error);
       }
-      for (const id of result.userIds)
-        emitToUser(io, id, "match:friends", { gameId: parsed.data.gameId });
+      const connection = await friends.getFriendshipBetween(
+        result.userIds[0] ?? "",
+        result.userIds[1] ?? "",
+      );
+      for (const id of result.userIds) {
+        const peerId = result.userIds.find((candidate) => candidate !== id);
+        const peerProfile = peerId
+          ? await profiles.getProfileByUserId(peerId)
+          : null;
+        emitToUser(io, id, "match:friends", {
+          gameId: parsed.data.gameId,
+          peerUsername: peerProfile?.username ?? null,
+        });
+        const friendship = connection
+          ? await assembleFriendship(connection, id)
+          : null;
+        if (friendship)
+          emitToUser(io, id, CHAT_EVENTS.friendAccepted, { friendship });
+      }
     }
-    cb?.({ ok: true, mutual: result.mutual });
+    const peer = result.mutual
+      ? result.userIds.find((id) => id !== socket.data.userId)
+      : null;
+    const profile = peer ? await profiles.getProfileByUserId(peer) : null;
+    cb?.({
+      ok: true,
+      mutual: result.mutual,
+      peerUsername: profile?.username ?? null,
+    });
   });
 }

@@ -10,6 +10,7 @@ import {
   type GameUpdate,
   type MoveRow,
   normalizeGameCode,
+  type Outcome,
 } from "@kyzen/shared/types";
 import {
   and,
@@ -343,8 +344,8 @@ export async function leaveMatchmaking(
   userId: string,
   owner: string,
   gameType: GameType,
-): Promise<void> {
-  await db.transaction(async (tx) => {
+): Promise<string | null> {
+  return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(802938)`);
     await tx
       .delete(matchmakingTicket)
@@ -355,5 +356,141 @@ export async function leaveMatchmaking(
           eq(matchmakingTicket.gameType, gameType),
         ),
       );
+    const [active] = await tx
+      .select({ code: game.code })
+      .from(game)
+      .innerJoin(gamePlayer, eq(gamePlayer.gameId, game.id))
+      .where(
+        and(
+          eq(gamePlayer.userId, userId),
+          eq(game.publicMatch, true),
+          eq(game.status, "active"),
+        ),
+      )
+      .limit(1);
+    return active?.code ?? null;
+  });
+}
+
+export async function persistGameMove(input: {
+  previous: GameRecord;
+  playerId: string;
+  moveData: unknown;
+  gameState: unknown;
+  outcome: Outcome;
+}): Promise<{ game: GameRecord; move: MoveRow } | null> {
+  return db.transaction(async (tx) => {
+    const [locked] = await tx
+      .select()
+      .from(game)
+      .where(
+        and(
+          eq(game.id, input.previous.id),
+          eq(game.status, "active"),
+          sql`${game.gameState} = ${JSON.stringify(input.previous.gameState)}::jsonb`,
+        ),
+      )
+      .for("update");
+    if (!locked) return null;
+    const outcome = input.outcome;
+    const completed = outcome.status === "completed";
+    const winnerRole =
+      outcome.status === "completed" ? outcome.winnerRole : null;
+    const winner =
+      outcome.status === "completed"
+        ? outcome.draw
+          ? "draw"
+          : (input.previous.players.find((player) => player.role === winnerRole)
+              ?.userId ?? null)
+        : null;
+    const [updated] = await tx
+      .update(game)
+      .set({
+        gameState: input.gameState,
+        status: completed ? "completed" : "active",
+        winner,
+        completedAt: completed ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(game.id, locked.id))
+      .returning();
+    const [number] = await tx
+      .select({ next: sql<number>`coalesce(max(${move.moveNumber}), 0) + 1` })
+      .from(move)
+      .where(eq(move.gameId, locked.id));
+    const [saved] = await tx
+      .insert(move)
+      .values({
+        gameId: locked.id,
+        playerId: input.playerId,
+        moveData: input.moveData,
+        moveNumber: number?.next ?? 1,
+      })
+      .returning();
+    if (!updated || !saved) throw new Error("Move could not be saved");
+    if (completed) await updateMatchStats(tx, input.previous, winner);
+    return { game: toGameRecord(updated, input.previous.players), move: saved };
+  });
+}
+
+async function updateMatchStats(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  record: GameRecord,
+  winner: string | null,
+) {
+  for (const player of [...record.players].sort((a, b) =>
+    a.userId.localeCompare(b.userId),
+  )) {
+    const [profile] = await tx
+      .select()
+      .from(userProfile)
+      .where(eq(userProfile.userId, player.userId))
+      .for("update");
+    if (!profile) continue;
+    const stats = { ...profile.stats };
+    const current = stats[record.gameType] ?? {
+      played: 0,
+      won: 0,
+      lost: 0,
+      drawn: 0,
+    };
+    stats[record.gameType] = {
+      played: current.played + 1,
+      won: current.won + (winner === player.userId ? 1 : 0),
+      lost:
+        current.lost + (winner !== "draw" && winner !== player.userId ? 1 : 0),
+      drawn: current.drawn + (winner === "draw" ? 1 : 0),
+    };
+    await tx
+      .update(userProfile)
+      .set({ stats, updatedAt: new Date() })
+      .where(eq(userProfile.userId, player.userId));
+  }
+}
+
+export async function abortActiveGame(
+  previous: GameRecord,
+  winner: string | null,
+): Promise<GameRecord | null> {
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(game)
+      .set({
+        status: "aborted",
+        winner,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(game.id, previous.id),
+          eq(game.status, "active"),
+          sql`${game.gameState} = ${JSON.stringify(previous.gameState)}::jsonb`,
+        ),
+      )
+      .returning();
+    if (!updated) return null;
+    if (winner) await updateMatchStats(tx, previous, winner);
+    return toGameRecord(updated, previous.players);
   });
 }

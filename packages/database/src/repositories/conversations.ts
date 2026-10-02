@@ -3,7 +3,7 @@ import type {
   ConversationRow,
   MemberRole,
 } from "@kyzen/shared/types";
-import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "../client";
 import { conversation, conversationMember, message } from "../schema";
 
@@ -240,7 +240,10 @@ export async function markRead(
 ): Promise<void> {
   await db
     .update(conversationMember)
-    .set({ lastReadMessageId: messageId, lastReadAt: new Date() })
+    .set({
+      lastReadMessageId: messageId,
+      lastReadAt: sql`(select created_at from message where id = ${messageId} and conversation_id = ${conversationId})`,
+    })
     .where(
       and(
         eq(conversationMember.conversationId, conversationId),
@@ -254,7 +257,10 @@ export async function unreadCount(
   userId: string,
 ): Promise<number> {
   const [member] = await db
-    .select({ lastReadAt: conversationMember.lastReadAt })
+    .select({
+      lastReadMessageId: conversationMember.lastReadMessageId,
+      leftAt: conversationMember.leftAt,
+    })
     .from(conversationMember)
     .where(
       and(
@@ -264,12 +270,17 @@ export async function unreadCount(
     )
     .limit(1);
 
+  if (!member || member.leftAt) return 0;
+
   const conds = [
     eq(message.conversationId, conversationId),
     isNull(message.deletedAt),
     ne(message.senderId, userId),
   ];
-  if (member?.lastReadAt) conds.push(gt(message.createdAt, member.lastReadAt));
+  if (member.lastReadMessageId)
+    conds.push(
+      sql`(${message.createdAt}, ${message.id}) > (select created_at, id from message where id = ${member.lastReadMessageId} and conversation_id = ${conversationId})`,
+    );
 
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })

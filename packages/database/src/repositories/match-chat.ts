@@ -10,6 +10,7 @@ import {
   matchMessage,
   matchmakingTicket,
   user,
+  userProfile,
 } from "../schema";
 import { pairKey } from "./friends";
 
@@ -53,9 +54,26 @@ export async function readMatchChat(code: string, userId: string) {
             .orderBy(desc(matchMessage.createdAt), desc(matchMessage.id))
             .limit(100)
         : [];
+    const peer = players.find((player) => player.userId !== userId);
+    const [connection] = peer
+      ? await tx
+          .select()
+          .from(friendship)
+          .where(eq(friendship.pairKey, pairKey(userId, peer.userId)))
+      : [];
+    const mutual =
+      choices.length === players.length && connection?.status === "accepted";
+    const [profile] =
+      mutual && peer
+        ? await tx
+            .select({ username: userProfile.username })
+            .from(userProfile)
+            .where(eq(userProfile.userId, peer.userId))
+        : [];
     return {
       chosen: choices.some((choice) => choice.userId === userId),
-      mutual: choices.length === players.length,
+      mutual,
+      peerUsername: profile?.username ?? null,
       messages: rows.reverse().map(
         (message): MatchMessage => ({
           id: message.id,
@@ -160,7 +178,7 @@ export async function chooseMatchFriend(code: string, userId: string) {
       .from(friendship)
       .where(eq(friendship.pairKey, key));
     if (existing?.status !== "accepted") {
-      for (const id of userIds) {
+      for (const id of [...userIds].sort()) {
         const [account] = await tx
           .select()
           .from(user)

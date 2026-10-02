@@ -40,6 +40,9 @@ describe.skipIf(!DB_UP)("transactional public matchmaking", () => {
     expect(record?.conversationId).toBeNull();
     expect(await conversations.findDm(a.id, b.id)).toBeNull();
     expect((await join(a.id))?.code).toBe(matched?.code);
+    expect(await games.leaveMatchmaking(a.id, a.id, TIC_TAC_TOE)).toBe(
+      matched?.code ?? null,
+    );
   });
 
   it("isolates config pools and expired tickets", async () => {

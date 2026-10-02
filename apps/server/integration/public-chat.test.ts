@@ -5,13 +5,16 @@ import {
   friends,
   games,
   matchChat,
+  profiles,
   schema,
 } from "@kyzen/database";
 import { getDefinition } from "@kyzen/games-core";
 import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { eq } from "drizzle-orm";
+import type { Server, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../src/api/serialize";
 import { createDm } from "../src/chat/conversations-service";
+import { handleMakeMove } from "../src/realtime/turn-based";
 import { createHarness, DB_UP } from "./harness";
 
 const h = createHarness("matchchat");
@@ -145,5 +148,62 @@ describe.skipIf(!DB_UP)("anonymous public match privacy", () => {
       await db
         .delete(schema.conversation)
         .where(eq(schema.conversation.id, dm.id));
+  });
+  it("ignores a stale timeout after a player has moved", async () => {
+    const { a, b, game } = await fixture();
+    const definition = getDefinition(TIC_TAC_TOE);
+    const result = definition.engine.reduce?.(
+      game.gameState,
+      { role: "X" },
+      { row: 0, col: 0 },
+    );
+    if (!result?.ok) throw new Error("Synthetic move failed");
+    await games.persistGameMove({
+      previous: game,
+      playerId: a.id,
+      moveData: { row: 0, col: 0 },
+      gameState: result.state,
+      outcome: result.outcome,
+    });
+    expect(await games.abortActiveGame(game, b.id)).toBeNull();
+    expect((await games.getGameById(game.id))?.status).toBe("active");
+    expect(
+      (await profiles.getProfileByUserId(b.id))?.stats[TIC_TAC_TOE],
+    ).toBeUndefined();
+  });
+  it("serializes concurrent moves and completion with exactly one stats update", async () => {
+    const { a, b, game } = await fixture();
+    const wire: unknown[] = [];
+    const io = {
+      to: () => ({
+        emit: (_event: string, payload: unknown) => wire.push(payload),
+      }),
+    } as unknown as Server;
+    const socket = (userId: string) =>
+      ({
+        data: { userId },
+        emit: (_event: string, payload: unknown) => wire.push(payload),
+      }) as unknown as Socket;
+    const make = (userId: string, row: number, col: number) =>
+      handleMakeMove(io, socket(userId), {
+        gameId: game.code,
+        moveData: { row, col },
+      });
+    await Promise.all(Array.from({ length: 10 }, () => make(a.id, 0, 0)));
+    expect(await games.listMoves(game.id)).toHaveLength(1);
+    await make(b.id, 1, 0);
+    await make(a.id, 0, 1);
+    await make(b.id, 1, 1);
+    await Promise.all(Array.from({ length: 10 }, () => make(a.id, 0, 2)));
+    expect(await games.listMoves(game.id)).toHaveLength(5);
+    expect((await games.getGameById(game.id))?.status).toBe("completed");
+    expect(
+      (await profiles.getProfileByUserId(a.id))?.stats[TIC_TAC_TOE]?.won,
+    ).toBe(1);
+    expect(
+      (await profiles.getProfileByUserId(b.id))?.stats[TIC_TAC_TOE]?.lost,
+    ).toBe(1);
+    for (const secret of [a.id, b.id, a.username, b.username])
+      expect(JSON.stringify(wire)).not.toContain(secret);
   });
 });

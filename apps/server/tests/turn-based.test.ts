@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { GameRecord, Outcome } from "@kyzen/shared/types";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
 const CODE = "K7P2QX";
@@ -32,6 +33,47 @@ const seatCalls: { player: Player; seatOrder: number }[] = [];
 const bumpCalls: { userId: string; outcome: string }[] = [];
 
 const games = {
+  persistGameMove: async (input: {
+    previous: GameRecord;
+    playerId: string;
+    moveData: unknown;
+    gameState: unknown;
+    outcome: Outcome;
+  }) => {
+    const row = {
+      id: `m${moves.length + 1}`,
+      gameId: current.id,
+      playerId: input.playerId,
+      moveData: input.moveData,
+      moveNumber: moves.length + 1,
+      createdAt: new Date(),
+    };
+    moves.push(row);
+    current = { ...current, gameState: input.gameState };
+    const outcome = input.outcome;
+    if (outcome.status === "completed") {
+      current = {
+        ...current,
+        status: "completed",
+        completedAt: new Date(),
+        winner: outcome.draw
+          ? "draw"
+          : (current.players.find(
+              (player) => player.role === outcome.winnerRole,
+            )?.userId ?? null),
+      };
+      for (const player of current.players)
+        bumpCalls.push({
+          userId: player.userId,
+          outcome: outcome.draw
+            ? "drawn"
+            : current.winner === player.userId
+              ? "won"
+              : "lost",
+        });
+    }
+    return { game: current, move: row };
+  },
   getGameById: async () => current,
   getGameByCode: async () => {
     lookupCalls++;

@@ -3,7 +3,7 @@ import {
   createMessageInputSchema,
   type MessageRow,
 } from "@kyzen/shared/types";
-import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../client";
 import { message } from "../schema";
 import { decodeCursor, encodeCursor } from "./cursor";
@@ -63,11 +63,7 @@ export async function listMessages(
     const c = decodeCursor(opts.cursor);
     if (c) {
       conds.push(
-        // biome-ignore lint/style/noNonNullAssertion: drizzle or() returns SQL given non-empty args
-        or(
-          lt(message.createdAt, c.createdAt),
-          and(eq(message.createdAt, c.createdAt), lt(message.id, c.id)),
-        )!,
+        sql`(${message.createdAt}, ${message.id}) < (select created_at, id from "message" where id::text = ${c.id} and conversation_id = ${conversationId})`,
       );
     }
   }

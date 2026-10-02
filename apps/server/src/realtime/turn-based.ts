@@ -10,7 +10,6 @@ import {
   type ClientMakeMove,
   type GameJson,
   isGameCode,
-  type Outcome,
   type ServerGameStatePayload,
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
@@ -120,35 +119,6 @@ async function ensureSeated(
   return { game, changed: true };
 }
 
-async function finalize(
-  gameRow: GameRecord,
-  outcome: Outcome,
-): Promise<GameRecord> {
-  if (outcome.status !== "completed") return gameRow;
-
-  const players = gameRow.players;
-  let winnerUserId: string | null = null;
-  if (!outcome.draw && outcome.winnerRole) {
-    winnerUserId =
-      players.find((p) => p.role === outcome.winnerRole)?.userId ?? null;
-  }
-
-  const updated = await games.updateGame(gameRow.id, {
-    status: "completed",
-    completedAt: new Date(),
-    winner: outcome.draw ? "draw" : winnerUserId,
-  });
-
-  for (const p of players) {
-    if (outcome.draw)
-      await profiles.bumpStats(p.userId, gameRow.gameType, "drawn");
-    else if (p.userId === winnerUserId)
-      await profiles.bumpStats(p.userId, gameRow.gameType, "won");
-    else await profiles.bumpStats(p.userId, gameRow.gameType, "lost");
-  }
-  return updated;
-}
-
 async function applyMove(
   io: IOServer,
   gameRow: GameRecord,
@@ -171,16 +141,15 @@ async function applyMove(
   );
   if (!result.ok) return;
 
-  const moveNumber = await games.nextMoveNumber(gameRow.id);
-  const moveRow = await games.addMove({
-    gameId: gameRow.id,
-    moveNumber,
+  const persisted = await games.persistGameMove({
+    previous: gameRow,
     playerId: player.userId,
     moveData: parsedMove.data,
+    gameState: result.state,
+    outcome: result.outcome,
   });
-
-  let updated = await games.updateGame(gameRow.id, { gameState: result.state });
-  updated = await finalize(updated, result.outcome);
+  if (!persisted) return;
+  const { game: updated, move: moveRow } = persisted;
 
   if (!opts.auto) turnTimers.resetStrikes(gameRow.id, player.role);
   scheduleNext(io, updated);
@@ -206,21 +175,8 @@ async function abortGame(
   gameRow: GameRecord,
   winner: GamePlayer | null,
 ): Promise<void> {
-  const updated = await games.updateGame(gameRow.id, {
-    status: "aborted",
-    completedAt: new Date(),
-    winner: winner ? winner.userId : null,
-  });
-
-  if (winner) {
-    for (const p of gameRow.players) {
-      await profiles.bumpStats(
-        p.userId,
-        gameRow.gameType,
-        p.userId === winner.userId ? "won" : "lost",
-      );
-    }
-  }
+  const updated = await games.abortActiveGame(gameRow, winner?.userId ?? null);
+  if (!updated) return;
 
   turnTimers.dispose(updated.id);
   emitToGame(io, gameRow.code, "game_state", {
@@ -342,3 +298,12 @@ export async function handleMakeMove(
 }
 
 export const __timerInternals = { onTurnTimeout };
+
+export async function ensureMatchClock(
+  io: IOServer,
+  code: string,
+): Promise<void> {
+  const record = await games.getGameByCode(code);
+  if (record?.status === "active" && turnTimers.deadline(record.id) === null)
+    scheduleNext(io, record);
+}

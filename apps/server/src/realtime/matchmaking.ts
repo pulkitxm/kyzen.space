@@ -7,6 +7,7 @@ import {
 import type { Server as IOServer, Socket } from "socket.io";
 import { emitToUser } from "./rooms";
 import { register } from "./socket-util";
+import { ensureMatchClock } from "./turn-based";
 
 export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
   register(socket, "game:queue_join", async (payload, cb) => {
@@ -36,6 +37,7 @@ export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
         definition.engine.roles.map((role) => ({ role })),
       ),
     });
+    if (match) await ensureMatchClock(io, match.code);
     cb?.({ ok: true, gameId: match?.code ?? null });
     if (match) {
       for (const userId of match.userIds)
@@ -48,11 +50,11 @@ export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
       cb?.({ ok: false, error: "Invalid queue request" });
       return;
     }
-    await games.leaveMatchmaking(
+    const gameId = await games.leaveMatchmaking(
       socket.data.userId,
       socket.id,
       parsed.data.gameType,
     );
-    cb?.({ ok: true });
+    cb?.({ ok: true, gameId });
   });
 }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { GameRecord, Outcome } from "@kyzen/shared/types";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
 const CODE = "K7P2QX";
@@ -12,6 +13,40 @@ let moves: any[] = [];
 const bumpCalls: { userId: string; outcome: string }[] = [];
 
 const games = {
+  abortActiveGame: async (_previous: GameRecord, winner: string | null) => {
+    current = {
+      ...current,
+      status: "aborted",
+      winner,
+      completedAt: new Date(),
+    };
+    if (winner)
+      for (const player of current.players)
+        bumpCalls.push({
+          userId: player.userId,
+          outcome: player.userId === winner ? "won" : "lost",
+        });
+    return current;
+  },
+  persistGameMove: async (input: {
+    previous: GameRecord;
+    playerId: string;
+    moveData: unknown;
+    gameState: unknown;
+    outcome: Outcome;
+  }) => {
+    const row = {
+      id: `m${moves.length + 1}`,
+      gameId: current.id,
+      playerId: input.playerId,
+      moveData: input.moveData,
+      moveNumber: moves.length + 1,
+      createdAt: new Date(),
+    };
+    moves.push(row);
+    current = { ...current, gameState: input.gameState };
+    return { game: current, move: row };
+  },
   getGameById: async () => current,
   getGameByCode: async () => current,
   listMoves: async () => moves,
