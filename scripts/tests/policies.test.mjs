@@ -186,3 +186,31 @@ describe("repository hygiene", () => {
     expect(run("check-repository").status).toBe(0);
   });
 });
+
+describe("strict Biome enforcement", () => {
+  test.each([
+    ["apps/server/src/probe.ts", 'console.log("debug");\n'],
+    ["packages/example/src/probe.ts", 'console.log("debug");\n'],
+    ["probe.test.ts", 'test.only("focused", () => {});\n'],
+    ["probe.test.ts", 'test.skip("disabled", () => {});\n'],
+    ["probe.ts", "debugger;\n"],
+    ["probe.ts", "export const value: any = 1;\n"],
+    ["probe.ts", `export const value = "\${value}";\n`],
+  ])("fails on forbidden source or warnings in %s", (path, source) => {
+    track(
+      "biome.json",
+      readFileSync(new URL("../../biome.json", import.meta.url)),
+    );
+    track(path, source);
+    track(".gitignore", "");
+    const binary = fileURLToPath(
+      new URL("../../node_modules/.bin/biome", import.meta.url),
+    );
+    const result = spawnSync(binary, ["ci", "--error-on-warnings", "."], {
+      cwd: repo,
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout + result.stderr).toContain("lint/");
+  });
+});
