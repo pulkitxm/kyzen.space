@@ -181,11 +181,17 @@ async function smoke() {
       .map(([key, value]) => `${key}=${value}`)
       .join("\n"),
   );
-  await run("docker", ["compose", "-f", "compose.yaml", "config", "--quiet"]);
+  const productionOverride = join(scratch, "production-compose.yaml");
+  writeFileSync(
+    productionOverride,
+    `services:\n  app:\n    env_file: !override [${JSON.stringify(envFile)}]\n`,
+  );
   await run("docker", [
     "compose",
     "-f",
-    "compose.dev.yaml",
+    "compose.yaml",
+    "-f",
+    productionOverride,
     "config",
     "--quiet",
   ]);
