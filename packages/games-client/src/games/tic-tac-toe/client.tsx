@@ -5,8 +5,11 @@ import {
   type Cell,
   isGameLive,
   isGameOver,
+  type Mark,
+  type ProfileStats,
   type TicTacToeState as TicState,
 } from "@kyzen/shared/types";
+import { domAnimation, LazyMotion, m } from "motion/react";
 import {
   useCallback,
   useEffect,
@@ -25,9 +28,10 @@ import {
 } from "react-icons/fa6";
 import { useGameAudio } from "../../audio/use-game-audio";
 import type { GameClientProps } from "../../types";
+import { TttBoard } from "./board";
 import { TttMark, TttMarkDefs } from "./marks";
-import { PlayerBar } from "./player-bar";
-import { WinStrike } from "./win-strike";
+
+import { type CardPlayer, PlayerCard } from "./player-card";
 import { findWinningLine } from "./winning-line";
 
 type GameJson = {
@@ -39,14 +43,13 @@ type GameJson = {
     username: string;
     role: string;
     avatar?: AvatarConfig | null;
+    stats?: ProfileStats | null;
   }[];
   gameState: TicState;
   turnDeadline?: number | null;
 };
 
 type MoveJson = Record<string, unknown>;
-
-const CELL_KEYS = ["nw", "n", "ne", "w", "c", "e", "sw", "s", "se"] as const;
 
 const REPLAY_MS = 850;
 
@@ -69,7 +72,7 @@ function appendMove(moves: MoveJson[], move: MoveJson): MoveJson[] {
 function roleForPlayer(
   players: GameJson["players"],
   playerId: string,
-): "X" | "O" | null {
+): Mark | null {
   const p = players.find((x) => x.userId === playerId);
   return p?.role === "X" || p?.role === "O" ? p.role : null;
 }
@@ -80,7 +83,7 @@ function buildStateAtStep(
   players: GameJson["players"],
 ): TicState {
   const board = emptyBoard();
-  let currentTurn: "X" | "O" = "X";
+  let currentTurn: Mark = "X";
   const sorted = sortMoves(moves);
   const n = Math.max(0, Math.min(step, sorted.length));
   for (let i = 0; i < n; i++) {
@@ -119,18 +122,18 @@ function ReplayToolbar({
   onNext: () => void;
   onLast: () => void;
 }) {
-  const glass =
-    "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card px-3 text-card-foreground shadow-sm outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35";
+  const btn =
+    "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-raised px-3 text-card-foreground shadow-sm outline-none transition hover:bg-surface-overlay focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35";
 
   return (
     <div
-      className="mt-6 flex max-w-[320px] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-border bg-surface-overlay/60 p-2"
+      className="flex max-w-[320px] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-border bg-surface-overlay/60 p-2"
       role="toolbar"
       aria-label="Replay controls"
     >
       <button
         type="button"
-        className={glass}
+        className={btn}
         onClick={onFirst}
         disabled={step <= 0}
         title="First"
@@ -139,7 +142,7 @@ function ReplayToolbar({
       </button>
       <button
         type="button"
-        className={glass}
+        className={btn}
         onClick={onPrev}
         disabled={step <= 0}
         title="Previous move (←)"
@@ -148,7 +151,7 @@ function ReplayToolbar({
       </button>
       <button
         type="button"
-        className={`${glass} min-w-13`}
+        className={`${btn} min-w-13`}
         onClick={onTogglePlay}
         disabled={maxStep === 0}
         title={isPlaying ? "Pause (Space)" : "Play (Space)"}
@@ -161,7 +164,7 @@ function ReplayToolbar({
       </button>
       <button
         type="button"
-        className={glass}
+        className={btn}
         onClick={onNext}
         disabled={step >= maxStep}
         title="Next move (→)"
@@ -170,7 +173,7 @@ function ReplayToolbar({
       </button>
       <button
         type="button"
-        className={glass}
+        className={btn}
         onClick={onLast}
         disabled={step >= maxStep}
         title="Last move"
@@ -181,19 +184,99 @@ function ReplayToolbar({
   );
 }
 
-function StatusDot({ online }: { online: boolean }) {
-  const tone = online ? "bg-success" : "bg-danger";
+function TurnBanner({
+  active,
+  currentTurn,
+  isMyTurn,
+  hasRole,
+  outcome,
+}: {
+  active: boolean;
+  currentTurn: Mark;
+  isMyTurn: boolean;
+  hasRole: boolean;
+  outcome: string | null;
+}) {
+  const label = outcome
+    ? outcome
+    : active
+      ? hasRole
+        ? isMyTurn
+          ? "Your move"
+          : "Opponent's move"
+        : `${currentTurn} to move`
+      : "Setting up the match";
+
   return (
-    <output
-      className="relative inline-flex size-3 items-center justify-center"
-      aria-label={online ? "Online" : "Offline"}
-      title={online ? "Online" : "Offline"}
-    >
-      <span
-        className={`absolute inline-flex size-3 animate-ping rounded-full opacity-70 ${tone}`}
-      />
-      <span className={`relative inline-flex size-2.5 rounded-full ${tone}`} />
-    </output>
+    <div className="relative flex items-center gap-2.5 rounded-full border border-border bg-surface-raised px-5 py-2">
+      {active && !outcome ? (
+        <TttMark mark={currentTurn} className="size-5" />
+      ) : null}
+      <span className="font-semibold text-card-foreground text-sm">
+        {label}
+      </span>
+      {active && !outcome ? (
+        <m.span
+          aria-hidden="true"
+          className="absolute right-4 bottom-0 left-4 h-0.5 origin-left rounded-full bg-primary"
+          initial={{ scaleX: 0.2, opacity: 0.5 }}
+          animate={{ scaleX: 1, opacity: 1 }}
+          transition={{
+            duration: 1.1,
+            repeat: Number.POSITIVE_INFINITY,
+            repeatType: "reverse",
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function SeatCard({
+  player,
+  variant,
+  userId,
+  active,
+  currentTurn,
+  winnerId,
+  connected,
+  turnDeadline,
+  onViewProfile,
+}: {
+  player: CardPlayer | null;
+  variant: "rail" | "strip";
+  userId: string | null;
+  active: boolean;
+  currentTurn: Mark;
+  winnerId: string | null;
+  connected: boolean;
+  turnDeadline: number | null;
+  onViewProfile?: (user: {
+    username: string;
+    avatar?: AvatarConfig | null;
+  }) => void;
+}) {
+  if (!player) {
+    return (
+      <div className="flex flex-1 items-center justify-center rounded-2xl border border-border border-dashed bg-surface-raised/50 px-4 py-5 text-center text-muted-foreground text-sm">
+        Waiting for a player
+      </div>
+    );
+  }
+  const mark =
+    player.role === "X" || player.role === "O" ? (player.role as Mark) : null;
+  const isMe = player.userId === userId;
+  return (
+    <PlayerCard
+      player={player}
+      variant={variant}
+      isTurn={active && mark !== null && mark === currentTurn}
+      isMe={isMe}
+      isWinner={winnerId === player.userId}
+      online={isMe ? connected : true}
+      turnDeadline={turnDeadline}
+      onViewProfile={onViewProfile}
+    />
   );
 }
 
@@ -221,8 +304,8 @@ export function TicTacToeGameClient({
   replayStepRef.current = replayStep;
 
   const isLive = isGameLive(game.status);
-
   const isPast = isGameOver(game.status);
+  const active = game.status === "active";
 
   const sortedLen = useMemo(() => sortMoves(moves).length, [moves]);
 
@@ -311,10 +394,11 @@ export function TicTacToeGameClient({
 
   const state = isPast ? replayState : liveState;
 
-  const myRole = game.players.find((p) => p.userId === userId)?.role ?? null;
+  const myRole = (game.players.find((p) => p.userId === userId)?.role ??
+    null) as Mark | null;
   const canMove =
     Boolean(userId) &&
-    game.status === "active" &&
+    active &&
     myRole !== null &&
     liveState.currentTurn === myRole;
 
@@ -322,24 +406,27 @@ export function TicTacToeGameClient({
     (row: number, col: number) => {
       if (!userId || !canMove) return;
       if (!socket?.connected) return;
+      audio.playTouch();
       socket.emit("make_move", {
         gameId,
         moveData: { row, col },
       });
     },
-    [userId, canMove, gameId, socket],
+    [userId, canMove, gameId, socket, audio],
   );
 
   const winnerLabel = game.winner
     ? game.winner === "draw"
-      ? "Draw"
-      : `Winner: ${game.players.find((p) => p.userId === game.winner)?.username ?? game.winner}`
+      ? "It's a draw"
+      : game.winner === userId
+        ? "You won!"
+        : `${game.players.find((p) => p.userId === game.winner)?.username ?? "Opponent"} won`
     : null;
 
   const winningLine =
     game.winner && game.winner !== "draw" ? findWinningLine(state.board) : null;
   const winLineKey = winningLine ? winningLine.join(",") : null;
-  const winMark = winningLine ? state.board[winningLine[0]] : null;
+  const winMark = winningLine ? (state.board[winningLine[0]] ?? null) : null;
 
   const [winState, setWinState] = useState<{
     key: string | null;
@@ -355,8 +442,8 @@ export function TicTacToeGameClient({
     const prevStatus = prevStatusRef.current;
     prevStatusRef.current = game.status;
     if (endSoundPlayedRef.current) return;
-    const wasLive = isGameLive(prevStatus);
-    if (wasLive && game.status === "completed" && game.winner) {
+    const wasLiveStatus = isGameLive(prevStatus);
+    if (wasLiveStatus && game.status === "completed" && game.winner) {
       endSoundPlayedRef.current = true;
       if (game.winner === "draw") audio.playDraw();
       else audio.playWin();
@@ -446,100 +533,101 @@ export function TicTacToeGameClient({
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [isPast]);
 
+  const playerX = game.players.find((p) => p.role === "X") ?? null;
+  const playerO = game.players.find((p) => p.role === "O") ?? null;
+
+  const boardGlow = isPast
+    ? Boolean(winningLine)
+    : active && (!myRole || liveState.currentTurn === myRole);
+
+  const replayShown = Math.min(replayStep, sortedLen);
+
+  const seatProps = {
+    userId,
+    active,
+    currentTurn: state.currentTurn,
+    winnerId: game.winner,
+    connected,
+    turnDeadline: game.turnDeadline ?? null,
+    onViewProfile,
+  };
+
   return (
-    <div className="mt-8">
-      <TttMarkDefs />
-      <PlayerBar
-        players={game.players}
-        currentTurn={state.currentTurn}
-        myUserId={userId}
-        active={game.status === "active"}
-        turnDeadline={game.turnDeadline ?? null}
-        onViewProfile={onViewProfile}
-      />
-      {isPast ? null : !userId ? (
-        <p className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
-          Sign in to join this table and play. Open the same link while signed
-          in as the second player to fill the match.
-        </p>
-      ) : (
-        <div className="mb-4 flex items-center">
-          <StatusDot online={Boolean(liveSocketKey) && connected} />
-        </div>
-      )}
+    <LazyMotion features={domAnimation}>
+      <div className="@container w-full pt-2">
+        <TttMarkDefs />
 
-      {error ? <p className="mb-4 text-danger text-sm">{error}</p> : null}
-
-      {winnerLabel ? (
-        <p className="mb-4 font-medium text-primary text-sm">{winnerLabel}</p>
-      ) : null}
-
-      <div className="relative grid w-fit grid-cols-3 gap-3">
-        {CELL_KEYS.map((cellKey, idx) => {
-          const row = Math.floor(idx / 3);
-          const col = idx % 3;
-          const mark = state.board[idx];
-          const playable =
-            !isPast && canMove && mark === null && game.status === "active";
-          const ghostMark = playable ? myRole : null;
-          return (
-            <button
-              key={cellKey}
-              type="button"
-              disabled={!playable}
-              onMouseEnter={() => {
-                if (playable) audio.playHover();
-              }}
-              onClick={() => {
-                if (!playable) return;
-                audio.playTouch();
-                makeMove(row, col);
-              }}
-              className="group flex size-24 items-center justify-center rounded-xl border border-border bg-surface-raised outline-none transition focus-visible:ring-2 focus-visible:ring-ring enabled:hover:bg-surface-overlay disabled:cursor-default sm:size-28"
-            >
-              {mark ? (
-                <TttMark mark={mark} className="size-16 sm:size-20" />
-              ) : ghostMark ? (
-                <TttMark
-                  mark={ghostMark}
-                  decorative
-                  className="size-16 opacity-0 transition-opacity duration-150 group-hover:opacity-40 group-focus-visible:opacity-40 sm:size-20"
-                />
-              ) : null}
-            </button>
-          );
-        })}
-        {winningLine && winMark ? (
-          <WinStrike
-            line={winningLine}
-            mark={winMark}
-            animate={winState.animate}
-          />
-        ) : null}
-      </div>
-
-      {isPast ? (
-        <>
-          <ReplayToolbar
-            step={Math.min(replayStep, sortedLen)}
-            maxStep={sortedLen}
-            isPlaying={replayPlaying}
-            onFirst={goFirst}
-            onPrev={goPrev}
-            onTogglePlay={toggleReplayPlay}
-            onNext={goNext}
-            onLast={goLast}
-          />
-          <p className="mt-3 text-muted-foreground text-xs">
-            Position after {Math.min(replayStep, sortedLen)} of {sortedLen}{" "}
-            moves
+        {error ? (
+          <p className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger text-sm">
+            {error}
           </p>
-        </>
-      ) : (
-        <p className="mt-6 text-muted-foreground text-xs">
-          Moves logged: {moves.length}
-        </p>
-      )}
-    </div>
+        ) : null}
+
+        <div className="grid @5xl:grid-cols-[17rem_minmax(0,1fr)_18rem] @5xl:items-start @5xl:gap-6 gap-5">
+          <aside className="@5xl:flex hidden flex-col gap-4">
+            <SeatCard player={playerX} variant="rail" {...seatProps} />
+          </aside>
+
+          <main className="flex flex-col items-center gap-5">
+            <div className="flex @5xl:hidden w-full items-stretch gap-3">
+              <SeatCard player={playerX} variant="strip" {...seatProps} />
+              <SeatCard player={playerO} variant="strip" {...seatProps} />
+            </div>
+
+            <TurnBanner
+              active={active}
+              currentTurn={state.currentTurn}
+              isMyTurn={canMove}
+              hasRole={myRole !== null}
+              outcome={winnerLabel}
+            />
+
+            <div className="relative">
+              <TttBoard
+                board={state.board}
+                myRole={myRole}
+                canMove={canMove}
+                active={active}
+                glow={boardGlow}
+                winningLine={winningLine}
+                winMark={winMark}
+                winAnimate={winState.animate}
+                onPlay={makeMove}
+                onHoverCell={audio.playHover}
+              />
+            </div>
+
+            {!isPast && !userId ? (
+              <p className="max-w-md rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-center text-sm text-warning-foreground">
+                Sign in to take a seat. Open this link signed in as the second
+                player to fill the match.
+              </p>
+            ) : null}
+
+            {isPast ? (
+              <>
+                <ReplayToolbar
+                  step={replayShown}
+                  maxStep={sortedLen}
+                  isPlaying={replayPlaying}
+                  onFirst={goFirst}
+                  onPrev={goPrev}
+                  onTogglePlay={toggleReplayPlay}
+                  onNext={goNext}
+                  onLast={goLast}
+                />
+                <p className="text-muted-foreground text-xs">
+                  Position after {replayShown} of {sortedLen} moves
+                </p>
+              </>
+            ) : null}
+          </main>
+
+          <aside className="@5xl:flex hidden flex-col gap-5">
+            <SeatCard player={playerO} variant="rail" {...seatProps} />
+          </aside>
+        </div>
+      </div>
+    </LazyMotion>
   );
 }

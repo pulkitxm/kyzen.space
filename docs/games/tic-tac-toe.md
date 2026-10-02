@@ -109,13 +109,22 @@ Socket.IO connection the chat lane uses, passed down as a prop.
   board component eagerly (not via `React.lazy`), so opening a finished game shows
   its final position (marks + the static winning line) in the first paint, with no
   board-skeleton flash.
-- **Player bar** (`player-bar.tsx`) sits above the grid: each player's **avatar**
-  + username + their mark, with the active player's chip highlighted (whose turn
-  it is). Avatars render through a games-client `Character`
-  (`packages/games-client/src/ui/character.tsx`, DiceBear avataaars) from the
-  `avatar` now carried on each player - the player payload was extended end-to-end
-  (`getPlayers` left-joins `user_profile`; `avatar?: AvatarConfig | null` added to
-  the shared `GamePlayer` type, `gamePlayerSchema`, and `GameClientProps`).
+- **Match arena** - on desktop the board renders inside a theme-aware "arena"
+  (`@container` 3-column layout, `max-w-6xl`) with per-seat **player cards**
+  (`player-card.tsx`) on the rails, a turn banner above the board, and a move
+  log + quick reactions + spectator strip; it collapses to a single stacked
+  column inside the chat-split pane. Each player card shows the **avatar** (in
+  the turn `CountdownRing`) + username + mark + presence and rank/rating/streak
+  badges, with the active seat highlighted. Avatars render through a games-client
+  `Character` (`packages/games-client/src/ui/character.tsx`, DiceBear avataaars)
+  from the `avatar` carried on each player - the player payload was extended
+  end-to-end (`getPlayers` left-joins `user_profile`; `avatar?: AvatarConfig | null`
+  added to the shared `GamePlayer` type, `gamePlayerSchema`, and `GameClientProps`).
+  The competitive/social extras (rating, rank, streak, spectators, friends
+  watching, reactions, and the post-match XP/rating/achievements summary) are
+  **presentational mocks** (`mock-arena.ts`, deterministic from ids) - there is no
+  backend for them yet; players, turn timer, move history, win/draw, and replay
+  are real.
 - **Replay controls** use `react-icons/fa6` (`FaBackwardStep`, `FaChevronLeft`,
   `FaPlay`/`FaPause`, `FaChevronRight`, `FaForwardStep`); the ✕/◯ glyphs are the
   one hand-authored decorative SVG, the same raw-SVG exception the playing-cards
