@@ -49,6 +49,10 @@ const synthetic = {
 };
 
 const env = { ...process.env, ...synthetic };
+if (process.env.GITHUB_ACTIONS !== "true") {
+  env.CIRCLE_NODE_TOTAL = "2";
+  env.REACT_DOCTOR_PARALLEL = "2";
+}
 
 async function run(command, args = [], extra = {}, cwd = root) {
   if (interrupted) throw new Error("CI checks were interrupted");
