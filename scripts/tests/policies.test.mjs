@@ -169,6 +169,11 @@ describe("repository hygiene", () => {
   test.each([
     [".husky/pre-commit", "exit 0"],
     ["lefthook.yml", "pre-commit: {}"],
+    [".huskyrc.json", "{}"],
+    [
+      "package.json",
+      '{"scripts":{"test":"bun test","pretest":"bun run check"}}',
+    ],
     [".env.production", "KEY=synthetic"],
     ["apps/web/.env", "KEY=synthetic"],
     ["package.json", '{"scripts":{"prepare":"husky"}}'],
@@ -177,6 +182,10 @@ describe("repository hygiene", () => {
   ])("rejects forbidden repository state in %s", (path, content) => {
     track(path, content);
     expect(run("check-repository").status).toBe(1);
+  });
+  test("allows a normal source folder for React hooks", () => {
+    track("apps/web/hooks/use-example.ts", "export {};\n");
+    expect(run("check-repository").status).toBe(0);
   });
   test("allows only the documented web env symlink and placeholder example", () => {
     track(".env.example", "KEY=synthetic");
