@@ -15,8 +15,12 @@ const NEAR_BOTTOM = 360;
 
 export function useGifResults(query: string, enabled: boolean) {
   const [cache, setCache] = useAtom(gifCacheAtom);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [request, setRequest] = useState<{
+    id: number;
+    append: boolean;
+  } | null>(null);
+  const loading = request?.append === false;
+  const loadingMore = request?.append === true;
   const [error, setError] = useState(false);
   const reqIdRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -26,11 +30,8 @@ export function useGifResults(query: string, enabled: boolean) {
   const fetchGifs = useCallback(
     async (value: string, offset: number, append: boolean) => {
       const reqId = ++reqIdRef.current;
-      if (append) setLoadingMore(true);
-      else {
-        setLoading(true);
-        setError(false);
-      }
+      setRequest({ id: reqId, append });
+      if (!append) setError(false);
       try {
         const url = value
           ? `/api/gifs/search?q=${encodeURIComponent(value)}&limit=${GIF_PAGE}&offset=${offset}`
@@ -60,10 +61,7 @@ export function useGifResults(query: string, enabled: boolean) {
           });
         }
       } finally {
-        if (reqId === reqIdRef.current) {
-          setLoading(false);
-          setLoadingMore(false);
-        }
+        setRequest((current) => (current?.id === reqId ? null : current));
       }
     },
     [setCache],

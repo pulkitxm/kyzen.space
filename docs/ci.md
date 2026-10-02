@@ -20,9 +20,9 @@ Install Bun at the version in `package.json`, Make, Python 3.9 or newer, and a r
 | `make ci-build` | All workspace builds |
 | `make ci-integration` | Database and Redis integration tests |
 | `make ci-smoke` | Production image and seeded development Compose game flows |
-| `make ci-react` | Advisory React Doctor diagnostics, without telemetry or PR comments |
+| `make ci-react` | Full-workspace React Doctor scan, failing on errors and warnings, without telemetry or PR comments |
 
-Biome and all other quality gates are blocking. React Doctor remains advisory because its broader heuristic rules already report existing findings; it does not replace Biome. Scanner execution failures still fail its target. Turbo checks use `--force` so a previous task result cannot hide a broken check.
+All quality gates are blocking. React Doctor checks every discovered React workspace and fails on any error or warning; it complements Biome. Scanner execution failures also fail its target. Turbo checks use `--force` so a previous task result cannot hide a broken check.
 
 ## Local resource scheduling
 

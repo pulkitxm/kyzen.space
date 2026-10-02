@@ -153,6 +153,8 @@ function AvatarEditorModal({
     }
   }, [draft, onSaved, router]);
 
+  if (typeof document === "undefined") return null;
+
   return createPortal(
     <>
       <div

@@ -59,7 +59,233 @@ export function Sidebar({
   signedIn,
   profileHref,
 }: SidebarProps) {
+  const { collapsed, setCollapsed, setWidth, displayCollapsed, displayWidth } =
+    useSidebarLayout(sidebarPrefsTrusted, sidebarPrefs);
+  const {
+    isResizing,
+    toggleCollapsed,
+    handleResizeStart,
+    handleResizeHandleClick,
+    handleResizeHandleDoubleClick,
+  } = useSidebarInteractions(collapsed, setCollapsed, setWidth);
+  const groups = getCategoryGroups().map(({ category, games }) => ({
+    category,
+    games: games.map((game) => ({ ...game, href: `/games/${game.type}` })),
+  }));
+
+  const collapsedWidth = 68;
+  const navPx = 8;
+  const navMx = 4;
+  const iconSize = 16;
+  const centeredPad = (collapsedWidth - navPx * 2 - navMx * 2 - iconSize) / 2;
+
+  const textClasses = cn(
+    "overflow-hidden whitespace-nowrap transition-[opacity,max-width,filter] duration-250 ease-in-out",
+    displayCollapsed
+      ? "max-w-0 opacity-0 blur-[2px]"
+      : "max-w-48 opacity-100 blur-0",
+  );
+
+  return (
+    <aside
+      className={cn(
+        "relative flex shrink-0 flex-col border-sidebar-border border-r bg-sidebar",
+        "fixed inset-y-0 left-0 z-50 w-64 md:relative md:z-auto md:w-(--sidebar-width)",
+        !mobileOpen && "hidden md:flex",
+      )}
+      style={
+        {
+          "--sidebar-width": `${displayCollapsed ? collapsedWidth : displayWidth}px`,
+          transition: isResizing ? "none" : "width 0.25s ease-in-out",
+        } as React.CSSProperties
+      }
+    >
+      <div
+        className={cn(
+          "group absolute top-0 -right-2 z-10 hidden h-full w-4 cursor-col-resize md:block",
+        )}
+      >
+        <button
+          type="button"
+          className="size-full"
+          onMouseDown={handleResizeStart}
+          onClick={handleResizeHandleClick}
+          onDoubleClick={handleResizeHandleDoubleClick}
+          aria-label="Resize sidebar"
+        />
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          className="absolute top-1/2 right-0 flex -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-sidebar-border bg-sidebar p-1 text-sidebar-foreground/70 opacity-0 shadow-sm transition-opacity hover:bg-sidebar-accent hover:text-sidebar-foreground group-hover:opacity-100"
+          aria-label={displayCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {displayCollapsed ? (
+            <FaChevronRight className="size-2" />
+          ) : (
+            <FaChevronLeft className="size-2" />
+          )}
+        </button>
+      </div>
+
+      <SidebarHeader
+        collapsed={displayCollapsed}
+        textClasses={textClasses}
+        onNavigate={onCloseMobile}
+      />
+
+      <nav
+        className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 py-3"
+        aria-label="Navigation"
+      >
+        {signedIn ? (
+          <SidebarSocialNav
+            collapsed={displayCollapsed}
+            collapsedPad={centeredPad}
+            onNavigate={onCloseMobile}
+          />
+        ) : null}
+        {groups.map(({ category, games }) => (
+          <div key={category.id} className="mb-4">
+            <div
+              className={cn(
+                "mb-1 px-2.5 py-1 font-medium text-sidebar-foreground/60 text-xs uppercase tracking-wider",
+                textClasses,
+              )}
+            >
+              {category.label}
+            </div>
+            <div className="flex flex-col gap-1">
+              {games.map((game) => (
+                <SidebarGameLink
+                  key={game.href}
+                  game={game}
+                  collapsed={displayCollapsed}
+                  centeredPad={centeredPad}
+                  textClasses={textClasses}
+                  onNavigate={onCloseMobile}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <SidebarFooter
+        collapsed={displayCollapsed}
+        signedIn={signedIn}
+        username={username}
+        avatar={avatar}
+        profileHref={profileHref}
+        onNavigate={onCloseMobile}
+      />
+    </aside>
+  );
+}
+
+function SidebarGameLink({
+  game,
+  collapsed,
+  centeredPad,
+  textClasses,
+  onNavigate,
+}: {
+  game: { href: string; name: string };
+  collapsed: boolean;
+  centeredPad: number;
+  textClasses: string;
+  onNavigate: () => void;
+}) {
   const pathname = usePathname();
+  const isActive = pathname.startsWith(game.href);
+  const link = (
+    <Link
+      key={game.href}
+      href={game.href}
+      onClick={onNavigate}
+      className={cn(
+        "mx-1 flex h-9 cursor-pointer items-center gap-2.5 overflow-hidden rounded-lg text-sm transition-[padding,background-color,border-color] duration-250 ease-in-out",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-foreground"
+          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+        !collapsed && isActive && "border-sidebar-primary border-l-2",
+        !(collapsed || isActive) && "border-transparent border-l-2",
+      )}
+      style={{
+        paddingLeft: collapsed ? `${centeredPad}px` : isActive ? "8px" : "10px",
+        paddingRight: collapsed ? `${centeredPad}px` : "10px",
+      }}
+    >
+      <span className={cn("flex shrink-0", isActive && "text-sidebar-primary")}>
+        <FaGamepad className="h-4 w-4 shrink-0" />
+      </span>
+      <span className={cn("font-medium", textClasses)}>{game.name}</span>
+    </Link>
+  );
+  return collapsed ? (
+    <Tooltip key={game.href}>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="right">{game.name}</TooltipContent>
+    </Tooltip>
+  ) : (
+    <Fragment key={game.href}>{link}</Fragment>
+  );
+}
+
+function SidebarSettingsLink({
+  collapsed,
+  onNavigate,
+}: {
+  collapsed: boolean;
+  onNavigate: () => void;
+}) {
+  const pathname = usePathname();
+  const isActive = pathname.startsWith("/settings");
+  const settingsLink = (
+    <Link
+      href="/settings/account"
+      onClick={onNavigate}
+      className={cn(
+        "flex h-9 w-full cursor-pointer items-center rounded-lg outline-none transition-[gap,padding,background-color] duration-250 ease-in-out focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-foreground"
+          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+      )}
+      style={{
+        gap: collapsed ? 0 : 10,
+        paddingLeft: collapsed ? 12 : 10,
+        paddingRight: collapsed ? 12 : 10,
+      }}
+      aria-label="Settings"
+    >
+      <span className="flex size-7 shrink-0 items-center justify-center">
+        <FaGear className="size-4 shrink-0" aria-hidden />
+      </span>
+      <span
+        className={cn(
+          "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sidebar-foreground/90 text-sm transition-[opacity,max-width,filter] duration-250 ease-in-out",
+          collapsed
+            ? "max-w-0 opacity-0 blur-[2px]"
+            : "max-w-48 opacity-100 blur-0",
+        )}
+      >
+        Settings
+      </span>
+    </Link>
+  );
+  return collapsed ? (
+    <Tooltip>
+      <TooltipTrigger asChild>{settingsLink}</TooltipTrigger>
+      <TooltipContent side="right">Settings</TooltipContent>
+    </Tooltip>
+  ) : (
+    settingsLink
+  );
+}
+
+function useSidebarLayout(
+  sidebarPrefsTrusted: boolean,
+  sidebarPrefs: SidebarPrefs,
+) {
   const atomsToHydrate = sidebarPrefsTrusted
     ? new Map<
         typeof sidebarCollapsedAtom | typeof sidebarWidthAtom,
@@ -80,20 +306,24 @@ export function Sidebar({
   const layoutKnown = sidebarPrefsTrusted || clientReady;
   const displayCollapsed = layoutKnown ? collapsed : false;
   const displayWidth = layoutKnown ? width : DEFAULT_SIDEBAR_WIDTH;
-  const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
     persistSidebarPrefsToCookie({ collapsed, width });
   }, [collapsed, width]);
+
+  return { collapsed, setCollapsed, setWidth, displayCollapsed, displayWidth };
+}
+
+function useSidebarInteractions(
+  collapsed: boolean,
+  setCollapsed: (value: boolean | ((previous: boolean) => boolean)) => void,
+  setWidth: (value: number) => void,
+) {
+  const [isResizing, setIsResizing] = useState(false);
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resizeStartXRef = useRef<number>(0);
   const hasResizedThisGestureRef = useRef(false);
   const resizeStartedFromCollapsedRef = useRef(false);
-
-  const groups = getCategoryGroups().map(({ category, games }) => ({
-    category,
-    games: games.map((game) => ({ ...game, href: `/games/${game.type}` })),
-  }));
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => !prev);
@@ -202,271 +432,126 @@ export function Sidebar({
     };
   }, [isResizing]);
 
-  const collapsedWidth = 68;
-  const navPx = 8;
-  const navMx = 4;
-  const iconSize = 16;
-  const centeredPad = (collapsedWidth - navPx * 2 - navMx * 2 - iconSize) / 2;
+  return {
+    isResizing,
+    toggleCollapsed,
+    handleResizeStart,
+    handleResizeHandleClick,
+    handleResizeHandleDoubleClick,
+  };
+}
 
-  const textClasses = cn(
-    "overflow-hidden whitespace-nowrap transition-[opacity,max-width,filter] duration-250 ease-in-out",
-    displayCollapsed
-      ? "max-w-0 opacity-0 blur-[2px]"
-      : "max-w-48 opacity-100 blur-0",
-  );
-
+function SidebarHeader({
+  collapsed,
+  textClasses,
+  onNavigate,
+}: {
+  collapsed: boolean;
+  textClasses: string;
+  onNavigate: () => void;
+}) {
   return (
-    <aside
-      className={cn(
-        "relative flex shrink-0 flex-col border-sidebar-border border-r bg-sidebar",
-        "fixed inset-y-0 left-0 z-50 w-64 md:relative md:z-auto md:w-(--sidebar-width)",
-        !mobileOpen && "hidden md:flex",
-      )}
-      style={
-        {
-          "--sidebar-width": `${displayCollapsed ? collapsedWidth : displayWidth}px`,
-          transition: isResizing ? "none" : "width 0.25s ease-in-out",
-        } as React.CSSProperties
-      }
-    >
-      <div
-        className={cn(
-          "group absolute top-0 -right-2 z-10 hidden h-full w-4 cursor-col-resize md:block",
-        )}
+    <div className="flex items-center gap-2 overflow-hidden border-sidebar-border border-b px-3 py-3.5">
+      <Link
+        href="/"
+        onClick={onNavigate}
+        className="flex min-w-0 items-center rounded-lg transition-[gap,padding,opacity] duration-250 ease-in-out hover:opacity-90"
+        style={{
+          gap: collapsed ? 0 : 10,
+          paddingLeft: collapsed ? 8 : 0,
+        }}
       >
-        <button
-          type="button"
-          className="size-full"
-          onMouseDown={handleResizeStart}
-          onClick={handleResizeHandleClick}
-          onDoubleClick={handleResizeHandleDoubleClick}
-          aria-label="Resize sidebar"
+        <Logo variant="icon" iconClassName="size-7" label="Kyzen" />
+        <Logo
+          variant="text"
+          decorative
+          className={cn("text-sidebar-foreground text-sm", textClasses)}
         />
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          className="absolute top-1/2 right-0 flex -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-sidebar-border bg-sidebar p-1 text-sidebar-foreground/70 opacity-0 shadow-sm transition-opacity hover:bg-sidebar-accent hover:text-sidebar-foreground group-hover:opacity-100"
-          aria-label={displayCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {displayCollapsed ? (
-            <FaChevronRight className="size-2" />
-          ) : (
-            <FaChevronLeft className="size-2" />
-          )}
-        </button>
-      </div>
-
-      <div className="flex items-center gap-2 overflow-hidden border-sidebar-border border-b px-3 py-3.5">
-        <Link
-          href="/"
-          onClick={onCloseMobile}
-          className="flex min-w-0 items-center rounded-lg transition-[gap,padding,opacity] duration-250 ease-in-out hover:opacity-90"
-          style={{
-            gap: displayCollapsed ? 0 : 10,
-            paddingLeft: displayCollapsed ? 8 : 0,
-          }}
-        >
-          <Logo variant="icon" iconClassName="size-7" label="Kyzen" />
-          <Logo
-            variant="text"
-            decorative
-            className={cn("text-sidebar-foreground text-sm", textClasses)}
-          />
-        </Link>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={onCloseMobile}
-          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden"
-          aria-label="Close menu"
-        >
-          <FaChevronLeft className="h-4 w-4" />
-        </button>
-      </div>
-
-      <nav
-        className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 py-3"
-        aria-label="Navigation"
+      </Link>
+      <div className="flex-1" />
+      <button
+        type="button"
+        onClick={onNavigate}
+        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden"
+        aria-label="Close menu"
       >
-        {signedIn ? (
-          <SidebarSocialNav
-            collapsed={displayCollapsed}
-            collapsedPad={centeredPad}
-            onNavigate={onCloseMobile}
-          />
-        ) : null}
-        {groups.map(({ category, games }) => (
-          <div key={category.id} className="mb-4">
+        <FaChevronLeft className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function SidebarFooter({
+  collapsed,
+  signedIn,
+  username,
+  avatar,
+  profileHref,
+  onNavigate,
+}: Pick<SidebarProps, "signedIn" | "username" | "avatar" | "profileHref"> & {
+  collapsed: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <div className="border-sidebar-border border-t px-2 py-3">
+      {signedIn ? (
+        <div className="mb-2">
+          <NotificationsPopover collapsed={collapsed} onNavigate={onNavigate} />
+        </div>
+      ) : null}
+      <div className="mb-2">
+        <SidebarSettingsLink collapsed={collapsed} onNavigate={onNavigate} />
+      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            href={profileHref}
+            onClick={onNavigate}
+            className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg outline-none transition-[gap,padding] duration-250 ease-in-out hover:bg-sidebar-accent"
+            style={{
+              gap: collapsed ? 0 : 10,
+              paddingLeft: collapsed ? 12 : 10,
+              paddingRight: collapsed ? 12 : 10,
+            }}
+            aria-label={signedIn ? "View profile" : "Sign in"}
+          >
             <div
               className={cn(
-                "mb-1 px-2.5 py-1 font-medium text-sidebar-foreground/60 text-xs uppercase tracking-wider",
-                textClasses,
+                "flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full font-medium text-xs",
+                signedIn
+                  ? "bg-sidebar-primary/15 text-sidebar-primary"
+                  : "bg-sidebar-accent text-sidebar-foreground/60",
               )}
             >
-              {category.label}
+              {signedIn ? (
+                <Character
+                  config={avatar}
+                  fallbackSeed={username ?? "player"}
+                  size={28}
+                  className="size-full"
+                />
+              ) : (
+                <FaUser className="size-3" />
+              )}
             </div>
-            <div className="flex flex-col gap-1">
-              {games.map((game) => {
-                const isActive = pathname.startsWith(game.href);
-                const link = (
-                  <Link
-                    key={game.href}
-                    href={game.href}
-                    onClick={onCloseMobile}
-                    className={cn(
-                      "mx-1 flex h-9 cursor-pointer items-center gap-2.5 overflow-hidden rounded-lg text-sm transition-[padding,background-color,border-color] duration-250 ease-in-out",
-                      isActive
-                        ? "bg-sidebar-accent text-sidebar-foreground"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-                      !displayCollapsed &&
-                        isActive &&
-                        "border-sidebar-primary border-l-2",
-                      !(displayCollapsed || isActive) &&
-                        "border-transparent border-l-2",
-                    )}
-                    style={{
-                      paddingLeft: displayCollapsed
-                        ? `${centeredPad}px`
-                        : isActive
-                          ? "8px"
-                          : "10px",
-                      paddingRight: displayCollapsed
-                        ? `${centeredPad}px`
-                        : "10px",
-                    }}
-                  >
-                    <span
-                      className={cn(
-                        "flex shrink-0",
-                        isActive && "text-sidebar-primary",
-                      )}
-                    >
-                      <FaGamepad className="h-4 w-4 shrink-0" />
-                    </span>
-                    <span className={cn("font-medium", textClasses)}>
-                      {game.name}
-                    </span>
-                  </Link>
-                );
-                return displayCollapsed ? (
-                  <Tooltip key={game.href}>
-                    <TooltipTrigger asChild>{link}</TooltipTrigger>
-                    <TooltipContent side="right">{game.name}</TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <Fragment key={game.href}>{link}</Fragment>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </nav>
-
-      <div className="border-sidebar-border border-t px-2 py-3">
-        {signedIn ? (
-          <div className="mb-2">
-            <NotificationsPopover
-              collapsed={displayCollapsed}
-              onNavigate={onCloseMobile}
-            />
-          </div>
-        ) : null}
-        <div className="mb-2">
-          {(() => {
-            const isActive = pathname.startsWith("/settings");
-            const settingsLink = (
-              <Link
-                href="/settings/account"
-                onClick={onCloseMobile}
-                className={cn(
-                  "flex h-9 w-full cursor-pointer items-center rounded-lg outline-none transition-[gap,padding,background-color] duration-250 ease-in-out focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                )}
-                style={{
-                  gap: displayCollapsed ? 0 : 10,
-                  paddingLeft: displayCollapsed ? 12 : 10,
-                  paddingRight: displayCollapsed ? 12 : 10,
-                }}
-                aria-label="Settings"
-              >
-                <span className="flex size-7 shrink-0 items-center justify-center">
-                  <FaGear className="size-4 shrink-0" aria-hidden />
-                </span>
-                <span
-                  className={cn(
-                    "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sidebar-foreground/90 text-sm transition-[opacity,max-width,filter] duration-250 ease-in-out",
-                    displayCollapsed
-                      ? "max-w-0 opacity-0 blur-[2px]"
-                      : "max-w-48 opacity-100 blur-0",
-                  )}
-                >
-                  Settings
-                </span>
-              </Link>
-            );
-            return displayCollapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>{settingsLink}</TooltipTrigger>
-                <TooltipContent side="right">Settings</TooltipContent>
-              </Tooltip>
-            ) : (
-              settingsLink
-            );
-          })()}
-        </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Link
-              href={profileHref}
-              onClick={onCloseMobile}
-              className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg outline-none transition-[gap,padding] duration-250 ease-in-out hover:bg-sidebar-accent"
-              style={{
-                gap: displayCollapsed ? 0 : 10,
-                paddingLeft: displayCollapsed ? 12 : 10,
-                paddingRight: displayCollapsed ? 12 : 10,
-              }}
-              aria-label={signedIn ? "View profile" : "Sign in"}
+            <span
+              className={cn(
+                "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sidebar-foreground/80 text-sm transition-[opacity,max-width,filter] duration-250 ease-in-out",
+                collapsed
+                  ? "max-w-0 opacity-0 blur-[2px]"
+                  : "max-w-48 opacity-100 blur-0",
+              )}
             >
-              <div
-                className={cn(
-                  "flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full font-medium text-xs",
-                  signedIn
-                    ? "bg-sidebar-primary/15 text-sidebar-primary"
-                    : "bg-sidebar-accent text-sidebar-foreground/60",
-                )}
-              >
-                {signedIn ? (
-                  <Character
-                    config={avatar}
-                    fallbackSeed={username ?? "player"}
-                    size={28}
-                    className="size-full"
-                  />
-                ) : (
-                  <FaUser className="size-3" />
-                )}
-              </div>
-              <span
-                className={cn(
-                  "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sidebar-foreground/80 text-sm transition-[opacity,max-width,filter] duration-250 ease-in-out",
-                  displayCollapsed
-                    ? "max-w-0 opacity-0 blur-[2px]"
-                    : "max-w-48 opacity-100 blur-0",
-                )}
-              >
-                {signedIn ? (username ?? "Profile") : "Sign in"}
-              </span>
-            </Link>
-          </TooltipTrigger>
-          {displayCollapsed ? (
-            <TooltipContent side="right">
               {signedIn ? (username ?? "Profile") : "Sign in"}
-            </TooltipContent>
-          ) : null}
-        </Tooltip>
-      </div>
-    </aside>
+            </span>
+          </Link>
+        </TooltipTrigger>
+        {collapsed ? (
+          <TooltipContent side="right">
+            {signedIn ? (username ?? "Profile") : "Sign in"}
+          </TooltipContent>
+        ) : null}
+      </Tooltip>
+    </div>
   );
 }

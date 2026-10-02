@@ -143,7 +143,7 @@ The two env vars differ deliberately. `API_URL` (server) can point at an interna
 
 ## The root layout: one fetch, correct first paint
 
-`app/layout.tsx` is an `async` Server Component and the linchpin of "correct first paint." It calls `getServerSession()` once, and if there is a user it issues **one parallel fan-out** of authenticated fetches:
+`app/layout.tsx` is an `async` Server Component and the linchpin of "correct first paint." It calls `getServerSession()` once. The private `loadShellState` helper supplies empty signed-out defaults or issues **one parallel fan-out** of authenticated fetches for an authenticated user:
 
 ```tsx
 const [me, convs, fr, reqs, notif, notifList] = await Promise.all([
@@ -227,7 +227,7 @@ See `apps/web/lib/socket/socket-context.tsx:45`. `withCredentials: true` is the 
 
 Two helpers make this ergonomic:
 
-- `useSocketEvent(event, handler)` (`apps/web/lib/socket/socket-context.tsx:77`) subscribes a component to a server event. It stores the handler in a ref and updates the ref every render, so the effect that wires `socket.on` only re-runs when the socket or event name changes - the latest closure is always called without churning subscriptions.
+- `useSocketEvent(event, handler)` (`apps/web/lib/socket/socket-context.tsx:77`) subscribes a component to a server event. It uses `useEffectEvent` to read the latest committed handler. The subscription effect runs when the socket or event name changes and removes the same listener during cleanup. The provider also explicitly removes its socket and manager status listeners before disconnecting.
 - `emitAck(socket, event, payload)` (`apps/web/lib/socket/socket-context.tsx:95`) turns Socket.IO's callback-style acknowledgements into a `Promise`, and **rejects** when the server replies `{ ok: false, error }`. This is how the client issues request/response-style actions over the socket (creating a game, creating a DM, marking read) and `await`s the result.
 
 ### The chat bridge: socket events → atom mutations
@@ -391,3 +391,9 @@ See [game boards](games-client.md), [adding a game](../adding-a-game.md), [audio
 - [audio](./audio.md) - the game-sound/background-music engine, the preference atoms + bridge, and the sliding settings gear over the layered-popup modal.
 - [chat-core](./chat-core.md) - the `CHAT_EVENTS` contract and DTOs (`ConversationJson`, `MessageJson`, …) this app consumes.
 - [Database](./database.md) - the generic `game` / `move` / `game_player` tables the SSR reads ultimately resolve to.
+
+## Focused client components
+
+The sidebar keeps atom hydration and cookie persistence in `useSidebarLayout`, resize gestures and keyboard shortcuts in `useSidebarInteractions`, and header, footer, game links, and settings links in private components. Chat rendering separates the conversation header, emoji browser, message avatar, and message content from their parent shells. The waiting overlay delegates invitation controls; the result overlay delegates rematch and navigation actions.
+
+`useGifResults` tracks loading with a request identity and whether that request appends results. Its `finally` updater clears only the matching request, so an older completion cannot stop the current spinner. Account identity dates specify both `en-US` and UTC for consistent server and browser output. Gesture refs synchronize in layout effects; socket and tutorial effect callbacks use the latest committed handlers.

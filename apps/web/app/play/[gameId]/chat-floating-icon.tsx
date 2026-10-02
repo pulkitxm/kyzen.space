@@ -1,6 +1,11 @@
 "use client";
 
-import { type CSSProperties, useCallback, useRef } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import {
   FaChevronDown,
   FaChevronLeft,
@@ -57,7 +62,9 @@ export function ChatFloatingIcon({
   onCommit: () => void;
 }) {
   const edgeRef = useRef(stashEdge);
-  edgeRef.current = stashEdge;
+  useLayoutEffect(() => {
+    edgeRef.current = stashEdge;
+  }, [stashEdge]);
   const justDraggedRef = useRef(false);
   const { glass } = useGlassMode();
   const glassOn = glass !== "off";
@@ -106,50 +113,15 @@ export function ChatFloatingIcon({
   );
 
   if (stashEdge) {
-    const centerX = icon.x + ICON_SIZE / 2;
-    const centerY = icon.y + ICON_SIZE / 2;
-    const vertical = stashEdge === "left" || stashEdge === "right";
-    const style: CSSProperties = vertical
-      ? {
-          [stashEdge === "left" ? "left" : "right"]: 0,
-          top: clampY(
-            centerY - EDGE_TAB_LENGTH / 2,
-            EDGE_TAB_LENGTH + ICON_MARGIN,
-          ),
-          width: EDGE_TAB_THICKNESS,
-          height: EDGE_TAB_LENGTH,
-        }
-      : {
-          [stashEdge === "top" ? "top" : "bottom"]: 0,
-          left: clampX(
-            centerX - EDGE_TAB_LENGTH / 2,
-            EDGE_TAB_LENGTH + ICON_MARGIN,
-          ),
-          width: EDGE_TAB_LENGTH,
-          height: EDGE_TAB_THICKNESS,
-        };
     return (
-      <button
-        type="button"
-        onClick={() => {
-          if (justDraggedRef.current) return;
-          onRestore();
+      <StashedChatIcon
+        icon={icon}
+        edge={stashEdge}
+        glassOn={glassOn}
+        onRestore={() => {
+          if (!justDraggedRef.current) onRestore();
         }}
-        aria-label="Restore chat"
-        style={style}
-        className={cn(
-          "fixed z-50 flex items-center justify-center shadow-lg outline-none transition",
-          glassOn
-            ? "glass-pane glass-press text-foreground"
-            : "bg-primary text-primary-foreground hover:bg-primary-hover",
-          stashEdge === "left" && "rounded-r-lg",
-          stashEdge === "right" && "rounded-l-lg",
-          stashEdge === "top" && "rounded-b-lg",
-          stashEdge === "bottom" && "rounded-t-lg",
-        )}
-      >
-        <Chevron edge={stashEdge} />
-      </button>
+      />
     );
   }
 
@@ -177,6 +149,61 @@ export function ChatFloatingIcon({
           {unread > 99 ? "99+" : unread}
         </span>
       )}
+    </button>
+  );
+}
+
+function StashedChatIcon({
+  icon,
+  edge,
+  glassOn,
+  onRestore,
+}: {
+  icon: IconPos;
+  edge: StashEdge;
+  glassOn: boolean;
+  onRestore: () => void;
+}) {
+  const centerX = icon.x + ICON_SIZE / 2;
+  const centerY = icon.y + ICON_SIZE / 2;
+  const vertical = edge === "left" || edge === "right";
+  const style: CSSProperties = vertical
+    ? {
+        [edge === "left" ? "left" : "right"]: 0,
+        top: clampY(
+          centerY - EDGE_TAB_LENGTH / 2,
+          EDGE_TAB_LENGTH + ICON_MARGIN,
+        ),
+        width: EDGE_TAB_THICKNESS,
+        height: EDGE_TAB_LENGTH,
+      }
+    : {
+        [edge === "top" ? "top" : "bottom"]: 0,
+        left: clampX(
+          centerX - EDGE_TAB_LENGTH / 2,
+          EDGE_TAB_LENGTH + ICON_MARGIN,
+        ),
+        width: EDGE_TAB_LENGTH,
+        height: EDGE_TAB_THICKNESS,
+      };
+  return (
+    <button
+      type="button"
+      onClick={onRestore}
+      aria-label="Restore chat"
+      style={style}
+      className={cn(
+        "fixed z-50 flex items-center justify-center shadow-lg outline-none transition",
+        glassOn
+          ? "glass-pane glass-press text-foreground"
+          : "bg-primary text-primary-foreground hover:bg-primary-hover",
+        edge === "left" && "rounded-r-lg",
+        edge === "right" && "rounded-l-lg",
+        edge === "top" && "rounded-b-lg",
+        edge === "bottom" && "rounded-t-lg",
+      )}
+    >
+      <Chevron edge={edge} />
     </button>
   );
 }

@@ -24,6 +24,18 @@ export type BoardGhost = {
   until: number;
 };
 
+const CELL_POSITIONS = [
+  { id: "nw", row: 0, col: 0 },
+  { id: "n", row: 0, col: 1 },
+  { id: "ne", row: 0, col: 2 },
+  { id: "w", row: 1, col: 0 },
+  { id: "c", row: 1, col: 1 },
+  { id: "e", row: 1, col: 2 },
+  { id: "sw", row: 2, col: 0 },
+  { id: "s", row: 2, col: 1 },
+  { id: "se", row: 2, col: 2 },
+];
+
 const ENTRANCE = Easing.bezier(0.16, 1, 0.3, 1);
 
 const NO_GHOSTS: readonly BoardGhost[] = [];
@@ -110,6 +122,7 @@ export function Board({
   dimAt?: number;
   style?: CSSProperties;
 }) {
+  const glowingCells = new Set(glowCells);
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const gap = Math.round(size * 0.035);
@@ -143,9 +156,8 @@ export function Board({
         ...style,
       }}
     >
-      {cells.map((cell, index) => {
-        const col = index % 3;
-        const row = Math.floor(index / 3);
+      {CELL_POSITIONS.map(({ id, row, col }, index) => {
+        const cell = cells[index] ?? null;
         const buildAt = buildStart + index * buildStagger;
         const cellIn =
           buildStagger === 0
@@ -172,11 +184,10 @@ export function Board({
               { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
             )
           : 0;
-        const glowing = glowCells.includes(index);
-        const cellKey = `cell-${row}-${col}`;
+        const glowing = glowingCells.has(index);
         return (
           <div
-            key={cellKey}
+            key={id}
             className="ttt-cell"
             style={{
               left: col * (cellSize + gap),

@@ -2,7 +2,7 @@
 
 import type { GameType } from "@kyzen/shared/types";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { FaPlus } from "react-icons/fa6";
 import { emitAck, useSocket } from "@/lib/socket/socket-context";
 import { SearchingScreen } from "../../_shared/searching-screen";
@@ -18,16 +18,19 @@ export function NewClient({
   const { socket } = useSocket();
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
+  const onRoomCreated = useEffectEvent((res: { code: string }) => {
+    router.replace(`/play/${res.code}`);
+  });
 
   useEffect(() => {
     if (!socket || startedRef.current) return;
     startedRef.current = true;
     emitAck<{ ok: true; code: string }>(socket, "room:create", { gameType })
-      .then((res) => router.replace(`/play/${res.code}`))
+      .then((res) => onRoomCreated(res))
       .catch((e) =>
         setError(e instanceof Error ? e.message : "Could not create the room"),
       );
-  }, [socket, gameType, router]);
+  }, [socket, gameType]);
 
   if (error) {
     return (

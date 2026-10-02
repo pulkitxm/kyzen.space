@@ -83,82 +83,15 @@ export function ConversationView({
     );
   }, [lastId, conversationId, socket, store, visible]);
 
-  const presence = useAtomValue(presenceAtom);
-  const me = conversation.members.find((m) => m.id === userId);
-  const others = conversation.members.filter((m) => m.id !== userId);
-  const isGroup = conversation.kind === "group";
-  const otherPresence = others[0] ? presence.get(others[0].id) : undefined;
-  const title = isGroup
-    ? (conversation.name ?? "Group")
-    : (others[0]?.username ?? "Direct message");
-  const subtitle = isGroup
-    ? `${onlineCount(
-        presence,
-        conversation.members.map((m) => m.id),
-        userId,
-      )} online · ${conversation.members.length} members · tap to manage`
-    : presenceLabel(otherPresence);
+  const me = conversation.members.find((member) => member.id === userId);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-5xl flex-col">
-      <header className="flex items-center gap-3 border-border border-b px-4 py-3">
-        <Link
-          href="/chat"
-          className="text-muted-foreground hover:text-foreground md:hidden"
-          aria-label="Back to conversations"
-        >
-          <FaArrowLeft className="size-4" />
-        </Link>
-        {isGroup ? (
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="flex min-w-0 flex-1 items-center gap-3 text-left"
-          >
-            <AvatarStack
-              users={others.map((m) => ({
-                id: m.id,
-                avatar: m.avatar,
-                seed: m.username,
-              }))}
-              size={32}
-            />
-            <div className="min-w-0">
-              <div className="truncate font-medium text-sm">{title}</div>
-              <div className="truncate text-muted-foreground text-xs">
-                {subtitle}
-              </div>
-            </div>
-          </button>
-        ) : (
-          <>
-            {others[0] ? (
-              <ProfilePopupTrigger user={others[0]} className="shrink-0">
-                <PresenceAvatar
-                  config={others[0].avatar}
-                  seed={others[0].username}
-                  size={36}
-                  online={otherPresence?.online ? true : undefined}
-                />
-              </ProfilePopupTrigger>
-            ) : (
-              <PresenceAvatar config={null} seed="?" size={36} />
-            )}
-            <div className="min-w-0">
-              <div className="truncate font-medium text-sm">{title}</div>
-              <div
-                className={
-                  otherPresence?.online
-                    ? "min-h-4 truncate text-emerald-500 text-xs"
-                    : "min-h-4 truncate text-muted-foreground text-xs"
-                }
-              >
-                {subtitle}
-              </div>
-            </div>
-          </>
-        )}
-      </header>
+      <ConversationHeader
+        conversation={conversation}
+        userId={userId}
+        onManage={() => setSettingsOpen(true)}
+      />
 
       <MessageList
         conversationId={conversationId}
@@ -174,7 +107,7 @@ export function ConversationView({
         me={me}
       />
 
-      {isGroup ? (
+      {conversation.kind === "group" ? (
         <GroupSettingsDialog
           conversation={conversation}
           userId={userId}
@@ -183,5 +116,91 @@ export function ConversationView({
         />
       ) : null}
     </div>
+  );
+}
+
+function ConversationHeader({
+  conversation,
+  userId,
+  onManage,
+}: {
+  conversation: ConversationJson;
+  userId: string;
+  onManage: () => void;
+}) {
+  const presence = useAtomValue(presenceAtom);
+  const others = conversation.members.filter((m) => m.id !== userId);
+  const isGroup = conversation.kind === "group";
+  const otherPresence = others[0] ? presence.get(others[0].id) : undefined;
+  const title = isGroup
+    ? (conversation.name ?? "Group")
+    : (others[0]?.username ?? "Direct message");
+  const subtitle = isGroup
+    ? `${onlineCount(
+        presence,
+        conversation.members.map((m) => m.id),
+        userId,
+      )} online · ${conversation.members.length} members · tap to manage`
+    : presenceLabel(otherPresence);
+
+  return (
+    <header className="flex items-center gap-3 border-border border-b px-4 py-3">
+      <Link
+        href="/chat"
+        className="text-muted-foreground hover:text-foreground md:hidden"
+        aria-label="Back to conversations"
+      >
+        <FaArrowLeft className="size-4" />
+      </Link>
+      {isGroup ? (
+        <button
+          type="button"
+          onClick={onManage}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <AvatarStack
+            users={others.map((m) => ({
+              id: m.id,
+              avatar: m.avatar,
+              seed: m.username,
+            }))}
+            size={32}
+          />
+          <div className="min-w-0">
+            <div className="truncate font-medium text-sm">{title}</div>
+            <div className="truncate text-muted-foreground text-xs">
+              {subtitle}
+            </div>
+          </div>
+        </button>
+      ) : (
+        <>
+          {others[0] ? (
+            <ProfilePopupTrigger user={others[0]} className="shrink-0">
+              <PresenceAvatar
+                config={others[0].avatar}
+                seed={others[0].username}
+                size={36}
+                online={otherPresence?.online ? true : undefined}
+              />
+            </ProfilePopupTrigger>
+          ) : (
+            <PresenceAvatar config={null} seed="?" size={36} />
+          )}
+          <div className="min-w-0">
+            <div className="truncate font-medium text-sm">{title}</div>
+            <div
+              className={
+                otherPresence?.online
+                  ? "min-h-4 truncate text-emerald-500 text-xs"
+                  : "min-h-4 truncate text-muted-foreground text-xs"
+              }
+            >
+              {subtitle}
+            </div>
+          </div>
+        </>
+      )}
+    </header>
   );
 }

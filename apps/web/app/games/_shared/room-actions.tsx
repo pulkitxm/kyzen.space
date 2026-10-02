@@ -131,11 +131,11 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
       <AnimatePresence>
         {panel === "join" ? (
           <m.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+            initial={{ scaleY: 0.95, opacity: 0 }}
+            animate={{ scaleY: 1, opacity: 1 }}
+            exit={{ scaleY: 0.95, opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="overflow-hidden"
+            className="origin-top overflow-hidden"
           >
             <div className="space-y-2 rounded-2xl border border-border bg-surface-raised p-3">
               <div className="flex items-center justify-between">

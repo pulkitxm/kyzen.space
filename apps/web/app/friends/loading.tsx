@@ -6,10 +6,9 @@ export default function FriendsLoading() {
       <header className="border-border border-b px-4 pt-4">
         <Skeleton className="mb-3 h-6 w-24" />
         <div className="flex gap-1">
-          {[16, 20, 12].map((w, i) => (
+          {[16, 20, 12].map((w) => (
             <Skeleton
-              // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder list
-              key={i}
+              key={w}
               className="h-9 rounded-t-lg"
               style={{ width: `${w * 4}px` }}
             />
