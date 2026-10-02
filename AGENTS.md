@@ -20,8 +20,8 @@ Only turn-based games currently have a server runner. Adding a `step` engine alo
 
 ## Style
 
-- No comments in code. Functional tooling directives and license blocks are allowed.
-- No em dash characters in new output.
+- No comments in tracked code, configuration, migrations, environment examples, or markup. Functional tooling directives and license blocks are allowed. Documentation prose and Markdown headings are not code comments.
+- No em dash characters in any tracked text file or new output.
 - No generated attribution in code, commits, or PR text.
 - Use `react-icons/fa6` for icons, then another `react-icons` pack if needed.
 - Use Jotai for cross-feature application state. A mounted session can own state in its shell and pass props to children; keep private UI state local.
@@ -30,6 +30,8 @@ Only turn-based games currently have a server runner. Adding a `step` engine alo
 - Before changing Next.js APIs, read the matching guide in the installed package's `dist/docs/` folder when available, or use the official Next.js documentation.
 
 ## Verification
+
+All quality gates run in CI. Do not install local Git hooks or automatic package lifecycle checks. `bun run check` fails on Biome warnings, formatting, imports, or lint errors. Run `bun run test:policies` after changing an enforcement script.
 
 Run `bun run type-check`, the touched workspaces' tests, `bun run check`, and `bun run strip-comments -- --check`. For runtime changes, also build and exercise HTTP, auth, and an authenticated two-player game. Document missing environment dependencies instead of claiming a check passed.
 
