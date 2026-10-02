@@ -153,7 +153,7 @@ async function services() {
   }
   env.DATABASE_URL = `postgres://postgres:postgres@127.0.0.1:${postgresPort}/kyzen_ci`;
   env.REDIS_URL = `redis://127.0.0.1:${redisPort}`;
-  await run("bun", ["run", "db:push", "--", "--force"]);
+  await run("bun", ["run", "db:migrate"]);
 }
 
 async function smoke() {

@@ -78,6 +78,13 @@
       "when": 1790960229272,
       "tag": "0010_match_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790962644745,
+      "tag": "0011_platform_schema",
+      "breakpoints": false
     }
   ]
 }
