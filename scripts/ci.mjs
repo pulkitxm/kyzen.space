@@ -358,7 +358,7 @@ const tasks = {
       "--scope",
       "full",
       "--blocking",
-      "none",
+      "warning",
       "--no-telemetry",
       "--no-supply-chain",
     ]),
