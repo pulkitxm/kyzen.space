@@ -90,7 +90,7 @@ With the combined app running against local synthetic data, `bun run --cwd apps/
 
 Implement its schemas in shared, pure rules and metadata in games-core, and board in games-client. Register the slug, definition, and board in the three existing registries. Add engine tests and a rules document. Optional config fields drive the existing setup form; optional music and tutorial assets come from metadata.
 
-Reuse the existing game page, room events, session, database tables, chat placement, profiles, results, and rematches. Follow [Adding a game](adding-a-game.md) for exact paths and contracts, using tic-tac-toe as the working example. Continuous realtime games need an explicit server runner extension; a `step` method alone is not a playable implementation.
+Reuse the existing game page, room events, session, database tables, chat placement, profiles, results, and rematches. Follow [Adding a game](adding-a-game.md) for exact paths and contracts, using tic-tac-toe as the working example. Matchmaking currently pairs two players; larger match groups need a platform extension. Continuous realtime games need an explicit server runner extension; a `step` method alone is not a playable implementation.
 
 ## How the wiki stays current
 
