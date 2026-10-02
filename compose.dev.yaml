@@ -1,0 +1,82 @@
+name: kyzen-dev
+
+x-app: &app
+  build:
+    context: .
+    target: development
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    NODE_ENV: development
+    DATABASE_URL: postgres://postgres:postgres@postgres:5432/kyzen_dev
+    REDIS_URL: redis://redis:6379
+    BETTER_AUTH_SECRET: local-development-secret-at-least-32-characters
+    BETTER_AUTH_URL: http://localhost:3000
+    WEB_URL: http://localhost:3000
+    API_URL: http://127.0.0.1:3000
+    NEXT_PUBLIC_API_URL: ""
+    NEXT_PUBLIC_SOCKET_URL: ""
+    PUBLIC_REALTIME_URL: http://localhost:3000
+    PORT: 3000
+    HOST: 0.0.0.0
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: kyzen_dev
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d kyzen_dev"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  setup:
+    <<: *app
+    command: ["sh", "-c", "bun run db:push -- --force && bun run db:seed"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    <<: *app
+    ports:
+      - "3000:3000"
+    init: true
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./apps
+          target: /app/apps
+          ignore: ["**/node_modules/", "**/.next/", "**/*.tsbuildinfo", "**/package.json", "**/.env"]
+        - action: sync
+          path: ./packages
+          target: /app/packages
+          ignore: ["**/node_modules/", "**/*.tsbuildinfo", "**/package.json"]
+        - action: rebuild
+          path: ./bun.lock
+
+volumes:
+  postgres-data:

@@ -73,7 +73,11 @@ const auth = betterAuth({
   },
   advanced: env.isProd
     ? {
-        crossSubDomainCookies: { enabled: true },
+        crossSubDomainCookies: {
+          enabled:
+            new URL(env.webUrl).hostname !==
+            new URL(env.betterAuthUrl).hostname,
+        },
         defaultCookieAttributes: { sameSite: "lax", secure: true },
       }
     : undefined,

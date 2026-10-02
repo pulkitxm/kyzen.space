@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "bun --env-file=../../.env --watch server.ts",
     "build": "next build",
-    "start": "next start --port 3000",
+    "start": "NODE_ENV=production bun --env-file=../../.env server.ts",
     "test": "bun test tests",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "dev:frontend": "next dev --port 3000",
+    "smoke:game": "bun scripts/smoke-game.ts"
   },
   "dependencies": {
     "@dicebear/collection": "^9.0.0",
@@ -31,7 +33,8 @@
     "react-dom": "19.2.4",
     "react-icons": "^5.6.0",
     "server-only": "^0.0.1",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "@kyzen/server": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

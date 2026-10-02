@@ -26,7 +26,7 @@ Integration tests **self-skip without a DB**: each file probes `select 1` and ga
 
 `harness.ts` factors out the boilerplate: `createHarness(prefix)` returns `makeUser`/`befriend`/`makeDm`/`makeGroup`/`trackGame`/`cleanup` over UUID-namespaced fixtures (so parallel files never collide), plus `unwrap`/`expectErr`/`TestUser`. Each edge/driver file does `const h = createHarness("…")` and `afterAll(h.cleanup)`, which deletes its tracked games/conversations/users. The two original files still carry their own copy of this harness inline. Some of the newer edge files go below the repository layer and insert rows **directly** via the `db`/`schema` barrel exports - `pagination-tiebreak-edge.test.ts` and `chat-gates-edge.test.ts` use an explicit `createdAt` or a direct `db.update` role promotion to set up states the public API won't produce, then assert through the repositories/services.
 
-The two Redis-backed integration files exercise real Redis rather than a DB, so they need a reachable `REDIS_URL`: `presence-redis.test.ts` covers `RedisPresenceStore`, and `health-probe-redis.test.ts` covers the `/health` probe round-trip (`runHealthProbe`). The `redis` service in `scripts/docker-compose.yml` (`redis:7` on `localhost:6379`) is a standard service brought up alongside Postgres by `bun run db:start` (and `bun run db:reset`). In CI it's the `redis` service on the `integration` job.
+The two Redis-backed integration files exercise real Redis rather than a DB, so they need a reachable `REDIS_URL`: `presence-redis.test.ts` covers `RedisPresenceStore`, and `health-probe-redis.test.ts` covers the `/health` probe round-trip (`runHealthProbe`). The `redis` service in `compose.dev.yaml` (`redis:7` on `localhost:6379`) is a standard service brought up alongside Postgres by `bun run db:start` (and `bun run db:reset`). In CI it's the `redis` service on the `integration` job.
 
 ## Files at a glance
 
@@ -140,10 +140,10 @@ Separate workflows cover the other gates - `lint.yml` (Biome `bun run check`, Ta
 
 Four further gates guard against the classic agentic-coding failure modes:
 
-- **`no-leftovers.yml`** - zero-dependency `git grep` checks: no `console.log` in app/package source (scripts and tests excluded), no `debugger` statements, no `.only` focused tests, no merge conflict markers, and no tracked `.env` files beyond `.env.example` and the committed `apps/web/.env` symlink.
+- **`no-leftovers.yml`** - zero-dependency `git grep` checks: no `console.log` in app/package source (scripts and tests excluded), no `debugger` statements, no `.only` focused tests, no merge conflict markers, and no tracked `.env` files beyond `.env.example`.
 - **`secrets.yml`** - runs gitleaks (`gitleaks dir`) over the working tree; `.gitleaks.toml` at the repo root extends the default rules and allowlists `.env.example`.
 - **`dep-audit.yml`** - `bun audit --audit-level=high` whenever `bun.lock` or any `package.json` changes, plus a weekly Monday cron so new advisories surface without a code change.
-- **`smoke.yml`** - boots the real stack (postgres + redis services, `db:push`, `bun run build`, then `apps/server` and `apps/web` started for real) and asserts `/health` reports ready (`/health` is a readiness check: it pings Postgres, reports Redis adapter status, and verifies its own `health_probe` broadcast round-trips through Redis, so a server that boots but cannot reach its dependencies fails here), a raw websocket handshake against `/socket.io` succeeds (the server is websocket-only), the `/health` probe's publish is observed on Redis (the workflow runs a raw `PSUBSCRIBE socket.io#*` watcher, curls `/health`, asserts `probe` is `ok`, and independently asserts a publish lands on the `health:probe` room channel - external proof of the same Socket.IO emit -> redis-adapter -> Redis PUBLISH pipeline that `/health` now verifies internally), and the homepage returns HTML. On failure it dumps both app logs into the job log.
+- **`smoke.yml`** - validates both Compose configurations, builds the production Docker image, and runs the combined app container against synthetic Postgres and Redis services. It checks readiness, a WebSocket handshake, the Redis health-probe round trip, rendered HTML, and an authenticated two-player game with reconnect recovery and persisted moves. On failure it dumps the container logs.
 
 Two meta workflows keep the feedback loop tight:
 
@@ -161,3 +161,9 @@ All workflows set least-privilege `permissions`, a per-PR `concurrency` group wi
 - [realtime.md](./realtime.md) - the game-lane handlers that `turn-based.test.ts` covers.
 - [server-api.md](./server-api.md) - the layering the `mock.module` server tests mirror.
 - `docs/adding-a-game.md` - what you must ship for the structural suites to pass.
+
+## Shared session and local fixtures
+
+`packages/games-client/tests/session.test.ts` verifies reconnect joins, room isolation, listener cleanup, and move-history resync. The waiting-overlay tests consume game props, matching the single session in the play shell.
+
+Use `docker compose -f compose.dev.yaml up --build` for the local fixture environment. It creates only synthetic profiles, conversation text, and a completed replay. The deployment Compose file uses external databases and does not seed. Runtime smoke checks start the combined app once and exercise HTTP plus WebSocket handshakes on port 3000.

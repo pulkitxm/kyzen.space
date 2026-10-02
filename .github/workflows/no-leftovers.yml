@@ -48,10 +48,10 @@ jobs:
           echo "No conflict markers."
       - name: No stray .env files
         run: |
-          stray=$(git ls-files | grep -E "(^|/)\.env" | grep -vxF -e ".env.example" -e "apps/web/.env" || true)
+          stray=$(git ls-files | grep -E "(^|/)\.env" | grep -vxF -e ".env.example" || true)
           if [ -n "$stray" ]; then
             echo "$stray"
-            echo "::error::A .env file is tracked by git. Only .env.example and the apps/web/.env symlink are allowed."
+            echo "::error::A .env file is tracked by git. Only .env.example is allowed."
             exit 1
           fi
           echo "No stray .env files."
