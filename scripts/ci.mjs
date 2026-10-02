@@ -226,6 +226,7 @@ async function smoke() {
     "-f",
     override,
   ];
+  await run("docker", [...compose, "config", "--quiet"]);
   await run("docker", [...compose, "up", "--build", "--detach"]);
   await verifyApp(devOrigin);
   await run("docker", [
@@ -386,6 +387,18 @@ try {
   console.log(`${target}: passed`);
 } catch (error) {
   console.error(error.message);
+  for (const container of containers)
+    Bun.spawnSync(["docker", "logs", "--tail", "80", container], {
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+  if (compose)
+    Bun.spawnSync(["docker", ...compose, "logs", "--tail", "80"], {
+      cwd: root,
+      env,
+      stdout: "inherit",
+      stderr: "inherit",
+    });
   process.exitCode = 1;
 } finally {
   if (compose) {
