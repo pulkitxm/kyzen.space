@@ -12,6 +12,7 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -192,7 +193,9 @@ export function TicTacToeGameClient({
   );
   const [replayPlaying, setReplayPlaying] = useState(false);
   const replayStepRef = useRef(replayStep);
-  replayStepRef.current = replayStep;
+  useLayoutEffect(() => {
+    replayStepRef.current = replayStep;
+  }, [replayStep]);
 
   const isLive = isGameLive(game.status);
 
@@ -326,17 +329,16 @@ export function TicTacToeGameClient({
   }, [sortedLen]);
 
   const toggleReplayPlay = useCallback(() => {
-    setReplayPlaying((wasPlaying) => {
-      if (wasPlaying) return false;
-      setReplayStep((s) => {
-        const cur = Math.min(s, sortedLen);
-        if (sortedLen <= 0) return 0;
-        if (cur >= sortedLen) return 0;
-        return cur;
-      });
-      return true;
+    if (replayPlaying) {
+      setReplayPlaying(false);
+      return;
+    }
+    setReplayStep((step) => {
+      const current = Math.min(step, sortedLen);
+      return current >= sortedLen ? 0 : current;
     });
-  }, [sortedLen]);
+    setReplayPlaying(true);
+  }, [replayPlaying, sortedLen]);
 
   const onReplayKey = useEffectEvent((e: KeyboardEvent) => {
     const t = e.target;

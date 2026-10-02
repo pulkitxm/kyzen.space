@@ -20,7 +20,7 @@ export function GameCard({
           <h3 className="font-semibold text-card-foreground text-lg tracking-tight">
             {game.name}
           </h3>
-          <p className="mt-0 max-h-0 overflow-hidden text-muted-foreground text-sm leading-snug opacity-0 transition-all duration-300 group-hover:mt-1.5 group-hover:max-h-24 group-hover:opacity-100">
+          <p className="mt-0 max-h-0 overflow-hidden text-muted-foreground text-sm leading-snug opacity-0 transition-opacity duration-300 group-hover:mt-1.5 group-hover:max-h-24 group-hover:opacity-100">
             {game.description}
           </p>
         </Link>
@@ -50,7 +50,7 @@ export function GameCard({
           <h3 className="font-semibold text-lg text-white tracking-tight drop-shadow-sm">
             {game.name}
           </h3>
-          <p className="mt-0 max-h-0 overflow-hidden text-sm text-white/75 leading-snug opacity-0 transition-all duration-300 group-hover:mt-1.5 group-hover:max-h-24 group-hover:opacity-100 group-focus-visible:mt-1.5 group-focus-visible:max-h-24 group-focus-visible:opacity-100">
+          <p className="mt-0 max-h-0 overflow-hidden text-sm text-white/75 leading-snug opacity-0 transition-opacity duration-300 group-hover:mt-1.5 group-hover:max-h-24 group-hover:opacity-100 group-focus-visible:mt-1.5 group-focus-visible:max-h-24 group-focus-visible:opacity-100">
             {game.description}
           </p>
         </div>

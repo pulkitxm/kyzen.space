@@ -3,7 +3,7 @@
 import "plyr/dist/plyr.css";
 import { AnimatePresence, m } from "motion/react";
 import type PlyrType from "plyr";
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 import { FaXmark } from "react-icons/fa6";
 
 export function TutorialModal({
@@ -18,8 +18,7 @@ export function TutorialModal({
   onClose: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  const closeTutorial = useEffectEvent(onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -47,7 +46,7 @@ export function TutorialModal({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current();
+      if (e.key === "Escape") closeTutorial();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

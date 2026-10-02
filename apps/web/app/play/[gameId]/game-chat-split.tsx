@@ -6,6 +6,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -49,7 +50,9 @@ export function GameChatSplit({
   const [tab, setTab] = useState<"game" | "chat">("game");
 
   const layoutRef = useRef(layout);
-  layoutRef.current = layout;
+  useLayoutEffect(() => {
+    layoutRef.current = layout;
+  }, [layout]);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persist = useCallback((override?: Partial<ChatLayout>) => {

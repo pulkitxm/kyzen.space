@@ -34,6 +34,7 @@ type CheckState =
   | { kind: "unavailable"; reason: string; suggestions: string[] };
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
   year: "numeric",
   month: "short",
   day: "numeric",

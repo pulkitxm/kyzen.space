@@ -1,6 +1,11 @@
 "use client";
 
-import { type CSSProperties, useCallback, useRef } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import {
   FaChevronDown,
   FaChevronLeft,
@@ -57,7 +62,9 @@ export function ChatFloatingIcon({
   onCommit: () => void;
 }) {
   const edgeRef = useRef(stashEdge);
-  edgeRef.current = stashEdge;
+  useLayoutEffect(() => {
+    edgeRef.current = stashEdge;
+  }, [stashEdge]);
   const justDraggedRef = useRef(false);
   const { glass } = useGlassMode();
   const glassOn = glass !== "off";

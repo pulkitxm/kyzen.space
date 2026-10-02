@@ -1,6 +1,12 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { useGlassPaneRef } from "@/components/glass/glass-pane";
 import {
   type ChatMode,
@@ -41,7 +47,9 @@ export function ChatPopoutWindow({
   children: ReactNode;
 }) {
   const geomRef = useRef(geometry);
-  geomRef.current = geometry;
+  useLayoutEffect(() => {
+    geomRef.current = geometry;
+  }, [geometry]);
   const paneRef = useGlassPaneRef<HTMLDivElement>();
 
   const startDrag = useCallback(

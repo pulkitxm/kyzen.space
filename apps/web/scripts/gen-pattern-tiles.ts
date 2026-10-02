@@ -524,7 +524,5 @@ ${uses.join("\n")}
 }
 
 console.log(`Generating ${THEMES.length} pattern tiles into ${OUT_DIR}`);
-for (const theme of THEMES) {
-  await buildTheme(theme);
-}
+await Promise.all(THEMES.map(buildTheme));
 console.log("done");

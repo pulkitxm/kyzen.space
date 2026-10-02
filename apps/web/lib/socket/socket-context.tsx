@@ -6,8 +6,8 @@ import {
   type ReactNode,
   use,
   useEffect,
+  useEffectEvent,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { io, type Socket } from "socket.io-client";
@@ -52,11 +52,17 @@ export function SocketProvider({
     });
     setSocket(s);
     setStatus("connecting");
-    s.on("connect", () => setStatus("connected"));
-    s.on("disconnect", () => setStatus("disconnected"));
-    s.io.on("reconnect_attempt", () => setStatus("connecting"));
+    const onConnect = () => setStatus("connected");
+    const onDisconnect = () => setStatus("disconnected");
+    const onReconnectAttempt = () => setStatus("connecting");
+    s.on("connect", onConnect);
+    s.on("disconnect", onDisconnect);
+    s.io.on("reconnect_attempt", onReconnectAttempt);
 
     return () => {
+      s.off("connect", onConnect);
+      s.off("disconnect", onDisconnect);
+      s.io.off("reconnect_attempt", onReconnectAttempt);
       s.disconnect();
       setSocket(null);
       setStatus("disconnected");
@@ -79,12 +85,11 @@ export function useSocketEvent<T = unknown>(
   handler: (payload: T) => void,
 ): void {
   const { socket } = useSocket();
-  const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+  const onEvent = useEffectEvent(handler);
 
   useEffect(() => {
     if (!socket) return;
-    const listener = (payload: T) => handlerRef.current(payload);
+    const listener = (payload: T) => onEvent(payload);
     socket.on(event, listener as (payload: unknown) => void);
     return () => {
       socket.off(event, listener as (payload: unknown) => void);

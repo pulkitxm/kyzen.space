@@ -1,18 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { clientFetch } from "@/lib/api-client";
 
 export function SessionEndForm({ token }: { token: string }) {
   const router = useRouter();
-  const [pending, setPending] = useState(false);
+  const [pending, startTransition] = useTransition();
 
-  const onEnd = async () => {
-    setPending(true);
-    try {
+  const onEnd = () =>
+    startTransition(async () => {
       const res = await clientFetch("/api/account/revoke-session", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -23,10 +22,7 @@ export function SessionEndForm({ token }: { token: string }) {
       };
       if (data.signedOut) router.push("/auth");
       else router.refresh();
-    } finally {
-      setPending(false);
-    }
-  };
+    });
 
   return (
     <Button variant="danger" size="sm" loading={pending} onClick={onEnd}>
