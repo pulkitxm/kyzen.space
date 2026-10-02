@@ -33,6 +33,8 @@ The engine owns game rules. Its initial state comes from seats. Its `reduce(stat
 
 Optional `currentRole` and `autoMove` hooks enable the platform's turn clock. `currentRole` returns the current role or null when the game ends. `autoMove` returns a legal move for that role.
 
+Current matchmaking pairs two players. A game requiring larger match groups needs an explicit matchmaking extension and verification of its seating and timeout outcomes.
+
 The deployed runner supports turn-based games. The type contract also describes realtime engines, but no server loop currently runs `step`. A realtime game needs platform work before it can be registered as playable.
 
 ## Board contract

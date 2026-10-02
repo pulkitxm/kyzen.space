@@ -120,3 +120,5 @@ The chat/social contract that web and server share: `dto.ts` (the `*Json` DTOs, 
 - [`./database-schema.md`](./database-schema.md) - how the hand-written `types/db/` row types are kept honest against the Drizzle schema by `drift-guard.ts`.
 - [`./database.md`](./database.md) - the repositories that validate inputs with the `types/db/io.ts` Zod schemas.
 - [`./chat-core.md`](./chat-core.md) - the chat DTOs (`types/chat/`) and the `CHAT_EVENTS` socket contract.
+
+Private implementation and presentation types stay beside their implementation. Shared wire and domain contracts remain in this package; moving private types here adds coupling without reuse.

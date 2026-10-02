@@ -329,7 +329,7 @@ A parallel flow exists for game creation: the chat service validates the **confi
 
 - [./README.md](./README.md) - architecture index and the big picture.
 - [./games-core-engine.md](./games-core-engine.md) - the engine *behavior* (`reduce`/`step`, `Outcome`, the Tic-tac-toe implementation) that these schemas type.
-- [./games-client.md](./games-client.md) - how the React UI consumes `GameJson`/`MoveJson` and renders boards from the same definitions. Boards no longer open their own socket: the `GameClientProps` contract now passes the app's shared Socket.IO connection (`socket` + `connected`), over which the board emits `join_room` / `make_move` / `leave_room`.
+- [./games-client.md](./games-client.md) - how the shared session consumes `GameJson`/`MoveJson` and supplies boards with state, ordered moves, and `makeMove`. Boards do not manage socket listeners or room membership.
 - [./realtime.md](./realtime.md) - the Socket.IO lanes and the `join_room` / `make_move` handlers (`handleJoinRoom`/`handleMakeMove`) that perform the two-stage validation described above.
 - [./server-api.md](./server-api.md) - the Hono REST surface, including `GET /api/games/:gameId` and `serializeGame`/`serializeMove`.
 - [./chat-core.md](./chat-core.md) - the chat/social contracts (now part of `@kyzen/shared`, under `types/chat/`) and the `gameCardMetaSchema` / create-game-in-conversation flow.

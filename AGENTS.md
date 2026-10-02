@@ -1,34 +1,44 @@
+# Working on Kyzen
 
+Read [README.md](README.md) for commands and [docs/architecture/README.md](docs/architecture/README.md) for the map. For a game, start with [docs/adding-a-game.md](docs/adding-a-game.md). Read subsystem docs only when changing that subsystem.
 
-# This is NOT the Next.js you know
+## Boundaries
 
-This version has breaking changes: APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+- `apps/web`: Next.js routes and the shared play shell. The shell mounts boards, chat, profile popups, settings, and results.
+- `apps/server`: server-only API, auth, chat services, and realtime handlers. `src/http.ts` mounts these on the Next.js HTTP server or runs separately.
+- `packages/games-core`: pure game engines and metadata. No React, network calls, or database access.
+- `packages/games-client`: boards and shared board primitives. Boards receive state, moves, and `makeMove`; they never manage sockets.
+- `packages/shared`: wire contracts, shared constants, and Zod schemas. This is the only package that imports `zod`. Keep local presentation types beside their implementation; do not put every private type into shared.
+- `packages/database`: schema, migrations, repositories, and local seeds. Only server code uses it.
+- `packages/avatar`: avatar options and validation.
 
-# Icons
+## Adding a game
 
-Use `react-icons` for icons instead of hand-writing inline `<svg>`. Prefer Font Awesome 6 (`react-icons/fa6`) first; if it lacks a good match, use another `react-icons` pack (Lucide `react-icons/lu`, or brand logos `react-icons/fc`). Only fall back to a raw inline `<svg>` when no library icon fits - that fallback is allowed. Use `fa6`, not the legacy `fa` (FA5). Generated/decorative SVG (doodle tiles, pattern assets), avatar rendering, and test SVG are not icons and stay as-is.
+Add the game's schemas, engine, metadata, board, tests, and rules document. Update the slug, engine, and board registrations listed in `docs/adding-a-game.md`. Reuse the generic routes, session, chat layouts, profile popups, audio, and database tables. Never create a game-specific socket event, API endpoint, or table for a turn-based game.
 
-# Shared packages: one home for types, schemas, and constants
+Only turn-based games currently have a server runner. Adding a `step` engine alone does not implement realtime gameplay. Extend the platform explicitly if that capability is needed.
 
-`@kyzen/shared` is the single source of truth for **every TypeScript type, every Zod schema, and every shared constant**, and is the **only** package allowed to depend on `zod`.
+## Style
 
-- Import types, Zod schemas, and `z` itself from `@kyzen/shared/types`; import shared constant values from `@kyzen/shared/constants`. Never `import … from "zod"` outside `packages/shared`, and never add `zod` to another `package.json`.
-- A new shared type or schema goes under `@kyzen/shared/types` (`chat/`, `games/`, `db/`, or a top-level module). A new shared constant goes in `@kyzen/shared/constants`.
-- The Drizzle schema and all DB repositories live in `@kyzen/database`; repositories validate inputs with `@kyzen/shared/types` schemas. `apps/web` must never import `@kyzen/database`.
-- `@kyzen/avatar` is the one exception: it owns its own types and stays `zod`-free (`@kyzen/shared` re-exports `AvatarConfig`).
-- Never duplicate a type, schema, or constant across web and server - put it in `@kyzen/shared`.
+- No comments in code. Functional tooling directives and license blocks are allowed.
+- No em dash characters in new output.
+- No generated attribution in code, commits, or PR text.
+- Use `react-icons/fa6` for icons, then another `react-icons` pack if needed.
+- Use Jotai for cross-feature application state. A mounted session can own state in its shell and pass props to children; keep private UI state local.
+- Use the existing glass and popup primitives for popup surfaces.
+- Add new top-level route names to `RESERVED_USERNAMES` in shared constants.
+- Before changing Next.js APIs, read the matching guide in the installed package's `dist/docs/` folder when available, or use the official Next.js documentation.
 
-See `docs/architecture/shared.md` and the "Shared packages - strict rules" section of `CLAUDE.md`.
+## Verification
 
-# Reserved usernames vs. top-level routes
+Run `bun run type-check`, the touched workspaces' tests, `bun run check`, and `bun run strip-comments -- --check`. For runtime changes, also build and exercise HTTP, auth, and an authenticated two-player game. Document missing environment dependencies instead of claiming a check passed.
 
-The profile page is a dynamic `/[username]` route, so every top-level segment under `apps/web/app/` is a potential username collision. When you add a new top-level route, add its segment to `RESERVED_USERNAMES` in `@kyzen/shared/constants` (`packages/shared/src/constants/username.ts`) if a user claiming that name would shadow the route. Per-user blocklisting is separate - that's the `NOT_ALLOWED_USERNAMES` env var (parsed in `apps/server/src/env.ts`).
+Use an isolated worktree. Commit coherent checkpoints through Pukbot, after staging only the relevant files. Read `pukbot capabilities --json` and command help first. Use Pukbot for GitHub writes. PR descriptions are one line. Merge only with a squash and branch deletion.
 
-# Game video tutorials
+Visual evidence must come from a fresh synthetic-data run. Post finished evidence separately from the PR description. Never share real project data or credentials.
 
-`vid-tutorials/` is a Remotion workspace with one tutorial composition per game; the composition id is the game's type slug (Studio at `localhost:3100/<type>`). Videos must use the app's theme tokens (`<ThemeRoot>` + `src/theme/theme.css`, seeded from `@kyzen/shared/constants`) and the game's own bg music (`<TutorialMusic>`; `publicDir` is `apps/web/public`). Build tutorials with the `game-tutorial-builder` agent from a markdown rules brief (canonically `docs/games/<type>.md`); conventions are in the `game-tutorial-videos` skill. Inside Remotion, animate only with `useCurrentFrame()` + `interpolate()`/`spring()` - CSS animations/transitions and `motion/react` are forbidden there. See `docs/video-tutorials.md`.
+## Documentation and roles
 
-# Keep docs and agents in sync
+Keep the matching architecture doc current. Game-authoring changes update `docs/adding-a-game.md`; game rules update `docs/games/<slug>.md`. Deployment changes update `docs/deployment.md`.
 
-A change is not done until the docs and agents reflect it. In the same change, update the matching `docs/architecture/*` page for subsystem/behavior changes (including `docs/architecture/shared.md` and `docs/architecture/database.md` for package-boundary changes), `docs/adding-a-game.md` + `.claude/agents/game-builder.md` for the game-authoring flow, `docs/games/<type>.md` for a new/changed game, `docs/video-tutorials.md` + the `game-tutorial-videos` skill + `.claude/agents/game-tutorial-builder.md` for the tutorial-video flow, and `CLAUDE.md` + this file for convention changes. Start from `docs/architecture/README.md`.
-
+The role adapters under `.claude/agents/` and `.codex/agents/` point to these same documents. Put the workflow in the documents, not in multiple copies of an agent prompt. Tutorial video work uses `docs/video-tutorials.md` and the existing tutorial role.

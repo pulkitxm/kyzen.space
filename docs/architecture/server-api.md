@@ -65,6 +65,7 @@ const authApp = new Hono().all("*", (c) => getAuth().handler(c.req.raw));
 
 export const app = new Hono<LoggerEnv>()
   .basePath("/api")
+  .use("*", cors({ origin: env.webUrl, credentials: true }))
   .use("*", requestLogger)
   .route("/auth", authApp)
   .route("/account", accountRouter)
@@ -341,7 +342,7 @@ The sender gets the message back in the HTTP `201` response; every *other* membe
 
 ## Gotchas, invariants & conventions
 
-- **`/api` prefix lives in two places that must agree.** The HTTP mount forwards `^/api(/.*)?$` (`apps/server/src/index.ts:46`) and Hono declares `basePath("/api")` (`apps/server/src/api/index.ts:18`). Route files use *un-prefixed* paths (`.get("/")`, `.get("/:id")`) - the prefix is added by the basePath, not by the router.
+- **The HTTP dispatch and Hono base path must agree.** `apps/server/src/http.ts` dispatches `/api` and `/api/*` to Hono; `apps/server/src/api/index.ts` declares `basePath("/api")`. Route files use unprefixed paths such as `.get("/")` or `.get("/:id")`. Hono adds the base path.
 - **Auth is `requireAuth` middleware, applied per router.** Fully-authed routers call `.use("*", requireAuth)` once at the top (so any route added to them is guarded by default); `profiles` opts in per-route on `/me*` and leaves its public routes open; `games` is public. A *new* router is only protected if it applies the middleware - declaring `Hono<AuthEnv>` types `c.get("userId")` as `string`, but the runtime guarantee comes from the `.use`/per-route `requireAuth`, so the two must go together.
 - **Better Auth owns `/api/auth/*` entirely.** Don't add routes under that prefix - `authApp` (`apps/server/src/api/index.ts`) swallows all methods/paths there. To read the session elsewhere, go through `requireAuth` (or `getSession` directly, as `account` does for session management), never re-implement cookie parsing.
 - **`fail()`'s status is the HTTP status.** The route does `c.json({ error: res.error }, res.status)` verbatim, so a service returning the wrong `ErrorStatus` produces the wrong HTTP code. Statuses are constrained to the `ErrorStatus` union (`apps/server/src/chat/result.ts:1`) - you can't return a 418.

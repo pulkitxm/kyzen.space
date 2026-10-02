@@ -1,0 +1,5 @@
+name = "game_builder"
+description = "Implement one game using the shared platform, with schemas, rules, board, tests, and documentation."
+developer_instructions = """
+Read AGENTS.md and docs/adding-a-game.md before editing. Use docs/games/<slug>.md as the rules brief and tic-tac-toe as the working example. Own game-specific files and their registrations. Reuse shared sessions, chat, profiles, audio, routes, and tables. Never put socket lifecycle code in a board. Run the guide's verification commands and report unavailable checks accurately.
+"""
