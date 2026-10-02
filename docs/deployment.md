@@ -29,7 +29,7 @@ bun run dev
 
 `db:start` uses the same local Postgres and Redis services without starting the app container. If you override their exposed ports, update the host URLs in `.env` too. The documented Bun commands load the root `.env`. Runtime containers and Vercel also accept injected environment variables. There is no workspace env symlink.
 
-With the combined app running against local synthetic data, `bun run --cwd apps/web smoke:game` verifies the rendered homepage, guest sign-in, authenticated socket connections, room creation, five moves, reconnect recovery, and persisted completion. It creates fresh synthetic guests and refuses remote origins.
+With the combined app running against local synthetic data, `bun run --cwd apps/web smoke:game` verifies the rendered homepage, guest sign-in, authenticated socket connections, room creation, five moves, reconnect recovery, and persisted completion. It also verifies public matching, participant authorization, identity redaction, short-lived chat, mutual friendship, and permanent messaging. It creates fresh synthetic guests and refuses remote origins.
 
 ## Docker with external databases
 
@@ -53,7 +53,7 @@ The default `compose.yaml` contains one app service and reads `.env` at runtime.
 
 The app listens on container port 3000. `APP_PORT` changes the host binding. Place it behind an HTTPS proxy that forwards WebSocket upgrades for `/socket.io`. Configure the OAuth redirect as `<BETTER_AUTH_URL>/api/auth/callback/google`. Readiness is available at `/health` and checks Postgres plus the Redis adapter when configured.
 
-Use one realtime instance for now: turn timers are process-local. Redis shares rooms, presence, and matchmaking, but does not make those timers durable across process restarts or multiple timer owners.
+Use one realtime instance for now: turn timers are process-local. Redis shares rooms and presence; PostgreSQL owns matchmaking, but does not make those timers durable across process restarts or multiple timer owners.
 
 ## Vercel services
 
@@ -100,7 +100,7 @@ Vercel CLI 62.1.0 routed `/socket.io` upgrade requests to the frontend during a 
 
 ### Realtime production limitation
 
-This configuration establishes builds, routing, and service communication. It does not make the existing process-local turn timers durable. Vercel container services run as Functions, can scale across instances, and scale down when idle. WebSocket connections also close at the function duration limit. The browser already uses WebSocket-only Socket.IO transport and reconnects; Redis coordinates rooms, presence, and matchmaking, but does not restore turn deadlines or assign durable timer ownership.
+This configuration establishes builds, routing, and service communication. It does not make the existing process-local turn timers durable. Vercel container services run as Functions, can scale across instances, and scale down when idle. WebSocket connections also close at the function duration limit. The browser already uses WebSocket-only Socket.IO transport and reconnects; Redis coordinates rooms and presence; PostgreSQL owns matchmaking, but does not restore turn deadlines or assign durable timer ownership.
 
 Before relying on this deployment for production timed games, move deadline execution and timer ownership into durable infrastructure and verify recovery across instance restarts and scale-out. A successful local services smoke test only verifies one backend process. For the current timed-game implementation, the persistent single-instance Docker deployment remains the supported production option.
 

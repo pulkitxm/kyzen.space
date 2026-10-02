@@ -5,21 +5,11 @@ import {
 import type { Socket } from "socket.io";
 import { childLogger } from "../logger";
 import { createStandaloneGame, validateJoinByCode } from "./rooms-service";
+import { rateLimiter } from "./socket-util";
 
 const log = childLogger({ mod: "realtime:rooms" });
 
 type AckFn = (res: unknown) => void;
-
-function rateLimiter(max: number, windowMs: number): () => boolean {
-  const hits: number[] = [];
-  return () => {
-    const now = Date.now();
-    while (hits.length > 0 && now - (hits[0] ?? 0) > windowMs) hits.shift();
-    if (hits.length >= max) return false;
-    hits.push(now);
-    return true;
-  };
-}
 
 export function attachRoomHandlers(socket: Socket): void {
   const createAllowed = rateLimiter(10, 60_000);

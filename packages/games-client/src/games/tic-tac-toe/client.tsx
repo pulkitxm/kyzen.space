@@ -504,6 +504,7 @@ function BoardCells({
         return (
           <button
             key={cellKey}
+            aria-label={`Row ${row + 1}, column ${col + 1}${mark ? `, ${mark}` : ", empty"}`}
             type="button"
             disabled={!playable}
             onMouseEnter={() => {

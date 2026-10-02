@@ -6,14 +6,19 @@ import {
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { emitToUser } from "./rooms";
-import { register } from "./socket-util";
+import { rateLimiter, register } from "./socket-util";
 import { ensureMatchClock } from "./turn-based";
 
 export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
+  const queueAllowed = rateLimiter(30, 60_000);
   register(socket, "game:queue_join", async (payload, cb) => {
     const parsed = clientQueueJoinSchema.safeParse(payload);
     if (!parsed.success) {
       cb?.({ ok: false, error: "Invalid queue request" });
+      return;
+    }
+    if (!queueAllowed()) {
+      cb?.({ ok: false, error: "Too many searches, slow down" });
       return;
     }
     const definition = getDefinition(parsed.data.gameType);
@@ -22,6 +27,7 @@ export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
       !config.success ||
       definition.engine.minPlayers !== 2 ||
       definition.engine.maxPlayers !== 2 ||
+      definition.engine.mode !== "turn-based" ||
       !definition.engine.reduce
     ) {
       cb?.({ ok: false, error: "Unsupported public match configuration" });
@@ -32,9 +38,9 @@ export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
       owner: socket.id,
       gameType: parsed.data.gameType,
       config: config.data,
-      roles: definition.engine.roles,
+      roles: definition.engine.roles.slice(0, 2),
       gameState: definition.engine.createInitialState(
-        definition.engine.roles.map((role) => ({ role })),
+        definition.engine.roles.slice(0, 2).map((role) => ({ role })),
       ),
     });
     if (match) await ensureMatchClock(io, match.code);

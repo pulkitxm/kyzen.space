@@ -173,25 +173,28 @@ try {
       return (await response.json()) as { game: GameJson };
     }),
   );
-  for (const guest of guests) {
-    if (JSON.stringify(snapshots).includes(guest.userId))
-      throw new Error("Public snapshot leaked an identity");
-  }
+  const accountIdPattern = new RegExp(
+    guests.map((guest) => guest.userId).join("|"),
+  );
+  if (accountIdPattern.test(JSON.stringify(snapshots)))
+    throw new Error("Public snapshot leaked an identity");
   const outsider = await createGuest();
   const forbidden = await fetch(`${origin}/api/games/${publicCode}`, {
     headers: { Cookie: outsider.cookie },
   });
   if (forbidden.status !== 404)
     throw new Error("Outsider could access a public match");
-  for (const socket of sockets) {
-    const ready = waitForState(
-      socket,
-      publicCode,
-      (state) => state.game.status === "active",
-    );
-    socket.emit("join_room", { gameId: publicCode });
-    await ready;
-  }
+  await Promise.all(
+    sockets.map(async (socket) => {
+      const ready = waitForState(
+        socket,
+        publicCode,
+        (state) => state.game.status === "active",
+      );
+      socket.emit("join_room", { gameId: publicCode });
+      await ready;
+    }),
+  );
   const messageInput = {
     gameId: publicCode,
     clientId: crypto.randomUUID(),
@@ -209,6 +212,7 @@ try {
     `${origin}/api/matches/${publicCode}/messages`,
     { headers: { Cookie: guests[1]?.cookie ?? "" } },
   );
+  if (!chatResponse.ok) throw new Error("Match chat could not be loaded");
   const chat = (await chatResponse.json()) as { messages: unknown[] };
   if (chat.messages.length !== 1)
     throw new Error("Match chat did not synchronize");
@@ -239,9 +243,8 @@ try {
       moveData: { row: position[0], col: position[1] },
     });
     const state = await next;
-    for (const guest of guests)
-      if (JSON.stringify(state).includes(guest.userId))
-        throw new Error("Realtime state leaked an identity");
+    if (accountIdPattern.test(JSON.stringify(state)))
+      throw new Error("Realtime state leaked an identity");
     if (index === 1) {
       opponent.disconnect();
       await connect(opponent);
@@ -262,11 +265,13 @@ try {
   const ended = await fetch(`${origin}/api/matches/${publicCode}/messages`, {
     headers: { Cookie: guests[0]?.cookie ?? "" },
   });
+  if (!ended.ok) throw new Error("Ended chat could not be loaded");
   if (((await ended.json()) as { messages: unknown[] }).messages.length)
     throw new Error("Ended match chat is still visible");
   const permanent = await fetch(`${origin}/api/conversations`, {
     headers: { Cookie: guests[0]?.cookie ?? "" },
   });
+  if (!permanent.ok) throw new Error("Permanent chats could not be loaded");
   const conversations = (await permanent.json()) as {
     conversations: { id: string }[];
   };

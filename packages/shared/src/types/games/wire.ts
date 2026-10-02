@@ -154,7 +154,7 @@ export function resolveWinnerUsername(
     : null;
 }
 
-export const matchMessageSchema = z.object({
+const matchMessageSchema = z.object({
   id: z.string(),
   gameId: gameCodeSchema,
   authorId: z.string(),

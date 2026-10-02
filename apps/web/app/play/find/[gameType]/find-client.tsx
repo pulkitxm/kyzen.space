@@ -3,7 +3,7 @@
 import type { GameType, ServerMatchFoundPayload } from "@kyzen/shared/types";
 import { useSetAtom } from "jotai";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FaMagnifyingGlass } from "react-icons/fa6";
 import { matchmakingAtom } from "@/lib/matchmaking-atoms";
 import {
@@ -40,30 +40,31 @@ export function FindClient({
     router.replace(`/play/${payload.gameId}`);
   });
 
+  const join = useCallback(async () => {
+    if (!socket?.connected || matchedRef.current) return;
+    try {
+      const result = await emitAck<{ ok: true; gameId: string | null }>(
+        socket,
+        "game:queue_join",
+        { gameType },
+      );
+      setError(null);
+      if (result.gameId && !matchedRef.current) {
+        matchedRef.current = true;
+        setMatchmaking({ searching: null });
+        router.replace(`/play/${result.gameId}`);
+      }
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : "Matchmaking failed. Retrying...",
+      );
+    }
+  }, [socket, gameType, router, setMatchmaking]);
+
   useEffect(() => {
     if (!socket) return;
-    const join = async () => {
-      if (!socket.connected || matchedRef.current) return;
-      try {
-        const result = await emitAck<{ ok: true; gameId: string | null }>(
-          socket,
-          "game:queue_join",
-          { gameType },
-        );
-        setError(null);
-        if (result.gameId && !matchedRef.current) {
-          matchedRef.current = true;
-          setMatchmaking({ searching: null });
-          router.replace(`/play/${result.gameId}`);
-        }
-      } catch (failure) {
-        setError(
-          failure instanceof Error
-            ? failure.message
-            : "Matchmaking failed. Retrying...",
-        );
-      }
-    };
     void join();
     socket.on("connect", join);
     const heartbeat = setInterval(join, 10000);
@@ -74,18 +75,31 @@ export function FindClient({
       socket.emit("game:queue_leave", { gameType });
       setMatchmaking({ searching: null });
     };
-  }, [socket, gameType, setMatchmaking, router]);
+  }, [socket, gameType, setMatchmaking, join]);
 
   useEffect(() => {
     const id = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const cancel = () => {
+  const cancel = async () => {
     matchedRef.current = true;
     setMatchmaking({ searching: null });
-    socket?.emit("game:queue_leave", { gameType });
-    router.push(`/games/${gameType}`);
+    try {
+      const result = socket?.connected
+        ? await emitAck<{ ok: true; gameId: string | null }>(
+            socket,
+            "game:queue_leave",
+            { gameType },
+          )
+        : null;
+      router.replace(
+        result?.gameId ? `/play/${result.gameId}` : `/games/${gameType}`,
+      );
+    } catch {
+      matchedRef.current = false;
+      setError("Could not cancel. Reconnect and try again.");
+    }
   };
 
   return (
@@ -96,7 +110,7 @@ export function FindClient({
         `${gameName} · ${formatElapsed(elapsed)} · Anonymous public match`
       }
       icon={<FaMagnifyingGlass size={26} aria-hidden="true" />}
-      onCancel={cancel}
+      onCancel={() => void cancel()}
     />
   );
 }

@@ -231,6 +231,11 @@ function GameOverActions({
 
   return (
     <div className="flex flex-col gap-2">
+      {game.publicMatch ? (
+        <Button onClick={() => router.push(`/play/find/${game.gameType}`)}>
+          Play again
+        </Button>
+      ) : null}
       {canRematch ? (
         <Button onClick={onRematch} disabled={rematch.busy}>
           {rematch.code ? "Go to rematch" : "Rematch"}

@@ -118,11 +118,16 @@ export function PlayClient({
 
   if (game.publicMatch) {
     return (
-      <div className="relative grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_320px] md:grid-rows-1">
-        {gameNode}
-        <PublicMatchPanel game={game} userId={userId} />
+      <>
+        <GameChatSplit
+          conversationId={game.id}
+          initialLayout={initialLayout}
+          layoutTrusted={layoutTrusted}
+          game={gameNode}
+          chat={() => <PublicMatchPanel game={game} userId={userId} />}
+        />
         {overlay}
-      </div>
+      </>
     );
   }
 
