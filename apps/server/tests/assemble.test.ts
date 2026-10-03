@@ -73,3 +73,29 @@ describe("assembleMessage - game-card code/UUID split", () => {
     expect(out.gameId).toBe(UUID);
   });
 });
+
+describe("assembleMessage - team results", () => {
+  test("carries every winner of a team game into the card", async () => {
+    const players = [
+      { userId: "u1", username: "alice", role: "p1" },
+      { userId: "u2", username: "bob", role: "p2" },
+      { userId: "bot:1", username: "Normal Bot", role: "p3" },
+    ];
+    dbState.game = {
+      id: UUID,
+      code: CODE,
+      status: "completed",
+      winner: null,
+      winners: ["u2", "bot:1"],
+      players,
+    };
+    // biome-ignore lint/suspicious/noExplicitAny: test message row
+    const out = await assembleMessage(gameCardRow() as any);
+    expect(out.metadata).toMatchObject({
+      status: "completed",
+      winner: null,
+      winners: ["u2", "bot:1"],
+      players,
+    });
+  });
+});

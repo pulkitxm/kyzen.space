@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import { TANK_ARENA, TIC_TAC_TOE } from "@kyzen/shared/constants";
 import type { GameCardMeta } from "@kyzen/shared/types";
 import { enrichGameCardMeta } from "../src/chat/game-card";
 import * as rooms from "../src/realtime/rooms";
@@ -20,37 +20,60 @@ const PLAYERS = [
 ];
 
 describe("enrichGameCardMeta", () => {
-  test("resolves a completed game's winner to a username", () => {
+  test("carries a completed game's winner and winners", () => {
     const meta = enrichGameCardMeta(BASE, {
       status: "completed",
       winner: "u2",
+      winners: ["u2"],
       players: PLAYERS,
     });
     expect(meta.status).toBe("completed");
     expect(meta.winner).toBe("u2");
-    expect(meta.winnerUsername).toBe("bob");
+    expect(meta.winners).toEqual(["u2"]);
     expect(meta.players).toEqual(PLAYERS);
   });
 
-  test("marks a draw with no winner username", () => {
+  test("carries every winner of a team game with no single winner", () => {
+    const players = [
+      { userId: "u1", username: "alice", role: "p1" },
+      { userId: "u2", username: "bob", role: "p2" },
+      { userId: "bot:1", username: "Normal Bot", role: "p3" },
+    ];
+    const meta = enrichGameCardMeta(
+      { ...BASE, gameType: TANK_ARENA },
+      {
+        status: "completed",
+        winner: null,
+        winners: ["u2", "bot:1"],
+        players,
+      },
+    );
+    expect(meta.winner).toBeNull();
+    expect(meta.winners).toEqual(["u2", "bot:1"]);
+    expect(meta.players).toEqual(players);
+  });
+
+  test("marks a draw and keeps the drawing players", () => {
     const meta = enrichGameCardMeta(BASE, {
       status: "completed",
       winner: "draw",
+      winners: ["u1", "u2"],
       players: PLAYERS,
     });
     expect(meta.winner).toBe("draw");
-    expect(meta.winnerUsername).toBeNull();
+    expect(meta.winners).toEqual(["u1", "u2"]);
   });
 
   test("carries status and players for an in-progress game", () => {
     const meta = enrichGameCardMeta(BASE, {
       status: "active",
       winner: null,
+      winners: [],
       players: PLAYERS,
     });
     expect(meta.status).toBe("active");
     expect(meta.winner).toBeNull();
-    expect(meta.winnerUsername).toBeNull();
+    expect(meta.winners).toEqual([]);
     expect(meta.players).toEqual(PLAYERS);
   });
 
@@ -61,6 +84,7 @@ describe("enrichGameCardMeta", () => {
     const meta = enrichGameCardMeta(BASE, {
       status: "waiting",
       winner: null,
+      winners: [],
       players: [firstPlayer],
     });
     expect(meta.gameType).toBe("tic-tac-toe");
@@ -70,16 +94,6 @@ describe("enrichGameCardMeta", () => {
 
   test("leaves metadata untouched when the game is missing", () => {
     expect(enrichGameCardMeta(BASE, null)).toEqual(BASE);
-  });
-
-  test("null winner username when the winner isn't in the players list", () => {
-    const meta = enrichGameCardMeta(BASE, {
-      status: "completed",
-      winner: "ghost",
-      players: PLAYERS,
-    });
-    expect(meta.winner).toBe("ghost");
-    expect(meta.winnerUsername).toBeNull();
   });
 });
 

@@ -115,6 +115,7 @@ export {
   type GameStatusDto,
   gameJsonSchema,
   gamePlayerSchema,
+  gameResultLabel,
   gameStatusSchema,
   isGameLive,
   isGameOver,

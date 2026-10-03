@@ -179,6 +179,27 @@ export function resolveWinnerUsername(
     : null;
 }
 
+export function gameResultLabel(game: {
+  status?: string;
+  winner?: string | null;
+  winners?: readonly string[];
+  players?: ReadonlyArray<{ userId: string; username: string }>;
+}): string | null {
+  if (!game.status || !isGameOver(game.status)) return null;
+  if (game.winner === "draw") return "Draw";
+  const ids = game.winners?.length
+    ? game.winners
+    : game.winner
+      ? [game.winner]
+      : [];
+  const names = ids.flatMap((id) => {
+    const username = game.players?.find((p) => p.userId === id)?.username;
+    return username ? [username] : [];
+  });
+  if (!names.length) return "Game over";
+  return `${new Intl.ListFormat("en", { type: "conjunction" }).format(names)} won`;
+}
+
 const matchMessageSchema = z.object({
   id: z.string(),
   gameId: gameCodeSchema,

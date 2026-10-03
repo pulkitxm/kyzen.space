@@ -2,7 +2,12 @@
 
 import { listGameMeta } from "@kyzen/games-core";
 import { CHAT_EVENTS } from "@kyzen/shared/constants";
-import type { GameCardMeta, GameType } from "@kyzen/shared/types";
+import {
+  type GameCardMeta,
+  type GameType,
+  gameResultLabel,
+  isGameOver,
+} from "@kyzen/shared/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -28,7 +33,7 @@ function gameCardPresentation(
   );
   const isChallenged = meta.challengedUserId === userId;
   let action = "Open";
-  if (status === "completed") action = "View";
+  if (isGameOver(status)) action = "View";
   else if (isPlayer) action = "Open";
   else if (status === "active") action = "Spectate";
   else if (meta.seatingMode === "challenge")
@@ -70,6 +75,7 @@ export function GameCardMessage({
   const showSeries = (seriesScore?.totalGames ?? 0) >= 2;
 
   const canRematch = status === "completed" && isPlayer;
+  const result = gameResultLabel(meta);
   const { action, statusText, tone, href } = gameCardPresentation(
     gameId,
     meta,
@@ -104,8 +110,16 @@ export function GameCardMessage({
           <div className="truncate font-medium text-sm">
             {gameName(meta.gameType)}
           </div>
+          {result ? (
+            <div
+              className="truncate text-muted-foreground text-xs"
+              title={result}
+            >
+              {result}
+            </div>
+          ) : null}
         </div>
-        {status === "completed" ? null : (
+        {result ? null : (
           <span className={cn("rounded-full px-2 py-0.5 text-[11px]", tone)}>
             {statusText}
           </span>
