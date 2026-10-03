@@ -1,5 +1,5 @@
+import { ceilDiv, sweepPointVsBox } from "@kyzen/physics";
 import { MINE_LIFT, MODULE_WIDTH, WATER_Y } from "./constants";
-import { ceilDiv } from "./math";
 
 export type Box = { x0: number; y0: number; x1: number; y1: number };
 
@@ -89,48 +89,7 @@ export function buildArena(modules: number): Arena {
   };
 }
 
-export function sweepBox(
-  x0: number,
-  y0: number,
-  dx: number,
-  dy: number,
-  minX: number,
-  minY: number,
-  maxX: number,
-  maxY: number,
-): number {
-  let t0 = 0;
-  let t1 = 1;
-  if (dx === 0) {
-    if (x0 < minX || x0 > maxX) return -1;
-  } else {
-    let a = (minX - x0) / dx;
-    let b = (maxX - x0) / dx;
-    if (a > b) {
-      const s = a;
-      a = b;
-      b = s;
-    }
-    if (a > t0) t0 = a;
-    if (b < t1) t1 = b;
-    if (t0 > t1) return -1;
-  }
-  if (dy === 0) {
-    if (y0 < minY || y0 > maxY) return -1;
-  } else {
-    let a = (minY - y0) / dy;
-    let b = (maxY - y0) / dy;
-    if (a > b) {
-      const s = a;
-      a = b;
-      b = s;
-    }
-    if (a > t0) t0 = a;
-    if (b < t1) t1 = b;
-    if (t0 > t1) return -1;
-  }
-  return t0;
-}
+export const sweepBox = sweepPointVsBox;
 
 export function sweepTerrain(
   x0: number,

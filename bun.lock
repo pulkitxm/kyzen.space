@@ -133,8 +133,17 @@
       "name": "@kyzen/games-core",
       "version": "0.1.0",
       "dependencies": {
+        "@kyzen/physics": "workspace:*",
         "@kyzen/shared": "workspace:*",
       },
+      "devDependencies": {
+        "@types/bun": "^1.1.14",
+        "typescript": "^5",
+      },
+    },
+    "packages/physics": {
+      "name": "@kyzen/physics",
+      "version": "0.1.0",
       "devDependencies": {
         "@types/bun": "^1.1.14",
         "typescript": "^5",
@@ -450,6 +459,8 @@
     "@kyzen/games-client": ["@kyzen/games-client@workspace:packages/games-client"],
 
     "@kyzen/games-core": ["@kyzen/games-core@workspace:packages/games-core"],
+
+    "@kyzen/physics": ["@kyzen/physics@workspace:packages/physics"],
 
     "@kyzen/server": ["@kyzen/server@workspace:apps/server"],
 

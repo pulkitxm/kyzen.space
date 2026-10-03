@@ -1,5 +1,5 @@
 {
-  "name": "@kyzen/games-core",
+  "name": "@kyzen/physics",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,11 +8,8 @@
   },
   "scripts": {
     "test": "bun test",
-    "type-check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@kyzen/physics": "workspace:*",
-    "@kyzen/shared": "workspace:*"
+    "type-check": "tsc --noEmit",
+    "verify": "bun scripts/verify-determinism.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",

@@ -1,3 +1,4 @@
+import { boxDistance, boxTouchesCircle } from "@kyzen/physics";
 import type {
   BotDifficulty,
   TankAction,
@@ -47,8 +48,6 @@ import {
 import {
   type BodyState,
   blastFactor,
-  boxDistance,
-  boxTouchesCircle,
   muzzleDistance,
   stepBody,
   type TraceHit,

@@ -1,3 +1,9 @@
+import {
+  boxDistance,
+  boxTouchesCircle,
+  sweepCircleVsCircle,
+  sweepPointVsSegment,
+} from "@kyzen/physics";
 import type {
   TankArenaAirstrike,
   TankArenaMine,
@@ -300,35 +306,6 @@ function moduleRange(xMin: number, xMax: number, modules: number): number[] {
   return out;
 }
 
-export function boxDistance(
-  px: number,
-  py: number,
-  bx: number,
-  by: number,
-  hw: number,
-  hh: number,
-): number {
-  const dx = Math.max(Math.abs(px - bx) - hw, 0);
-  const dy = Math.max(Math.abs(py - by) - hh, 0);
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-export function boxTouchesCircle(
-  bx: number,
-  by: number,
-  hw: number,
-  hh: number,
-  cx: number,
-  cy: number,
-  r: number,
-): boolean {
-  const qx = Math.min(Math.max(cx, bx - hw), bx + hw);
-  const qy = Math.min(Math.max(cy, by - hh), by + hh);
-  const dx = cx - qx;
-  const dy = cy - qy;
-  return dx * dx + dy * dy < r * r;
-}
-
 function sweepCircle(
   x0: number,
   y0: number,
@@ -339,37 +316,10 @@ function sweepCircle(
   r: number,
   insideHits: boolean,
 ): number {
-  const fx = x0 - cx;
-  const fy = y0 - cy;
-  const c = fx * fx + fy * fy - r * r;
-  if (c <= 0) return insideHits ? 0 : -1;
-  const a = dx * dx + dy * dy;
-  if (a === 0) return -1;
-  const b = 2 * (fx * dx + fy * dy);
-  const disc = b * b - 4 * a * c;
-  if (disc < 0) return -1;
-  const t = (-b - Math.sqrt(disc)) / (2 * a);
-  return t >= 0 && t <= 1 ? t : -1;
+  return sweepCircleVsCircle(x0, y0, dx, dy, 0, cx, cy, r, insideHits);
 }
 
-function sweepSegment(
-  x0: number,
-  y0: number,
-  dx: number,
-  dy: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): number {
-  const ex = bx - ax;
-  const ey = by - ay;
-  const denom = dx * ey - dy * ex;
-  if (denom === 0) return -1;
-  const t = ((ax - x0) * ey - (ay - y0) * ex) / denom;
-  const u = ((ax - x0) * dy - (ay - y0) * dx) / denom;
-  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? t : -1;
-}
+const sweepSegment = sweepPointVsSegment;
 
 export type BodyStep = { landed: boolean; wrappedFrom: number | null };
 
