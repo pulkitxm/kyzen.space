@@ -11,6 +11,8 @@ export function useGameAudio() {
       playTouch: () => engine?.playTouch(),
       playWin: () => engine?.playWin(),
       playDraw: () => engine?.playDraw(),
+      playSound: (url: string, gain?: number) => engine?.playSound(url, gain),
+      preloadSounds: (urls: readonly string[]) => engine?.preloadSounds(urls),
       unlock: () => engine?.unlock(),
     };
   }, []);

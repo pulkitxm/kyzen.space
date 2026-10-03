@@ -1,3 +1,4 @@
+import { TANK_ARENA } from "@kyzen/shared/constants";
 import {
   type GameEngine,
   lobbyConfigSchema,
@@ -33,7 +34,6 @@ import {
   RESULTS_MS,
   SELECT_MS,
   STEPS_PER_SECOND,
-  TANK_ARENA,
   TANKS,
 } from "./constants";
 import {

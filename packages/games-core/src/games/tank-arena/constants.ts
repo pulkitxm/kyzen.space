@@ -7,8 +7,6 @@ import {
   tankPickupKindSchema,
 } from "@kyzen/shared/types";
 
-export const TANK_ARENA = "tank-arena";
-
 export const TANK_KINDS: readonly TankKind[] = tankKindSchema.options;
 export const ACTIONS = tankActionSchema.options;
 export const PICKUP_KINDS: readonly TankPickupKind[] =

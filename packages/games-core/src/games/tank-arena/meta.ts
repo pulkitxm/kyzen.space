@@ -1,9 +1,8 @@
-import { GAME_CATEGORIES } from "@kyzen/shared/constants";
-import type { GameMeta, GameType } from "@kyzen/shared/types";
-import { TANK_ARENA } from "./constants";
+import { GAME_CATEGORIES, TANK_ARENA } from "@kyzen/shared/constants";
+import type { GameMeta } from "@kyzen/shared/types";
 
 export const tankArenaMeta: GameMeta = {
-  type: TANK_ARENA as string as GameType,
+  type: TANK_ARENA,
   name: "Tank Arena",
   description:
     "Lock your shot in secret, then watch every tank fire at once across a frozen foundry.",

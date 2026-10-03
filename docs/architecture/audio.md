@@ -55,6 +55,10 @@ module is safe to import during SSR; `getGameAudioEngine()` returns `null` when
   `sfxGain` node, so rapid hovers **overlap** cleanly and the SFX volume/mute is
   one gain. A muted or zero-volume channel, a missing URL, or a failed load all
   play nothing. There is **no oscillator synthesis** anywhere in the engine.
+- **Per-game SFX** that the fixed keys cannot express go through
+  `playSound(url, gain)` and `preloadSounds(urls)` (both also on
+  `useGameAudio`). They use the same buffer cache, SFX gain, volume, and mute;
+  Tank Arena preloads its 15 effects and plays them by URL.
 - **Background music** is a streamed file routed through a persistent `musicGain`
   node. When a per-game track URL is registered (`setMusicSource`, e.g.
   tic-tac-toe's `/sounds/tic-tac-toe-bg.ogg`) it plays via an `HTMLAudioElement`

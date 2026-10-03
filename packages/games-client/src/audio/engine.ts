@@ -52,6 +52,9 @@ export class GameAudioEngine {
   private sfxUrls: SfxSources = {};
   private sfxBuffers: Partial<Record<SfxKey, AudioBuffer>> = {};
   private sfxLoading = new Set<SfxKey>();
+  private soundBuffers = new Map<string, AudioBuffer>();
+  private soundLoading = new Set<string>();
+  private soundUrls = new Set<string>();
 
   private ensureContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
@@ -74,6 +77,7 @@ export class GameAudioEngine {
     if (ctx.state === "suspended") void ctx.resume();
     this.reconcileMusic();
     this.preloadSfx();
+    for (const url of this.soundUrls) void this.loadSound(ctx, url, null);
   }
 
   setSfxVolume(volume: number): void {
@@ -130,6 +134,46 @@ export class GameAudioEngine {
     this.playSfx("draw");
   }
 
+  playSound(url: string, gain = 1): void {
+    const ctx = this.ensureContext();
+    if (!ctx || this.sfxMuted || this.sfxVolume <= 0) return;
+    if (ctx.state === "suspended") void ctx.resume();
+    const buffer = this.soundBuffers.get(url);
+    if (buffer) {
+      this.fireSfx(ctx, buffer, gain);
+      return;
+    }
+    void this.loadSound(ctx, url, gain);
+  }
+
+  preloadSounds(urls: readonly string[]): void {
+    for (const url of urls) this.soundUrls.add(url);
+    const ctx = this.ctx;
+    if (!ctx) return;
+    for (const url of urls) void this.loadSound(ctx, url, null);
+  }
+
+  private async loadSound(
+    ctx: AudioContext,
+    url: string,
+    playGain: number | null,
+  ): Promise<void> {
+    if (this.soundBuffers.has(url) || this.soundLoading.has(url)) return;
+    this.soundLoading.add(url);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+      this.soundBuffers.set(url, buffer);
+      if (playGain !== null && !this.sfxMuted && this.sfxVolume > 0) {
+        this.fireSfx(ctx, buffer, playGain);
+      }
+    } catch {
+    } finally {
+      this.soundLoading.delete(url);
+    }
+  }
+
   private applySfxGain(): void {
     const ctx = this.ctx;
     if (!ctx || !this.sfxGain) return;
@@ -153,11 +197,18 @@ export class GameAudioEngine {
     if (url) void this.loadSfx(ctx, key, url, true);
   }
 
-  private fireSfx(ctx: AudioContext, buffer: AudioBuffer): void {
+  private fireSfx(ctx: AudioContext, buffer: AudioBuffer, gain = 1): void {
     if (!this.sfxGain) return;
     const src = ctx.createBufferSource();
     src.buffer = buffer;
-    src.connect(this.sfxGain);
+    if (gain === 1) {
+      src.connect(this.sfxGain);
+    } else {
+      const level = ctx.createGain();
+      level.gain.value = Math.max(0, gain);
+      src.connect(level);
+      level.connect(this.sfxGain);
+    }
     src.start();
   }
 
