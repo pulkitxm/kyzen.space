@@ -173,13 +173,27 @@ export function createTerrain(boxes: ArenaBox[]) {
 
     if (width > 1.2) {
       trim.push(
-        slab(box.x0 + 0.3, box.x1 - 0.3, box.y1 - 0.34, box.y1 - 0.24, frontZ, 0.06),
+        slab(
+          box.x0 + 0.3,
+          box.x1 - 0.3,
+          box.y1 - 0.34,
+          box.y1 - 0.24,
+          frontZ,
+          0.06,
+        ),
       );
     }
 
     if (height > 1.6) {
       trim.push(
-        slab(box.x0 + 0.18, box.x0 + 0.26, box.y0 + 0.3, box.y1 - 0.5, frontZ, 0.06),
+        slab(
+          box.x0 + 0.18,
+          box.x0 + 0.26,
+          box.y0 + 0.3,
+          box.y1 - 0.5,
+          frontZ,
+          0.06,
+        ),
       );
     }
 
@@ -209,12 +223,18 @@ export function createTerrain(boxes: ArenaBox[]) {
 
     if (width > 3 && box.y0 < 0.1) {
       const stripeY = box.y1 - 0.5;
-      stripes.push(warningStripe(box.x0 + 0.2, box.x0 + 1.4, stripeY, frontZ + 0.01));
-      stripes.push(warningStripe(box.x1 - 1.4, box.x1 - 0.2, stripeY, frontZ + 0.01));
+      stripes.push(
+        warningStripe(box.x0 + 0.2, box.x0 + 1.4, stripeY, frontZ + 0.01),
+      );
+      stripes.push(
+        warningStripe(box.x1 - 1.4, box.x1 - 0.2, stripeY, frontZ + 0.01),
+      );
     }
 
     if (width > 5 && height > 2 && random() > 0.5) {
-      vents.push(ventGrate(box.x0 + width * 0.3, box.y0 + height * 0.35, frontZ + 0.01));
+      vents.push(
+        ventGrate(box.x0 + width * 0.3, box.y0 + height * 0.35, frontZ + 0.01),
+      );
     }
   }
 

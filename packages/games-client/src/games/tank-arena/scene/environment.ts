@@ -13,7 +13,6 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   Points,
-  PointsMaterial,
   type Scene,
   type ShaderMaterial,
   Shape,
