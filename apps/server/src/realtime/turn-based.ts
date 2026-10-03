@@ -60,8 +60,9 @@ function scheduleNext(io: IOServer, gameRow: GameRecord): void {
     isFirstTurn: turnTimers.isFirstTurn(gameRow.id, role),
     strikes: turnTimers.strikes(gameRow.id, role),
   });
+  const armedState = JSON.stringify(gameRow.gameState);
   turnTimers.arm(gameRow.id, role, limit, () => {
-    void onTurnTimeout(io, gameRow.id);
+    void onTurnTimeout(io, gameRow.id, armedState);
   });
 }
 
@@ -188,12 +189,21 @@ async function abortGame(
   await broadcastGameCard(io, updated.id);
 }
 
-async function onTurnTimeout(io: IOServer, gameId: string): Promise<void> {
+async function onTurnTimeout(
+  io: IOServer,
+  gameId: string,
+  armedState?: string,
+): Promise<void> {
   const gameRow = await games.getGameById(gameId);
   if (gameRow?.status !== "active") {
     turnTimers.clear(gameId);
     return;
   }
+  if (
+    armedState !== undefined &&
+    JSON.stringify(gameRow.gameState) !== armedState
+  )
+    return;
   const role = currentRoleOf(gameRow);
   if (!role) {
     turnTimers.clear(gameId);

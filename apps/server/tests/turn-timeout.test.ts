@@ -158,6 +158,28 @@ describe("onTurnTimeout - auto-move", () => {
   });
 });
 
+describe("onTurnTimeout - stale callbacks", () => {
+  test("a timeout armed for an earlier turn does nothing after a move lands", async () => {
+    current = activeGame(Array(9).fill(null), "X");
+    const armedForX = JSON.stringify(current.gameState);
+    turnTimers.setStrikes(UUID, "O", 2);
+    const { io } = fakeIo();
+    const { socket } = fakeSocket("u1");
+    // biome-ignore lint/suspicious/noExplicitAny: fake io/socket
+    await handleMakeMove(io as any, socket as any, {
+      gameId: CODE,
+      moveData: { row: 0, col: 0 },
+    });
+    await __timerInternals.onTurnTimeout(io, UUID, armedForX);
+
+    expect(moves).toHaveLength(1);
+    expect(current.status).toBe("active");
+    expect(current.gameState.currentTurn).toBe("O");
+    expect(turnTimers.strikes(UUID, "O")).toBe(2);
+    expect(turnTimers.strikes(UUID, "X")).toBe(0);
+  });
+});
+
 describe("onTurnTimeout - abort", () => {
   test("a third consecutive timeout aborts and the responding opponent wins", async () => {
     current = activeGame(Array(9).fill(null), "X");

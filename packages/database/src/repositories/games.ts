@@ -340,6 +340,15 @@ export async function joinMatchmaking(input: {
   });
 }
 
+export async function releaseMatchmakingOwner(owner: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(802938)`);
+    await tx
+      .delete(matchmakingTicket)
+      .where(eq(matchmakingTicket.owner, owner));
+  });
+}
+
 export async function leaveMatchmaking(
   userId: string,
   owner: string,

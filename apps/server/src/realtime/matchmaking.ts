@@ -5,12 +5,20 @@ import {
   clientQueueLeaveSchema,
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
+import { childLogger } from "../logger";
 import { emitToUser } from "./rooms";
 import { rateLimiter, register } from "./socket-util";
 import { ensureMatchClock } from "./turn-based";
 
+const log = childLogger({ mod: "realtime:matchmaking" });
+
 export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
   const queueAllowed = rateLimiter(30, 60_000);
+  socket.on("disconnect", () => {
+    games.releaseMatchmakingOwner(socket.id).catch((err: unknown) => {
+      log.warn({ err, userId: socket.data.userId }, "queue cleanup failed");
+    });
+  });
   register(socket, "game:queue_join", async (payload, cb) => {
     const parsed = clientQueueJoinSchema.safeParse(payload);
     if (!parsed.success) {

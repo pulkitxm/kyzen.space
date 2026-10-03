@@ -60,6 +60,23 @@ describe.skipIf(!DB_UP)("transactional public matchmaking", () => {
     await games.leaveMatchmaking(b.id, b.id, TIC_TAC_TOE);
   });
 
+  it("releases a disconnected owner's tickets so nobody is matched against a closed tab", async () => {
+    const a = await h.makeUser("closedTab");
+    const b = await h.makeUser("survivor");
+    const c = await h.makeUser("latecomer");
+    expect(await join(a.id, { pool: "release" }, "socket-a")).toBeNull();
+    expect(await join(b.id, { pool: "other" }, "socket-b")).toBeNull();
+    await games.releaseMatchmakingOwner("socket-a");
+    expect(await join(c.id, { pool: "release" }, "socket-c")).toBeNull();
+    const remaining = await db
+      .select({ userId: schema.matchmakingTicket.userId })
+      .from(schema.matchmakingTicket)
+      .where(eq(schema.matchmakingTicket.userId, b.id));
+    expect(remaining).toHaveLength(1);
+    await games.leaveMatchmaking(b.id, "socket-b", TIC_TAC_TOE);
+    await games.leaveMatchmaking(c.id, "socket-c", TIC_TAC_TOE);
+  });
+
   it("cancels only the current owner's ticket", async () => {
     const a = await h.makeUser("tabs");
     await join(a.id, {}, "old-tab");
