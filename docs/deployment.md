@@ -49,7 +49,9 @@ bun run db:migrate
 docker compose up --build -d
 ```
 
-The default `compose.yaml` contains one app service and reads `.env` at runtime. It does not bundle or create databases. Schema migration is an explicit operation against the configured database; it does not happen on container startup. The image excludes `.env`, credentials, local dependencies, and repository metadata.
+The default `compose.yaml` contains one app service and reads `.env` at runtime. It does not bundle or create databases. The platform-schema migration restores room codes, normalized player seats, guest/account fields, and the full pattern enum that earlier development schema pushes added without migrations. Existing JSONB player seats are moved into `game_player` before the old column is removed. The repair can run on an already-normalized schema with an existing migration ledger. Databases initialized only with `db:push` need their migration ledger baselined before `db:migrate`; do not replay the original create-table migrations against them. CI initializes its disposable database through the real migration chain.
+
+Schema migration is an explicit operation against the configured database; it does not happen on container startup. The image excludes `.env`, credentials, local dependencies, and repository metadata.
 
 The app listens on container port 3000. `APP_PORT` changes the host binding. Place it behind an HTTPS proxy that forwards WebSocket upgrades for `/socket.io`. Configure the OAuth redirect as `<BETTER_AUTH_URL>/api/auth/callback/google`. Readiness is available at `/health` and checks Postgres plus the Redis adapter when configured.
 
