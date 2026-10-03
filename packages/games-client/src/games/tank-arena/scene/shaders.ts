@@ -334,6 +334,39 @@ void main() {
   });
 }
 
+export function snowfallMaterial() {
+  return new ShaderMaterial({
+    uniforms: { uScale: { value: 300 }, uTime: { value: 0 } },
+    vertexShader: `
+uniform float uScale;
+uniform float uTime;
+attribute float aSize;
+varying float vAlpha;
+void main() {
+  vec3 pos = position;
+  pos.x += sin(uTime * 0.5 + position.y * 0.1) * 0.3;
+  vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+  float depth = -mv.z;
+  gl_PointSize = aSize * uScale / max(depth, 0.001);
+  vAlpha = (1.0 - smoothstep(20.0, 80.0, depth)) * 0.7;
+  gl_Position = projectionMatrix * mv;
+}
+`,
+    fragmentShader: `
+varying float vAlpha;
+void main() {
+  float d = length(gl_PointCoord - vec2(0.5));
+  float soft = 1.0 - smoothstep(0.1, 0.5, d);
+  if (vAlpha <= 0.001 || soft <= 0.001) discard;
+  gl_FragColor = vec4(vec3(0.95, 0.98, 1.0), soft * vAlpha);
+}
+`,
+    transparent: true,
+    blending: NormalBlending,
+    depthWrite: false,
+  });
+}
+
 export function setUniform(
   material: ShaderMaterial,
   name: string,

@@ -16,11 +16,12 @@ import {
   MeshStandardMaterial,
   Object3D,
   Path,
+  PointLight,
   Shape,
   SphereGeometry,
 } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { SceneTank, TankModelKind } from "../view";
+import { mergeNonIndexed } from "./merge";
 
 export const MODEL_SIZE: Record<
   TankModelKind,
@@ -81,20 +82,6 @@ function placed(geometry: BufferGeometry, x: number, y: number, z: number) {
   return geometry;
 }
 
-function nonIndexed(geometry: BufferGeometry) {
-  const result = geometry.index ? geometry.toNonIndexed() : geometry;
-  if (result !== geometry) geometry.dispose();
-  return result;
-}
-
-function mergeParts(parts: BufferGeometry[]) {
-  const ready = parts.map(nonIndexed);
-  const result = mergeGeometries(ready, false);
-  for (const part of ready) part.dispose();
-  if (!result) throw new Error("tank geometry merge failed");
-  return result;
-}
-
 type PartName =
   | "bastionHull"
   | "bastionTurret"
@@ -122,6 +109,7 @@ export type TankKit = {
     rubber: MeshStandardMaterial;
     glass: MeshStandardMaterial;
     flame: MeshBasicMaterial;
+    glow: MeshBasicMaterial;
   };
   accent: (color: number) => MeshStandardMaterial;
   paint: (color: number) => MeshStandardMaterial;
@@ -151,7 +139,7 @@ export function createTankKit(): TankKit {
   }
   const skirt = placed(new BoxGeometry(2.6, 0.14, 1.78), 0, 0.84, 0);
   const plate = placed(new BoxGeometry(1.1, 0.42, 0.06), -0.3, 1.06, 0.8);
-  const bastionHullGeometry = mergeParts([
+  const bastionHullGeometry = mergeNonIndexed([
     bastionHull,
     skirt,
     plate,
@@ -178,7 +166,7 @@ export function createTankKit(): TankKit {
   brake.translate(1.62, 0, 0);
   const mantlet = new BoxGeometry(0.42, 0.42, 0.56);
   mantlet.translate(0.12, 0, 0);
-  const bastionBarrel = mergeParts([heavyBarrel, brake, mantlet]);
+  const bastionBarrel = mergeNonIndexed([heavyBarrel, brake, mantlet]);
   const tread = extrude(treadShape(), 0.48, 0.035);
   const wheel = new CylinderGeometry(0.27, 0.27, 0.36, 16);
   wheel.rotateX(Math.PI / 2);
@@ -219,7 +207,7 @@ export function createTankKit(): TankKit {
   strutA.translate(-0.5, 0.32, 0);
   const strutB = new BoxGeometry(0.07, 0.4, 0.07);
   strutB.translate(0.5, 0.32, 0);
-  const skidGeometry = mergeParts([skid, strutA, strutB]);
+  const skidGeometry = mergeNonIndexed([skid, strutA, strutB]);
   const fin = extrude(
     profile([
       [0, 0],
@@ -238,7 +226,7 @@ export function createTankKit(): TankKit {
   tipRing.translate(1.98, 0, 0);
   const collar = new CylinderGeometry(0.18, 0.18, 0.3, 14);
   collar.rotateX(Math.PI / 2);
-  const kestrelBarrel = mergeParts([slimBarrel, tipRing, collar]);
+  const kestrelBarrel = mergeNonIndexed([slimBarrel, tipRing, collar]);
   const nozzle = new ConeGeometry(0.18, 0.36, 12, 1, true);
   nozzle.rotateZ(Math.PI / 2);
   const flame = new ConeGeometry(0.14, 1.0, 10, 1, true);
@@ -267,31 +255,38 @@ export function createTankKit(): TankKit {
 
   const materials = {
     armor: new MeshStandardMaterial({
-      color: 0x8796a3,
-      metalness: 0.55,
-      roughness: 0.38,
+      color: 0x7a8a98,
+      metalness: 0.6,
+      roughness: 0.32,
     }),
     dark: new MeshStandardMaterial({
-      color: 0x20262d,
-      metalness: 0.55,
-      roughness: 0.5,
+      color: 0x1a2028,
+      metalness: 0.6,
+      roughness: 0.45,
     }),
     rubber: new MeshStandardMaterial({
-      color: 0x15181c,
-      metalness: 0.1,
-      roughness: 0.85,
+      color: 0x121518,
+      metalness: 0.08,
+      roughness: 0.9,
     }),
     glass: new MeshStandardMaterial({
-      color: 0x0f2a3a,
-      metalness: 0.2,
-      roughness: 0.08,
-      emissive: 0x2a8fbf,
-      emissiveIntensity: 0.9,
+      color: 0x0a2030,
+      metalness: 0.25,
+      roughness: 0.05,
+      emissive: 0x30a0d0,
+      emissiveIntensity: 1.2,
     }),
     flame: new MeshBasicMaterial({
-      color: 0x7fd8ff,
+      color: 0x80e0ff,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
+      blending: AdditiveBlending,
+      depthWrite: false,
+    }),
+    glow: new MeshBasicMaterial({
+      color: 0xffa060,
+      transparent: true,
+      opacity: 0.8,
       blending: AdditiveBlending,
       depthWrite: false,
     }),
@@ -395,13 +390,22 @@ export class TankModel {
   private readonly wheels: Mesh[] = [];
   private readonly teeth: InstancedMesh | null;
   private readonly flames: Mesh[] = [];
+  private readonly lights: PointLight[] = [];
+  private readonly paintMeshes: Mesh[] = [];
+  private readonly accentMeshes: Mesh[] = [];
   private readonly detailed: boolean;
+  private readonly basePaintColor: Color;
+  private readonly baseAccentColor: Color;
   private facing = 1;
   private recoil = 0;
   private squash = 0;
   private travel = 0;
   private thrust = 0;
   private visible = true;
+  private hitFlash = 0;
+  private damageLevel = 0;
+  private muzzleFlash = 0;
+  private muzzleLight: PointLight | null = null;
 
   constructor(
     kit: TankKit,
@@ -411,8 +415,11 @@ export class TankModel {
   ) {
     this.kind = kind;
     this.detailed = detailed;
+    this.basePaintColor = new Color(color);
+    this.baseAccentColor = new Color(color);
     this.root.add(this.body);
     const accent = kit.accent(color);
+    const paint = kit.paint(color);
     const size = MODEL_SIZE[kind];
     this.pivot.position.set(kind === "bastion" ? 0.36 : 0.34, size.pivotY, 0);
     this.pivot.add(this.barrel);
@@ -420,7 +427,9 @@ export class TankModel {
 
     if (kind === "bastion") {
       this.body.add(part(kit, "bastionHull", kit.materials.armor));
-      this.body.add(part(kit, "bastionTurret", kit.paint(color)));
+      const turret = part(kit, "bastionTurret", paint);
+      this.paintMeshes.push(turret);
+      this.body.add(turret);
       this.barrel.add(part(kit, "bastionBarrel", kit.materials.dark));
       for (const z of [-0.7, 0.7]) {
         const tread = part(kit, "tread", kit.materials.rubber);
@@ -441,9 +450,11 @@ export class TankModel {
       }
       const stripe = part(kit, "stripe", accent, false);
       stripe.position.set(-0.05, 1.42, 0.8);
+      this.accentMeshes.push(stripe);
       this.body.add(stripe);
       const lamp = part(kit, "lamp", accent, false);
       lamp.position.set(1.42, 1.0, 0.45);
+      this.accentMeshes.push(lamp);
       this.body.add(lamp);
       const antenna = part(kit, "antenna", kit.materials.dark, false);
       antenna.position.set(-0.7, 2.06, -0.4);
@@ -451,6 +462,7 @@ export class TankModel {
       this.body.add(antenna);
       const tip = part(kit, "tip", accent, false);
       tip.position.set(-0.94, 2.92, -0.4);
+      this.accentMeshes.push(tip);
       this.body.add(tip);
       this.teeth = detailed
         ? new InstancedMesh(kit.geometries.tooth, kit.materials.dark, TEETH * 2)
@@ -459,9 +471,23 @@ export class TankModel {
         this.teeth.castShadow = false;
         this.body.add(this.teeth);
       }
+      if (detailed) {
+        const headlight = new PointLight(color, 2, 6);
+        headlight.position.set(1.5, 1.0, 0);
+        this.lights.push(headlight);
+        this.body.add(headlight);
+        const muzzleLight = new PointLight(0xffd080, 0, 10);
+        muzzleLight.position.set(size.muzzle, 0, 0);
+        this.muzzleLight = muzzleLight;
+        this.barrel.add(muzzleLight);
+      }
     } else {
-      this.body.add(part(kit, "kestrelHull", kit.paint(color)));
-      this.body.add(part(kit, "canopy", accent, false));
+      const hull = part(kit, "kestrelHull", paint);
+      this.paintMeshes.push(hull);
+      this.body.add(hull);
+      const canopy = part(kit, "canopy", accent, false);
+      this.accentMeshes.push(canopy);
+      this.body.add(canopy);
       this.barrel.add(part(kit, "kestrelBarrel", kit.materials.dark));
       for (const z of [-0.48, 0.48]) {
         const skid = part(kit, "skid", kit.materials.dark);
@@ -472,6 +498,7 @@ export class TankModel {
         const fin = part(kit, "fin", accent, false);
         fin.position.set(-0.86, 1.08, z);
         fin.rotation.x = z > 0 ? -0.35 : 0.35;
+        this.accentMeshes.push(fin);
         this.body.add(fin);
         const nozzle = part(kit, "nozzle", kit.materials.dark, false);
         nozzle.position.set(-1.14, 0.78, z * 0.8);
@@ -483,6 +510,16 @@ export class TankModel {
         this.body.add(flame);
       }
       this.teeth = null;
+      if (detailed) {
+        const thrusterGlow = new PointLight(0x60c0ff, 3, 5);
+        thrusterGlow.position.set(-1.3, 0.78, 0);
+        this.lights.push(thrusterGlow);
+        this.body.add(thrusterGlow);
+        const muzzleLight = new PointLight(0xffd080, 0, 8);
+        muzzleLight.position.set(size.muzzle, 0, 0);
+        this.muzzleLight = muzzleLight;
+        this.barrel.add(muzzleLight);
+      }
     }
     this.layoutTeeth();
   }
@@ -499,6 +536,7 @@ export class TankModel {
 
   fire() {
     this.recoil = 1;
+    this.muzzleFlash = 1;
   }
 
   land() {
@@ -507,6 +545,14 @@ export class TankModel {
 
   boost() {
     this.thrust = 1;
+  }
+
+  hit() {
+    this.hitFlash = 1;
+  }
+
+  setDamage(level: number) {
+    this.damageLevel = Math.min(1, Math.max(0, level));
   }
 
   muzzleWorld(target: { x: number; y: number }) {
@@ -555,6 +601,11 @@ export class TankModel {
     this.recoil = Math.max(0, this.recoil - dt * 3.2);
     this.barrel.position.x = -0.32 * this.recoil * this.recoil;
 
+    this.muzzleFlash = Math.max(0, this.muzzleFlash - dt * 8);
+    if (this.muzzleLight) {
+      this.muzzleLight.intensity = this.muzzleFlash * this.muzzleFlash * 40;
+    }
+
     this.squash = Math.max(0, this.squash - dt * 3);
     const s = Math.sin(this.squash * Math.PI) * 0.22;
     const bob =
@@ -586,6 +637,32 @@ export class TankModel {
           0.6 + this.thrust * 0.3,
         );
       }
+      for (const light of this.lights) {
+        light.intensity = 2 + this.thrust * 4;
+      }
+    }
+
+    this.hitFlash = Math.max(0, this.hitFlash - dt * 5);
+    const flash = this.hitFlash * this.hitFlash;
+    const white = new Color(0xffffff);
+    const scorched = new Color(0x2a1a0a);
+    const dmg = this.damageLevel * 0.6;
+    for (const mesh of this.paintMeshes) {
+      const material = mesh.material as MeshStandardMaterial;
+      material.emissive
+        .copy(this.basePaintColor)
+        .lerp(scorched, dmg)
+        .lerp(white, flash);
+      material.emissiveIntensity = 0.12 + flash * 2;
+    }
+    for (const mesh of this.accentMeshes) {
+      const material = mesh.material as MeshStandardMaterial;
+      const intensity = 0.85 * (1 - dmg * 0.5) + flash * 2;
+      material.emissive.copy(this.baseAccentColor).lerp(white, flash);
+      material.emissiveIntensity = intensity;
+    }
+    for (const light of this.lights) {
+      light.intensity *= 1 - dmg * 0.4;
     }
   }
 }
