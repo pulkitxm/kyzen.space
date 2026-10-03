@@ -28,11 +28,14 @@ import {
 import { Nameplates } from "./hud";
 import { MatchHud } from "./match-hud";
 import {
+  type AimDrag,
   actionSlots,
   aimFromDrag,
   airstrikeWarning,
   type BoardMode,
+  beginAimDrag,
   deriveMode,
+  dragPoint,
   localRoleOf,
   lockSummary,
   parseTankState,
@@ -98,6 +101,7 @@ function TankArenaMatch({
   const [dragging, setDragging] = useState(false);
   const [left, setLeft] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<AimDrag | null>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -190,8 +194,7 @@ function TankArenaMatch({
     plan.setAction(action);
   };
 
-  const aimAt = (clientX: number, clientY: number) => {
-    const point = scene.handle?.screenToWorld(clientX, clientY);
+  const aimAt = (point: { x: number; y: number } | null) => {
     if (!point || !me?.kind) return;
     plan.setAim(
       aimFromDrag(
@@ -201,6 +204,35 @@ function TankArenaMatch({
         isJumpAction(me.kind, plan.action),
       ),
     );
+  };
+
+  const startAim = (clientX: number, clientY: number) => {
+    const handle = scene.handle;
+    dragRef.current = handle
+      ? beginAimDrag(handle.screenToWorld, clientX, clientY)
+      : null;
+    setDragging(true);
+    aimAt(dragRef.current?.press ?? null);
+  };
+
+  const moveAim = (clientX: number, clientY: number) => {
+    const drag = dragRef.current;
+    const handle = scene.handle;
+    if (!drag || !handle) return;
+    aimAt(
+      dragPoint(
+        drag,
+        handle.screenToWorld,
+        clientX,
+        clientY,
+        arenaWidth(state),
+      ),
+    );
+  };
+
+  const endAim = () => {
+    dragRef.current = null;
+    setDragging(false);
   };
 
   const leave = () => {
@@ -253,12 +285,9 @@ function TankArenaMatch({
         label={`Tank Arena, ${label}. Drag from your tank to aim, or use the arrow keys.`}
         minimap={minimapRef}
         onReady={onReady}
-        onAimStart={(x, y) => {
-          setDragging(true);
-          aimAt(x, y);
-        }}
-        onAimMove={aimAt}
-        onAimEnd={() => setDragging(false)}
+        onAimStart={startAim}
+        onAimMove={moveAim}
+        onAimEnd={endAim}
       >
         <Nameplates
           entries={

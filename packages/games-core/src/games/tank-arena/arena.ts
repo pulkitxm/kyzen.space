@@ -1,5 +1,10 @@
-import { MINE_LIFT, MODULE_WIDTH, WATER_Y } from "./constants";
-import { ceilDiv } from "./math";
+import { ceilDiv, Terrain } from "@kyzen/physics";
+import {
+  MINE_LIFT,
+  MODULE_WIDTH,
+  TERRAIN_CELL_WIDTH,
+  WATER_Y,
+} from "./constants";
 
 export type Box = { x0: number; y0: number; x1: number; y1: number };
 
@@ -17,7 +22,7 @@ export type Arena = {
   mineAnchors: Anchor[];
 };
 
-export const MODULE_BOXES: readonly Box[] = [
+const MODULE_BOXES: readonly Box[] = [
   { x0: 0, y0: -3, x1: 13, y1: 0 },
   { x0: 17, y0: -3, x1: 32, y1: 0 },
   { x0: 2, y0: 7, x1: 10.5, y1: 8 },
@@ -89,106 +94,23 @@ export function buildArena(modules: number): Arena {
   };
 }
 
-export function sweepBox(
-  x0: number,
-  y0: number,
-  dx: number,
-  dy: number,
-  minX: number,
-  minY: number,
-  maxX: number,
-  maxY: number,
-): number {
-  let t0 = 0;
-  let t1 = 1;
-  if (dx === 0) {
-    if (x0 < minX || x0 > maxX) return -1;
-  } else {
-    let a = (minX - x0) / dx;
-    let b = (maxX - x0) / dx;
-    if (a > b) {
-      const s = a;
-      a = b;
-      b = s;
-    }
-    if (a > t0) t0 = a;
-    if (b < t1) t1 = b;
-    if (t0 > t1) return -1;
-  }
-  if (dy === 0) {
-    if (y0 < minY || y0 > maxY) return -1;
-  } else {
-    let a = (minY - y0) / dy;
-    let b = (maxY - y0) / dy;
-    if (a > b) {
-      const s = a;
-      a = b;
-      b = s;
-    }
-    if (a > t0) t0 = a;
-    if (b < t1) t1 = b;
-    if (t0 > t1) return -1;
-  }
-  return t0;
-}
+const terrains = new Map<number, Terrain>();
 
-export function sweepTerrain(
-  x0: number,
-  y0: number,
-  dx: number,
-  dy: number,
-): number {
-  let best = -1;
-  const first = Math.floor(Math.min(x0, x0 + dx) / MODULE_WIDTH);
-  const last = Math.floor(Math.max(x0, x0 + dx) / MODULE_WIDTH);
-  for (let k = first; k <= last; k++) {
-    const shift = k * MODULE_WIDTH;
-    for (const box of MODULE_BOXES) {
-      const t = sweepBox(
-        x0,
-        y0,
-        dx,
-        dy,
-        box.x0 + shift,
-        box.y0,
-        box.x1 + shift,
-        box.y1,
-      );
-      if (t >= 0 && (best < 0 || t < best)) best = t;
-    }
+export function terrainFor(modules: number): Terrain {
+  let terrain = terrains.get(modules);
+  if (!terrain) {
+    terrain = new Terrain({
+      boxes: buildArena(modules).boxes.map((box) => ({
+        minX: box.x0,
+        minY: box.y0,
+        maxX: box.x1,
+        maxY: box.y1,
+      })),
+      width: modules * MODULE_WIDTH,
+      wrap: true,
+      cellWidth: TERRAIN_CELL_WIDTH,
+    });
+    terrains.set(modules, terrain);
   }
-  return best;
-}
-
-const LOS_INSET = 0.01;
-
-export function lineOfSight(
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-): boolean {
-  const dx = x1 - x0;
-  const dy = y1 - y0;
-  const first = Math.floor(Math.min(x0, x1) / MODULE_WIDTH);
-  const last = Math.floor(Math.max(x0, x1) / MODULE_WIDTH);
-  for (let k = first; k <= last; k++) {
-    const shift = k * MODULE_WIDTH;
-    for (const box of MODULE_BOXES) {
-      if (
-        sweepBox(
-          x0,
-          y0,
-          dx,
-          dy,
-          box.x0 + shift + LOS_INSET,
-          box.y0 + LOS_INSET,
-          box.x1 + shift - LOS_INSET,
-          box.y1 - LOS_INSET,
-        ) >= 0
-      )
-        return false;
-    }
-  }
-  return true;
+  return terrain;
 }

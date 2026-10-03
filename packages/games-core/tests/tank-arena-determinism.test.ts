@@ -1,90 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
   BotDifficulty,
-  TankAction,
   TankArenaMove,
   TankArenaState,
 } from "@kyzen/shared/types";
 import { chachaBlock, deriveSecret } from "../src/games/tank-arena/math";
-import {
-  canUse,
-  type Frame,
-  resolutionInput,
-  simulateRound,
-} from "../src/index";
-import { apply, engine, lock, seats, started } from "./tank-arena-fixtures";
-
-const GOLDEN_STATE =
-  "a2106fd20659f05f006f9d095e9d0a6d7f8020649ff46a6a63dea4bbb933ca55";
-const GOLDEN_FRAMES =
-  "b1ddd52bd7721ff8b0f410f043dcb53f42c1828fa0d83e45ef47a1d8530700a6";
-
-const SCRIPT: Record<string, [TankAction, number, number][]> = {
-  p1: [
-    ["missile", 40, 0.7],
-    ["specialA", 45, 0.75],
-    ["shield", 90, 0.5],
-    ["missile", 135, 0.8],
-    ["specialB", 0, 0.5],
-    ["missile", 60, 0.9],
-  ],
-  p2: [
-    ["missile", 140, 0.65],
-    ["jump", 70, 0.5],
-    ["specialA", 120, 0.6],
-    ["missile", 30, 1],
-    ["specialB", 100, 0.7],
-    ["shield", 90, 0.5],
-  ],
-  p3: [
-    ["specialA", 60, 0.8],
-    ["missile", 150, 0.55],
-    ["jump", 110, 0.8],
-    ["specialB", 80, 0.9],
-    ["missile", 10, 1],
-    ["missile", 170, 0.45],
-  ],
-  p4: [
-    ["jump", 70, 0.5],
-    ["specialB", 180, 0.5],
-    ["missile", 100, 0.75],
-    ["specialA", 20, 0.95],
-    ["missile", -10, 1],
-    ["jump", 30, 1],
-  ],
-};
-
-function sha(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function scripted(): { state: TankArenaState; frames: Frame[] } {
-  let state = started(["bastion", "kestrel", "kestrel", "bastion"], {
-    teams: true,
-    seed: 2026,
-  });
-  let frames: Frame[] = [];
-  for (let round = 1; round <= 6 && state.phase === "plan"; round++) {
-    for (const role of engine.pendingRoles?.(state) ?? []) {
-      const [action, angle, power] = SCRIPT[role]?.[round - 1] ?? [
-        "idle",
-        90,
-        0.5,
-      ];
-      const move = canUse(state, role, action)
-        ? lock(round, action, angle, power)
-        : lock(round, "missile", angle, power);
-      state = apply(state, role, move);
-    }
-    const replay = resolutionInput(state);
-    frames = [];
-    if (replay) simulateRound(replay, (frame) => frames.push(frame));
-  }
-  return { state, frames };
-}
+import { resolutionInput, simulateRound } from "../src/index";
+import { apply, engine, seats, started } from "./tank-arena-fixtures";
+import { GOLDEN, measure, scripted } from "./tank-arena-golden";
 
 function playBots(
   difficulties: BotDifficulty[],
@@ -112,19 +38,22 @@ function playBots(
 }
 
 describe("determinism", () => {
-  test("a fixed four-player script matches the golden hashes", () => {
-    const { state, frames } = scripted();
-    expect(state.round).toBe(7);
-    const frameText = JSON.stringify(
-      frames.map((frame) => [
-        frame.step,
-        frame.tanks.map((t) => [t.x, t.y, t.hp]),
-        frame.projectiles.map((p) => [p.x, p.y]),
-      ]),
-    );
-    expect(sha(JSON.stringify(state))).toBe(GOLDEN_STATE);
-    expect(sha(frameText)).toBe(GOLDEN_FRAMES);
+  test("a fixed four-player script and repeated jumps match the goldens", () => {
+    expect(scripted().state.round).toBe(7);
+    expect(measure()).toEqual(GOLDEN);
   });
+
+  test("node reproduces the same golden checksums", () => {
+    const run = spawnSync(
+      "bun",
+      [join(import.meta.dir, "..", "scripts", "verify-determinism.ts")],
+      { encoding: "utf8" },
+    );
+    expect(run.stdout).toContain(
+      "bun and node reproduce every golden checksum",
+    );
+    expect(run.status).toBe(0);
+  }, 60_000);
 
   test("simulating twice, interleaved with other worlds, is identical", () => {
     const first = scripted();

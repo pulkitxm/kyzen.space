@@ -40,7 +40,7 @@ export type {
   AimPoint,
   TrajectoryPreview,
 } from "./aim";
-export { aimVector, previewTrajectory } from "./aim";
+export { aimAngle, aimVector, previewTrajectory } from "./aim";
 export type { Anchor, Arena, Box, SpawnSlot } from "./arena";
 export { buildArena, modulesFor } from "./arena";
 export { botMove } from "./bots";
@@ -75,4 +75,5 @@ export type {
   SimEvent,
   SimPhase,
 } from "./simulate";
-export { shieldRadius, simulateRound } from "./simulate";
+export { simulateRound } from "./simulate";
+export { shieldRadius } from "./world";

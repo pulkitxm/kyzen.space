@@ -43,6 +43,8 @@ A completed outcome is `{ status: "completed", winnerRoles, draw }`. Without a d
 
 Public matchmaking supports turn-based and simultaneous engines with `reduce`. Configs are validated by `configSchema` and matched by canonical JSONB equality. `playerCount(config)` sets the group size (default 2), and `GameDefinition.queues` lists find-page variants, each with its own config. When a queue config has `mode: "teams"`, public seats alternate teams `A` and `B`; otherwise each seat is its own team. Public queues never add bots. Keep state and moves role-based: never embed account IDs, usernames, avatars, or profile data in engine state. Public wire snapshots replace account IDs with match-scoped role aliases, including the viewer ID supplied to the board. The shared shell supplies temporary chat and disables profile popups. See [public matchmaking](architecture/matchmaking.md).
 
+**Motion and collisions.** A game whose rounds resolve as moving bodies should simulate them with `@kyzen/physics` inside `reduce` instead of writing its own stepper: build a `World` per resolution from the stored state, step it at a fixed rate, and persist rounded results so clients can replay the same frames. See [physics](architecture/physics.md).
+
 The type contract also describes realtime engines, but no server loop runs `step` yet. A realtime game needs platform work before it can be registered as playable.
 
 ## Board contract

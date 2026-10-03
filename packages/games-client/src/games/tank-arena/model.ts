@@ -1,4 +1,6 @@
 import {
+  aimAngle,
+  aimVector,
   canUse,
   cooldownsOf,
   JUMP_MAX_ANGLE,
@@ -39,6 +41,8 @@ export type BoardMode =
   | "finished";
 
 export type Aim = { angle: number; power: number };
+
+type Point = { x: number; y: number };
 
 export type RosterEntry = {
   role: string;
@@ -277,24 +281,53 @@ export function clampAim(aim: Aim, jumpLike: boolean): Aim {
 }
 
 export function aimFromDrag(
-  origin: { x: number; y: number },
-  point: { x: number; y: number },
+  origin: Point,
+  point: Point,
   width: number,
   jumpLike: boolean,
 ): Aim {
   const dx = wrappedDelta(origin.x, point.x, width);
   const dy = point.y - origin.y;
   const length = Math.sqrt(dx * dx + dy * dy);
-  const angle = length < 1e-6 ? 90 : (Math.atan2(dy, dx) * 180) / Math.PI;
+  const angle = length < 1e-6 ? 90 : aimAngle(dx, dy);
   return clampAim({ angle, power: length / DRAG_FULL_POWER }, jumpLike);
 }
 
-export function aimTarget(origin: { x: number; y: number }, aim: Aim) {
-  const radians = (aim.angle * Math.PI) / 180;
+export type ScreenToWorld = (clientX: number, clientY: number) => Point | null;
+
+export type AimDrag = { clientX: number; clientY: number; press: Point };
+
+export function beginAimDrag(
+  toWorld: ScreenToWorld,
+  clientX: number,
+  clientY: number,
+): AimDrag | null {
+  const press = toWorld(clientX, clientY);
+  return press ? { clientX, clientY, press } : null;
+}
+
+export function dragPoint(
+  drag: AimDrag,
+  toWorld: ScreenToWorld,
+  clientX: number,
+  clientY: number,
+  width: number,
+): Point | null {
+  const start = toWorld(drag.clientX, drag.clientY);
+  const now = toWorld(clientX, clientY);
+  if (!start || !now) return null;
+  return {
+    x: drag.press.x + wrappedDelta(start.x, now.x, width),
+    y: drag.press.y + (now.y - start.y),
+  };
+}
+
+export function aimTarget(origin: Point, aim: Aim) {
+  const direction = aimVector(aim.angle);
   const reach = aim.power * DRAG_FULL_POWER;
   return {
-    x: origin.x + Math.cos(radians) * reach,
-    y: origin.y + Math.sin(radians) * reach,
+    x: origin.x + direction.x * reach,
+    y: origin.y + direction.y * reach,
   };
 }
 

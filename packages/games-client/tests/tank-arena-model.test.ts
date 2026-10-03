@@ -10,11 +10,13 @@ import {
   actionFromKey,
   actionSlots,
   aimFromDrag,
+  beginAimDrag,
   clampAim,
   cooldownPips,
   DRAG_FULL_POWER,
   defaultAim,
   deriveMode,
+  dragPoint,
   localRoleOf,
   lockSummary,
   nudgeAim,
@@ -99,6 +101,134 @@ describe("aimFromDrag", () => {
 
   test("a zero length drag aims straight up", () => {
     expect(aimFromDrag(origin, origin, 64, false).angle).toBe(90);
+  });
+});
+
+type Camera = {
+  x: number;
+  y: number;
+  distance: number;
+  width: number;
+  height: number;
+  left?: number;
+  top?: number;
+};
+
+function lens(camera: Camera) {
+  const eye = { x: camera.x, y: camera.y + 3.2, z: camera.distance };
+  const fz = -camera.distance;
+  const fy = -3.2;
+  const fl = Math.sqrt(fy * fy + fz * fz);
+  const forward = { x: 0, y: fy / fl, z: fz / fl };
+  const right = { x: 1, y: 0, z: 0 };
+  const up = { x: 0, y: -forward.z, z: forward.y };
+  const tanHalf = Math.tan((38 * Math.PI) / 360);
+  const aspect = camera.width / camera.height;
+  const left = camera.left ?? 0;
+  const top = camera.top ?? 0;
+  return {
+    toScreen(point: { x: number; y: number }) {
+      const v = { x: point.x - eye.x, y: point.y - eye.y, z: -eye.z };
+      const depth = v.y * forward.y + v.z * forward.z;
+      const sx = v.x / (depth * tanHalf * aspect);
+      const sy = (v.y * up.y + v.z * up.z) / (depth * tanHalf);
+      return {
+        x: left + ((sx + 1) / 2) * camera.width,
+        y: top + ((1 - sy) / 2) * camera.height,
+      };
+    },
+    toWorld(clientX: number, clientY: number) {
+      const sx = ((clientX - left) / camera.width) * 2 - 1;
+      const sy = 1 - ((clientY - top) / camera.height) * 2;
+      const dx = right.x * sx * tanHalf * aspect;
+      const dy = forward.y + up.y * sy * tanHalf;
+      const dz = forward.z + up.z * sy * tanHalf;
+      const t = -eye.z / dz;
+      return { x: eye.x + dx * t, y: eye.y + dy * t };
+    },
+  };
+}
+
+function dragWith(
+  press: ReturnType<typeof lens>,
+  move: ReturnType<typeof lens>,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  origin: { x: number; y: number },
+) {
+  const drag = beginAimDrag(press.toWorld, from.x, from.y);
+  if (!drag) throw new Error("no drag");
+  const point = dragPoint(drag, move.toWorld, to.x, to.y, 64);
+  if (!point) throw new Error("no point");
+  return aimFromDrag(origin, point, 64, true);
+}
+
+describe("drag aiming in world space", () => {
+  const origin = { x: 20, y: 0.9 };
+  const press = { x: 20.3, y: 1.1 };
+  const release = { x: 24.1, y: 6.7 };
+  const expected = aimFromDrag(origin, release, 64, true);
+
+  test("the same world drag gives the same plan at any zoom or canvas size", () => {
+    for (const camera of [
+      { x: 22, y: 4, distance: 60, width: 800, height: 450 },
+      { x: 22, y: 4, distance: 35, width: 1600, height: 900 },
+      { x: 18, y: 2, distance: 90, width: 390, height: 700, left: 40 },
+      { x: 25, y: 7, distance: 60, width: 1280, height: 400, top: 120 },
+    ]) {
+      const view = lens(camera);
+      const aim = dragWith(
+        view,
+        view,
+        view.toScreen(press),
+        view.toScreen(release),
+        origin,
+      );
+      expect(aim).toEqual(expected);
+    }
+  });
+
+  test("the camera following or shaking mid-drag does not move the aim", () => {
+    const still = lens({ x: 22, y: 4, distance: 60, width: 800, height: 450 });
+    const from = still.toScreen(press);
+    const to = still.toScreen(release);
+    const panned = lens({
+      x: 25.5,
+      y: 5.2,
+      distance: 60,
+      width: 800,
+      height: 450,
+    });
+    expect(dragWith(still, panned, from, to, origin)).toEqual(expected);
+    expect(
+      aimFromDrag(origin, panned.toWorld(to.x, to.y), 64, true),
+    ).not.toEqual(expected);
+  });
+
+  test("the same on-screen drag from the tank repeats the plan every round", () => {
+    const plans = [
+      { x: 20, y: 0.9 },
+      { x: 9.3, y: 8.9 },
+      { x: 51.75, y: 3.1 },
+    ].map((tank) => {
+      const view = lens({
+        x: tank.x + 2,
+        y: tank.y + 3,
+        distance: 60,
+        width: 800,
+        height: 450,
+      });
+      const at = view.toScreen(tank);
+      return dragWith(
+        view,
+        view,
+        { x: at.x + 6, y: at.y - 4 },
+        { x: at.x + 70, y: at.y - 95 },
+        tank,
+      );
+    });
+    expect(plans[1]).toEqual(plans[0]);
+    expect(plans[2]).toEqual(plans[0]);
   });
 });
 

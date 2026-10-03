@@ -41,6 +41,7 @@ A conversation-backed game also mounts the existing chat view through `GameChatS
 
 | Guide | Scope |
 | --- | --- |
+| [physics.md](physics.md) | Deterministic 2D physics, math, geometry, world simulation |
 | [games-client.md](games-client.md) | Board contract, shared session, registry, replay |
 | [games-core-engine.md](games-core-engine.md) | Pure engines and registry conformance |
 | [games-core-schemas.md](games-core-schemas.md) | Generic game contracts and validation |

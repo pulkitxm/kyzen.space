@@ -27,7 +27,7 @@ function tank(role: string) {
 
 function state(): TankArenaState {
   return {
-    version: 1,
+    version: 2,
     secret: [1, 2, 3, 4, 5, 6, 7, 4_294_967_295],
     round: 1,
     phase: "plan",
@@ -152,7 +152,7 @@ describe("tank arena state schema", () => {
       { ...value, seed: 12 },
       { ...value, secret: [1, 2, 3] },
       { ...value, secret: [1, 2, 3, 4, 5, 6, 7, 2 ** 32] },
-      { ...value, version: 2 },
+      { ...value, version: 1 },
       { ...value, phase: "replay" },
       { ...value, round: 41 },
       { ...value, modules: 1 },
