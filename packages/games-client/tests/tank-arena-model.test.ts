@@ -21,9 +21,11 @@ import {
   parseTankState,
   rosterEntries,
   secondsLeft,
+  spacedColors,
   statBars,
   TEAM_PALETTE,
   teamColor,
+  teamColors,
 } from "../src/games/tank-arena/model";
 
 function seats(count: number, teams = false): Seat[] {
@@ -206,6 +208,33 @@ describe("HUD derivations", () => {
       3,
     );
     expect(teamColor(ffa, "p1")).toBe(TEAM_PALETTE[0]);
+  });
+
+  test("any number of players gets distinct colors", () => {
+    for (const count of [2, 8, 9, 25, 120]) {
+      expect(new Set(spacedColors(count)).size).toBe(count);
+    }
+    const crowd = start(40);
+    const colors = [...teamColors(crowd).values()];
+    expect(new Set(colors).size).toBe(40);
+    const mine = teamColor(crowd, "p1");
+    expect(colors.filter((color) => color === mine).length).toBe(1);
+  });
+
+  test("teams keep one color per team in large matches", () => {
+    const letters = "ABCDEFGHIJ";
+    const big = tankArenaEngine.createInitialState(
+      Array.from({ length: 30 }, (_, i) => ({
+        role: `p${i + 1}`,
+        team: letters[i % letters.length] ?? "A",
+        bot: null,
+      })),
+      { config: { mode: "teams" }, seed: 5 },
+    );
+    const colors = teamColors(big);
+    expect(colors.get("p1")).toBe(colors.get("p11"));
+    expect(colors.get("p1")).toBe(colors.get("p21"));
+    expect(new Set(colors.values()).size).toBe(10);
   });
 
   test("action slots disable specials on cooldown and after locking", () => {

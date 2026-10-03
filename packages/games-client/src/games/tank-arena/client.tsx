@@ -28,7 +28,6 @@ import {
 import { Nameplates } from "./hud";
 import { MatchHud } from "./match-hud";
 import {
-  actionFromKey,
   actionSlots,
   aimFromDrag,
   airstrikeWarning,
@@ -36,13 +35,14 @@ import {
   deriveMode,
   localRoleOf,
   lockSummary,
-  nudgeAim,
   parseTankState,
+  replayView,
   rosterEntries,
   tankOf,
   teamColor,
 } from "./model";
 import { sceneContext } from "./replay";
+import { handlePlanKey } from "./shortcuts";
 import type { ArenaHandle } from "./view";
 
 export function TankArenaBoard(props: GameClientProps) {
@@ -80,15 +80,6 @@ function phaseLabel(mode: BoardMode, round: number | null) {
   }
 }
 
-function isEditable(target: EventTarget | null) {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-}
-
 function TankArenaMatch({
   game,
   userId,
@@ -105,6 +96,8 @@ function TankArenaMatch({
   });
   const [pickedKind, setPickedKind] = useState<TankKind | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [left, setLeft] = useState(false);
+  const boardRef = useRef<HTMLDivElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -117,7 +110,14 @@ function TankArenaMatch({
     () => sceneContext(state, game.players, localRole, pickedKind),
     [state, game.players, localRole, pickedKind],
   );
-  const replay = useResolutionReplay({ state, ctx, scene, deadline, sounds });
+  const replay = useResolutionReplay({
+    state,
+    ctx,
+    scene,
+    deadline,
+    live,
+    sounds,
+  });
   const mode = deriveMode({ state, localRole, replaying: replay.active });
   const plan = usePlanState(state, localRole);
   const me = tankOf(state, localRole);
@@ -203,36 +203,24 @@ function TankArenaMatch({
     );
   };
 
+  const leave = () => {
+    if (!live || !connected || left) return;
+    makeMove({ type: "forfeit", round: state.round });
+    setLeft(true);
+  };
+
   const onPlanKey = useEffectEvent((event: KeyboardEvent) => {
-    if (
-      isEditable(event.target) ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey
-    ) {
-      return;
-    }
-    if (event.key === "Enter") {
-      if (event.target instanceof HTMLButtonElement) return;
-      event.preventDefault();
-      lock();
-      return;
-    }
-    const action = actionFromKey(event.key);
-    if (action) {
-      selectAction(action);
-      return;
-    }
-    const next = nudgeAim(
-      plan.aim,
-      event.key,
-      event.shiftKey,
-      isJumpAction(me?.kind ?? null, plan.action),
+    handlePlanKey(
+      event,
+      { board: boardRef.current, body: document.body },
+      {
+        aim: plan.aim,
+        jumpLike: isJumpAction(me?.kind ?? null, plan.action),
+        lock,
+        selectAction,
+        setAim: plan.setAim,
+      },
     );
-    if (next) {
-      event.preventDefault();
-      plan.setAim(next);
-    }
   });
 
   useEffect(() => {
@@ -249,15 +237,13 @@ function TankArenaMatch({
     [sounds],
   );
 
-  const shownState =
-    replay.active && state.resolution
-      ? { ...state, tanks: state.resolution.before.tanks }
-      : state;
+  const shownState = replay.active ? replayView(state) : state;
   const roster = rosterEntries(shownState, game.players, localRole);
   const label = phaseLabel(mode, replay.round);
 
   return (
     <div
+      ref={boardRef}
       className="relative isolate min-h-105 w-full flex-1 overflow-hidden rounded-2xl bg-[#020812] text-slate-50"
       data-mode={mode}
     >
@@ -288,15 +274,17 @@ function TankArenaMatch({
       <MatchHud
         mode={mode}
         phase={state.phase}
-        round={mode === "replay" ? (replay.round ?? state.round) : state.round}
+        round={shownState.round}
         label={label}
         deadline={deadline}
         timerActive={mode === "plan" && !lockState.pending}
-        summary={lockSummary(state)}
+        summary={lockSummary(shownState)}
         roster={roster}
         airstrike={airstrikeWarning(state) !== null && mode !== "replay"}
         player={Boolean(localRole)}
         live={live}
+        connected={connected}
+        canLeave={!left}
         submitted={submitted}
         picked={pickedKind}
         previewColor={localRole ? teamColor(state, localRole) : 0x3edcff}
@@ -313,7 +301,7 @@ function TankArenaMatch({
         onSelectAction={selectAction}
         onLock={lock}
         onSkip={replay.skip}
-        onLeave={() => makeMove({ type: "forfeit", round: state.round })}
+        onLeave={leave}
       />
     </div>
   );

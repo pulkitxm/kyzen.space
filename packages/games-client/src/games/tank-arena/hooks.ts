@@ -18,6 +18,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { TankAudio } from "./audio";
 import {
@@ -51,20 +52,36 @@ function roundTimeOf(state: TankArenaState) {
   return tankArenaEngine.roundTimeMs?.(state) ?? 0;
 }
 
-function initialReplayDone(
+export type ReplaySettlement = { decided: boolean; done: number | null };
+
+export function settleReplay(
   state: TankArenaState,
   deadline: number | null,
+  live: boolean,
   now: number,
-): number | null {
+): ReplaySettlement {
   const resolution = state.resolution;
-  if (!resolution) return null;
+  if (!resolution) return { decided: true, done: null };
+  if (deadline === null) {
+    return live
+      ? { decided: false, done: null }
+      : { decided: true, done: resolution.round };
+  }
   const offset = replayOffset({
     now,
     deadline,
     roundTimeMs: roundTimeOf(state),
     durationMs: replayDurationMs(resolution.steps),
   });
-  return offset === null ? resolution.round : null;
+  return { decided: true, done: offset === null ? resolution.round : null };
+}
+
+function planAngles(state: TankArenaState) {
+  const aims = new Map<string, number>();
+  for (const [role, plan] of Object.entries(state.resolution?.plans ?? {})) {
+    aims.set(role, plan.angle);
+  }
+  return aims;
 }
 
 export function usePlanState(state: TankArenaState, role: string | null) {
@@ -181,42 +198,73 @@ export function aimPreview(
   };
 }
 
+function createRoundStore() {
+  let value: number | null = null;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => value,
+    set: (next: number | null) => {
+      if (next === value) return;
+      value = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
 export function useResolutionReplay(input: {
   state: TankArenaState;
   ctx: SceneContext;
   scene: SceneState;
   deadline: number | null;
+  live: boolean;
   sounds: TankAudio;
 }) {
-  const { state, ctx, scene, deadline, sounds } = input;
+  const { state, ctx, scene, deadline, live, sounds } = input;
   const round = state.resolution?.round ?? null;
-  const [done, setDone] = useState<number | null>(() =>
-    initialReplayDone(state, deadline, Date.now()),
+  const [mounted] = useState(() => ({ round, at: Date.now() }));
+  const [watchedRound] = useState(createRoundStore);
+  const watched = useSyncExternalStore(
+    watchedRound.subscribe,
+    watchedRound.get,
+    watchedRound.get,
   );
-  const mountedRound = useRef(round);
-  const active = round !== null && done !== round;
-  const finish = useCallback(() => setDone(round), [round]);
+  const liveArrival = round !== mounted.round;
+  const settled: ReplaySettlement = liveArrival
+    ? { decided: true, done: null }
+    : settleReplay(state, deadline, live, mounted.at);
+  const decided = settled.decided;
+  const active =
+    round !== null &&
+    watched !== round &&
+    settled.done !== round &&
+    !scene.failed;
+  const finish = useCallback(
+    () => watchedRound.set(round),
+    [watchedRound, round],
+  );
+
+  const hold = useEffectEvent((handle: ArenaHandle) => {
+    const before = state.resolution?.before;
+    if (before) handle.setFrame(stateScene(before, ctx, planAngles(state)));
+    handle.setAim(null);
+    handle.setAirstrike(null);
+  });
 
   const start = useEffectEvent((handle: ArenaHandle) => {
-    const resolution = state.resolution;
-    const aims = new Map<string, number>();
-    if (resolution) {
-      for (const [role, plan] of Object.entries(resolution.plans)) {
-        aims.set(role, plan.angle);
-      }
-    }
-    const data = buildReplay(state, ctx, aims);
-    if (!data || data.frames.length < 2) {
-      setDone(round);
-      return () => {};
-    }
+    const data = buildReplay(state, ctx, planAngles(state));
+    if (!data) return;
     const offset = replayOffset({
       now: Date.now(),
       deadline,
       roundTimeMs: roundTimeOf(state),
       durationMs: data.durationMs,
     });
-    const liveArrival = mountedRound.current !== round;
     let elapsed = offset ?? (liveArrival ? 0 : data.durationMs);
     let emitted = replayCursor(elapsed, data.frames.length).index;
     const first = data.frames[emitted] ?? data.frames[0];
@@ -240,21 +288,20 @@ export function useResolutionReplay(input: {
       if (a && b) handle.setFrame(interpolateFrame(a, b, cursor.t, ctx.width));
       if (cursor.done) {
         handle.setTicker(null);
-        setDone(round);
+        finish();
       }
     });
     return () => handle.setTicker(null);
   });
 
   useEffect(() => {
-    if (!active) return;
-    if (scene.failed) {
-      setDone(round);
+    if (round === null || !active || !scene.handle) return;
+    if (!decided) {
+      hold(scene.handle);
       return;
     }
-    if (!scene.handle) return;
     return start(scene.handle);
-  }, [active, scene.handle, scene.failed, round]);
+  }, [round, active, decided, scene.handle]);
 
   return { active, round, skip: finish };
 }

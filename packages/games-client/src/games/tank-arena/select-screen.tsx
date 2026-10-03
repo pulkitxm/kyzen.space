@@ -4,8 +4,9 @@ import { TANK_KINDS, TANKS } from "@kyzen/games-core";
 import type { TankKind } from "@kyzen/shared/types";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { FaCheck, FaLock } from "react-icons/fa6";
-import { actionIcon, PANEL, RoundTimer } from "./hud";
+import { ActionIcon, RoundTimer } from "./hud";
 import { cssColor, type RosterEntry, statBars } from "./model";
+import { PANEL } from "./styles";
 import type { PreviewHandle } from "./view";
 
 function TankPreview({ kind, color }: { kind: TankKind; color: number }) {
@@ -123,7 +124,7 @@ function TankCard({
               className="rounded-lg border border-white/10 bg-black/20 p-2"
             >
               <p className="flex items-center gap-1.5 font-semibold text-xs">
-                {actionIcon(kind, slot)}
+                <ActionIcon kind={kind} action={slot} />
                 {special.name}
               </p>
               <p className="mt-0.5 text-[11px] text-slate-300 leading-snug">
@@ -142,6 +143,7 @@ function TankCard({
 
 export function SelectScreen({
   player,
+  connected,
   submitted,
   picked,
   deadline,
@@ -151,6 +153,7 @@ export function SelectScreen({
   onSecond,
 }: {
   player: boolean;
+  connected: boolean;
   submitted: boolean;
   picked: TankKind | null;
   deadline: number | null;
@@ -200,50 +203,98 @@ export function SelectScreen({
         ))}
       </div>
       <div className="sticky -bottom-3 -mx-3 -mb-3 flex flex-col gap-3 border-white/10 border-t bg-slate-950/85 p-3 backdrop-blur-md sm:-bottom-4 sm:-mx-4 sm:-mb-4 sm:flex-row sm:items-center sm:p-4">
-        <ul aria-label="Pick status" className="flex flex-1 flex-wrap gap-1.5">
-          {entries.map((entry) => (
-            <li
-              key={entry.role}
-              className="flex items-center gap-1.5 rounded-full bg-white/8 px-2 py-0.5 text-xs"
-            >
-              <span
-                aria-hidden="true"
-                className="size-2 rounded-full"
-                style={{ backgroundColor: cssColor(entry.color) }}
-              />
-              <span className="max-w-28 truncate">
-                {entry.local ? "You" : entry.name}
-              </span>
-              {entry.locked ? (
-                <FaCheck aria-label="picked" className="text-emerald-300" />
-              ) : (
-                <span className="text-slate-400">choosing</span>
-              )}
-            </li>
-          ))}
-        </ul>
+        <PickStatus entries={entries} lockedCount={lockedCount} />
         {player ? (
-          <button
-            type="button"
-            disabled={done}
-            onClick={() => onPick(focused)}
-            className="flex h-12 items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 font-bold text-sky-950 uppercase tracking-wide outline-none transition focus-visible:ring-2 focus-visible:ring-white enabled:hover:bg-sky-400 disabled:bg-emerald-500/80 disabled:text-emerald-950"
-          >
-            {done ? (
-              <>
-                <FaCheck aria-hidden="true" />{" "}
-                {picked ? `${TANKS[picked].name} locked` : "Locked in"}
-              </>
-            ) : (
-              <>
-                <FaLock aria-hidden="true" /> Confirm {TANKS[focused].name}
-              </>
-            )}
-          </button>
+          <ConfirmButton
+            done={done}
+            connected={connected}
+            picked={picked}
+            focused={focused}
+            onPick={onPick}
+          />
         ) : (
           <p className="text-slate-300 text-sm">Spectating tank selection</p>
         )}
       </div>
     </section>
+  );
+}
+
+function PickStatus({
+  entries,
+  lockedCount,
+}: {
+  entries: RosterEntry[];
+  lockedCount: number;
+}) {
+  return (
+    <ul
+      aria-label={`Pick status, ${lockedCount} of ${entries.length} picked`}
+      className="flex max-h-16 flex-1 flex-wrap gap-1.5 overflow-y-auto"
+    >
+      {entries.map((entry) => (
+        <li
+          key={entry.role}
+          className="flex items-center gap-1.5 rounded-full bg-white/8 px-2 py-0.5 text-xs"
+        >
+          <span
+            aria-hidden="true"
+            className="size-2 rounded-full"
+            style={{ backgroundColor: cssColor(entry.color) }}
+          />
+          <span className="max-w-28 truncate">
+            {entry.local ? "You" : entry.name}
+          </span>
+          {entry.locked ? (
+            <FaCheck aria-label="picked" className="text-emerald-300" />
+          ) : (
+            <span className="text-slate-400">choosing</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function confirmLabel(
+  done: boolean,
+  connected: boolean,
+  picked: TankKind | null,
+  focused: TankKind,
+) {
+  if (done) return picked ? `${TANKS[picked].name} locked` : "Locked in";
+  if (!connected) return "Reconnecting...";
+  return `Confirm ${TANKS[focused].name}`;
+}
+
+function ConfirmButton({
+  done,
+  connected,
+  picked,
+  focused,
+  onPick,
+}: {
+  done: boolean;
+  connected: boolean;
+  picked: TankKind | null;
+  focused: TankKind;
+  onPick: (kind: TankKind) => void;
+}) {
+  const Icon = done ? FaCheck : FaLock;
+  return (
+    <button
+      type="button"
+      disabled={done || !connected}
+      onClick={() => onPick(focused)}
+      className={[
+        "flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl px-6 font-bold uppercase tracking-wide outline-none transition focus-visible:ring-2 focus-visible:ring-white",
+        done
+          ? "bg-emerald-500/80 text-emerald-950"
+          : "bg-sky-500 text-sky-950 enabled:hover:bg-sky-400 disabled:opacity-60",
+      ].join(" ")}
+    >
+      <Icon aria-hidden="true" />{" "}
+      {confirmLabel(done, connected, picked, focused)}
+    </button>
   );
 }

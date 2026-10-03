@@ -17,7 +17,7 @@ import type {
   TankArenaTank,
   TankKind,
 } from "@kyzen/shared/types";
-import { teamColor } from "./model";
+import { teamColors } from "./model";
 import type {
   SceneEvent,
   SceneFrame,
@@ -72,13 +72,12 @@ export function sceneContext(
   localRole: string | null,
   pickedKind: TankKind | null = null,
 ): SceneContext {
-  const colors = new Map<string, number>();
+  const colors = teamColors(state);
+  const usernames = new Map(players.map((p) => [p.role, p.username]));
   const names = new Map<string, string>();
   const kinds = new Map<string, TankKind | null>();
   for (const tank of state.tanks) {
-    colors.set(tank.role, teamColor(state, tank.role));
-    const player = players.find((p) => p.role === tank.role);
-    names.set(tank.role, player?.username ?? tank.role.toUpperCase());
+    names.set(tank.role, usernames.get(tank.role) ?? tank.role.toUpperCase());
     kinds.set(
       tank.role,
       tank.kind ?? (tank.role === localRole ? pickedKind : null),
@@ -232,11 +231,13 @@ function frameScene(
   };
 }
 
-function tankCenter(frame: SceneFrame, role: string) {
-  const tank = frame.tanks.find((t) => t.role === role);
-  return tank
-    ? { x: tank.x, y: tank.y + tank.height / 2, bottom: tank.y }
-    : null;
+function tankCenters(frame: SceneFrame) {
+  return new Map(
+    frame.tanks.map((tank) => [
+      tank.role,
+      { x: tank.x, y: tank.y + tank.height / 2, bottom: tank.y },
+    ]),
+  );
 }
 
 export function sceneEvents(
@@ -245,6 +246,12 @@ export function sceneEvents(
   current: SceneFrame,
   ctx: SceneContext,
 ): SceneEvent[] {
+  if (events.length === 0) return [];
+  const before = tankCenters(previous);
+  const after = tankCenters(current);
+  const pickups = new Map(previous.pickups.map((item) => [item.id, item]));
+  const shots = new Map(current.projectiles.map((shot) => [shot.id, shot]));
+  const walls = new Map(current.walls.map((wall) => [wall.id, wall]));
   const out: SceneEvent[] = [];
   for (const event of events) {
     switch (event.type) {
@@ -285,9 +292,7 @@ export function sceneEvents(
         out.push({ type: "wall", x: event.x, y: event.y });
         break;
       case "pickup": {
-        const item = previous.pickups.find((p) => p.id === `${event.id}`);
-        const center = tankCenter(current, event.role);
-        const at = item ?? center;
+        const at = pickups.get(`${event.id}`) ?? after.get(event.role);
         if (at)
           out.push({ type: "pickup", x: at.x, y: at.y, kind: event.kind });
         break;
@@ -295,8 +300,8 @@ export function sceneEvents(
       case "wrap": {
         const y =
           event.entity === "tank"
-            ? (tankCenter(current, String(event.id))?.y ?? 0)
-            : (current.projectiles.find((p) => p.id === `${event.id}`)?.y ?? 0);
+            ? (after.get(String(event.id))?.y ?? 0)
+            : (shots.get(`${event.id}`)?.y ?? 0);
         out.push({ type: "portal", y });
         break;
       }
@@ -304,7 +309,7 @@ export function sceneEvents(
         out.push({ type: "splash", x: event.x });
         break;
       case "land": {
-        const center = tankCenter(current, event.role);
+        const center = after.get(event.role);
         if (center) {
           out.push({
             type: "land",
@@ -317,8 +322,7 @@ export function sceneEvents(
       }
       case "jump":
       case "leap": {
-        const center =
-          tankCenter(previous, event.role) ?? tankCenter(current, event.role);
+        const center = before.get(event.role) ?? after.get(event.role);
         if (center) {
           out.push({
             type: event.type,
@@ -333,7 +337,7 @@ export function sceneEvents(
         out.push({ type: "shield", role: event.role });
         break;
       case "wall": {
-        const wall = current.walls.find((w) => w.id === event.role);
+        const wall = walls.get(event.role);
         if (wall) {
           out.push({
             type: "wall",
@@ -388,12 +392,13 @@ const EVENT_SOUNDS: Partial<Record<SimEvent["type"], SoundName>> = {
 };
 
 export function eventSounds(events: readonly SimEvent[]): SoundName[] {
-  const sounds: SoundName[] = [];
+  const unique = new Set<SoundName>();
   for (const event of events) {
     const sound = EVENT_SOUNDS[event.type];
-    if (sound && !sounds.includes(sound)) sounds.push(sound);
+    if (sound) unique.add(sound);
   }
-  if (sounds.includes("mine")) {
+  const sounds = [...unique];
+  if (unique.has("mine")) {
     const index = sounds.indexOf("explode");
     if (index >= 0) sounds.splice(index, 1);
   }

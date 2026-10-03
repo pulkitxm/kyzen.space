@@ -103,6 +103,7 @@ export type ArenaMountOptions = {
   minimap: HTMLCanvasElement | null;
   reducedMotion: boolean;
   onContextLost: () => void;
+  onContextRestored: () => void;
 };
 
 export type ArenaHandle = {

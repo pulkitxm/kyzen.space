@@ -17,6 +17,7 @@ mock.module("../src/games/tank-arena/scene", () => ({
 }));
 
 const { TankArenaBoard } = await import("../src/games/tank-arena/client");
+const { settleReplay } = await import("../src/games/tank-arena/hooks");
 const { TankArenaSkeleton } = await import("../src/games/tank-arena/skeleton");
 
 function apply(state: TankArenaState, role: string, move: unknown) {
@@ -76,7 +77,12 @@ function lockAll(
 
 function render(
   state: TankArenaState,
-  options: { viewer?: string; deadline?: number | null; status?: string } = {},
+  options: {
+    viewer?: string;
+    deadline?: number | null;
+    status?: string;
+    connected?: boolean;
+  } = {},
 ) {
   const game = {
     id: "ABC123",
@@ -98,7 +104,7 @@ function render(
       game={game}
       moves={[]}
       userId={options.viewer ?? "u1"}
-      connected
+      connected={options.connected ?? true}
       makeMove={() => {}}
     />,
   );
@@ -172,7 +178,48 @@ describe("TankArenaBoard", () => {
     expect(html).toContain("Locked in. 1 of 2 ready.");
     expect(html).toContain("alpha is locked in");
     expect(html).toContain("Bot 2 is planning");
-    expect(html).not.toContain("Leave match");
+    expect(html).toContain("Leave match");
+  });
+
+  test("leaving is offered during tank select too", () => {
+    expect(render(fresh(2))).toContain("Leave match");
+    const picked = apply(fresh(2), "p1", {
+      type: "select",
+      round: 0,
+      tank: "bastion",
+    });
+    expect(render(picked)).toContain("Leave match");
+    expect(render(fresh(2), { viewer: "someone-else" })).not.toContain(
+      "Leave match",
+    );
+  });
+
+  test("locking waits for the connection instead of dropping the move", () => {
+    const html = render(planning(2), { connected: false });
+    expect(html).toContain("Reconnecting...");
+    expect(html).not.toContain("Lock in");
+    expect(html).toMatch(
+      /<button[^>]*disabled=""[^>]*aria-keyshortcuts="Enter"/,
+    );
+  });
+
+  test("tank picks wait for the connection", () => {
+    const html = render(fresh(2), { connected: false });
+    expect(html).toContain("Reconnecting...");
+    expect(html).not.toContain("Confirm Bastion");
+  });
+
+  test("large matches keep the pick list compact and colors distinct", () => {
+    const html = render(fresh(25));
+    expect(html).toContain("Pick status, 0 of 25 picked");
+    expect(html).toContain("max-h-16");
+    const swatches = [
+      ...html.matchAll(
+        /size-2 rounded-full" style="background-color:(#[0-9a-f]{6})/g,
+      ),
+    ].map((match) => match[1]);
+    expect(swatches.length).toBe(25);
+    expect(new Set(swatches).size).toBe(25);
   });
 
   test("a fresh resolution plays as a replay with a skip control", () => {
@@ -186,6 +233,47 @@ describe("TankArenaBoard", () => {
     expect(html).toContain("Round 1 in motion");
     expect(html).toContain("Skip");
     expect(html).not.toContain("Lock in");
+  });
+
+  test("the replay shows the replayed round, not the next round's locks", () => {
+    const resolved = lockAll(planning(2));
+    const next = apply(resolved, "p2", {
+      type: "lock",
+      round: resolved.round,
+      action: "idle",
+      angle: 90,
+      power: 0.5,
+    });
+    const html = render(next, {
+      deadline: Date.now() + roundTime(next) - 100,
+    });
+    expect(html).toContain('data-mode="replay"');
+    expect(html).toContain("Round 1");
+    expect(html).not.toContain("Round 2");
+    expect(html).toContain("2 of 2 players locked in");
+    expect(html).toContain("alpha is locked in");
+  });
+
+  test("a fresh resolution without a deadline waits instead of being skipped", () => {
+    const resolved = lockAll(planning(2));
+    const html = render(resolved, { deadline: null });
+    expect(html).toContain('data-mode="replay"');
+    expect(html).toContain("Round 1 in motion");
+    expect(settleReplay(resolved, null, true, Date.now())).toEqual({
+      decided: false,
+      done: null,
+    });
+    const opened = Date.now() - 100;
+    expect(
+      settleReplay(resolved, opened + roundTime(resolved), true, Date.now()),
+    ).toEqual({ decided: true, done: null });
+    expect(settleReplay(resolved, Date.now() + 1000, true, Date.now())).toEqual(
+      { decided: true, done: resolved.resolution?.round ?? -1 },
+    );
+    expect(settleReplay(resolved, null, false, Date.now())).toEqual({
+      decided: true,
+      done: resolved.resolution?.round ?? -1,
+    });
   });
 
   test("an old resolution is not replayed after a reload", () => {

@@ -123,6 +123,7 @@ export function mountArena(
   let width = 1;
   let height = 1;
   let disposed = false;
+  let paused = false;
   let minimapShown = false;
   let frameHandle = 0;
   let last = deps.now();
@@ -156,9 +157,15 @@ export function mountArena(
 
   function onContextLost(event: Event) {
     event.preventDefault();
+    paused = true;
+    deps.cancelFrame(frameHandle);
     options.onContextLost();
   }
+  function onContextRestored() {
+    options.onContextRestored();
+  }
   canvas.addEventListener("webglcontextlost", onContextLost);
+  canvas.addEventListener("webglcontextrestored", onContextRestored);
   const resizeObserver = deps.observeResize(container, resize);
   resize();
 
@@ -368,7 +375,7 @@ export function mountArena(
   }
 
   function tick() {
-    if (disposed) return;
+    if (disposed || paused) return;
     const now = deps.now();
     const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
     last = now;
@@ -483,6 +490,8 @@ export function mountArena(
       deps.cancelFrame(frameHandle);
       resizeObserver.disconnect();
       canvas.removeEventListener("webglcontextlost", onContextLost);
+      canvas.removeEventListener("webglcontextrestored", onContextRestored);
+      if (options.minimap) options.minimap.style.visibility = "hidden";
       overlay.dispose();
       projectiles.dispose();
       shields.dispose();

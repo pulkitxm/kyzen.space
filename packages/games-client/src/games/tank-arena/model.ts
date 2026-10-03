@@ -23,8 +23,12 @@ const POWER_STEP = 0.05;
 
 export const TEAM_PALETTE = [
   0x3edcff, 0xff4d5e, 0xffc23d, 0xa77bff, 0x7dff6a, 0xff7bd5, 0x3dffc0,
-  0xff8a3d, 0x6a8bff, 0xe8ff5a, 0xff5ab0, 0x5ae0ff,
+  0xff8a3d,
 ] as const;
+const GOLDEN_ANGLE = 137.50776;
+const SPACED_HUE_START = 192;
+const SPACED_SATURATION = 0.85;
+const SPACED_LIGHTNESS = 0.6;
 
 export type BoardMode =
   | "select"
@@ -69,17 +73,50 @@ export function tankOf(state: TankArenaState, role: string | null) {
 }
 
 function teamOrder(state: TankArenaState): string[] {
-  const order: string[] = [];
-  for (const seat of state.seats) {
-    if (!order.includes(seat.team)) order.push(seat.team);
+  return [...new Set(state.seats.map((seat) => seat.team))];
+}
+
+function hslColor(hue: number, saturation: number, lightness: number) {
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const channel = (offset: number) => {
+    const k = (offset + hue / 30) % 12;
+    const value =
+      lightness - (chroma / 2) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(value * 255);
+  };
+  return (channel(0) << 16) | (channel(8) << 8) | channel(4);
+}
+
+export function spacedColors(count: number): number[] {
+  if (count <= TEAM_PALETTE.length) return TEAM_PALETTE.slice(0, count);
+  const colors: number[] = [];
+  const used = new Set<number>();
+  for (let index = 0; index < count; index++) {
+    let hue = SPACED_HUE_START + index * GOLDEN_ANGLE;
+    let color = hslColor(hue % 360, SPACED_SATURATION, SPACED_LIGHTNESS);
+    for (let tries = 0; used.has(color) && tries < 720; tries++) {
+      hue += 0.5;
+      color = hslColor(hue % 360, SPACED_SATURATION, SPACED_LIGHTNESS);
+    }
+    used.add(color);
+    colors.push(color);
   }
-  return order;
+  return colors;
+}
+
+export function teamColors(state: TankArenaState): Map<string, number> {
+  const order = teamOrder(state);
+  const palette = spacedColors(order.length);
+  const byTeam = new Map(order.map((team, index) => [team, palette[index]]));
+  const colors = new Map<string, number>();
+  for (const seat of state.seats) {
+    colors.set(seat.role, byTeam.get(seat.team) ?? TEAM_PALETTE[0]);
+  }
+  return colors;
 }
 
 export function teamColor(state: TankArenaState, role: string): number {
-  const team = state.seats.find((seat) => seat.role === role)?.team ?? role;
-  const index = Math.max(0, teamOrder(state).indexOf(team));
-  return TEAM_PALETTE[index % TEAM_PALETTE.length] ?? TEAM_PALETTE[0];
+  return teamColors(state).get(role) ?? TEAM_PALETTE[0];
 }
 
 export function cssColor(color: number) {
@@ -115,14 +152,15 @@ export function rosterEntries(
   localRole: string | null,
 ): RosterEntry[] {
   const locked = lockedRoles(state);
+  const colors = teamColors(state);
+  const usernames = new Map(players.map((p) => [p.role, p.username]));
   return state.seats.map((seat, index) => {
     const tank = state.tanks[index];
-    const player = players.find((p) => p.role === seat.role);
     return {
       role: seat.role,
-      name: player?.username ?? seat.role.toUpperCase(),
+      name: usernames.get(seat.role) ?? seat.role.toUpperCase(),
       team: seat.team,
-      color: teamColor(state, seat.role),
+      color: colors.get(seat.role) ?? TEAM_PALETTE[0],
       kind: tank?.kind ?? null,
       hp: tank?.hp ?? 0,
       maxHp: tank ? maxHpOf(tank) : 0,
@@ -134,9 +172,24 @@ export function rosterEntries(
   });
 }
 
+export function replayView(state: TankArenaState): TankArenaState {
+  const resolution = state.resolution;
+  if (!resolution) return state;
+  return {
+    ...state,
+    round: resolution.round,
+    tanks: resolution.before.tanks,
+    pickups: resolution.before.pickups,
+    mines: resolution.before.mines,
+    airstrike: resolution.before.airstrike,
+    submitted: Object.keys(resolution.plans),
+  };
+}
+
 export function lockSummary(state: TankArenaState) {
+  const submitted = lockedRoles(state);
   const living = state.tanks.filter((tank) => tank.alive);
-  const locked = living.filter((tank) => state.submitted.includes(tank.role));
+  const locked = living.filter((tank) => submitted.has(tank.role));
   return { locked: locked.length, total: living.length };
 }
 

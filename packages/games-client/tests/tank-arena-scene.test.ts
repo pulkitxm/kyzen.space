@@ -203,6 +203,7 @@ describe("arena scene lifecycle", () => {
         minimap: null,
         reducedMotion: false,
         onContextLost: () => {},
+        onContextRestored: () => {},
       },
       deps,
     );
@@ -253,7 +254,7 @@ describe("arena scene lifecycle", () => {
     expect(calls.rendererDispose).toBe(1);
     expect(calls.forceContextLoss).toBe(1);
     expect(calls.canvasRemoved).toBe(1);
-    expect(calls.removeListener).toBe(1);
+    expect(calls.removeListener).toBe(2);
     const missed = [...disposals.entries()].filter(([, count]) => count === 0);
     expect(missed.length).toBe(0);
     expect(handle.scene.children.length).toBe(0);
@@ -278,6 +279,7 @@ describe("arena scene lifecycle", () => {
           minimap: null,
           reducedMotion: true,
           onContextLost: () => {},
+          onContextRestored: () => {},
         },
         failing,
       ),
@@ -288,10 +290,11 @@ describe("arena scene lifecycle", () => {
     expect(calls.appended).toBeUndefined();
   });
 
-  test("a lost context is reported to the board", () => {
+  test("a lost context pauses rendering and a restored one is reported", () => {
     const calls: Calls = {};
-    const { deps, canvas } = fakeDeps(calls);
+    const { deps, canvas, step, frames } = fakeDeps(calls);
     let lost = 0;
+    let restored = 0;
     const handle = mountArena(
       container(calls),
       {
@@ -301,14 +304,33 @@ describe("arena scene lifecycle", () => {
         onContextLost: () => {
           lost += 1;
         },
+        onContextRestored: () => {
+          restored += 1;
+        },
       },
       deps,
     );
-    const listener = canvas.listeners.get("webglcontextlost") as
-      | ((event: { preventDefault: () => void }) => void)
-      | undefined;
-    listener?.({ preventDefault: () => {} });
+    step();
+    expect(calls.composerRender).toBe(1);
+    let prevented = false;
+    const onLost = canvas.listeners.get("webglcontextlost") as (event: {
+      preventDefault: () => void;
+    }) => void;
+    onLost({
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+    expect(prevented).toBe(true);
     expect(lost).toBe(1);
+    expect(frames.size).toBe(0);
+    step();
+    expect(calls.composerRender).toBe(1);
+    const onRestored = canvas.listeners.get("webglcontextrestored") as
+      | (() => void)
+      | undefined;
+    onRestored?.();
+    expect(restored).toBe(1);
     handle?.dispose();
   });
 

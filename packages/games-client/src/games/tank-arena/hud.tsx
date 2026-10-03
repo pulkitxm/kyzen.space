@@ -26,11 +26,15 @@ import {
   type RosterEntry,
   secondsLeft,
 } from "./model";
+import { PANEL } from "./styles";
 
-export const PANEL =
-  "glass-pane rounded-xl border border-white/15 bg-slate-950/55 text-slate-50 shadow-lg backdrop-blur-md";
-
-export function actionIcon(kind: TankKind | null, action: TankAction) {
+export function ActionIcon({
+  kind,
+  action,
+}: {
+  kind: TankKind | null;
+  action: TankAction;
+}) {
   switch (action) {
     case "missile":
       return <FaCrosshairs aria-hidden="true" />;
@@ -285,6 +289,7 @@ export function ActionBar({
   aim,
   locked,
   pending,
+  connected,
   dimmed,
   onSelect,
   onLock,
@@ -295,6 +300,7 @@ export function ActionBar({
   aim: Aim;
   locked: boolean;
   pending: boolean;
+  connected: boolean;
   dimmed: boolean;
   onSelect: (action: TankAction) => void;
   onLock: () => void;
@@ -333,7 +339,7 @@ export function ActionBar({
                       : "border-white/15 bg-white/5 enabled:hover:bg-white/12",
                   ].join(" ")}
                 >
-                  {actionIcon(kind, slot.action)}
+                  <ActionIcon kind={kind} action={slot.action} />
                   <span className="line-clamp-2 max-w-full px-1 text-center font-medium text-[10px] leading-tight">
                     {details.label}
                   </span>
@@ -365,7 +371,7 @@ export function ActionBar({
       <button
         type="button"
         onClick={onLock}
-        disabled={locked || pending}
+        disabled={locked || pending || !connected}
         aria-keyshortcuts="Enter"
         className={[
           "flex h-14 items-center justify-center gap-2 rounded-xl px-6 font-bold text-base uppercase tracking-wide shadow-lg outline-none transition focus-visible:ring-2 focus-visible:ring-sky-300 md:h-18",
@@ -380,7 +386,8 @@ export function ActionBar({
           </>
         ) : (
           <>
-            <FaLock aria-hidden="true" /> {pending ? "Locking" : "Lock in"}
+            <FaLock aria-hidden="true" />{" "}
+            {connected ? (pending ? "Locking" : "Lock in") : "Reconnecting..."}
           </>
         )}
       </button>

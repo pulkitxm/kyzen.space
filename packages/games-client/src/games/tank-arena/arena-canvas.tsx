@@ -9,9 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { type ArenaStatus, createArenaLifecycle } from "./arena-lifecycle";
 import type { ArenaHandle } from "./view";
-
-type Status = "loading" | "ready" | "failed";
 
 export function ArenaCanvas({
   reducedMotion,
@@ -37,7 +36,7 @@ export function ArenaCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<number | null>(null);
-  const [status, setStatus] = useState<Status>("loading");
+  const [status, setStatus] = useState<ArenaStatus>("loading");
 
   const report = useEffectEvent((handle: ArenaHandle | null, failed: boolean) =>
     onReady(handle, failed),
@@ -49,33 +48,28 @@ export function ArenaCanvas({
     const container = containerRef.current;
     if (!container) return;
     let cancelled = false;
-    let handle: ArenaHandle | null = null;
-    const fail = () => {
-      if (cancelled) return;
-      setStatus("failed");
-      report(null, true);
-    };
+    const lifecycle = createArenaLifecycle((next, handle) => {
+      setStatus(next);
+      report(handle, next === "failed");
+    });
     import("./scene")
       .then((module) => {
         if (cancelled) return;
-        handle = module.mountArena(container, {
-          overlay: overlayRef.current,
-          minimap: minimapCanvas(),
-          reducedMotion: motionPreference(),
-          onContextLost: fail,
-        });
-        if (!handle) {
-          fail();
-          return;
-        }
-        setStatus("ready");
-        report(handle, false);
+        lifecycle.start((events) =>
+          module.mountArena(container, {
+            overlay: overlayRef.current,
+            minimap: minimapCanvas(),
+            reducedMotion: motionPreference(),
+            ...events,
+          }),
+        );
       })
-      .catch(fail);
+      .catch(() => {
+        if (!cancelled) lifecycle.fail();
+      });
     return () => {
       cancelled = true;
-      handle?.dispose();
-      handle = null;
+      lifecycle.dispose();
       report(null, false);
     };
   }, []);
@@ -128,6 +122,16 @@ export function ArenaCanvas({
             The 3D arena could not start because WebGL is unavailable on this
             device. You can still pick actions, aim with the arrow keys, and
             lock in your plan.
+          </p>
+        </div>
+      ) : null}
+      {status === "restoring" ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/60 p-6">
+          <p
+            role="status"
+            className="glass-pane max-w-sm rounded-xl border border-border bg-card/80 p-4 text-center text-card-foreground text-sm"
+          >
+            Restoring graphics...
           </p>
         </div>
       ) : null}
