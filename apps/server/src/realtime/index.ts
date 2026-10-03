@@ -29,6 +29,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
   const io = new IOServer(httpServer, {
     path: "/socket.io",
     transports: ["websocket"],
+    destroyUpgrade: false,
     cors: { origin: env.webUrl, credentials: true },
   });
 
@@ -75,7 +76,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
     attachGameChatHandlers(io, socket);
     attachMatchmakingHandlers(io, socket);
     attachMatchChatHandlers(io, socket);
-    attachRoomHandlers(socket);
+    attachRoomHandlers(io, socket);
     void handlePresenceConnect(io, socket);
 
     registerGameEvent(socket, slog, "join_room", clientJoinRoomSchema, (data) =>

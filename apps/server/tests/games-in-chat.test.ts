@@ -48,6 +48,7 @@ mock.module("@kyzen/database", () => ({
     getProfileByUserId: async () => profile,
   },
   messages: {},
+  matchChat: {},
   accountMerge: {},
   friends: {},
   notifications: {},
@@ -75,6 +76,9 @@ mock.module("../src/chat/messages-service", () => ({
     sentMessages.push(input);
     return { ok: true, value: { id: "msg-1", ...input } };
   },
+  sendSystemMessage: async () => ({ ok: true, value: null }),
+  deleteMessage: async () => ({ ok: true, value: null }),
+  markRead: async () => ({ ok: true, value: null }),
 }));
 
 const { createGameInConversation } = await import(

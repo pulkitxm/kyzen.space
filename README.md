@@ -1,6 +1,6 @@
 # Kyzen
 
-Multiplayer games with shared chat, profiles, rooms, and matchmaking. Adding a turn-based game means implementing its rules and board while reusing the platform.
+Multiplayer games with shared chat, profiles, rooms, and matchmaking. Adding a turn-based or simultaneous-round game means implementing its rules and board while reusing the platform.
 
 ## Start locally
 

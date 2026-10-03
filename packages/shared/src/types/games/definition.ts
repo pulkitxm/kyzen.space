@@ -26,6 +26,13 @@ export interface ConfigField {
   max?: number;
 }
 
+export interface PublicQueue {
+  id: string;
+  label: string;
+  description: string;
+  config: unknown;
+}
+
 export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
   meta: GameMeta;
   engine: GameEngine<S, I>;
@@ -33,4 +40,6 @@ export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
   moveSchema: ZodType<I>;
   configSchema: ZodType<C>;
   configFields?: ConfigField[];
+  queues?: PublicQueue[];
+  layout?: "standard" | "wide";
 }

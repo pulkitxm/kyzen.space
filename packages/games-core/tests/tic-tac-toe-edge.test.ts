@@ -3,6 +3,7 @@ import type {
   Cell,
   Mark,
   Outcome,
+  Seat,
   TicTacToeMove,
   TicTacToeState,
 } from "@kyzen/shared/types";
@@ -263,7 +264,7 @@ describe("reduce outcome over the seam between active and completed", () => {
     expect(isBoardFull(res.state.board)).toBe(false);
     expect(res.outcome).toEqual({
       status: "completed",
-      winnerRole: "X",
+      winnerRoles: ["X"],
       draw: false,
     });
   });
@@ -280,7 +281,7 @@ describe("reduce outcome over the seam between active and completed", () => {
     expect(lineWinner(res.state.board)).toBeNull();
     expect(res.outcome).toEqual({
       status: "completed",
-      winnerRole: null,
+      winnerRoles: [],
       draw: true,
     });
   });
@@ -298,7 +299,7 @@ describe("reduce outcome over the seam between active and completed", () => {
     if (res.outcome.status !== "completed")
       throw new Error("expected completed");
     expect(res.outcome.draw).toBe(false);
-    expect(res.outcome.winnerRole).toBe("X");
+    expect(res.outcome.winnerRoles).toEqual(["X"]);
   });
 });
 
@@ -332,26 +333,35 @@ describe("reduce post-terminal rejection", () => {
   });
 });
 
-describe("createInitialState ignores seat arrangement", () => {
+const SETUP = { config: {}, seed: 7 };
+
+function seat(role: string, team = role): Seat {
+  return { role, team, bot: null };
+}
+
+describe("createInitialState ignores seat arrangement, teams, bots, and seed", () => {
   test("yields X-to-move on an empty board regardless of the seats passed", () => {
-    const seatVariants = [
+    const seatVariants: Seat[][] = [
       [],
-      [{ role: "X" }, { role: "O" }],
-      [{ role: "O" }, { role: "X" }],
-      [{ role: "anything" }],
+      [seat("X"), seat("O")],
+      [seat("O"), seat("X")],
+      [seat("anything", "A")],
+      [seat("X", "A"), { role: "O", team: "A", bot: "hard" }],
     ];
     for (const seats of seatVariants) {
-      const s = ticTacToeEngine.createInitialState(seats);
-      expect(s.currentTurn).toBe("X");
-      expect(s.board).toEqual(emptyBoard());
+      for (const seed of [0, 1, 2 ** 31 - 1]) {
+        const s = ticTacToeEngine.createInitialState(seats, { ...SETUP, seed });
+        expect(s.currentTurn).toBe("X");
+        expect(s.board).toEqual(emptyBoard());
+      }
     }
   });
 
   test("a mutation of one created state never leaks into the next", () => {
-    const first = ticTacToeEngine.createInitialState([]);
+    const first = ticTacToeEngine.createInitialState([], SETUP);
     first.board[0] = "X";
     (first as TicTacToeState).currentTurn = "O";
-    const second = ticTacToeEngine.createInitialState([]);
+    const second = ticTacToeEngine.createInitialState([], SETUP);
     expect(second.board[0]).toBeNull();
     expect(second.currentTurn).toBe("X");
   });
@@ -361,14 +371,21 @@ describe("engine static descriptors", () => {
   test("declares two fixed seats with distinct ordered roles", () => {
     expect(ticTacToeEngine.minPlayers).toBe(2);
     expect(ticTacToeEngine.maxPlayers).toBe(2);
-    expect([...ticTacToeEngine.roles]).toEqual(["X", "O"]);
+    expect([0, 1].map((index) => ticTacToeEngine.roleForSeat(index))).toEqual([
+      "X",
+      "O",
+    ]);
     expect(ticTacToeEngine.mode).toBe("turn-based");
   });
 
-  test("roles cover every seat index the server would assign", () => {
-    expect(ticTacToeEngine.roles.length).toBeGreaterThanOrEqual(
-      ticTacToeEngine.maxPlayers,
-    );
+  test("is a plain turn-based engine without lobby, bot, or round hooks", () => {
+    expect(ticTacToeEngine.lobby).toBeUndefined();
+    expect(ticTacToeEngine.botMove).toBeUndefined();
+    expect(ticTacToeEngine.pendingRoles).toBeUndefined();
+    expect(ticTacToeEngine.roundOf).toBeUndefined();
+    expect(ticTacToeEngine.publicState).toBeUndefined();
+    expect(ticTacToeEngine.publicMove).toBeUndefined();
+    expect(ticTacToeEngine.playerCount).toBeUndefined();
   });
 
   test("does not implement the realtime step handler", () => {

@@ -6,9 +6,10 @@ import {
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { childLogger } from "../logger";
+import { ensureClock } from "./game-runner";
 import { emitToUser } from "./rooms";
+import { initialState, publicGroupSize, publicSeats } from "./setup";
 import { rateLimiter, register } from "./socket-util";
-import { ensureMatchClock } from "./turn-based";
 
 const log = childLogger({ mod: "realtime:matchmaking" });
 
@@ -31,13 +32,10 @@ export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
     }
     const definition = getDefinition(parsed.data.gameType);
     const config = definition.configSchema.safeParse(parsed.data.config ?? {});
-    if (
-      !config.success ||
-      definition.engine.minPlayers !== 2 ||
-      definition.engine.maxPlayers !== 2 ||
-      definition.engine.mode !== "turn-based" ||
-      !definition.engine.reduce
-    ) {
+    const groupSize = config.success
+      ? publicGroupSize(definition, config.data)
+      : null;
+    if (!config.success || groupSize === null) {
       cb?.({ ok: false, error: "Unsupported public match configuration" });
       return;
     }
@@ -46,12 +44,10 @@ export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
       owner: socket.id,
       gameType: parsed.data.gameType,
       config: config.data,
-      roles: definition.engine.roles.slice(0, 2),
-      gameState: definition.engine.createInitialState(
-        definition.engine.roles.slice(0, 2).map((role) => ({ role })),
-      ),
+      seats: publicSeats(definition.engine, groupSize, config.data),
+      createState: (seats) => initialState(definition, seats, config.data),
     });
-    if (match) await ensureMatchClock(io, match.code);
+    if (match) await ensureClock(io, match.code);
     cb?.({ ok: true, gameId: match?.code ?? null });
     if (match) {
       for (const userId of match.userIds)

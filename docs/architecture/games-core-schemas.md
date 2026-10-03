@@ -19,14 +19,16 @@ This doc covers the **schema/contract half** of games-core: the `GameDefinition`
 | --- | --- |
 | `packages/shared/src/constants/games.ts` | **Single source of truth for game slugs.** Declares each slug constant (e.g. `TIC_TAC_TOE`), the `GAME_TYPES` tuple. Exported via `@kyzen/shared/constants`. |
 | `packages/shared/src/types/games/core.ts` | `GameType` union and `gameTypeSchema` (`z.enum(GAME_TYPES)`). All wire schemas that carry a `gameType` field validate against `gameTypeSchema`. Exported via `@kyzen/shared/types`. |
-| `packages/shared/src/types/games/definition.ts` | `GameDefinition<S,I,C>`, `GameMeta` (`type: GameType`, not `string`), `ConfigField` - the self-describing manifest one game ships. Exported via `@kyzen/shared/types`. |
-| `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>`, `Outcome`, `ReduceResult`, `StepResult`, `Seat`, `MoveContext` - the behavioral contract a `GameDefinition` references. Exported via `@kyzen/shared/types`. |
+| `packages/shared/src/types/games/definition.ts` | `GameDefinition<S,I,C>`, `GameMeta` (`type: GameType`, not `string`), `ConfigField`, and `PublicQueue` - the self-describing manifest one game ships, including its public queue variants and board layout. Exported via `@kyzen/shared/types`. |
+| `packages/shared/src/types/games/engine.ts` | `GameEngine<State,Input>`, `Outcome`, `ReduceResult`, `StepResult`, `Seat`, `SetupOptions`, `MoveContext`, `LobbySupport`, `BotDifficulty` - the behavioral contract a `GameDefinition` references. Exported via `@kyzen/shared/types`. |
+| `packages/shared/src/types/games/lobby.ts` | The shared lobby config: `lobbyConfigSchema` (`{ mode: "ffa" \| "teams", teams: Record<userId, TeamId>, bots: LobbyBot[] }`, at most `LOBBY_MAX_BOTS` = 64 bots), `teamIdSchema` (one capital letter), `lobbyBotSchema` (`{ id: "bot:<n>", difficulty, team }`), and the `isBotId` / `botId` helpers. Lobby engines use it as their `configSchema`. Exported via `@kyzen/shared/types`. |
 | `packages/shared/src/types/games/code.ts` | The **public game room code**: `GAME_CODE_ALPHABET`/`GAME_CODE_LENGTH`, `generateGameCode`, `normalizeGameCode`, `isGameCode`, and `gameCodeSchema` (normalizes then validates a 6-char Crockford-base32 code). The code is the public game id; the UUID `game.id` stays internal. Exported via `@kyzen/shared/types`. |
-| `packages/shared/src/types/games/wire.ts` | Shared **wire/socket** Zod schemas: `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, the matchmaking-lane `clientQueueJoinSchema`/`clientQueueLeaveSchema`, `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, the server→client `Server*Payload` types (`ServerGameStatePayload`, `ServerGameOverPayload`, `ServerErrorPayload`, `ServerMatchFoundPayload`), and the pure status helpers `isGameOver`/`isGameLive`/`resolveWinnerUsername`. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`). Exported via `@kyzen/shared/types`. |
+| `packages/shared/src/types/games/wire.ts` | Shared **wire/socket** Zod schemas: `gameStatusSchema`, `gamePlayerSchema`, `clientJoinRoomSchema`, `clientMakeMoveSchema`, the matchmaking-lane `clientQueueJoinSchema`/`clientQueueLeaveSchema`, the room-lane `clientCreateRoomSchema`/`clientJoinByCodeSchema`/`clientRoomConfigureSchema`/`clientRoomStartSchema`/`clientRoomLeaveSchema` (`{ gameId }`)/`clientRoomKickSchema` (`{ gameId, userId }`), `gameJsonSchema`/`GameJson`, `moveJsonSchema`/`MoveJson`, the server→client `Server*Payload` types (`ServerGameStatePayload`, `ServerGameOverPayload`, `ServerErrorPayload`, `ServerMatchFoundPayload`), and the pure helpers `isGameOver`/`isGameLive`/`resolveWinnerUsername`/`gameResultLabel`. The inbound envelopes validate `gameId` with `gameCodeSchema` (from `code.ts`). Exported via `@kyzen/shared/types`. |
 | `packages/shared/src/types/games/categories.ts` | `GameCategoryDef` default interface and the `GameCategoryId` union (`GAME_CATEGORIES` ids). Both re-exported via the `types/games` barrel (`index.ts:1-4`). |
 | `packages/shared/src/types/games/series.ts` | **Best-of-N "series" wire DTOs** (the rematch flow): `seriesScoreEntrySchema`/`seriesScoreSchema`, `seriesGameSummarySchema`, and `seriesDetailSchema` (+ inferred `SeriesScore`/`SeriesDetail`/…). What `GET /api/games/:gameId/series` returns. Exported via `@kyzen/shared/types`. |
 | `packages/shared/src/constants/categories.ts` | The static `GAME_CATEGORIES` list used to group games in the lobby. Exported via `@kyzen/shared/constants`. |
 | `packages/shared/src/types/games/tic-tac-toe/schemas.ts` | Per-game `stateSchema` / `moveSchema` / `configSchema`, each `.strict()`, with TS types derived via `z.infer`. The slug constant lives in `constants/games.ts`, not here. Exported via `@kyzen/shared/types`. |
+| `packages/shared/src/types/games/tank-arena/schemas.ts` | Tank Arena's bounded state, move, and config schemas. Its config is `lobbyConfigSchema`. See [Tank Arena](../games/tank-arena.md). |
 | `packages/games-core/src/registry.ts` | Derives `getDefinition`/`getEngine`/`hasEngine`/`listGameMeta`/`getCategoryGroups`/`listGameTypes`/`listDefinitions` from the single `GAMES` array. `hasEngine(type: string): type is GameType` is a type guard; `listGameTypes(): GameType[]` returns the narrowed list; `listDefinitions(): GameDefinition[]` returns the array itself. |
 | `packages/games-core/src/games/index.ts` | The single `GAMES` array - the registry's source. |
 | `packages/games-core/src/index.ts` | Public package surface: engines, definitions, and registry helpers. |
@@ -44,6 +46,15 @@ export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
   moveSchema: ZodType<I>;
   configSchema: ZodType<C>;
   configFields?: ConfigField[];
+  queues?: PublicQueue[];
+  layout?: "standard" | "wide";
+}
+
+export interface PublicQueue {
+  id: string;
+  label: string;
+  description: string;
+  config: unknown;
 }
 ```
 
@@ -82,16 +93,22 @@ export interface ConfigField {
 
 `configFields` is the *presentation* of config; `configSchema` is the *validation* of config. They are kept separate on purpose - the lobby form is built from `configFields`, but the resulting object is only ever trusted after it passes `configSchema`. Tic-tac-toe has no options, so `configFields` is `[]` and `configSchema` is the empty strict object `z.object({}).strict()`.
 
+`queues` lists the find-page variants of public matchmaking. Each variant sends its own `config` and is its own pool; the group size is `engine.playerCount?.(config) ?? 2`. Tank Arena ships `duel` (`{ mode: "ffa" }`, two players) and `teams` (`{ mode: "teams" }`, four players in teams `A` and `B`). A definition without `queues` has one default pool. `layout` picks the play page frame: `"standard"` (the default) keeps the board beside the side panels, and `"wide"` gives the board the full width, which Tank Arena uses.
+
 ## The `GameEngine` contract referenced by every definition
 
 `packages/shared/src/types/games/engine.ts` defines the behavioral half. The key types:
 
 ```ts
+export type BotDifficulty = "easy" | "normal" | "hard";
+
 export type Outcome =
   | { status: "active" }
-  | { status: "completed"; winnerRole: string | null; draw: boolean };
+  | { status: "completed"; winnerRoles: string[]; draw: boolean };
 
-export type Seat = { role: string };
+export type Seat = { role: string; team: string; bot: BotDifficulty | null };
+
+export type SetupOptions = { config: unknown; seed: number };
 
 export type ReduceResult<State> =
   | { ok: true; state: State; outcome: Outcome }
@@ -100,35 +117,45 @@ export type ReduceResult<State> =
 export type StepResult<State> = { state: State; outcome: Outcome };
 
 export type MoveContext = { role: string };
+
+export type LobbySupport = { teams: boolean; bots: boolean };
 ```
 
-`Outcome` is a discriminated union: a move either leaves the game `"active"` or marks it `"completed"` with a `winnerRole` (a *role* string like `"X"`, **not** a user id) and a `draw` flag. `ReduceResult` is similarly a tagged union - `reduce` returns `{ ok: false, error }` for an illegal move instead of throwing, so the server can relay that string straight back to the client. This `ok`-tagging is the spine of the trust model: the server branches on `result.ok` and only persists when it is `true`.
+`Outcome` is a discriminated union: a move either leaves the game `"active"` or marks it `"completed"` with `winnerRoles` (*role* strings like `"X"` or `"p3"`, **not** user ids) and a `draw` flag. A solo win lists one role, a team win lists every role on the team, and a draw lists the drawing roles (or none). The server maps roles to user ids: `game.winners` holds every winning seat, and `game.winner` is the single winner's id, `"draw"`, or `null` for a shared win. A `Seat` carries its `team` (its own role outside team play) and a `bot` difficulty for lobby bots, and `SetupOptions` hands `createInitialState` the validated config plus a server-generated `seed`, so engines stay deterministic while hidden randomness comes from the server. `ReduceResult` is similarly a tagged union - `reduce` returns `{ ok: false, error }` for an illegal move instead of throwing, so the server can relay that string straight back to the client. This `ok`-tagging is the spine of the trust model: the server branches on `result.ok` and only persists when it is `true`.
 
 The `GameEngine` interface (`packages/shared/src/types/games/engine.ts`):
 
 ```ts
 export interface GameEngine<State, Input> {
   readonly type: string;
-  readonly mode: "turn-based" | "realtime";
+  readonly mode: "turn-based" | "simultaneous" | "realtime";
   readonly minPlayers: number;
   readonly maxPlayers: number;
-  readonly roles: readonly string[];
+  readonly lobby?: LobbySupport;
 
-  createInitialState(seats: Seat[]): State;
-
+  roleForSeat(index: number): string;
+  createInitialState(seats: Seat[], options: SetupOptions): State;
   reduce?(state: State, ctx: MoveContext, input: Input): ReduceResult<State>;
-
-  step?(
-    state: State,
-    inputs: Map<string, Input>,
-    dt: number,
-  ): StepResult<State>;
-
+  autoMove?(state: State, role: string, strikes: number): Input;
+  currentRole?(state: State): string | null;
+  roundOf?(state: State): number;
+  pendingRoles?(state: State): string[];
+  roundTimeMs?(state: State): number;
+  botMove?(state: State, role: string, difficulty: BotDifficulty): Input;
+  publicState?(state: State): unknown;
+  publicMove?(state: State, move: Input): unknown;
+  playerCount?(config: unknown): number;
+  step?(state: State, inputs: Map<string, Input>, dt: number): StepResult<State>;
   readonly tickRate?: number;
 }
 ```
 
-Both `reduce` and `step` are optional because `mode` selects which one applies: turn-based games implement `reduce` (one move at a time), realtime games implement `step` (batched inputs per tick). The conformance suite enforces that the right one exists for the declared `mode` (`packages/games-core/tests/conformance.test.ts:46`). `roles` is an ordered list - seat *n* gets `roles[n]`, which is how the join handler assigns a role to a newly seated player (`apps/server/src/realtime/turn-based.ts:58`).
+`mode` selects the handler: turn-based and simultaneous games implement `reduce`, realtime games implement `step` (the platform has no realtime runner yet). The conformance suite enforces that the right one exists for the declared `mode`. `roleForSeat(index)` names seat *n*'s role; it must be distinct and stable for every index, and `maxPlayers` may be `Infinity`. The optional hooks:
+
+- **Clocks:** turn-based engines expose `currentRole`; simultaneous engines expose `roundOf`, `pendingRoles` (living roles that still owe a move this round), and `roundTimeMs` (the round allowance). On a timeout the runner submits `autoMove(state, role, strikes)`.
+- **Bots:** `botMove(state, role, difficulty)` returns a legal, deterministic move for a bot seat. Lobby engines that allow bots must provide it.
+- **Hidden information:** `publicState` and `publicMove` redact state and moves for every broadcast, HTTP snapshot, and move history. Simultaneous engines hide locked plans until the round resolves.
+- **Lobby and queues:** `lobby` declares whether a private lobby may use teams and bots; `playerCount(config)` sizes a public match for a queue config.
 
 `MoveContext` carries only `{ role }`. The engine deliberately knows nothing about user ids, sessions, or sockets - the server resolves the authenticated user to a seat *role* before calling `reduce`, keeping the engine pure and trivially unit-testable.
 
@@ -192,6 +219,10 @@ export type ClientQueueLeave = z.infer<typeof clientQueueLeaveSchema>;
 
 ```ts
 export const gameJsonSchema = z.object({
+  publicMatch: z.boolean().optional(),
+  viewerId: z.string().nullable().optional(),
+  config: z.unknown().optional(),
+  winners: z.array(z.string()).optional(),
   id: z.string(),
   gameType: gameTypeSchema,
   status: gameStatusSchema,
@@ -206,11 +237,12 @@ export const gameJsonSchema = z.object({
   completedAt: z.string().nullable().optional(),
   createdAt: z.string().nullable().optional(),
   updatedAt: z.string().nullable().optional(),
+  turnDeadline: z.number().nullable().optional(),
 });
 export type GameJson = z.infer<typeof gameJsonSchema>;
 ```
 
-`gameType` is validated by `gameTypeSchema` (a `z.enum(GAME_TYPES)` from `@kyzen/shared/types`) - an unknown game slug is rejected at the wire boundary, not silently passed through. The `GameType` union and `GAME_TYPES` tuple are the single source of truth (`@kyzen/shared/constants` and `@kyzen/shared/types`); adding a game to `GAME_TYPES` automatically widens the schema everywhere it is used. Again `gameState: z.unknown()` - the *outer* DTO is game-agnostic; the inner per-game state is validated separately by that game's `stateSchema`. `gameStatusSchema` is `z.enum(["waiting", "active", "completed", "abandoned"])`; `seatingModeSchema` is `z.enum(["open", "challenge"])`; and `gamePlayerSchema` is a `.strict()` object of `{ userId, username, role, avatar? }`, where `avatar` is the optional/nullable `avatarConfigSchema` (`packages/shared/src/types/games/wire.ts:22`, imported from `../avatar`). All live in `packages/shared/src/types/games/wire.ts`. (The server's DB-side `GamePlayer` value still constructs just `{ userId, username, role }` at `apps/server/src/realtime/turn-based.ts:59`; the optional `avatar` is part of the wire DTO contract.)
+`gameType` is validated by `gameTypeSchema` (a `z.enum(GAME_TYPES)` from `@kyzen/shared/types`) - an unknown game slug is rejected at the wire boundary, not silently passed through. The `GameType` union and `GAME_TYPES` tuple are the single source of truth (`@kyzen/shared/constants` and `@kyzen/shared/types`); adding a game to `GAME_TYPES` automatically widens the schema everywhere it is used. Again `gameState: z.unknown()` - the *outer* DTO is game-agnostic; the inner per-game state is validated separately by that game's `stateSchema`. `gameStatusSchema` is `z.enum(["waiting", "active", "completed", "abandoned", "aborted"])`; `winners` lists every winning seat and `winner` is the single winner, `"draw"`, or `null` for a shared win; `seatingModeSchema` is `z.enum(["open", "challenge"])`; and `gamePlayerSchema` is a `.strict()` object of `{ userId, username, role, avatar? }`, where `avatar` is the optional/nullable `avatarConfigSchema` (`packages/shared/src/types/games/wire.ts:22`, imported from `../avatar`). All live in `packages/shared/src/types/games/wire.ts`. (The server's DB-side `GamePlayer` value still constructs just `{ userId, username, role }` at `apps/server/src/realtime/turn-based.ts:59`; the optional `avatar` is part of the wire DTO contract.)
 
 `GameJson` is the lingua franca of the system. The server *produces* it via `serializeGame` (`apps/server/src/api/serialize.ts:51`), which maps a Drizzle `GameRecord` row into this exact shape - note `id` is set to `row.code`, the public room code, never the internal UUID (`apps/server/src/api/serialize.ts:53`), so `GameJson.id` *is* the code clients put in URLs and socket payloads. The web app *consumes* it as the type of what `GET /api/games/:gameId` returns (`apps/web/app/play/[gameId]/page.tsx:42`). The same `z.infer`-derived type is the contract on both ends.
 
@@ -288,7 +320,10 @@ Note the patterns that recur across every game in the codebase:
 Definitions are collected in one array (`packages/games-core/src/games/index.ts`):
 
 ```ts
-export const GAMES = [ticTacToeDefinition] satisfies GameDefinition[];
+export const GAMES = [
+  ticTacToeDefinition,
+  tankArenaDefinition,
+] satisfies GameDefinition[];
 ```
 
 `registry.ts` builds a `Map` from `meta.type` → definition and derives every lookup helper from it (`packages/games-core/src/registry.ts`). `getDefinition(type)` throws on an unknown type; `hasEngine(type)` is the soft check the chat service uses before creating a game; `listGameTypes()` returns the narrowed `GameType[]` (used by the conformance suite to assert `GAME_TYPES` matches the registry); `listGameMeta()` powers the lobby grid; `getCategoryGroups()` joins `GAMES` against `GAME_CATEGORIES` (from `@kyzen/shared/constants`) and drops empty categories. Adding a game is purely: declare its slug in `@kyzen/shared/constants`, write its schemas in `packages/shared/src/types/games/<type>/schemas.ts`, write the engine/meta/index in `packages/games-core/src/games/<type>/`, append to `GAMES`, export from `index.ts`. No new route, table, or socket event - see `docs/adding-a-game.md`.
@@ -300,15 +335,15 @@ This is the core insight made concrete. Follow a single Tic-tac-toe move from th
 1. User clicks a cell. The web client emits a `make_move` socket event with `{ gameId, moveData: { row, col } }`.
 2. **Generic envelope validation.** The game-lane registration runs `clientMakeMoveSchema.safeParse(payload)` inside `registerGameEvent` (`apps/server/src/realtime/socket-util.ts:55`). If the envelope is malformed (bad `gameId`, extra keys), it emits `game_error` and stops. `moveData` is still `unknown` at this point.
 3. On a valid envelope, `registerGameEvent` calls the registered runner, which invokes `handleMakeMove(io, socket, data)` from `./turn-based` directly (`apps/server/src/realtime/index.ts:69`) - there is no driver indirection.
-4. **Authorization.** `handleMakeMove` (`apps/server/src/realtime/turn-based.ts:129`) confirms the game is `active` and that the authenticated `socket.data.userId` actually holds a seat (`gameRow.players.find(...)`). The user is mapped to a *role* here.
-5. **Per-game move validation.** `def.moveSchema.safeParse(payload.moveData)` (`apps/server/src/realtime/turn-based.ts:147`) - now the *real* Tic-tac-toe `moveSchema` validates the move's shape. Invalid → `game_error: "Invalid move"`.
-6. **Stored-state validation.** `def.stateSchema.safeParse(gameRow.gameState)` (`apps/server/src/realtime/turn-based.ts:149`). The state pulled from Postgres JSONB is validated *too* - if it's somehow corrupt, the server bails with `"Corrupt game state"` rather than feeding garbage into the engine.
-7. **Authoritative reduce.** `def.engine.reduce(parsedState.data, { role: player.role }, parsedMove.data)` (`apps/server/src/realtime/turn-based.ts:152`) runs the same engine the client could run, but on server-validated inputs. It returns `{ ok: false, error }` (relayed verbatim) or `{ ok: true, state, outcome }`.
-8. **Persist + broadcast.** On `ok`, the server records the move (`games.addMove`), writes `result.state` back (`games.updateGame`), runs `finalize` for completion/stats, then emits a single `game_state` carrying `{ game, move }` - the full serialized game plus the one new move as a delta (`apps/server/src/realtime/turn-based.ts:170`–`:174`) - to the room.
+4. **Authorization.** `handleMakeMove` (`apps/server/src/realtime/turn-based.ts`) resolves the code and calls `submitMove` (`apps/server/src/realtime/game-runner.ts`), which confirms under the game lock that the game is `active` and that the authenticated `socket.data.userId` holds a seat. The user is mapped to a *role* here.
+5. **Per-game move validation.** `commitMoves` runs `def.moveSchema.safeParse(moveData)` - now the *real* game `moveSchema` validates the move's shape. Invalid → `game_error: "Invalid move"`.
+6. **Stored-state validation.** `def.stateSchema.safeParse(row.gameState)` in `commitMoves`. The state pulled from Postgres JSONB is validated *too* - if it's somehow corrupt, the server bails with `"Corrupt game state"` rather than feeding garbage into the engine.
+7. **Authoritative reduce.** `commitMoves` in `apps/server/src/realtime/game-runner.ts` runs `def.engine.reduce(state, { role }, move)`, the same engine the client could run, on server-validated inputs. It returns `{ ok: false, error }` (relayed verbatim) or `{ ok: true, state, outcome }`.
+8. **Persist + broadcast.** On `ok`, `games.persistGameMoves` compares the previous state, writes the new state and the move, and on completion maps `outcome.winnerRoles` to `winners`, `winner`, and stats in one transaction. The runner then emits a single redacted `game_state` carrying `{ game, move }` to the room and lets pending bots move as one batch (one transaction, one broadcast whose `move` is the batch's last move).
 
-Summarized: `cell click → socket make_move → socket-util.ts:55 (envelope) → turn-based.ts:147 (moveSchema) → turn-based.ts:149 (stateSchema) → turn-based.ts:152 (engine.reduce) → DB write → broadcast game_state`. The client may have *anticipated* this result by running the same engine locally, but the server's copy is the only one that counts.
+Summarized: `cell click → socket make_move → socket-util.ts (envelope) → game-runner.ts commitMoves (moveSchema → stateSchema → engine.reduce) → persistGameMoves → broadcast game_state`. The client may have *anticipated* this result by running the same engine locally, but the server's copy is the only one that counts.
 
-A parallel flow exists for game creation: the chat service validates the **config** with the same discipline - `definition.configSchema.safeParse(input.config ?? {})` at `apps/server/src/chat/games-in-chat-service.ts:90`, after a `hasEngine` gate (`:79`) - then seeds the first seat's state with `engine.createInitialState` (`:130`).
+A parallel flow exists for game creation: the chat service validates the **config** with the same discipline - `definition.configSchema.safeParse(input.config ?? {})` at `apps/server/src/chat/games-in-chat-service.ts:90`, after a `hasEngine` gate (`:79`) - then builds the first state with `engine.createInitialState(seats, { config, seed })` once enough players are seated (lobby engines wait for the host's start).
 
 ## Gotchas, invariants & conventions
 
@@ -318,11 +353,11 @@ A parallel flow exists for game creation: the chat service validates the **confi
 - **The server validates *stored state*, not just incoming moves.** `def.stateSchema.safeParse(gameRow.gameState)` guards against corrupt/migrated JSONB. Treat persisted state as untrusted, just like client input.
 - **`.strict()` on every per-game object schema.** Unknown keys must fail. A non-strict schema is a silent security hole here.
 - **Types are inferred from schemas (`z.infer`), never hand-written alongside them.** This keeps the validator and the static type provably in sync.
-- **`winnerRole` is a role, not a user id.** `Outcome.winnerRole` is `"X"`/`"O"`; the turn-based handler maps role → `userId` in `finalize` (`apps/server/src/realtime/turn-based.ts:84`). `GameJson.winner`, by contrast, is the resolved user id (or the literal `"draw"`).
-- **`roles` ordering is load-bearing.** Seat *n* receives `roles[n]`. The join handler relies on `engine.roles[players.length]` (`apps/server/src/realtime/turn-based.ts:58`); reordering `roles` reassigns seats.
+- **`winnerRoles` are roles, not user ids.** `Outcome.winnerRoles` holds roles like `"X"` or `"p2"`; `games.persistGameMoves` maps them to user ids. `GameJson.winners` lists every winning seat (bots included), and `GameJson.winner` is the single winner's id, the literal `"draw"`, or `null` for a shared team win.
+- **`roleForSeat` is load-bearing.** Seat *n* receives `roleForSeat(n)`, both when a player joins and when lobby or public seats are built; changing it reassigns seats in existing games.
 - **`reduce` returns errors, it does not throw.** Use the `ReduceResult` `ok` tag; a thrown error would escape the handler's normal error-relay path.
 - **`getDefinition` throws on unknown types; `hasEngine` does not.** Use `hasEngine` for soft "is this a real game?" checks (as the chat service does) and `getDefinition` once you know the type is valid.
-- **One `GAMES` array is the only registration point.** The conformance suite (`packages/games-core/tests/conformance.test.ts`) iterates it and asserts `meta.type === engine.type`, coherent player bounds, the correct handler for the mode, that `createInitialState` validates against `stateSchema`, that `moveSchema` rejects nonsense, and that `configSchema` accepts the declared `configFields` defaults - plus (added this round) that `meta.categoryId` joins to a real `GAME_CATEGORIES` id, `roles` has no duplicates, and `coverImage` (when set) is a `/games/` path. A new game gets these checks for free. (A companion `tests/registry.test.ts` covers the registry API itself.)
+- **One `GAMES` array is the only registration point.** The conformance suite (`packages/games-core/tests/conformance.test.ts`) iterates it and asserts `meta.type === engine.type`, coherent player bounds, the correct handler for the mode, that `createInitialState` validates against `stateSchema` and is seed-deterministic, that `moveSchema` rejects nonsense, that `configSchema` accepts the declared `configFields` defaults, that `roleForSeat` names distinct roles, that simultaneous engines provide their round hooks, that lobby engines with bots provide `botMove`, that public queue configs size a valid group, that `autoMove` and `botMove` return legal moves, and that completed outcomes name winners by seat role - plus that `meta.categoryId` joins to a real `GAME_CATEGORIES` id and media paths live under `/games/`. A new game gets these checks for free. (A companion `tests/registry.test.ts` covers the registry API itself.)
 - **No comments in source.** This repo enforces a strict no-comments rule; the schema files are intentionally self-documenting. Only tooling directives (e.g. the `biome-ignore` at `apps/server/src/realtime/turn-based.ts:57`) are permitted.
 
 ## Where to go next

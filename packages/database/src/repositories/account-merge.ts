@@ -237,6 +237,12 @@ export async function mergeAccounts(
       .update(game)
       .set({ winner: targetId })
       .where(eq(game.winner, anonId));
+    await tx
+      .update(game)
+      .set({
+        winners: sql`(select jsonb_agg(case when entry.id = ${anonId} then ${targetId} else entry.id end order by entry.position) from jsonb_array_elements_text(${game.winners}) with ordinality as entry(id, position))`,
+      })
+      .where(sql`${game.winners} @> ${JSON.stringify([anonId])}::jsonb`);
 
     const targetSeatGames = await tx
       .select({ gameId: gamePlayer.gameId })

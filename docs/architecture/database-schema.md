@@ -25,9 +25,9 @@ A Drizzle table is a `pgTable(name, columns, (t) => [constraints])` call. Each c
 | Piece | What it does | Example |
 | --- | --- | --- |
 | `pgTable("game", {…}, (t) => […])` | Declares a table: name, column map, optional index/constraint list. | `game` (`schema.ts:103`) |
-| Column types | `text` / `uuid` / `integer` / `boolean` / `timestamp` / `jsonb` map to Postgres types. | `gameType: text("game_type")` |
+| Column types | `text` / `uuid` / `integer` / `boolean` / `timestamp` / `jsonb` map to Postgres types. Every `timestamp` passes `{ withTimezone: true }` (`timestamptz`). | `gameType: text("game_type")` |
 | `.primaryKey()` / `.defaultRandom()` | Primary key; server-side random `uuid` default. | `id: uuid("id").defaultRandom().primaryKey()` |
-| `.notNull()` / `.default(v)` / `.defaultNow()` | Nullability and SQL-side defaults. | `createdAt: timestamp(...).defaultNow().notNull()` |
+| `.notNull()` / `.default(v)` / `.defaultNow()` | Nullability and SQL-side defaults. | `createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()` |
 | `.$defaultFn(() => …)` | A **JS-side** default (runs in the app, not in SQL). | `code: text("code")...$defaultFn(() => generateGameCode())` (`schema.ts:107`); `createdAt: timestamp(...).$defaultFn(() => new Date())` (`schema.ts:55`) |
 | `.references(() => t.col, { onDelete })` | Foreign key + delete behavior (`cascade` / `set null`). | `gameId: uuid(...).references(() => game.id, { onDelete: "cascade" })` |
 | `.$type<T>()` | **Compile-time-only** cast - narrows the TS type, with **no runtime check**. | `status: text("status").$type<GameStatus>()`; `gameState: jsonb(...).$type<unknown>()` |
@@ -60,6 +60,7 @@ export const game = pgTable(
     gameType: text("game_type").notNull(),
     status: text("status").$type<GameStatus>().notNull().default("waiting"),
     winner: text("winner"),
+    winners: jsonb("winners").$type<string[]>().notNull().default([]),
     gameState: jsonb("game_state").$type<unknown>(),
     config: jsonb("config").$type<unknown>(),
     conversationId: uuid("conversation_id").references(() => conversation.id, {
@@ -73,10 +74,14 @@ export const game = pgTable(
     seriesId: uuid("series_id").references((): AnyPgColumn => game.id, {
       onDelete: "set null",
     }),
-    startedAt: timestamp("started_at"),
-    completedAt: timestamp("completed_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("game_conversation_idx").on(t.conversationId),
@@ -87,12 +92,14 @@ export const game = pgTable(
 
 **Two identifiers, one public.** `id` is the internal `uuid` primary key - it is the FK target for `move.game_id` / `game_player.game_id` and is used for every DB write, but it is **never** serialized to clients. `code` is the **public** identifier: a short, shareable, human-friendly room code (e.g. `K7P2QX`) generated app-side by `$defaultFn(() => generateGameCode())` (from `@kyzen/shared/types`, imported at `schema.ts:26`) and pinned unique by the `game_code_uq` constraint. `serializeGame` sets `GameJson.id = row.code`, so URLs (`/play/<code>`) and socket payloads (`join_room` / `make_move`) carry the code, never the UUID. Because the code is randomly allocated it can collide, so `createGame` wraps its insert in a retry loop that catches a `game_code_uq` unique violation and re-rolls (see [`database.md`](./database.md)); `getGameByCode` resolves a game by code (normalizing first). See [`generic-game-schema.md`](./generic-game-schema.md) for the full public-code/internal-id story.
 
-**`seriesId` links a rematch series.** `seriesId` (`schema.ts:124`) is a nullable `uuid` **self-FK** to `game.id` (`onDelete: "set null"`), backed by the `game_series_idx` index (`schema.ts:134`). Its meaning is *the id of the first game in the series*: a brand-new game's series is itself (`createGame` generates the row id app-side with `randomUUID()` and defaults `seriesId` to that same id, `games.ts:34`/`:44`), and a rematch copies its parent's `seriesId`. So every game in a rematch series - root included - shares one `seriesId`, and the whole series is a single flat query (`WHERE series_id = X`, `getSeriesGames`) rather than a predecessor-pointer chain to walk. The `series_id` column stays nullable for FK-set-null safety, but in practice every game has one. See [`database.md`](./database.md) for `getSeriesGames` / `findLiveGameInConversation` and [`realtime.md`](./realtime.md) for the rematch flow.
+**`seriesId` links a rematch series.** `seriesId` (`schema.ts:124`) is a nullable `uuid` **self-FK** to `game.id` (`onDelete: "set null"`), backed by the `game_series_idx` index (`schema.ts:134`). Its meaning is *the id of the first game in the series*: a brand-new game's series is itself (`createGame` generates the row id app-side with `randomUUID()` and defaults `seriesId` to that same id, `games.ts:34`/`:44`), and a rematch copies its parent's `seriesId`. A private standalone room's rematch is created by `games.createRematch`, which takes a transaction advisory lock on the series id and reuses the series' live (waiting or active) game, so concurrent rematch clicks open one room. So every game in a rematch series - root included - shares one `seriesId`, and the whole series is a single flat query (`WHERE series_id = X`, `getSeriesGames`) rather than a predecessor-pointer chain to walk. The `series_id` column stays nullable for FK-set-null safety, but in practice every game has one. See [`database.md`](./database.md) for `getSeriesGames` / `findLiveGameInConversation` and [`realtime.md`](./realtime.md) for the rematch flow.
+
+**`winners` records every winner; `winner` summarizes.** On completion the server maps the engine's `Outcome.winnerRoles` to seat user ids and stores them in `winners` (`jsonb`, default `[]`). For a draw, `winners` lists the co-drawers (empty when every seat drew). `winner` stays as the summary used by cards, series, and older readers: the user id when exactly one seat won, `"draw"` for any draw, otherwise `null` (a shared team win). Stats follow the same rule: listed seats win (or draw on a draw), every other human seat loses, and bot seats never receive stats.
 
 `move` and `game_player` add the constraints that make the generic model safe:
 
 - **`move`** (`schema.ts:138`) - `unique("move_game_number_uq").on(gameId, moveNumber)` keeps move numbers dense and unique per game, so the DB itself rejects a duplicate / double-submit. `onDelete: "cascade"` drops a game's move log with it. `move.game_id` references the UUID `game.id`, not the code.
-- **`game_player`** (`schema.ts:153`) - one row per seat (a normalization of the old `players` JSONB array). `unique("game_player_uq").on(gameId, userId)` makes it impossible to seat a user twice; `index("game_player_user_idx").on(userId)` turns "all games for this user" into a fast indexed join. `seatOrder` preserves turn order; `role` is the engine's per-seat role string (`"X"` / `"O"`). Its `game_id` also references the UUID `game.id`.
+- **`game_player`** (`schema.ts:153`) - one row per seat (a normalization of the old `players` JSONB array). `unique("game_player_uq").on(gameId, userId)` makes it impossible to seat a user twice; `index("game_player_user_idx").on(userId)` turns "all games for this user" into a fast indexed join. `seatOrder` preserves turn order; `role` is the engine's per-seat role string (`"X"` / `"O"`, from `engine.roleForSeat(seatOrder)`). When a player leaves or is removed from a waiting lobby, `games.removeLobbyPlayer` deletes the row and rewrites the remaining rows' `seatOrder` and `role` to stay contiguous. Its `game_id` also references the UUID `game.id`. Bot seats are ordinary rows with `user_id = "bot:<n>"` and username `"Bot <n> (<Difficulty>)"`, where `n` is the bot's 1-based position in the lobby config; they have no `user` or `user_profile` row, which is why `game_player.user_id` has no foreign key.
 
 ### Auth, chat, social, profile
 
@@ -117,6 +124,7 @@ The remaining tables are conventional relational shapes - one line each:
 
 ## Gotchas & invariants
 
+- **Every timestamp is an absolute instant.** All columns are `timestamp with time zone`, so a `now()` default, a SQL `now()` comparison, and a JavaScript `Date` written by Drizzle (`toISOString()`) all mean the same moment whatever the database session `TimeZone` is. Never add a `timestamp` without `withTimezone: true`: Postgres would fill its `now()` default with the session's local wall clock while Drizzle reads it back as UTC.
 - **`game_state` / `config` / `move_data` are `unknown` by design.** The DB neither knows nor checks their shape; validity is owned by the game's Zod schemas and enforced at the realtime boundary (`apps/server/src/realtime/turn-based.ts:149`). Treat any `gameState` you read as untrusted until `safeParse`'d.
 - **`$type<…>()` is compile-time only.** `status`, `seatingMode`, `kind`, `role`, etc. are plain `text`; Postgres will not reject an out-of-union value - the repository must only write legal ones.
 - **`game` has two ids: a private UUID and a public `code`.** `id` (uuid PK) is internal - the FK target for `move` / `game_player` and used for all writes - and is never serialized. `code` (`game_code_uq`, `$defaultFn(generateGameCode)`) is the public, shareable room id that appears in URLs and socket payloads (`serializeGame` sets `GameJson.id = row.code`). Resolve by code with `getGameByCode`; `createGame` retries on a `game_code_uq` collision.
@@ -144,4 +152,8 @@ The remaining tables are conventional relational shapes - one line each:
 
 `game.publicMatch` identifies participant-only anonymous games. `matchmaking_ticket` stores one leased ticket per account, with socket ownership, registered game type, canonical config, queue age, and expiry. Match creation and both seats are committed with ticket removal.
 
-`match_message` is separate from permanent conversations. It stores sender IDs privately, deduplicates client UUIDs per match/sender, and expires messages after seven days. APIs hide all messages after game completion. `match_friend_choice` records each participant's independent consent; an accepted friendship requires both choices. All three tables cascade on account or game deletion where applicable. See [public matchmaking](matchmaking.md).
+`match_message` is separate from permanent conversations and serves every waiting or active game without a conversation (public matches and private standalone rooms, including their lobby). It stores sender IDs privately, deduplicates client UUIDs per match/sender, and expires messages after seven days. APIs hide all messages after game completion and from players who left the lobby. `match_friend_choice` records one participant's consent toward one specific participant (`target_user_id`, unique per `(game_id, user_id, target_user_id)`), so any pair in an N-player match can connect; an accepted friendship requires both directions. All three tables cascade on account or game deletion where applicable. See [public matchmaking](matchmaking.md).
+
+Migration `0013_timestamptz` converts every timestamp column to `timestamp with time zone`, reading existing values as UTC (`USING col AT TIME ZONE 'UTC'`), which is how Drizzle wrote JavaScript dates into the former `timestamp` columns.
+
+Migration `0012_simultaneous_platform` adds `game.winners` (backfilled from single-user `winner` values) and `match_friend_choice.target_user_id` (backfilled with the other seat of existing two-player choices) with the widened unique constraint.

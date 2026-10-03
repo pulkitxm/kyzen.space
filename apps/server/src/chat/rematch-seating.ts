@@ -3,9 +3,10 @@ import { getDefinition } from "@kyzen/games-core";
 
 export function computeRematchSeating(prev: GameRecord): string[] {
   const { engine } = getDefinition(prev.gameType);
-  const firstRole = engine.roles[0];
+  const roles = prev.players.map((_, index) => engine.roleForSeat(index));
+  const firstRole = roles[0];
   const ordered = [...prev.players].sort(
-    (a, b) => engine.roles.indexOf(a.role) - engine.roles.indexOf(b.role),
+    (a, b) => roles.indexOf(a.role) - roles.indexOf(b.role),
   );
   const ids = ordered.map((p) => p.userId);
 

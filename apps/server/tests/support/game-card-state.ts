@@ -19,6 +19,7 @@ export function gameCardDbMock() {
       getPublicUsers: async () => [],
     },
     messages: { getGameCardByGameId: async () => dbState.card },
+    matchChat: {},
     accountMerge: {},
     conversations: {},
     friends: {},

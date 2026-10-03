@@ -1,6 +1,8 @@
-import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import { TANK_ARENA, TIC_TAC_TOE } from "@kyzen/shared/constants";
 import type { GameType } from "@kyzen/shared/types";
 import type { ComponentType } from "react";
+import { TankArenaBoard } from "./games/tank-arena/client";
+import { TankArenaSkeleton } from "./games/tank-arena/skeleton";
 import { TicTacToeGameClient } from "./games/tic-tac-toe/client";
 import { TicTacToeSkeleton } from "./games/tic-tac-toe/skeleton";
 import { DefaultGameSkeleton } from "./skeletons";
@@ -11,6 +13,7 @@ const REGISTRY: Record<
   { Board: ComponentType<GameClientProps>; Skeleton?: ComponentType }
 > = {
   [TIC_TAC_TOE]: { Board: TicTacToeGameClient, Skeleton: TicTacToeSkeleton },
+  [TANK_ARENA]: { Board: TankArenaBoard, Skeleton: TankArenaSkeleton },
 };
 
 function getEntry(gameType: string) {

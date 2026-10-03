@@ -1,4 +1,5 @@
 import type {
+  GameJson,
   MoveJson,
   ServerErrorPayload,
   ServerGameStatePayload,
@@ -14,6 +15,15 @@ export function mergeGameMoves(
   return [...new Map(incoming.map((move) => [move.moveNumber, move])).values()]
     .filter((move) => move.gameId === payload.game.id)
     .sort((a, b) => a.moveNumber - b.moveNumber);
+}
+
+export function mergeGameSnapshot(
+  previous: GameJson,
+  next: GameJson,
+): GameJson {
+  return next.viewerId === undefined && previous.viewerId !== undefined
+    ? { ...next, viewerId: previous.viewerId }
+    : next;
 }
 
 export function bindGameSession(

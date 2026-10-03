@@ -14,6 +14,7 @@ import { eq } from "drizzle-orm";
 import type { Server, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../src/api/serialize";
 import { createDm } from "../src/chat/conversations-service";
+import { initialState, plainSeats } from "../src/realtime/setup";
 import { handleMakeMove } from "../src/realtime/turn-based";
 import { createHarness, DB_UP } from "./harness";
 
@@ -30,10 +31,11 @@ async function fixture() {
       { userId: a.id, username: a.username, role: "X" },
       { userId: b.id, username: b.username, role: "O" },
     ],
-    gameState: getDefinition(TIC_TAC_TOE).engine.createInitialState([
-      { role: "X" },
-      { role: "O" },
-    ]),
+    gameState: initialState(
+      getDefinition(TIC_TAC_TOE),
+      plainSeats([{ role: "X" }, { role: "O" }]),
+      {},
+    ),
   });
   h.trackGame(game.id);
   return { a, b, game };
@@ -50,7 +52,6 @@ describe.skipIf(!DB_UP)("anonymous public match privacy", () => {
         moveNumber: 1,
         moveData: { row: 0, col: 0 },
       }),
-      game.code,
       game,
     );
     const wire = JSON.stringify({ snapshot, move });
@@ -130,15 +131,16 @@ describe.skipIf(!DB_UP)("anonymous public match privacy", () => {
       body: "this stays in the match",
       clientId: crypto.randomUUID(),
     });
-    expect((await matchChat.chooseMatchFriend(game.code, a.id)).mutual).toBe(
-      false,
-    );
+    expect(
+      (await matchChat.chooseMatchFriend(game.code, a.id, `${game.code}:O`))
+        .mutual,
+    ).toBe(false);
     expect(await friends.areFriends(a.id, b.id)).toBe(false);
     expect(await conversations.findDm(a.id, b.id)).toBeNull();
     expect((await createDm(a.id, b.id)).ok).toBe(false);
     const results = await Promise.all([
-      matchChat.chooseMatchFriend(game.code, b.id),
-      matchChat.chooseMatchFriend(game.code, b.id),
+      matchChat.chooseMatchFriend(game.code, b.id, `${game.code}:X`),
+      matchChat.chooseMatchFriend(game.code, b.id, `${game.code}:X`),
     ]);
     expect(results.every((result) => result.mutual)).toBe(true);
     expect(await friends.areFriends(a.id, b.id)).toBe(true);
@@ -158,14 +160,13 @@ describe.skipIf(!DB_UP)("anonymous public match privacy", () => {
       { row: 0, col: 0 },
     );
     if (!result?.ok) throw new Error("Synthetic move failed");
-    await games.persistGameMove({
+    await games.persistGameMoves({
       previous: game,
-      playerId: a.id,
-      moveData: { row: 0, col: 0 },
+      moves: [{ playerId: a.id, moveData: { row: 0, col: 0 } }],
       gameState: result.state,
       outcome: result.outcome,
     });
-    expect(await games.abortActiveGame(game, b.id)).toBeNull();
+    expect(await games.abortActiveGame(game, [b.id])).toBeNull();
     expect((await games.getGameById(game.id))?.status).toBe("active");
     expect(
       (await profiles.getProfileByUserId(b.id))?.stats[TIC_TAC_TOE],

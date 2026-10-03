@@ -3,7 +3,7 @@
 import type { GameJson, MoveJson } from "@kyzen/shared/types";
 import { useCallback, useEffect, useState } from "react";
 import type { Socket } from "socket.io-client";
-import { bindGameSession, mergeGameMoves } from "./session";
+import { bindGameSession, mergeGameMoves, mergeGameSnapshot } from "./session";
 
 export function useGameSession({
   socket,
@@ -32,7 +32,7 @@ export function useGameSession({
       (payload) => {
         setError(null);
         setSession((previous) => ({
-          game: payload.game,
+          game: mergeGameSnapshot(previous.game, payload.game),
           moves: mergeGameMoves(previous.moves, payload),
         }));
       },
@@ -43,7 +43,8 @@ export function useGameSession({
   const makeMove = useCallback(
     (moveData: unknown) => {
       if (!socket?.connected || session.game.status !== "active") return;
-      if (!session.game.players.some((player) => player.userId === userId))
+      const playerId = session.game.viewerId ?? userId;
+      if (!session.game.players.some((player) => player.userId === playerId))
         return;
       setError(null);
       socket.emit("make_move", { gameId, moveData });

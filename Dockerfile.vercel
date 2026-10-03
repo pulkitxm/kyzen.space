@@ -8,6 +8,7 @@ COPY packages/avatar/package.json packages/avatar/package.json
 COPY packages/database/package.json packages/database/package.json
 COPY packages/games-core/package.json packages/games-core/package.json
 COPY packages/games-client/package.json packages/games-client/package.json
+COPY packages/physics/package.json packages/physics/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY vid-tutorials/package.json vid-tutorials/package.json
 RUN bun install --frozen-lockfile

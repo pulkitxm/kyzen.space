@@ -2,6 +2,7 @@ import { describe, expect, it, mock } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 mock.module("next/navigation", () => ({
+  usePathname: () => "/",
   useRouter: () => ({ push: () => {}, replace: () => {} }),
 }));
 

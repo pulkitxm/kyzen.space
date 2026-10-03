@@ -5,7 +5,6 @@ import {
   type Mark,
   type Outcome,
   type ReduceResult,
-  type Seat,
   type TicTacToeMove,
   type TicTacToeState,
   ticTacToeMoveSchema,
@@ -46,9 +45,10 @@ function isMark(role: string): role is Mark {
 
 function outcomeFor(state: TicTacToeState): Outcome {
   const winner = lineWinner(state.board);
-  if (winner) return { status: "completed", winnerRole: winner, draw: false };
+  if (winner)
+    return { status: "completed", winnerRoles: [winner], draw: false };
   if (isBoardFull(state.board))
-    return { status: "completed", winnerRole: null, draw: true };
+    return { status: "completed", winnerRoles: [], draw: true };
   return { status: "active" };
 }
 
@@ -61,9 +61,12 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
   mode: "turn-based",
   minPlayers: 2,
   maxPlayers: 2,
-  roles: ["X", "O"],
 
-  createInitialState(_seats: Seat[]): TicTacToeState {
+  roleForSeat(index): Mark {
+    return index % 2 === 0 ? "X" : "O";
+  },
+
+  createInitialState(): TicTacToeState {
     return { board: emptyBoard(), currentTurn: "X" };
   },
 
@@ -96,7 +99,7 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
     return { ok: true, state: nextState, outcome: outcomeFor(nextState) };
   },
 
-  autoMove(state, _role): TicTacToeMove {
+  autoMove(state): TicTacToeMove {
     const empties: number[] = [];
     for (let i = 0; i < state.board.length; i++) {
       if (state.board[i] === null) empties.push(i);

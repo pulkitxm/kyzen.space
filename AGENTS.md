@@ -14,9 +14,9 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow, [README.m
 
 ## Adding a game
 
-Add the game's schemas, engine, metadata, board, tests, and rules document. Update the slug, engine, and board registrations listed in `docs/adding-a-game.md`. Reuse the generic routes, session, chat layouts, profile popups, audio, and database tables. Never create a game-specific socket event, API endpoint, or table for a turn-based game.
+Add the game's schemas, engine, metadata, board, tests, and rules document. Update the slug, engine, and board registrations listed in `docs/adding-a-game.md`. Reuse the generic routes, session, chat layouts, profile popups, audio, and database tables. Never create a game-specific socket event, API endpoint, or table for a turn-based or simultaneous game.
 
-Only turn-based games currently have a server runner. Adding a `step` engine alone does not implement realtime gameplay. Extend the platform explicitly if that capability is needed.
+Turn-based and simultaneous-round engines share the server runner. Realtime `step` engines have no runner, so adding a `step` engine alone does not implement realtime gameplay. Extend the platform explicitly if that capability is needed.
 
 ## Style
 

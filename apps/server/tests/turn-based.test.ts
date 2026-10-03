@@ -33,22 +33,24 @@ const seatCalls: { player: Player; seatOrder: number }[] = [];
 const bumpCalls: { userId: string; outcome: string }[] = [];
 
 const games = {
-  persistGameMove: async (input: {
+  persistGameMoves: async (input: {
     previous: GameRecord;
-    playerId: string;
-    moveData: unknown;
+    moves: { playerId: string; moveData: unknown }[];
     gameState: unknown;
     outcome: Outcome;
   }) => {
-    const row = {
-      id: `m${moves.length + 1}`,
-      gameId: current.id,
-      playerId: input.playerId,
-      moveData: input.moveData,
-      moveNumber: moves.length + 1,
-      createdAt: new Date(),
-    };
-    moves.push(row);
+    const saved = input.moves.map((entry) => {
+      const row = {
+        id: `m${moves.length + 1}`,
+        gameId: current.id,
+        playerId: entry.playerId,
+        moveData: entry.moveData,
+        moveNumber: moves.length + 1,
+        createdAt: new Date(),
+      };
+      moves.push(row);
+      return row;
+    });
     current = { ...current, gameState: input.gameState };
     const outcome = input.outcome;
     if (outcome.status === "completed") {
@@ -58,8 +60,8 @@ const games = {
         completedAt: new Date(),
         winner: outcome.draw
           ? "draw"
-          : (current.players.find(
-              (player) => player.role === outcome.winnerRole,
+          : (current.players.find((player) =>
+              outcome.winnerRoles.includes(player.role),
             )?.userId ?? null),
       };
       for (const player of current.players)
@@ -72,7 +74,7 @@ const games = {
               : "lost",
         });
     }
-    return { game: current, move: row };
+    return { game: current, moves: saved };
   },
   getGameById: async () => current,
   getGameByCode: async () => {
@@ -110,6 +112,7 @@ const profiles = {
 mock.module("@kyzen/database", () => ({
   games,
   profiles,
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},

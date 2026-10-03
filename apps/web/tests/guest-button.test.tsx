@@ -1,10 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-mock.module("next/navigation", () => ({
-  useRouter: () => ({ push: () => {}, refresh: () => {} }),
-}));
-
 mock.module("@/lib/auth-client", () => ({
   authClient: {
     getSession: async () => ({ data: null }),

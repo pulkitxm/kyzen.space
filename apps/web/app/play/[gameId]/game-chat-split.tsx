@@ -6,6 +6,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -31,23 +32,29 @@ import { GameSettingsGear } from "./game-settings-gear";
 
 const SAVE_DEBOUNCE_MS = 600;
 
+export type ChatTab = "game" | "chat";
+
 export function GameChatSplit({
   conversationId,
   game,
   chat,
+  tab,
+  onTabChange,
   initialLayout,
   layoutTrusted,
 }: {
   conversationId: string;
   game: ReactNode;
-  chat: (visible: boolean) => ReactNode;
+  chat: (visible: boolean, onIncoming: () => void) => ReactNode;
+  tab: ChatTab;
+  onTabChange: (tab: ChatTab) => void;
   initialLayout: ChatLayout;
   layoutTrusted: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [layout, setLayout] = useState<ChatLayout>(initialLayout);
-  const [tab, setTab] = useState<"game" | "chat">("game");
+  const [missed, setMissed] = useState(0);
 
   const layoutRef = useRef(layout);
   useLayoutEffect(() => {
@@ -124,22 +131,27 @@ export function GameChatSplit({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  const onViewportChange = useEffectEvent((desktop: boolean) => {
+    if (desktop) {
+      onTabChange("game");
+      return;
+    }
+    const cur = layoutRef.current;
+    const patch: Partial<ChatLayout> = {};
+    if (cur.mode === "popout") patch.mode = "mounted";
+    if (cur.minimized) {
+      patch.minimized = false;
+      patch.stashEdge = null;
+    }
+    if (Object.keys(patch).length > 0) update(patch);
+  });
+
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
-    const onChange = () => {
-      if (mq.matches) return;
-      const cur = layoutRef.current;
-      const patch: Partial<ChatLayout> = {};
-      if (cur.mode === "popout") patch.mode = "mounted";
-      if (cur.minimized) {
-        patch.minimized = false;
-        patch.stashEdge = null;
-      }
-      if (Object.keys(patch).length > 0) update(patch);
-    };
+    const onChange = () => onViewportChange(mq.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, [update]);
+  }, []);
 
   const startDrag = useCallback(
     (e: ReactMouseEvent) => {
@@ -165,16 +177,19 @@ export function GameChatSplit({
 
   const unread = useAtomValue(conversationUnreadAtomFamily(conversationId));
 
-  const minimize = useCallback(
-    () => update({ minimized: true, stashEdge: null }),
-    [update],
-  );
+  const countIncoming = useCallback(() => {
+    if (layoutRef.current.minimized) setMissed((count) => count + 1);
+  }, []);
 
-  const closeToSide = useCallback(
-    () =>
-      update({ minimized: true, stashEdge: layoutRef.current.lastStashEdge }),
-    [update],
-  );
+  const minimize = useCallback(() => {
+    setMissed(0);
+    update({ minimized: true, stashEdge: null });
+  }, [update]);
+
+  const closeToSide = useCallback(() => {
+    setMissed(0);
+    update({ minimized: true, stashEdge: layoutRef.current.lastStashEdge });
+  }, [update]);
 
   const restore = useCallback(
     () => update({ minimized: false, stashEdge: null }),
@@ -207,12 +222,18 @@ export function GameChatSplit({
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
       {}
-      <div className="flex shrink-0 border-border border-b md:hidden">
+      <div
+        role="tablist"
+        aria-label="Game and chat"
+        className="flex shrink-0 border-border border-b md:hidden"
+      >
         {(["game", "chat"] as const).map((t) => (
           <button
             key={t}
             type="button"
-            onClick={() => setTab(t)}
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => onTabChange(t)}
             className={cn(
               "flex-1 border-b-2 py-2 text-sm capitalize outline-none transition",
               tab === t
@@ -260,14 +281,16 @@ export function GameChatSplit({
           onGeometryChange={setGeometry}
           onCommit={persist}
         >
-          <div className="min-h-0 w-full">{chat(!minimized)}</div>
+          <div className="min-h-0 w-full">
+            {chat(!minimized, countIncoming)}
+          </div>
         </ChatPopoutWindow>
 
         {minimized && (
           <ChatFloatingIcon
             icon={icon}
             stashEdge={stashEdge}
-            unread={unread}
+            unread={unread + missed}
             onIconChange={setIcon}
             onStashChange={changeStash}
             onRestore={restore}

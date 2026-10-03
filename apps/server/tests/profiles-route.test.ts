@@ -72,6 +72,7 @@ mock.module("@kyzen/database", () => ({
   games: {
     gamesForUser: async () => [],
   },
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},

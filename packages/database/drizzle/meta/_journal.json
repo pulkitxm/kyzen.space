@@ -85,6 +85,20 @@
       "when": 1790962644745,
       "tag": "0011_platform_schema",
       "breakpoints": false
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791013025075,
+      "tag": "0012_simultaneous_platform",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791043311909,
+      "tag": "0013_timestamptz",
+      "breakpoints": true
     }
   ]
 }

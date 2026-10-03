@@ -8,71 +8,17 @@ import { getDefinition } from "@kyzen/games-core";
 import {
   type ClientJoinRoom,
   type ClientMakeMove,
-  type GameJson,
   isGameCode,
-  type ServerGameStatePayload,
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
-import { publicPlayerId, serializeGame, serializeMove } from "../api/serialize";
 import { broadcastGameCard } from "../chat/game-card-broadcast";
-import { emitToGame, joinGameRoom } from "./rooms";
-import {
-  abortOutcome,
-  decideTimeout,
-  turnLimitMs,
-  turnTimers,
-} from "./turn-timer";
+import { withGameLock } from "./game-lock";
+import { emitFullState, settle, submitMove } from "./game-runner";
+import { joinGameRoom } from "./rooms";
+import { initialState, lobbySettings, plainSeats } from "./setup";
 
 function err(socket: Socket, message: string) {
   socket.emit("game_error", { message });
-}
-
-function withTimerFields(game: GameJson, gameId: string): GameJson {
-  return {
-    ...game,
-    turnDeadline: turnTimers.deadline(gameId),
-    players: game.players.map((p) => ({
-      ...p,
-      timeoutStrikes: turnTimers.strikes(gameId, p.role),
-    })),
-  };
-}
-
-function currentRoleOf(gameRow: GameRecord): string | null {
-  const def = getDefinition(gameRow.gameType);
-  if (!def.engine.currentRole) return null;
-  const parsed = def.stateSchema.safeParse(gameRow.gameState);
-  if (!parsed.success) return null;
-  return def.engine.currentRole(parsed.data);
-}
-
-function scheduleNext(io: IOServer, gameRow: GameRecord): void {
-  if (gameRow.status !== "active") {
-    turnTimers.clear(gameRow.id);
-    return;
-  }
-  const role = currentRoleOf(gameRow);
-  if (!role) {
-    turnTimers.clear(gameRow.id);
-    return;
-  }
-  const limit = turnLimitMs({
-    isFirstTurn: turnTimers.isFirstTurn(gameRow.id, role),
-    strikes: turnTimers.strikes(gameRow.id, role),
-  });
-  const armedState = JSON.stringify(gameRow.gameState);
-  turnTimers.arm(gameRow.id, role, limit, () => {
-    void onTurnTimeout(io, gameRow.id, armedState);
-  });
-}
-
-async function emitFullState(io: IOServer, gameRow: GameRecord) {
-  const moves = await games.listMoves(gameRow.id);
-  const payload: ServerGameStatePayload = {
-    game: withTimerFields(serializeGame(gameRow), gameRow.id),
-    moves: moves.map((m) => serializeMove(m, gameRow.code, gameRow)),
-  };
-  emitToGame(io, gameRow.code, "game_state", payload);
 }
 
 async function ensureSeated(
@@ -85,9 +31,12 @@ async function ensureSeated(
     return { game: gameRow, changed: false };
   }
 
-  const { engine } = getDefinition(gameRow.gameType);
+  const definition = getDefinition(gameRow.gameType);
+  const { engine } = definition;
+  const reserved = engine.lobby ? lobbySettings(gameRow.config).bots.length : 0;
   const seatFree =
-    gameRow.status === "waiting" && players.length < engine.maxPlayers;
+    gameRow.status === "waiting" &&
+    players.length + reserved < engine.maxPlayers;
   const challengeReserved =
     gameRow.seatingMode === "challenge" &&
     !!gameRow.challengedUserId &&
@@ -99,146 +48,32 @@ async function ensureSeated(
 
   const profile = await profiles.getProfileByUserId(userId);
   const username = profile?.username ?? "player";
-  // biome-ignore lint/style/noNonNullAssertion: seatFree guarantees players.length < maxPlayers, so a role exists for the next seat
-  const role = engine.roles[players.length]!;
+  const role = engine.roleForSeat(players.length);
   const newPlayer: GamePlayer = { userId, username, role };
   const nextPlayers = [...players, newPlayer];
-  const becomesActive = nextPlayers.length >= engine.minPlayers;
 
   const seated = await games.seatPlayer(gameRow.id, newPlayer, players.length);
   if (!seated) {
     const refreshed = await games.getGameById(gameRow.id);
     return { game: refreshed ?? gameRow, changed: false };
   }
+  if (engine.lobby) {
+    const refreshed = await games.getGameById(gameRow.id);
+    return {
+      game: refreshed ?? { ...gameRow, players: nextPlayers },
+      changed: true,
+    };
+  }
+  const becomesActive = nextPlayers.length >= engine.minPlayers;
   const game = await games.updateGame(gameRow.id, {
     status: becomesActive ? "active" : "waiting",
     startedAt: becomesActive ? new Date() : gameRow.startedAt,
     gameState:
-      gameRow.gameState ??
-      engine.createInitialState(nextPlayers.map((p) => ({ role: p.role }))),
+      becomesActive || gameRow.gameState == null
+        ? initialState(definition, plainSeats(nextPlayers), gameRow.config)
+        : gameRow.gameState,
   });
   return { game, changed: true };
-}
-
-async function applyMove(
-  io: IOServer,
-  gameRow: GameRecord,
-  player: GamePlayer,
-  moveData: unknown,
-  opts: { auto?: boolean } = {},
-): Promise<void> {
-  const def = getDefinition(gameRow.gameType);
-  if (!def.engine.reduce) return;
-
-  const parsedMove = def.moveSchema.safeParse(moveData);
-  if (!parsedMove.success) return;
-  const parsedState = def.stateSchema.safeParse(gameRow.gameState);
-  if (!parsedState.success) return;
-
-  const result = def.engine.reduce(
-    parsedState.data,
-    { role: player.role },
-    parsedMove.data,
-  );
-  if (!result.ok) return;
-
-  const persisted = await games.persistGameMove({
-    previous: gameRow,
-    playerId: player.userId,
-    moveData: parsedMove.data,
-    gameState: result.state,
-    outcome: result.outcome,
-  });
-  if (!persisted) return;
-  const { game: updated, move: moveRow } = persisted;
-
-  if (!opts.auto) turnTimers.resetStrikes(gameRow.id, player.role);
-  scheduleNext(io, updated);
-
-  const move = serializeMove(moveRow, gameRow.code, gameRow);
-  const statePayload: ServerGameStatePayload = {
-    game: withTimerFields(serializeGame(updated), updated.id),
-    move: opts.auto ? { ...move, auto: true } : move,
-  };
-  emitToGame(io, gameRow.code, "game_state", statePayload);
-
-  if (updated.status === "completed") {
-    turnTimers.dispose(updated.id);
-    emitToGame(io, gameRow.code, "game_over", {
-      winner: publicPlayerId(updated, updated.winner),
-    });
-    await broadcastGameCard(io, updated.id);
-  }
-}
-
-async function abortGame(
-  io: IOServer,
-  gameRow: GameRecord,
-  winner: GamePlayer | null,
-): Promise<void> {
-  const updated = await games.abortActiveGame(gameRow, winner?.userId ?? null);
-  if (!updated) return;
-
-  turnTimers.dispose(updated.id);
-  emitToGame(io, gameRow.code, "game_state", {
-    game: withTimerFields(serializeGame(updated), updated.id),
-  });
-  emitToGame(io, gameRow.code, "game_over", {
-    winner: publicPlayerId(updated, updated.winner),
-  });
-  await broadcastGameCard(io, updated.id);
-}
-
-async function onTurnTimeout(
-  io: IOServer,
-  gameId: string,
-  armedState?: string,
-): Promise<void> {
-  const gameRow = await games.getGameById(gameId);
-  if (gameRow?.status !== "active") {
-    turnTimers.clear(gameId);
-    return;
-  }
-  if (
-    armedState !== undefined &&
-    JSON.stringify(gameRow.gameState) !== armedState
-  )
-    return;
-  const role = currentRoleOf(gameRow);
-  if (!role) {
-    turnTimers.clear(gameId);
-    return;
-  }
-  const player = gameRow.players.find((p) => p.role === role);
-  if (!player) {
-    turnTimers.clear(gameId);
-    return;
-  }
-
-  const decision = decideTimeout({ strikes: turnTimers.strikes(gameId, role) });
-  if (decision.kind === "abort") {
-    const opponent = gameRow.players.find((p) => p.role !== role) ?? null;
-    const opponentStrikes = opponent
-      ? turnTimers.strikes(gameId, opponent.role)
-      : 0;
-    const outcome = abortOutcome({ opponentStrikes });
-    await abortGame(
-      io,
-      gameRow,
-      outcome.winner === "opponent" ? opponent : null,
-    );
-    return;
-  }
-
-  turnTimers.setStrikes(gameId, role, decision.nextStrikes);
-  const def = getDefinition(gameRow.gameType);
-  const parsed = def.stateSchema.safeParse(gameRow.gameState);
-  if (!def.engine.autoMove || !parsed.success) {
-    turnTimers.clear(gameId);
-    return;
-  }
-  const move = def.engine.autoMove(parsed.data, role);
-  await applyMove(io, gameRow, player, move, { auto: true });
 }
 
 export async function handleJoinRoom(
@@ -258,18 +93,19 @@ export async function handleJoinRoom(
   )
     return err(socket, "Game not found");
 
-  const { game, changed } = await ensureSeated(
-    gameRow,
-    userId,
-    payload.intent ?? "play",
-  );
+  const { game, changed } = await withGameLock(gameRow.id, async () => {
+    const fresh = (await games.getGameById(gameRow.id)) ?? gameRow;
+    const seated = await ensureSeated(fresh, userId, payload.intent ?? "play");
+    return {
+      game:
+        seated.game.status === "active"
+          ? await settle(io, seated.game)
+          : seated.game,
+      changed: seated.changed,
+    };
+  });
 
   joinGameRoom(socket, game.code);
-  if (
-    game.status === "active" &&
-    (changed || turnTimers.deadline(game.id) === null)
-  )
-    scheduleNext(io, game);
   await emitFullState(io, game);
   if (changed) await broadcastGameCard(io, game.id);
 }
@@ -284,36 +120,7 @@ export async function handleMakeMove(
 
   const gameRow = await games.getGameByCode(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
-  if (gameRow.status !== "active") return err(socket, "Game is not active");
 
-  const player = gameRow.players.find((p) => p.userId === userId);
-  if (!player) return err(socket, "Not a player in this game");
-
-  const def = getDefinition(gameRow.gameType);
-  if (!def.engine.reduce) return err(socket, "Game does not accept moves");
-
-  const parsedMove = def.moveSchema.safeParse(payload.moveData);
-  if (!parsedMove.success) return err(socket, "Invalid move");
-  const parsedState = def.stateSchema.safeParse(gameRow.gameState);
-  if (!parsedState.success) return err(socket, "Corrupt game state");
-
-  const result = def.engine.reduce(
-    parsedState.data,
-    { role: player.role },
-    parsedMove.data,
-  );
-  if (!result.ok) return err(socket, result.error);
-
-  await applyMove(io, gameRow, player, parsedMove.data);
-}
-
-export const __timerInternals = { onTurnTimeout };
-
-export async function ensureMatchClock(
-  io: IOServer,
-  code: string,
-): Promise<void> {
-  const record = await games.getGameByCode(code);
-  if (record?.status === "active" && turnTimers.deadline(record.id) === null)
-    scheduleNext(io, record);
+  const error = await submitMove(io, gameRow.id, userId, payload.moveData);
+  if (error) err(socket, error);
 }

@@ -8,9 +8,11 @@
   },
   "scripts": {
     "test": "bun test",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "verify": "bun scripts/verify-determinism.ts"
   },
   "dependencies": {
+    "@kyzen/physics": "workspace:*",
     "@kyzen/shared": "workspace:*"
   },
   "devDependencies": {

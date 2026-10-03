@@ -11,7 +11,7 @@ if (!autoMove || !reduce) {
 describe("tic-tac-toe autoMove", () => {
   test("returns a legal move on an empty cell that reduce accepts", () => {
     const state: TicTacToeState = { board: emptyBoard(), currentTurn: "X" };
-    const move = autoMove(state, "X");
+    const move = autoMove(state, "X", 0);
     const idx = move.row * 3 + move.col;
     expect(state.board[idx]).toBeNull();
     const result = reduce(state, { role: "X" }, move);
@@ -26,7 +26,7 @@ describe("tic-tac-toe autoMove", () => {
     board[4] = "O";
     const state: TicTacToeState = { board, currentTurn: "O" };
     for (let i = 0; i < 30; i++) {
-      const move = autoMove(state, "O");
+      const move = autoMove(state, "O", 2);
       expect(board[move.row * 3 + move.col]).toBeNull();
     }
   });

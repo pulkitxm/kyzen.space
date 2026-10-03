@@ -35,6 +35,7 @@ const profiles = {
 mock.module("@kyzen/database", () => ({
   games,
   profiles,
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},

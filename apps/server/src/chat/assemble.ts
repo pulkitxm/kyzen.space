@@ -53,6 +53,7 @@ async function withGameCardStatus(
     metadata: enrichGameCardMeta(msg.metadata as GameCardMeta, {
       status: game.status,
       winner: game.winner,
+      winners: game.winners ?? [],
       players: (game.players ?? []) as GamePlayer[],
       seriesScore,
       seriesSuperseded,

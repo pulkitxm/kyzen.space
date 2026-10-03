@@ -5,6 +5,7 @@ import {
   createGameInConversation,
   rematchGame,
 } from "../src/chat/games-in-chat-service";
+import { createStandaloneGame } from "../src/realtime/rooms-service";
 import { handleJoinRoom, handleMakeMove } from "../src/realtime/turn-based";
 import { createHarness, DB_UP } from "./harness";
 
@@ -37,6 +38,62 @@ function makeSocket(userId: string) {
 }
 
 const move = (row: number, col: number) => ({ row, col });
+
+describe.skipIf(!DB_UP)("private room rematch", () => {
+  it("opens one waiting room for concurrent clicks and invites the other player", async () => {
+    const a = await h.makeUser("prA");
+    const b = await h.makeUser("prB");
+    const created = await createStandaloneGame({
+      userId: a.id,
+      gameType: TIC_TAC_TOE,
+    });
+    if (!created.ok) throw new Error(created.error);
+    const code = created.value.code;
+    h.trackGame(code);
+    const io = makeIo();
+    const sockA = makeSocket(a.id);
+    const sockB = makeSocket(b.id);
+    await handleJoinRoom(io as never, sockB as never, { gameId: code });
+    for (const [socket, row, col] of [
+      [sockA, 0, 0],
+      [sockB, 1, 0],
+      [sockA, 0, 1],
+      [sockB, 1, 1],
+      [sockA, 0, 2],
+    ] as const)
+      await handleMakeMove(io as never, socket as never, {
+        gameId: code,
+        moveData: move(row, col),
+      });
+    const finished = await games.getGameByCode(code);
+    expect(finished?.status).toBe("completed");
+
+    const [first, second] = await Promise.all([
+      rematchGame({ userId: a.id, gameId: code }),
+      rematchGame({ userId: b.id, gameId: code }),
+    ]);
+    if (!first.ok || !second.ok) throw new Error("rematch failed");
+    const newCode = first.value.game.id;
+    h.trackGame(newCode);
+    expect(second.value.game.id).toBe(newCode);
+    const invites = [first.value.recipients, second.value.recipients].sort(
+      (x, y) => (y?.length ?? 0) - (x?.length ?? 0),
+    );
+    const room = await games.getGameByCode(newCode);
+    const host = room?.creatorUserId;
+    expect(invites).toEqual([[host === a.id ? b.id : a.id], []]);
+    expect(room?.status).toBe("waiting");
+    expect(room?.conversationId).toBeNull();
+    expect(room?.seriesId).toBe(finished?.seriesId ?? "");
+    expect(room?.players.map((player) => [player.userId, player.role])).toEqual(
+      [[host ?? "", "X"]],
+    );
+
+    const guest = host === a.id ? sockB : sockA;
+    await handleJoinRoom(io as never, guest as never, { gameId: newCode });
+    expect((await games.getGameByCode(newCode))?.status).toBe("active");
+  });
+});
 
 describe.skipIf(!DB_UP)("rematch end-to-end", () => {
   it("links a rematch into the same series with loser-first seating", async () => {

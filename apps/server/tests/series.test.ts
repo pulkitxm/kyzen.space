@@ -115,4 +115,26 @@ describe("computeSeriesScore", () => {
     expect(score.entries.find((e) => e.userId === "u3")?.wins).toBe(1);
     expect(score.entries.find((e) => e.userId === "u2")?.wins).toBe(0);
   });
+
+  test("credits every member of a winning team and no one for a shared draw", () => {
+    const players = [
+      { userId: "u1", username: "aman", role: "P1" },
+      { userId: "u2", username: "riya", role: "P2" },
+      { userId: "u3", username: "kabir", role: "P3" },
+      { userId: "bot:1", username: "Hard Bot", role: "P4" },
+    ];
+    const teamWin = {
+      ...game("completed", null, players),
+      winners: ["u1", "u3"],
+    } as GameRecord;
+    const sharedDraw = {
+      ...game("completed", "draw", players),
+      winners: ["u2", "bot:1"],
+    } as GameRecord;
+    const score = computeSeriesScore([teamWin, sharedDraw]);
+    expect(score.draws).toBe(1);
+    expect(
+      Object.fromEntries(score.entries.map((e) => [e.userId, e.wins])),
+    ).toEqual({ u1: 1, u2: 0, u3: 1, "bot:1": 0 });
+  });
 });

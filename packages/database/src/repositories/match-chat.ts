@@ -1,6 +1,17 @@
 import { ANON_MAX_FRIENDS } from "@kyzen/shared/constants";
-import type { MatchMessage } from "@kyzen/shared/types";
-import { and, count, desc, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
+import { isBotId, isGameLive, type MatchMessage } from "@kyzen/shared/types";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "../client";
 import {
   friendship,
@@ -15,22 +26,46 @@ import {
 import { pairKey } from "./friends";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type MatchRow = typeof game.$inferSelect;
+type Seat = { userId: string; role: string };
+
+const FRIEND_WINDOW_MS = 15 * 60000;
 
 async function participant(tx: Transaction, code: string, userId: string) {
   const [row] = await tx
     .select()
     .from(game)
-    .where(and(eq(game.code, code), eq(game.publicMatch, true)))
+    .where(and(eq(game.code, code), isNull(game.conversationId)))
     .for("update");
   if (!row) throw new Error("Match not found");
   const players = await tx
-    .select()
+    .select({ userId: gamePlayer.userId, role: gamePlayer.role })
     .from(gamePlayer)
     .where(eq(gamePlayer.gameId, row.id))
     .orderBy(gamePlayer.seatOrder);
   if (!players.some((player) => player.userId === userId))
     throw new Error("Match not found");
   return { row, players };
+}
+
+function playerIdOf(row: MatchRow, players: Seat[], userId: string): string {
+  if (!row.publicMatch) return userId;
+  const seat = players.find((player) => player.userId === userId);
+  return seat ? `${row.code}:${seat.role}` : "";
+}
+
+function toMatchMessage(
+  row: MatchRow,
+  players: Seat[],
+  message: typeof matchMessage.$inferSelect,
+): MatchMessage {
+  return {
+    id: message.id,
+    gameId: row.code,
+    authorId: playerIdOf(row, players, message.senderId),
+    body: message.body,
+    createdAt: message.createdAt.toISOString(),
+  };
 }
 
 export async function readMatchChat(code: string, userId: string) {
@@ -40,49 +75,62 @@ export async function readMatchChat(code: string, userId: string) {
       .select()
       .from(matchFriendChoice)
       .where(eq(matchFriendChoice.gameId, row.id));
-    const rows =
-      row.status === "active"
-        ? await tx
-            .select()
-            .from(matchMessage)
-            .where(
-              and(
-                eq(matchMessage.gameId, row.id),
-                gt(matchMessage.expiresAt, new Date()),
-              ),
-            )
-            .orderBy(desc(matchMessage.createdAt), desc(matchMessage.id))
-            .limit(100)
-        : [];
-    const peer = players.find((player) => player.userId !== userId);
-    const [connection] = peer
+    const rows = isGameLive(row.status)
       ? await tx
           .select()
-          .from(friendship)
-          .where(eq(friendship.pairKey, pairKey(userId, peer.userId)))
+          .from(matchMessage)
+          .where(
+            and(
+              eq(matchMessage.gameId, row.id),
+              gt(matchMessage.expiresAt, sql`now()`),
+            ),
+          )
+          .orderBy(desc(matchMessage.createdAt), desc(matchMessage.id))
+          .limit(100)
       : [];
-    const mutual =
-      choices.length === players.length && connection?.status === "accepted";
-    const [profile] =
-      mutual && peer
-        ? await tx
-            .select({ username: userProfile.username })
-            .from(userProfile)
-            .where(eq(userProfile.userId, peer.userId))
-        : [];
-    return {
-      chosen: choices.some((choice) => choice.userId === userId),
-      mutual,
-      peerUsername: profile?.username ?? null,
-      messages: rows.reverse().map(
-        (message): MatchMessage => ({
-          id: message.id,
-          gameId: code,
-          authorId: `${code}:${players.find((player) => player.userId === message.senderId)?.role}`,
-          body: message.body,
-          createdAt: message.createdAt.toISOString(),
-        }),
+    const chosen = choices
+      .filter((choice) => choice.userId === userId)
+      .map((choice) => choice.targetUserId);
+    const mutualIds = chosen.filter((target) =>
+      choices.some(
+        (choice) => choice.userId === target && choice.targetUserId === userId,
       ),
+    );
+    const accepted = mutualIds.length
+      ? await tx
+          .select({ pairKey: friendship.pairKey })
+          .from(friendship)
+          .where(
+            and(
+              inArray(
+                friendship.pairKey,
+                mutualIds.map((target) => pairKey(userId, target)),
+              ),
+              eq(friendship.status, "accepted"),
+            ),
+          )
+      : [];
+    const friendIds = mutualIds.filter((target) =>
+      accepted.some((row) => row.pairKey === pairKey(userId, target)),
+    );
+    const profiles = friendIds.length
+      ? await tx
+          .select({
+            userId: userProfile.userId,
+            username: userProfile.username,
+          })
+          .from(userProfile)
+          .where(inArray(userProfile.userId, friendIds))
+      : [];
+    return {
+      choices: chosen.map((target) => playerIdOf(row, players, target)),
+      friends: profiles.map((profile) => ({
+        playerId: playerIdOf(row, players, profile.userId),
+        username: profile.username,
+      })),
+      messages: rows
+        .reverse()
+        .map((message) => toMatchMessage(row, players, message)),
     };
   });
 }
@@ -95,7 +143,7 @@ export async function sendMatchMessage(input: {
 }): Promise<MatchMessage> {
   return db.transaction(async (tx) => {
     const { row, players } = await participant(tx, input.code, input.userId);
-    if (row.status !== "active") throw new Error("Match chat has ended");
+    if (!isGameLive(row.status)) throw new Error("Match chat has ended");
     const [existing] = await tx
       .select()
       .from(matchMessage)
@@ -108,19 +156,18 @@ export async function sendMatchMessage(input: {
       );
     let message = existing;
     if (!message) {
-      const [last] = await tx
-        .select()
+      const [recent] = await tx
+        .select({ id: matchMessage.id })
         .from(matchMessage)
         .where(
           and(
             eq(matchMessage.gameId, row.id),
             eq(matchMessage.senderId, input.userId),
+            gt(matchMessage.createdAt, sql`now() - interval '1 second'`),
           ),
         )
-        .orderBy(desc(matchMessage.createdAt))
         .limit(1);
-      if (last && Date.now() - last.createdAt.getTime() < 1000)
-        throw new Error("Please wait before sending another message");
+      if (recent) throw new Error("Please wait before sending another message");
       const [total] = await tx
         .select({ value: count() })
         .from(matchMessage)
@@ -134,51 +181,59 @@ export async function sendMatchMessage(input: {
           senderId: input.userId,
           clientId: input.clientId,
           body: input.body,
-          expiresAt: new Date(Date.now() + 7 * 86400000),
+          expiresAt: sql`now() + interval '7 days'`,
         })
         .returning();
     }
     if (!message) throw new Error("Message could not be saved");
-    return {
-      id: message.id,
-      gameId: input.code,
-      authorId: `${input.code}:${players.find((player) => player.userId === input.userId)?.role}`,
-      body: message.body,
-      createdAt: message.createdAt.toISOString(),
-    };
+    return toMatchMessage(row, players, message);
   });
 }
 
-export async function chooseMatchFriend(code: string, userId: string) {
+export async function chooseMatchFriend(
+  code: string,
+  userId: string,
+  playerId: string,
+): Promise<{ mutual: boolean; targetUserId: string }> {
   return db.transaction(async (tx) => {
     const { row, players } = await participant(tx, code, userId);
+    if (!row.publicMatch) throw new Error("Match not found");
     if (
-      players.length !== 2 ||
-      (row.status !== "active" &&
-        (!row.completedAt ||
-          Date.now() - row.completedAt.getTime() > 15 * 60000))
+      row.status !== "active" &&
+      (!row.completedAt ||
+        Date.now() - row.completedAt.getTime() > FRIEND_WINDOW_MS)
     )
       throw new Error("The connection window has ended");
-    const userIds = players.map((player) => player.userId);
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${pairKey(userIds[0] ?? "", userIds[1] ?? "")}))`,
+    const target = players.find(
+      (player) => playerIdOf(row, players, player.userId) === playerId,
     );
+    if (!target || target.userId === userId || isBotId(target.userId))
+      throw new Error("Player not found");
+    const targetUserId = target.userId;
+    const key = pairKey(userId, targetUserId);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
     await tx
       .insert(matchFriendChoice)
-      .values({ gameId: row.id, userId })
+      .values({ gameId: row.id, userId, targetUserId })
       .onConflictDoNothing();
-    const choices = await tx
+    const [reverse] = await tx
       .select()
       .from(matchFriendChoice)
-      .where(eq(matchFriendChoice.gameId, row.id));
-    if (choices.length < 2) return { mutual: false, userIds };
-    const key = pairKey(userIds[0] ?? "", userIds[1] ?? "");
+      .where(
+        and(
+          eq(matchFriendChoice.gameId, row.id),
+          eq(matchFriendChoice.userId, targetUserId),
+          eq(matchFriendChoice.targetUserId, userId),
+        ),
+      );
+    if (!reverse) return { mutual: false, targetUserId };
+    const pair = [userId, targetUserId].sort();
     const [existing] = await tx
       .select()
       .from(friendship)
       .where(eq(friendship.pairKey, key));
     if (existing?.status !== "accepted") {
-      for (const id of [...userIds].sort()) {
+      for (const id of pair) {
         const [account] = await tx
           .select()
           .from(user)
@@ -205,8 +260,8 @@ export async function chooseMatchFriend(code: string, userId: string) {
       await tx
         .insert(friendship)
         .values({
-          requesterId: userIds[0] ?? "",
-          addresseeId: userIds[1] ?? "",
+          requesterId: pair[0] ?? "",
+          addresseeId: pair[1] ?? "",
           pairKey: key,
           status: "accepted",
           respondedAt: new Date(),
@@ -220,18 +275,16 @@ export async function chooseMatchFriend(code: string, userId: string) {
           },
         });
     }
-    return { mutual: true, userIds };
+    return { mutual: true, targetUserId };
   });
 }
 
 export async function purgeExpiredMatchData(): Promise<void> {
-  await db.delete(matchMessage).where(lt(matchMessage.expiresAt, new Date()));
+  await db.delete(matchMessage).where(lt(matchMessage.expiresAt, sql`now()`));
   await db
     .delete(matchmakingTicket)
-    .where(lt(matchmakingTicket.expiresAt, new Date()));
+    .where(lt(matchmakingTicket.expiresAt, sql`now()`));
   await db
     .delete(matchFriendChoice)
-    .where(
-      lt(matchFriendChoice.createdAt, new Date(Date.now() - 7 * 86400000)),
-    );
+    .where(lt(matchFriendChoice.createdAt, sql`now() - interval '7 days'`));
 }

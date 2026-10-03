@@ -8,9 +8,11 @@ import {
   type GameRow,
   type GameType,
   type GameUpdate,
+  isBotId,
   type MoveRow,
   normalizeGameCode,
   type Outcome,
+  type Seat,
 } from "@kyzen/shared/types";
 import {
   and,
@@ -62,24 +64,8 @@ export async function createGame(input: CreateGameInput): Promise<GameRecord> {
   throw new Error("Failed to allocate a unique game code");
 }
 
-export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
-  const rows = await db
-    .select({
-      userId: gamePlayer.userId,
-      username: gamePlayer.username,
-      role: gamePlayer.role,
-      avatar: userProfile.avatar,
-    })
-    .from(gamePlayer)
-    .leftJoin(userProfile, eq(userProfile.userId, gamePlayer.userId))
-    .where(eq(gamePlayer.gameId, gameId))
-    .orderBy(gamePlayer.seatOrder);
-  return rows.map((r) => ({
-    userId: r.userId,
-    username: r.username,
-    role: r.role,
-    avatar: r.avatar ?? null,
-  }));
+export function getPlayers(gameId: string): Promise<GamePlayer[]> {
+  return playersIn(db, gameId);
 }
 
 export async function getGameById(id: string): Promise<GameRecord | null> {
@@ -140,18 +126,202 @@ export async function seatPlayer(
   player: GamePlayer,
   seatOrder: number,
 ): Promise<boolean> {
-  const rows = await db
-    .insert(gamePlayer)
-    .values({
-      gameId,
-      userId: player.userId,
-      username: player.username,
-      role: player.role,
-      seatOrder,
+  return db.transaction(async (tx) => {
+    const [waiting] = await tx
+      .select({ id: game.id })
+      .from(game)
+      .where(and(eq(game.id, gameId), eq(game.status, "waiting")))
+      .for("update");
+    if (!waiting) return false;
+    const [occupied] = await tx
+      .select({ id: gamePlayer.id })
+      .from(gamePlayer)
+      .where(
+        and(eq(gamePlayer.gameId, gameId), eq(gamePlayer.seatOrder, seatOrder)),
+      )
+      .limit(1);
+    if (occupied) return false;
+    const rows = await tx
+      .insert(gamePlayer)
+      .values({
+        gameId,
+        userId: player.userId,
+        username: player.username,
+        role: player.role,
+        seatOrder,
+      })
+      .onConflictDoNothing({ target: [gamePlayer.gameId, gamePlayer.userId] })
+      .returning({ id: gamePlayer.id });
+    return rows.length > 0;
+  });
+}
+
+export async function configureLobby(
+  gameId: string,
+  config: unknown,
+): Promise<GameRecord | null> {
+  const [row] = await db
+    .update(game)
+    .set({ config, updatedAt: new Date() })
+    .where(and(eq(game.id, gameId), eq(game.status, "waiting")))
+    .returning();
+  if (!row) return null;
+  return toGameRecord(row, await getPlayers(gameId));
+}
+
+async function playersIn(
+  executor: typeof db | Transaction,
+  gameId: string,
+): Promise<GamePlayer[]> {
+  const rows = await executor
+    .select({
+      userId: gamePlayer.userId,
+      username: gamePlayer.username,
+      role: gamePlayer.role,
+      avatar: userProfile.avatar,
     })
-    .onConflictDoNothing({ target: [gamePlayer.gameId, gamePlayer.userId] })
-    .returning({ id: gamePlayer.id });
-  return rows.length > 0;
+    .from(gamePlayer)
+    .leftJoin(userProfile, eq(userProfile.userId, gamePlayer.userId))
+    .where(eq(gamePlayer.gameId, gameId))
+    .orderBy(gamePlayer.seatOrder);
+  return rows.map((r) => ({ ...r, avatar: r.avatar ?? null }));
+}
+
+export async function removeLobbyPlayer(input: {
+  gameId: string;
+  userId: string;
+  roleForSeat: (index: number) => string;
+}): Promise<GameRecord | null> {
+  return db.transaction(async (tx) => {
+    const [locked] = await tx
+      .select({ id: game.id })
+      .from(game)
+      .where(and(eq(game.id, input.gameId), eq(game.status, "waiting")))
+      .for("update");
+    if (!locked) return null;
+    const removed = await tx
+      .delete(gamePlayer)
+      .where(
+        and(
+          eq(gamePlayer.gameId, locked.id),
+          eq(gamePlayer.userId, input.userId),
+        ),
+      )
+      .returning({ id: gamePlayer.id });
+    if (!removed.length) return null;
+    const remaining = await tx
+      .select({ id: gamePlayer.id })
+      .from(gamePlayer)
+      .where(eq(gamePlayer.gameId, locked.id))
+      .orderBy(gamePlayer.seatOrder);
+    for (const [index, seat] of remaining.entries())
+      await tx
+        .update(gamePlayer)
+        .set({ seatOrder: index, role: input.roleForSeat(index) })
+        .where(eq(gamePlayer.id, seat.id));
+    const [updated] = await tx
+      .update(game)
+      .set({
+        config: sql`${game.config} #- array['teams', ${input.userId}]::text[]`,
+        updatedAt: new Date(),
+      })
+      .where(eq(game.id, locked.id))
+      .returning();
+    if (!updated) throw new Error("Lobby could not be updated");
+    return toGameRecord(updated, await playersIn(tx, locked.id));
+  });
+}
+
+export async function createRematch(
+  input: CreateGameInput & { seriesId: string },
+): Promise<{ game: GameRecord; created: boolean }> {
+  createGameInputSchema.parse(input);
+  for (let attempt = 1; attempt <= GAME_CODE_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${input.seriesId}))`,
+        );
+        const [live] = await tx
+          .select()
+          .from(game)
+          .where(
+            and(
+              eq(game.seriesId, input.seriesId),
+              inArray(game.status, ["waiting", "active"]),
+            ),
+          )
+          .orderBy(desc(game.createdAt))
+          .limit(1);
+        if (live)
+          return {
+            game: toGameRecord(live, await playersIn(tx, live.id)),
+            created: false,
+          };
+        return { game: await insertGame(tx, input), created: true };
+      });
+    } catch (error) {
+      if (!isGameCodeCollision(error)) throw error;
+    }
+  }
+  throw new Error("Failed to allocate a unique game code");
+}
+
+export async function startLobby(input: {
+  previous: GameRecord;
+  bots: GamePlayer[];
+  gameState: unknown;
+}): Promise<GameRecord | null> {
+  return db.transaction(async (tx) => {
+    const [locked] = await tx
+      .select({ id: game.id })
+      .from(game)
+      .where(
+        and(
+          eq(game.id, input.previous.id),
+          eq(game.status, "waiting"),
+          sql`coalesce(${game.config}, 'null'::jsonb) = ${JSON.stringify(input.previous.config ?? null)}::jsonb`,
+        ),
+      )
+      .for("update");
+    if (!locked) return null;
+    const seated = await tx
+      .select({ userId: gamePlayer.userId })
+      .from(gamePlayer)
+      .where(eq(gamePlayer.gameId, locked.id))
+      .orderBy(gamePlayer.seatOrder);
+    const humans = input.previous.players;
+    if (
+      seated.length !== humans.length ||
+      seated.some((row, index) => row.userId !== humans[index]?.userId)
+    )
+      return null;
+    if (input.bots.length)
+      await tx.insert(gamePlayer).values(
+        input.bots.map((bot, index) => ({
+          gameId: locked.id,
+          userId: bot.userId,
+          username: bot.username,
+          role: bot.role,
+          seatOrder: humans.length + index,
+        })),
+      );
+    const [updated] = await tx
+      .update(game)
+      .set({
+        status: "active",
+        gameState: input.gameState,
+        startedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(game.id, locked.id))
+      .returning();
+    if (!updated) throw new Error("Game could not be started");
+    return toGameRecord(updated, [
+      ...humans,
+      ...input.bots.map((bot) => ({ ...bot, avatar: null })),
+    ]);
+  });
 }
 
 export async function updateGame(
@@ -232,6 +402,7 @@ async function insertGame(
       gameState: input.gameState,
       config: input.config ?? null,
       winner: null,
+      winners: [],
       seriesId: input.seriesId ?? id,
       conversationId: input.conversationId ?? null,
       creatorUserId: input.creatorUserId ?? null,
@@ -255,13 +426,22 @@ async function insertGame(
   return toGameRecord(created, input.players);
 }
 
+function shuffled<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index--) {
+    const swap = randomInt(index + 1);
+    [result[index], result[swap]] = [result[swap] as T, result[index] as T];
+  }
+  return result;
+}
+
 export async function joinMatchmaking(input: {
   userId: string;
   owner: string;
   gameType: GameType;
   config: unknown;
-  roles: readonly string[];
-  gameState: unknown;
+  seats: Seat[];
+  createState: (seats: Seat[]) => unknown;
 }): Promise<{ code: string; userIds: string[] } | null> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(802938)`);
@@ -278,7 +458,6 @@ export async function joinMatchmaking(input: {
       )
       .limit(1);
     if (active) return { code: active.code, userIds: [input.userId] };
-    const expiresAt = new Date(Date.now() + 45000);
     const [ticket] = await tx
       .select({
         joinedAt: matchmakingTicket.joinedAt,
@@ -286,46 +465,53 @@ export async function joinMatchmaking(input: {
       })
       .from(matchmakingTicket)
       .where(eq(matchmakingTicket.userId, input.userId));
+    const ticketValues = {
+      userId: input.userId,
+      owner: input.owner,
+      gameType: input.gameType,
+      config: input.config,
+      expiresAt: sql`now() + interval '45 seconds'`,
+    };
     await tx
       .insert(matchmakingTicket)
-      .values({ ...input, expiresAt })
+      .values(ticketValues)
       .onConflictDoUpdate({
         target: matchmakingTicket.userId,
         set: {
-          owner: input.owner,
-          gameType: input.gameType,
-          config: input.config,
-          expiresAt,
-          joinedAt: ticket?.samePool ? ticket.joinedAt : new Date(),
+          ...ticketValues,
+          joinedAt: ticket?.samePool ? ticket.joinedAt : sql`now()`,
         },
       });
-    const [opponent] = await tx
+    const opponentCount = input.seats.length - 1;
+    if (opponentCount < 1) return null;
+    const opponents = await tx
       .select()
       .from(matchmakingTicket)
       .where(
         and(
           eq(matchmakingTicket.gameType, input.gameType),
           ne(matchmakingTicket.userId, input.userId),
-          gt(matchmakingTicket.expiresAt, new Date()),
+          gt(matchmakingTicket.expiresAt, sql`now()`),
           sql`${matchmakingTicket.config} = ${JSON.stringify(input.config)}::jsonb`,
         ),
       )
       .orderBy(matchmakingTicket.joinedAt, matchmakingTicket.userId)
-      .limit(1);
-    if (!opponent) return null;
-    const userIds = randomInt(2)
-      ? [opponent.userId, input.userId]
-      : [input.userId, opponent.userId];
+      .limit(opponentCount);
+    if (opponents.length < opponentCount) return null;
+    const userIds = shuffled([
+      input.userId,
+      ...opponents.map((opponent) => opponent.userId),
+    ]);
     const players = userIds.map((userId, index) => ({
       userId,
       username: `Player ${index + 1}`,
-      role: input.roles[index] ?? "",
+      role: input.seats[index]?.role ?? "",
     }));
     const created = await insertGame(tx, {
       publicMatch: true,
       gameType: input.gameType,
       players,
-      gameState: input.gameState,
+      gameState: input.createState(input.seats),
       config: input.config,
       status: "active",
     });
@@ -381,13 +567,27 @@ export async function leaveMatchmaking(
   });
 }
 
-export async function persistGameMove(input: {
+function resolveWinners(
+  players: GamePlayer[],
+  winnerRoles: string[],
+  draw: boolean,
+): { winners: string[]; winner: string | null } {
+  const winners = players
+    .filter((player) => winnerRoles.includes(player.role))
+    .map((player) => player.userId);
+  return {
+    winners,
+    winner: draw ? "draw" : winners.length === 1 ? (winners[0] ?? null) : null,
+  };
+}
+
+export async function persistGameMoves(input: {
   previous: GameRecord;
-  playerId: string;
-  moveData: unknown;
+  moves: { playerId: string; moveData: unknown }[];
   gameState: unknown;
   outcome: Outcome;
-}): Promise<{ game: GameRecord; move: MoveRow } | null> {
+}): Promise<{ game: GameRecord; moves: MoveRow[] } | null> {
+  if (!input.moves.length) throw new Error("No moves to save");
   return db.transaction(async (tx) => {
     const [locked] = await tx
       .select()
@@ -403,21 +603,20 @@ export async function persistGameMove(input: {
     if (!locked) return null;
     const outcome = input.outcome;
     const completed = outcome.status === "completed";
-    const winnerRole =
-      outcome.status === "completed" ? outcome.winnerRole : null;
-    const winner =
-      outcome.status === "completed"
-        ? outcome.draw
-          ? "draw"
-          : (input.previous.players.find((player) => player.role === winnerRole)
-              ?.userId ?? null)
-        : null;
+    const result = completed
+      ? resolveWinners(
+          input.previous.players,
+          outcome.winnerRoles,
+          outcome.draw,
+        )
+      : { winners: [], winner: null };
     const [updated] = await tx
       .update(game)
       .set({
         gameState: input.gameState,
         status: completed ? "completed" : "active",
-        winner,
+        winner: result.winner,
+        winners: result.winners,
         completedAt: completed ? new Date() : null,
         updatedAt: new Date(),
       })
@@ -427,35 +626,53 @@ export async function persistGameMove(input: {
       .select({ next: sql<number>`coalesce(max(${move.moveNumber}), 0) + 1` })
       .from(move)
       .where(eq(move.gameId, locked.id));
-    const [saved] = await tx
+    const first = Number(number?.next ?? 1);
+    const saved = await tx
       .insert(move)
-      .values({
-        gameId: locked.id,
-        playerId: input.playerId,
-        moveData: input.moveData,
-        moveNumber: number?.next ?? 1,
-      })
+      .values(
+        input.moves.map((entry, index) => ({
+          gameId: locked.id,
+          playerId: entry.playerId,
+          moveData: entry.moveData,
+          moveNumber: first + index,
+        })),
+      )
       .returning();
-    if (!updated || !saved) throw new Error("Move could not be saved");
-    if (completed) await updateMatchStats(tx, input.previous, winner);
-    return { game: toGameRecord(updated, input.previous.players), move: saved };
+    if (!updated || saved.length !== input.moves.length)
+      throw new Error("Moves could not be saved");
+    if (completed)
+      await updateMatchStats(
+        tx,
+        input.previous,
+        result.winners,
+        outcome.status === "completed" && outcome.draw,
+      );
+    return {
+      game: toGameRecord(updated, input.previous.players),
+      moves: saved.sort((a, b) => a.moveNumber - b.moveNumber),
+    };
   });
 }
 
 async function updateMatchStats(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: Transaction,
   record: GameRecord,
-  winner: string | null,
+  winners: string[],
+  draw: boolean,
 ) {
-  for (const player of [...record.players].sort((a, b) =>
-    a.userId.localeCompare(b.userId),
-  )) {
+  const humans = record.players
+    .filter((player) => !isBotId(player.userId))
+    .sort((a, b) => a.userId.localeCompare(b.userId));
+  for (const player of humans) {
     const [profile] = await tx
       .select()
       .from(userProfile)
       .where(eq(userProfile.userId, player.userId))
       .for("update");
     if (!profile) continue;
+    const listed = winners.includes(player.userId);
+    const drawn = draw && (winners.length === 0 || listed);
+    const won = !draw && listed;
     const stats = { ...profile.stats };
     const current = stats[record.gameType] ?? {
       played: 0,
@@ -465,10 +682,9 @@ async function updateMatchStats(
     };
     stats[record.gameType] = {
       played: current.played + 1,
-      won: current.won + (winner === player.userId ? 1 : 0),
-      lost:
-        current.lost + (winner !== "draw" && winner !== player.userId ? 1 : 0),
-      drawn: current.drawn + (winner === "draw" ? 1 : 0),
+      won: current.won + (won ? 1 : 0),
+      lost: current.lost + (!won && !drawn ? 1 : 0),
+      drawn: current.drawn + (drawn ? 1 : 0),
     };
     await tx
       .update(userProfile)
@@ -479,14 +695,15 @@ async function updateMatchStats(
 
 export async function abortActiveGame(
   previous: GameRecord,
-  winner: string | null,
+  winners: string[],
 ): Promise<GameRecord | null> {
   return db.transaction(async (tx) => {
     const [updated] = await tx
       .update(game)
       .set({
         status: "aborted",
-        winner,
+        winner: winners.length === 1 ? (winners[0] ?? null) : null,
+        winners,
         completedAt: new Date(),
         updatedAt: new Date(),
       })
@@ -499,7 +716,7 @@ export async function abortActiveGame(
       )
       .returning();
     if (!updated) return null;
-    if (winner) await updateMatchStats(tx, previous, winner);
+    if (winners.length) await updateMatchStats(tx, previous, winners, false);
     return toGameRecord(updated, previous.players);
   });
 }

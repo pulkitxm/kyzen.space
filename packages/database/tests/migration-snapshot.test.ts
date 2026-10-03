@@ -4,7 +4,7 @@ import * as schema from "../src/schema";
 
 test("the latest migration snapshot matches the platform schema", async () => {
   const snapshot = await Bun.file(
-    new URL("../drizzle/meta/0011_snapshot.json", import.meta.url),
+    new URL("../drizzle/meta/0013_snapshot.json", import.meta.url),
   ).json();
   const current = generateDrizzleJson(schema, snapshot.prevId);
   expect(current.tables).toEqual(snapshot.tables);

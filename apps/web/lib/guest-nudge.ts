@@ -13,3 +13,7 @@ export function decideGuestNudge(input: {
   if (input.now < input.snoozedUntil) return { show: false, markSeen: false };
   return { show: true, markSeen: false };
 }
+
+export function guestNudgeAllowedOn(pathname: string | null): boolean {
+  return !pathname || !/^\/play(\/|$)/.test(pathname);
+}

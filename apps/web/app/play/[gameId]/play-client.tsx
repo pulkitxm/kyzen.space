@@ -1,30 +1,51 @@
 "use client";
 
 import {
+  type GameClientProps,
   getGameClient,
   getGameSkeleton,
   useGameSession,
 } from "@kyzen/games-client";
-import type {
-  ConversationJson,
-  GameJson,
-  GameType,
-  MessageJson,
-  MoveJson,
+import { getDefinition, hasEngine } from "@kyzen/games-core";
+import {
+  type ConversationJson,
+  type GameJson,
+  type GameType,
+  isBotId,
+  type MessageJson,
+  type MoveJson,
 } from "@kyzen/shared/types";
 import { useAtomValue } from "jotai";
-import { Suspense, useMemo } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import { useProfilePopup } from "@/components/ui";
 import { gameMusicSource } from "@/lib/audio/music-sources";
 import { useGameAudioBridge } from "@/lib/audio/use-audio-bridge";
 import type { ChatLayout } from "@/lib/chat-layout";
+import { chatPanelMode } from "@/lib/games/match-chat";
+import { resultDelayMs } from "@/lib/games/outcome";
 import { socketStatusAtom, useSocket } from "@/lib/socket/socket-context";
-import { GameChatSplit } from "./game-chat-split";
+import { cn } from "@/lib/utils";
+import { type ChatTab, GameChatSplit } from "./game-chat-split";
 import { GameOverOverlay } from "./game-over-overlay";
 import { GameSettingsGear } from "./game-settings-gear";
-import { PublicMatchPanel } from "./public-match-panel";
+import type { LobbySettings } from "./lobby-panel";
+import { MatchChatPanel } from "./match-chat-panel";
 import { WaitingForOpponentOverlay } from "./waiting-overlay";
+
+type ProfileUser = Parameters<NonNullable<GameClientProps["onViewProfile"]>>[0];
+
+function lobbySettings(gameType: GameType): LobbySettings | null {
+  if (!hasEngine(gameType)) return null;
+  const { engine } = getDefinition(gameType);
+  return engine.lobby
+    ? {
+        ...engine.lobby,
+        minPlayers: engine.minPlayers,
+        maxPlayers: engine.maxPlayers,
+      }
+    : null;
+}
 
 export function PlayClient({
   gameId,
@@ -51,6 +72,7 @@ export function PlayClient({
 }) {
   const GameClient = getGameClient(gameType);
   const GameSkeleton = getGameSkeleton(gameType);
+  const wide = hasEngine(gameType) && getDefinition(gameType).layout === "wide";
   const { socket } = useSocket();
   const status = useAtomValue(socketStatusAtom);
   const openProfile = useProfilePopup();
@@ -60,24 +82,51 @@ export function PlayClient({
     initialGame,
     initialMoves,
   });
+  const viewerId = game.viewerId ?? userId;
+  const players = game.players;
+  const [chatTab, setChatTab] = useState<ChatTab>("game");
 
   useGameAudioBridge(gameMusicSource(gameType));
 
+  const viewProfile = useCallback(
+    (user: ProfileUser) => {
+      if (
+        players.some(
+          (player) =>
+            isBotId(player.userId) && player.username === user.username,
+        )
+      )
+        return;
+      openProfile(user);
+    },
+    [players, openProfile],
+  );
+  const onViewProfile = game.publicMatch ? undefined : viewProfile;
+
   const connected = status === "connected";
-  const gameNode = useMemo(
+  const board = useMemo(
     () =>
       GameClient ? (
-        <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
-          <Suspense fallback={<GameSkeleton />}>
-            <GameClient
-              userId={userId}
-              connected={connected}
-              game={game}
-              moves={moves}
-              makeMove={makeMove}
-              onViewProfile={game.publicMatch ? undefined : openProfile}
-            />
-          </Suspense>
+        <div
+          className={cn(
+            "flex h-full min-h-0 w-full flex-col",
+            wide ? "p-2 md:p-3" : "mx-auto max-w-2xl p-4",
+          )}
+        >
+          {game.gameState == null ? (
+            <GameSkeleton />
+          ) : (
+            <Suspense fallback={<GameSkeleton />}>
+              <GameClient
+                userId={viewerId}
+                connected={connected}
+                game={game}
+                moves={moves}
+                makeMove={makeMove}
+                onViewProfile={onViewProfile}
+              />
+            </Suspense>
+          )}
         </div>
       ) : (
         <div className="p-6 text-center text-muted-foreground text-sm">
@@ -87,13 +136,26 @@ export function PlayClient({
     [
       GameClient,
       GameSkeleton,
-      userId,
+      wide,
+      viewerId,
       connected,
       game,
       moves,
       makeMove,
-      openProfile,
+      onViewProfile,
     ],
+  );
+
+  const gameNode = (
+    <div className="relative h-full min-h-0 w-full">
+      {board}
+      <WaitingForOpponentOverlay
+        gameId={gameId}
+        game={game}
+        userId={viewerId}
+        lobby={lobbySettings(gameType)}
+      />
+    </div>
   );
 
   const overlay = (
@@ -106,32 +168,44 @@ export function PlayClient({
           {error}
         </p>
       ) : null}
-      <WaitingForOpponentOverlay gameId={gameId} game={game} />
       <GameOverOverlay
         gameId={gameId}
-        userId={userId}
+        userId={viewerId}
         game={game}
         conversation={conversation}
+        resultDelayMs={resultDelayMs(game)}
+        covered={chatTab === "chat"}
       />
     </>
   );
 
-  if (game.publicMatch) {
+  const chatMode = chatPanelMode(game, Boolean(conversation), viewerId);
+
+  if (chatMode === "match") {
     return (
       <>
         <GameChatSplit
           conversationId={game.id}
           initialLayout={initialLayout}
           layoutTrusted={layoutTrusted}
+          tab={chatTab}
+          onTabChange={setChatTab}
           game={gameNode}
-          chat={() => <PublicMatchPanel game={game} userId={userId} />}
+          chat={(_visible, onIncoming) => (
+            <MatchChatPanel
+              game={game}
+              userId={viewerId}
+              onViewProfile={onViewProfile}
+              onIncoming={onIncoming}
+            />
+          )}
         />
         {overlay}
       </>
     );
   }
 
-  if (!conversation) {
+  if (chatMode === "none" || !conversation) {
     return (
       <div className="relative h-full min-h-0">
         {gameNode}
@@ -147,6 +221,8 @@ export function PlayClient({
         conversationId={conversation.id}
         initialLayout={initialLayout}
         layoutTrusted={layoutTrusted}
+        tab={chatTab}
+        onTabChange={setChatTab}
         game={gameNode}
         chat={(visible) => (
           <ConversationView

@@ -16,4 +16,5 @@ registry, so adding a game without its doc fails the suite.
 
 ## Current games
 
+- [tank-arena](./tank-arena.md)
 - [tic-tac-toe](./tic-tac-toe.md)

@@ -23,6 +23,7 @@ mock.module("../src/auth", () => ({
 }));
 
 mock.module("@kyzen/database", () => ({
+  matchChat: {},
   accountMerge: {
     getPendingForTarget: async () => pendingRow,
     getById: async () => byId,

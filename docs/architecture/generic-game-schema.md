@@ -83,10 +83,12 @@ The mapping to the database is direct:
 | --- | --- | --- |
 | `meta.type` (e.g. `"tic-tac-toe"`) | `game.game_type` | At game creation |
 | `configSchema.parse(config)` | `game.config` | At game creation (validated before write) |
-| `engine.createInitialState(seats)` result | `game.game_state` | At game creation (with the creator's seat) |
+| `engine.createInitialState(seats, { config, seed })` result | `game.game_state` | At creation for ordinary games, again with every seat when the game activates; at `room:start` for lobby engines (`null` while the lobby waits) |
 | `stateSchema.safeParse(row.gameState)` | reads `game.game_state` | Before every `reduce` call |
 | `moveSchema.safeParse(payload.moveData)` result | `move.move_data` | After `reduce` accepts the move |
-| `engine.roles[seatOrder]` | `game_player.role` | Creator at creation; others on join |
+| `engine.roleForSeat(seatOrder)` | `game_player.role` | Creator at creation; others on join; bot seats at `room:start` |
+| `Outcome.winnerRoles` mapped to seat user ids | `game.winners`, summarized in `game.winner` | When a move completes the game |
+| `engine.publicState` / `engine.publicMove` | nothing (read-time redaction) | Every snapshot, delta, and HTTP response |
 
 The engine and its Zod schemas are the same code the web client imports (`apps/web` → `@kyzen/games-core` for the engine, `@kyzen/shared` for the schemas + types) - the server never has a separate validation step. Zod is the single source of truth for what's a valid `game_state` or `move_data`.
 
@@ -122,7 +124,7 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
   mode: "turn-based",
   minPlayers: 2,
   maxPlayers: 2,
-  roles: ["X", "O"],
+  roleForSeat(index) { … },
   createInitialState() { … },
   reduce(state, ctx, input) { … },
 };
@@ -130,7 +132,7 @@ export const ticTacToeEngine: GameEngine<TicTacToeState, TicTacToeMove> = {
 
 ### Phase 1 - Alice creates the game (status: `"waiting"`)
 
-Alice creates the game from a conversation. `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts:66`) seats the **creator** as the first player - `firstRole` = `engine.roles[0]` → `"X"` (`const [firstRole] = engine.roles`, `:118`) - and initializes `game_state` in the *same* insert via `engine.createInitialState([{ role: firstRole }])` (`:130`). `createGame` writes the `game` row and the creator's `game_player` row in one transaction (`packages/database/src/repositories/games.ts:29`) and defaults `series_id` to the row's own id (a brand-new game is its own one-game series). So after creation **two** rows already exist:
+Alice creates the game from a conversation. `createGameInConversation` (`apps/server/src/chat/games-in-chat-service.ts`) seats the **creator** as the first player with `engine.roleForSeat(0)` → `"X"` and initializes `game_state` in the *same* insert via `createInitialState([{ role: "X", team: "X", bot: null }], { config, seed })`. `createGame` writes the `game` row and the creator's `game_player` row in one transaction (`packages/database/src/repositories/games.ts:29`) and defaults `series_id` to the row's own id (a brand-new game is its own one-game series). So after creation **two** rows already exist:
 
 ```
 game row
@@ -141,6 +143,7 @@ game row
   game_state   : { "board": [null,null,null,null,null,null,null,null,null],
                    "currentTurn": "X" }
   config       : {}
+  winners      : []
   series_id    : "g-001"          ← defaults to its own id; a rematch copies it
 
 game_player row
@@ -152,11 +155,11 @@ game_player row
   seat_order : 0
 ```
 
-`game_state` is **not** `null` at creation - `createInitialState` runs immediately, so the board exists before the second player arrives. `status` stays `"waiting"` only because the game still needs a second seat to become `"active"`. `config` is `{}` - the result of `definition.configSchema.safeParse(input.config ?? {})`, validated at `games-in-chat-service.ts:90`. An empty object is still a legal value; it occupies the column so future games that **do** use config (e.g. a board-size setting) write their validated config here.
+`game_state` is **not** `null` at creation for an ordinary engine - `createInitialState` runs immediately, so the board exists before the second player arrives. (A lobby engine stores `null` here until the host starts the game.) `status` stays `"waiting"` only because the game still needs a second seat to become `"active"`. `config` is `{}` - the result of `definition.configSchema.safeParse(input.config ?? {})`, validated in `createGameInConversation`. An empty object is still a legal value; it occupies the column so future games that **do** use config (e.g. a board-size setting) write their validated config here.
 
 ### Phase 2 - Bob joins, the last seat fills (status: `"active"`)
 
-Bob opens the game and the server seats him through `ensureSeated` (`apps/server/src/realtime/turn-based.ts:33`). `players.length` is `1` now, so his role is `engine.roles[1]` → `"O"` (`turn-based.ts:58`), and `seatPlayer` inserts his row (`:63`). Because `nextPlayers.length` (2) reaches `engine.minPlayers`, the game flips to `"active"` and `startedAt` is set (`:68`–`:70`). `game_state` is **left as-is**: the `gameRow.gameState ?? engine.createInitialState(...)` guard (`:71`–`:73`) keeps the state Alice's creation already minted - `createInitialState` does **not** run again here.
+Bob opens the game and the server seats him through `ensureSeated` (`apps/server/src/realtime/turn-based.ts`) under the game lock. `players.length` is `1` now, so his role is `engine.roleForSeat(1)` → `"O"`, and `seatPlayer` inserts his row after locking the waiting game row. Because `nextPlayers.length` (2) reaches `engine.minPlayers`, the game flips to `"active"`, `startedAt` is set, and `game_state` is rebuilt from both seats with a fresh seed. For tic-tac-toe that is the same empty board.
 
 ```
 game_player row
@@ -177,16 +180,15 @@ The nine-element `board` array is index-mapped as `board[row * 3 + col]`. All `n
 
 ### Phase 3 - Alice plays `{ row: 0, col: 0 }`
 
-`handleMakeMove` (`turn-based.ts:129`) runs the full validate → reduce → persist cycle:
+`handleMakeMove` (`turn-based.ts`) hands the move to `submitMove` (`game-runner.ts`), which runs the full validate → reduce → persist cycle under the game lock:
 
-1. **Parse the move** - `def.moveSchema.safeParse({ row: 0, col: 0 })` → ok (`turn-based.ts:147`).
-2. **Parse the stored state** - `def.stateSchema.safeParse(row.gameState)` → ok (`:149`).
-3. **Authoritative reduce** - `def.engine.reduce(state, { role: "X" }, { row: 0, col: 0 })` (`:152`). The context is just `{ role }` (`MoveContext`, `packages/shared/src/types/games/engine.ts:13`) - the engine never sees a user id.
+1. **Parse the move** - `def.moveSchema.safeParse({ row: 0, col: 0 })` → ok.
+2. **Parse the stored state** - `def.stateSchema.safeParse(row.gameState)` → ok.
+3. **Authoritative reduce** - `def.engine.reduce(state, { role: "X" }, { row: 0, col: 0 })`. The context is just `{ role }` (`MoveContext`) - the engine never sees a user id.
    - Checks `ctx.role === state.currentTurn` → `"X" === "X"` ✓
    - Checks `board[0]` is `null` ✓
    - Returns `{ board: ["X",null,…], currentTurn: "O" }`.
-4. **Insert move** - `games.addMove(...)` (`:160`); the row's `player_id` holds the mover's user id.
-5. **Update game** - `games.updateGame(...)` (`:167`) with the new `game_state`.
+4. **Persist** - `games.persistGameMoves(...)` checks that `game_state` is still the state that was reduced, writes the new `game_state`, and inserts the move rows (one per submission, consecutive numbers); the row's `player_id` holds the mover's user id.
 
 ```
 move row
@@ -203,12 +205,13 @@ game row (updated)
 
 ### Phase 4 - Bob replies `{1,0}` then `{2,1}`; Alice completes the top row and wins
 
-Play alternates `X, O, X, O, X`: Bob takes `{1,0}` (move 2), Alice `{0,1}` (move 3), Bob `{2,1}` (move 4), and Alice closes the top row with `{0,2}` (move 5). On that last move `reduce` returns a `ReduceResult` whose `outcome` is `{ status: "completed", winnerRole: "X", draw: false }` (the `Outcome` shape from `packages/shared/src/types/games/engine.ts:1` - a *role* string, **not** a user id). `finalize` (`turn-based.ts:78`) maps `winnerRole` → the winning `user_id`, writes it to `game.winner`, flips `status` to `"completed"`, sets `completedAt`, and bumps each player's stats.
+Play alternates `X, O, X, O, X`: Bob takes `{1,0}` (move 2), Alice `{0,1}` (move 3), Bob `{2,1}` (move 4), and Alice closes the top row with `{0,2}` (move 5). On that last move `reduce` returns a `ReduceResult` whose `outcome` is `{ status: "completed", winnerRoles: ["X"], draw: false }` (roles, **not** user ids). `games.persistGameMoves` maps the roles to user ids, writes `game.winners = ["u-alice"]` and the summary `game.winner = "u-alice"`, flips `status` to `"completed"`, sets `completedAt`, and updates each human player's stats in the same transaction.
 
 ```
 game row (final)
   status     : "completed"
   winner     : "u-alice"
+  winners    : ["u-alice"]
   game_state : { "board": ["X","X","X","O",null,null,null,"O",null],
                  "currentTurn": "O" }
 ```
@@ -292,43 +295,44 @@ After `step` resolves the tick, a new `game_state` is written with the outcome a
 
 **Config-driven variants.** Board size, time limits, house rules - all go in `config` (validated by `configSchema` before the row is inserted). The `configFields` array on `GameDefinition` tells the lobby UI which form fields to render without the server needing to know the specifics.
 
-**Replaying history.** Because `move` is an append-only log keyed by `(gameId, moveNumber)` and each `move_data` is the raw input (not a diff), any game can be replayed from `createInitialState` by folding `reduce` over the move log in order. The final `game_state` column is a materialized cache of that fold - it lets the server skip re-playing the full history on every move.
+**Replaying history.** Because `move` is an append-only log keyed by `(gameId, moveNumber)` and each `move_data` is the raw input (not a diff), any game can be replayed from `createInitialState(seats, { config, seed })` by folding `reduce` over the move log in order; engines keep the seed in state for exactly this reason. The final `game_state` column is a materialized cache of that fold. Bot moves are ordinary rows whose `player_id` is the bot seat id.
+
+**Hidden information.** `game_state` and `move_data` always hold the full truth (for example sealed orders in a simultaneous round). Redaction happens when serializing: `engine.publicState` and `engine.publicMove` decide what clients may see, so the database never stores a redacted copy.
 
 ## The lifecycle at a glance
 
 ```
 creator creates game (seated as the first player)
-  → role = engine.roles[0]                            (games-in-chat-service.ts:118)
-  → game_state = engine.createInitialState([{ role }]) (games-in-chat-service.ts:130)
-  → insert game row + creator's game_player row        (games.ts:29)
-      status "waiting", game_state already set
+  → role = engine.roleForSeat(0)                      (games-in-chat-service.ts / rooms-service.ts)
+  → game_state = createInitialState(seats, { config, seed }), or null for a lobby engine
+  → insert game row + creator's game_player row        (games.createGame)
+      status "waiting"
 
-each additional player joins
-  → role = engine.roles[players.length]               (turn-based.ts:58)
-  → insert game_player row (role, seat_order)          (turn-based.ts:63)
-  → if min players reached:
-      update game row (status "active", startedAt)     (turn-based.ts:68)
-      game_state kept as-is (gameState ?? …)           (turn-based.ts:71)
+each additional player joins                           (turn-based.ts, under the game lock)
+  → role = engine.roleForSeat(players.length)
+  → games.seatPlayer (locks the waiting row, refuses an occupied seat order)
+  → ordinary engines, min players reached:
+      status "active", startedAt, game_state rebuilt from every seat
+  → lobby engines: stay "waiting" until the host emits room:start
 
-client emits make_move { gameId, moveData }
-  → def.moveSchema.safeParse(moveData)                (turn-based.ts:147)
-  → def.stateSchema.safeParse(row.gameState)          (turn-based.ts:149)
-  → result = def.engine.reduce(state, { role }, input) (turn-based.ts:152)
-  → insert move row (move_data, move_number)          (turn-based.ts:160)
-  → update game row (game_state: result.state)        (turn-based.ts:167)
-  → if outcome.status === "completed": finalize       (turn-based.ts:168)
-      set winner, status "completed", bump stats
+host emits room:start (lobby engines)                  (lobby.ts)
+  → seats = humans then bots, teams from config
+  → games.startLobby: insert bot game_player rows, status "active", game_state
 
-server broadcasts one game_state { game, move } to room (turn-based.ts:174)
+client emits make_move { gameId, moveData }            (game-runner.ts, under the game lock)
+  → def.moveSchema.safeParse / def.stateSchema.safeParse
+  → result = def.engine.reduce(state, { role }, input)
+  → games.persistGameMoves: state CAS, move rows, winners/winner/stats on completion
+  → broadcast one redacted game_state { game, move }; bots move next
 ```
 
 ## Gotchas & invariants
 
 - **`game_state` is `unknown` until `safeParse`'d.** Read the raw row and you have bytes. The repository hands you an `unknown`; the caller is responsible for parsing it through the game's Zod schema before passing it to the engine.
 - **`move_number` is dense and DB-enforced.** `move_game_number_uq` on `(gameId, moveNumber)` rejects a double-submit at the constraint level - the server does not need an advisory lock.
-- **Role assignment is seat-order-dependent.** The creator takes `engine.roles[0]` at creation (`games-in-chat-service.ts:118`); each later joiner takes `engine.roles[players.length]`, evaluated *before* their `game_player` row is inserted (`turn-based.ts:58`). Seat `i` always gets `roles[i]` - you cannot choose your role. (A **rematch** instead pre-seats every prior player up front in `computeRematchSeating` order - loser-first for 2 players - so seat 0 / `roles[0]` goes to the loser; see [`realtime.md`](./realtime.md).)
-- **`createInitialState` fires once, at creation.** `createGameInConversation` mints the initial `game_state` in the creating insert (`games-in-chat-service.ts:130`), not when the last seat fills. The `gameRow.gameState ?? engine.createInitialState(...)` guard on join (`turn-based.ts:71`) is a fallback the normal flow never triggers, because the state already exists. Reaching `"active"` only flips `status`; it does not re-mint state.
-- **`move.player_id` is plain `text`, not a foreign key.** It stores the mover's `user.id` but declares no `references()` constraint - same for `game_player.user_id`. (`user.id` is Better Auth `text`; the game tables hold it without an FK.)
+- **Role assignment is seat-order-dependent.** The creator takes `engine.roleForSeat(0)`; each later joiner takes `engine.roleForSeat(players.length)`, evaluated *before* their `game_player` row is inserted. Lobby bots take the seats after every human. You cannot choose your role. (A **rematch** pre-seats prior players up front in `computeRematchSeating` order - loser-first for 2 players; see [`realtime.md`](./realtime.md).)
+- **Initial state is minted from the full seat list.** Ordinary games mint a state at creation (so the waiting board renders) and mint it again from every seat when the game activates; lobby games keep `game_state` `null` until `room:start`. Every mint gets a fresh server seed.
+- **`move.player_id` is plain `text`, not a foreign key.** It stores the mover's `user.id` (or a `bot:<n>` seat id) and declares no `references()` constraint - same for `game_player.user_id`. Bot seats have no `user` row.
 - **The public id is `code`; the FK/PK id is `uuid`.** Clients only ever see and send the short `code` (`/play/<code>`, socket `gameId`); the server resolves it with `getGameByCode` and uses the internal `uuid` for FK joins and writes. `serializeGame` maps `row.code → GameJson.id`, so the UUID never leaves the server. Only **games** moved to codes - conversations/messages/friendships/users/profiles keep their UUIDs.
 - **No per-game tables, ever.** If you find yourself thinking "I need a `connect_four_state` column," the answer is: add it to the state schema and let it live in `game_state`.
 

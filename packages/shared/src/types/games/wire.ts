@@ -69,6 +69,44 @@ export const clientCreateRoomSchema = z
   .strict();
 export type ClientCreateRoom = z.infer<typeof clientCreateRoomSchema>;
 
+export const clientRoomConfigureSchema = z
+  .object({
+    gameId: gameCodeSchema,
+    config: z.unknown(),
+  })
+  .strict();
+export type ClientRoomConfigure = z.infer<typeof clientRoomConfigureSchema>;
+
+export const clientRoomStartSchema = z
+  .object({
+    gameId: gameCodeSchema,
+  })
+  .strict();
+export type ClientRoomStart = z.infer<typeof clientRoomStartSchema>;
+
+export const clientRoomLeaveSchema = z
+  .object({
+    gameId: gameCodeSchema,
+  })
+  .strict();
+export type ClientRoomLeave = z.infer<typeof clientRoomLeaveSchema>;
+
+export const clientRoomKickSchema = z
+  .object({
+    gameId: gameCodeSchema,
+    userId: z.string().min(1),
+  })
+  .strict();
+export type ClientRoomKick = z.infer<typeof clientRoomKickSchema>;
+
+export const clientMatchFriendSchema = z
+  .object({
+    gameId: gameCodeSchema,
+    playerId: z.string().min(1),
+  })
+  .strict();
+export type ClientMatchFriend = z.infer<typeof clientMatchFriendSchema>;
+
 export const clientJoinByCodeSchema = z
   .object({
     code: gameCodeSchema,
@@ -92,6 +130,8 @@ export type ServerJoinByCodeResult =
 export const gameJsonSchema = z.object({
   publicMatch: z.boolean().optional(),
   viewerId: z.string().nullable().optional(),
+  config: z.unknown().optional(),
+  winners: z.array(z.string()).optional(),
   id: z.string(),
   gameType: gameTypeSchema,
   status: gameStatusSchema,
@@ -152,6 +192,27 @@ export function resolveWinnerUsername(
   return winner && winner !== "draw"
     ? (players.find((p) => p.userId === winner)?.username ?? null)
     : null;
+}
+
+export function gameResultLabel(game: {
+  status?: string;
+  winner?: string | null;
+  winners?: readonly string[];
+  players?: ReadonlyArray<{ userId: string; username: string }>;
+}): string | null {
+  if (!game.status || !isGameOver(game.status)) return null;
+  if (game.winner === "draw") return "Draw";
+  const ids = game.winners?.length
+    ? game.winners
+    : game.winner
+      ? [game.winner]
+      : [];
+  const names = ids.flatMap((id) => {
+    const username = game.players?.find((p) => p.userId === id)?.username;
+    return username ? [username] : [];
+  });
+  if (!names.length) return "Game over";
+  return `${new Intl.ListFormat("en", { type: "conjunction" }).format(names)} won`;
 }
 
 const matchMessageSchema = z.object({

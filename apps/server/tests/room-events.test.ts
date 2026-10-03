@@ -35,6 +35,7 @@ const profiles = {
 mock.module("@kyzen/database", () => ({
   games,
   profiles,
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},
@@ -89,7 +90,7 @@ describe("room:create", () => {
   test("acks the new room code on success", async () => {
     const { socket, handlers } = fakeSocket("u1");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = await invoke(handlers.get("room:create"), {
       gameType: TIC_TAC_TOE,
     });
@@ -100,7 +101,7 @@ describe("room:create", () => {
   test("acks an error for an invalid payload without creating a game", async () => {
     const { socket, handlers } = fakeSocket("u1");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = (await invoke(handlers.get("room:create"), {})) as {
       ok: boolean;
     };
@@ -112,7 +113,7 @@ describe("room:create", () => {
     profile = null;
     const { socket, handlers } = fakeSocket("u1");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = (await invoke(handlers.get("room:create"), {
       gameType: TIC_TAC_TOE,
     })) as { ok: boolean };
@@ -125,7 +126,7 @@ describe("room:join", () => {
     current = room();
     const { socket, handlers } = fakeSocket("u2");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = await invoke(handlers.get("room:join"), { code: CODE });
     expect(res).toEqual({ ok: true, code: CODE });
   });
@@ -133,7 +134,7 @@ describe("room:join", () => {
   test("acks not_found for an unparseable code", async () => {
     const { socket, handlers } = fakeSocket("u2");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = await invoke(handlers.get("room:join"), { code: "bad" });
     expect(res).toEqual({ ok: false, error: "not_found" });
   });
@@ -147,8 +148,56 @@ describe("room:join", () => {
     });
     const { socket, handlers } = fakeSocket("u2");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = await invoke(handlers.get("room:join"), { code: CODE });
     expect(res).toEqual({ ok: false, error: "full" });
+  });
+});
+
+describe("lobby events", () => {
+  test("room:start is rate limited like room:create", async () => {
+    const { socket, handlers } = fakeSocket("u1");
+    // biome-ignore lint/suspicious/noExplicitAny: fake socket
+    attachRoomHandlers({} as any, socket as any);
+    const results: unknown[] = [];
+    for (let i = 0; i < 11; i++)
+      results.push(await invoke(handlers.get("room:start"), { gameId: CODE }));
+    expect(results.slice(0, 10)).toEqual(
+      Array(10).fill({ ok: false, error: "Game not found" }),
+    );
+    expect(results[10]).toEqual({
+      ok: false,
+      error: "Too many starts, slow down",
+    });
+  });
+
+  test("room:leave and room:kick reject malformed payloads", async () => {
+    const { socket, handlers } = fakeSocket("u1");
+    // biome-ignore lint/suspicious/noExplicitAny: fake socket
+    attachRoomHandlers({} as any, socket as any);
+    const invalid = { ok: false, error: "Invalid payload" };
+    expect(await invoke(handlers.get("room:leave"), {})).toEqual(invalid);
+    expect(
+      await invoke(handlers.get("room:leave"), { gameId: CODE, extra: 1 }),
+    ).toEqual(invalid);
+    expect(await invoke(handlers.get("room:kick"), { gameId: CODE })).toEqual(
+      invalid,
+    );
+    expect(
+      await invoke(handlers.get("room:kick"), { gameId: CODE, userId: "" }),
+    ).toEqual(invalid);
+  });
+
+  test("room:leave and room:kick answer through the lobby service", async () => {
+    const { socket, handlers } = fakeSocket("u1");
+    // biome-ignore lint/suspicious/noExplicitAny: fake socket
+    attachRoomHandlers({} as any, socket as any);
+    expect(await invoke(handlers.get("room:leave"), { gameId: CODE })).toEqual({
+      ok: false,
+      error: "Game not found",
+    });
+    expect(
+      await invoke(handlers.get("room:kick"), { gameId: CODE, userId: "u2" }),
+    ).toEqual({ ok: false, error: "Game not found" });
   });
 });

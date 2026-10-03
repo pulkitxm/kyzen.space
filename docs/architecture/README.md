@@ -14,7 +14,7 @@ For a guided first read, start with the [repository walkthrough](../repository-w
 | Registrations | Shared slug tuple, engine list, client registry | Small explicit additions |
 | Room join, reconnect, state, moves | `games-client/src/use-game-session.ts` and `session.ts` | Reuse |
 | Page, chat placement, profiles, results | `apps/web/app/play/[gameId]` | Reuse |
-| Authoritative execution and timers | `apps/server/src/realtime/turn-based.ts` | Reuse |
+| Authoritative execution, clocks, bots, lobbies | `apps/server/src/realtime/game-runner.ts`, `turn-based.ts`, `lobby.ts` | Reuse |
 | Authentication and social features | `apps/server` services and `apps/web` shell | Reuse |
 | Persistence | `packages/database` generic game/move/player tables | Reuse |
 
@@ -31,16 +31,17 @@ Start with [adding a game](../adding-a-game.md). The server imports engines and 
 1. The play route fetches the game's snapshot and move history by public room code.
 2. The shared play session joins that room and receives a fresh snapshot, including after reconnect.
 3. The board renders the supplied state and calls `makeMove` with a game-specific move.
-4. The server validates the envelope and the game's schemas, authorizes the player, and runs the engine.
-5. The server persists the result and broadcasts state with a move delta.
+4. The server takes the game's lock, validates the envelope and the game's schemas, authorizes the player, and runs the engine.
+5. The server persists the result with a compare-and-swap, submits any pending bot moves, re-arms the turn or round clock, and broadcasts redacted state with a move delta.
 6. The shared session filters by room, deduplicates and orders moves, and updates the board and overlays together.
 
-A conversation-backed game also mounts the existing chat view through `GameChatSplit`: docked at the side, floating, or minimized. Public matches mount temporary participant-only chat through the same layout. Private standalone rooms render the board. Public players use match-scoped aliases and have no profile callback; audio sources come from game metadata.
+A conversation-backed game also mounts the existing chat view through `GameChatSplit`: docked at the side, floating, or minimized. Public matches and private standalone rooms mount temporary participant-only match chat through the same layout; only public matches alias identities. Public players use match-scoped aliases and have no profile callback; audio sources come from game metadata.
 
 ## Reference docs
 
 | Guide | Scope |
 | --- | --- |
+| [physics.md](physics.md) | Deterministic 2D physics, math, geometry, world simulation |
 | [games-client.md](games-client.md) | Board contract, shared session, registry, replay |
 | [games-core-engine.md](games-core-engine.md) | Pure engines and registry conformance |
 | [games-core-schemas.md](games-core-schemas.md) | Generic game contracts and validation |
