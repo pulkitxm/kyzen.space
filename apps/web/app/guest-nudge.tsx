@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { FaGoogle, FaXmark } from "react-icons/fa6";
 import { GlassPane } from "@/components/glass/glass-pane";
@@ -9,6 +10,7 @@ import {
   GUEST_SEEN_KEY,
   GUEST_SNOOZE_KEY,
   GUEST_SNOOZE_MS,
+  guestNudgeAllowedOn,
 } from "@/lib/guest-nudge";
 
 let cachedDecision: { show: boolean; markSeen: boolean } | null = null;
@@ -24,6 +26,7 @@ function readDecision() {
 }
 
 export function GuestNudge() {
+  const pathname = usePathname();
   const [dismissed, setDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -39,7 +42,7 @@ export function GuestNudge() {
     }
   }, []);
 
-  const open = show && !dismissed;
+  const open = show && !dismissed && guestNudgeAllowedOn(pathname);
 
   const dismiss = useCallback(() => {
     localStorage.setItem(

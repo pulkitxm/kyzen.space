@@ -10,8 +10,13 @@ mock.module("@/lib/socket/socket-context", () => ({
   emitAck: async () => ({ ok: true, code: "A2K9P7" }),
 }));
 
-const { chatPanelMode, chatPeers, friendStates, mergeMatchMessages } =
-  await import("@/lib/games/match-chat");
+const {
+  chatPanelMode,
+  chatPeers,
+  friendStates,
+  isIncomingMatchMessage,
+  mergeMatchMessages,
+} = await import("@/lib/games/match-chat");
 const { MatchChatPanel } = await import("@/app/play/[gameId]/match-chat-panel");
 
 function game(over: Partial<GameJson>): GameJson {
@@ -89,6 +94,33 @@ describe("chat panel mode", () => {
       ],
     );
     expect(merged.map((entry) => entry.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("incoming match messages", () => {
+  const known = [message("a", "2026-01-01T00:00:01Z")];
+
+  it("counts new messages from other players", () => {
+    expect(
+      isIncomingMatchMessage(
+        known,
+        { ...message("b", "2026-01-01T00:00:02Z"), authorId: "u2" },
+        "u1",
+      ),
+    ).toBe(true);
+  });
+
+  it("skips the viewer's own messages and repeated deliveries", () => {
+    expect(
+      isIncomingMatchMessage(known, message("b", "2026-01-01T00:00:02Z"), "u1"),
+    ).toBe(false);
+    expect(
+      isIncomingMatchMessage(
+        known,
+        { ...message("a", "2026-01-01T00:00:01Z"), authorId: "u2" },
+        "u1",
+      ),
+    ).toBe(false);
   });
 });
 

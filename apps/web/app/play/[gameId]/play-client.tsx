@@ -16,7 +16,7 @@ import {
   type MoveJson,
 } from "@kyzen/shared/types";
 import { useAtomValue } from "jotai";
-import { Suspense, useCallback, useMemo } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import { useProfilePopup } from "@/components/ui";
 import { gameMusicSource } from "@/lib/audio/music-sources";
@@ -26,7 +26,7 @@ import { chatPanelMode } from "@/lib/games/match-chat";
 import { resultDelayMs } from "@/lib/games/outcome";
 import { socketStatusAtom, useSocket } from "@/lib/socket/socket-context";
 import { cn } from "@/lib/utils";
-import { GameChatSplit } from "./game-chat-split";
+import { type ChatTab, GameChatSplit } from "./game-chat-split";
 import { GameOverOverlay } from "./game-over-overlay";
 import { GameSettingsGear } from "./game-settings-gear";
 import type { LobbySettings } from "./lobby-panel";
@@ -84,6 +84,7 @@ export function PlayClient({
   });
   const viewerId = game.viewerId ?? userId;
   const players = game.players;
+  const [chatTab, setChatTab] = useState<ChatTab>("game");
 
   useGameAudioBridge(gameMusicSource(gameType));
 
@@ -173,6 +174,7 @@ export function PlayClient({
         game={game}
         conversation={conversation}
         resultDelayMs={resultDelayMs(game)}
+        covered={chatTab === "chat"}
       />
     </>
   );
@@ -186,12 +188,15 @@ export function PlayClient({
           conversationId={game.id}
           initialLayout={initialLayout}
           layoutTrusted={layoutTrusted}
+          tab={chatTab}
+          onTabChange={setChatTab}
           game={gameNode}
-          chat={() => (
+          chat={(_visible, onIncoming) => (
             <MatchChatPanel
               game={game}
               userId={viewerId}
               onViewProfile={onViewProfile}
+              onIncoming={onIncoming}
             />
           )}
         />
@@ -216,6 +221,8 @@ export function PlayClient({
         conversationId={conversation.id}
         initialLayout={initialLayout}
         layoutTrusted={layoutTrusted}
+        tab={chatTab}
+        onTabChange={setChatTab}
         game={gameNode}
         chat={(visible) => (
           <ConversationView

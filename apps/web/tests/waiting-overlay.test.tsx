@@ -3,6 +3,7 @@ import { LOBBY_MAX_BOTS } from "@kyzen/shared/types";
 import { renderToStaticMarkup } from "react-dom/server";
 
 mock.module("next/navigation", () => ({
+  usePathname: () => "/",
   useRouter: () => ({ push: () => {}, replace: () => {} }),
 }));
 

@@ -112,18 +112,20 @@ export function GameOverOverlay({
   game,
   conversation,
   resultDelayMs,
+  covered = false,
 }: {
   gameId: string;
   userId: string;
   game: GameJson;
   conversation: ConversationJson | null;
   resultDelayMs: number;
+  covered?: boolean;
 }) {
   const { layers } = useLayeredPopup();
   const cardRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(() => isGameOver(game.status));
   const ready = useResultsReady(game.completedAt, resultDelayMs);
-  const visible = open && ready && isGameOver(game.status);
+  const visible = open && ready && !covered && isGameOver(game.status);
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
   const [rematch, setRematch] = useState<{
     busy: boolean;
@@ -145,8 +147,9 @@ export function GameOverOverlay({
     },
   );
 
+  const hasSeries = !game.publicMatch;
   useEffect(() => {
-    if (!open || !isGameOver(game.status)) return;
+    if (!open || !hasSeries || !isGameOver(game.status)) return;
     let active = true;
     clientFetchJson<SeriesDetail>(`/api/games/${gameId}/series`)
       .then((d) => {
@@ -156,7 +159,7 @@ export function GameOverOverlay({
     return () => {
       active = false;
     };
-  }, [open, gameId, game.status]);
+  }, [open, hasSeries, gameId, game.status]);
 
   const layerCount = layers.length;
   useEffect(() => {
@@ -164,7 +167,10 @@ export function GameOverOverlay({
     function onPointerDown(e: MouseEvent) {
       if (layerCount > 0) return;
       const card = cardRef.current;
-      if (card && !card.contains(e.target as Node)) setOpen(false);
+      const target = e.target;
+      if (!card || !(target instanceof Element)) return;
+      if (card.contains(target) || target.closest('[role="tablist"]')) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
@@ -254,7 +260,11 @@ function GameOverActions({
   const canRematch =
     isPlayer && game.status === "completed" && !game.publicMatch;
 
+  const rematchPending = useRef(false);
+
   const onRematch = useCallback(async () => {
+    if (rematchPending.current) return;
+    rematchPending.current = true;
     if (rematch.code) {
       router.push(`/play/${rematch.code}`);
       return;
@@ -268,6 +278,7 @@ function GameOverActions({
       );
       router.push(`/play/${res.gameId}`);
     } catch (e) {
+      rematchPending.current = false;
       setRematch((r) => ({
         ...r,
         busy: false,

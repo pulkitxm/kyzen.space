@@ -42,6 +42,17 @@ export function mergeMatchMessages(
     .slice(-100);
 }
 
+export function isIncomingMatchMessage(
+  known: MatchMessage[],
+  message: MatchMessage,
+  viewerId: string,
+): boolean {
+  return (
+    message.authorId !== viewerId &&
+    !known.some((entry) => entry.id === message.id)
+  );
+}
+
 export type FriendState = {
   chosen: boolean;
   mutual: boolean;

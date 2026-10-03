@@ -12,6 +12,7 @@ import type { GameJson } from "@kyzen/shared/types";
 import { renderToStaticMarkup } from "react-dom/server";
 
 mock.module("next/navigation", () => ({
+  usePathname: () => "/",
   useRouter: () => ({ push: () => {}, replace: () => {} }),
 }));
 
@@ -229,6 +230,22 @@ describe("GameOverOverlay", () => {
     expect(html).toContain("It&#x27;s a draw");
     expect(html).toContain("Play again");
     expect(html).not.toContain("Rematch");
+  });
+
+  it("hides the results while the game view is covered", () => {
+    const props = {
+      gameId: "A2K9P7",
+      userId: "u1",
+      game: game({ winner: "u1", winners: ["u1"] }),
+      conversation: null,
+      resultDelayMs: 0,
+    };
+    expect(
+      renderToStaticMarkup(<GameOverOverlay {...props} covered />),
+    ).not.toContain("Play again");
+    expect(
+      renderToStaticMarkup(<GameOverOverlay {...props} covered={false} />),
+    ).toContain("Play again");
   });
 
   it("tells players outside a partial draw that they lost", () => {

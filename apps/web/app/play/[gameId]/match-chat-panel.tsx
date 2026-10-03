@@ -22,6 +22,7 @@ import {
   chatPeers,
   type FriendState,
   friendStates,
+  isIncomingMatchMessage,
   type MatchChatSnapshot,
   mergeMatchMessages,
 } from "@/lib/games/match-chat";
@@ -43,7 +44,19 @@ function failureMessage(failure: unknown, fallback: string): string {
   return failure instanceof Error ? failure.message : fallback;
 }
 
-function useMatchChat(gameId: string, open: boolean, loadable: boolean) {
+function useMatchChat({
+  gameId,
+  userId,
+  open,
+  loadable,
+  onIncoming,
+}: {
+  gameId: string;
+  userId: string;
+  open: boolean;
+  loadable: boolean;
+  onIncoming?: () => void;
+}) {
   const { socket } = useSocket();
   const [messages, setMessages] = useState<MatchMessage[]>([]);
   const [friends, setFriends] = useState<Record<string, FriendState>>({});
@@ -55,7 +68,9 @@ function useMatchChat(gameId: string, open: boolean, loadable: boolean) {
     setFriends((previous) => ({ ...previous, [playerId]: state }));
 
   useSocketEvent<MatchMessage>("match:message", (message) => {
-    if (message.gameId === gameId && open) addMessage(message);
+    if (message.gameId !== gameId || !open) return;
+    if (isIncomingMatchMessage(messages, message, userId)) onIncoming?.();
+    addMessage(message);
   });
   useSocketEvent<{
     gameId: string;
@@ -104,15 +119,23 @@ export function MatchChatPanel({
   game,
   userId,
   onViewProfile,
+  onIncoming,
 }: {
   game: GameJson;
   userId: string;
   onViewProfile?: ViewProfile;
+  onIncoming?: () => void;
 }) {
   const publicMatch = Boolean(game.publicMatch);
   const waiting = game.status === "waiting";
   const open = game.status === "active" || (waiting && !publicMatch);
-  const chat = useMatchChat(game.id, open, !(waiting && publicMatch));
+  const chat = useMatchChat({
+    gameId: game.id,
+    userId,
+    open,
+    loadable: !(waiting && publicMatch),
+    onIncoming,
+  });
   const peers = chatPeers(game, userId);
 
   return (

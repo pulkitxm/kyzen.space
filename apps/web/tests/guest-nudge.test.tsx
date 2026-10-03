@@ -5,7 +5,14 @@ mock.module("@/lib/auth-client", () => ({
   authClient: { signIn: { social: async () => ({}) } },
 }));
 
-const { decideGuestNudge } = await import("@/lib/guest-nudge");
+mock.module("next/navigation", () => ({
+  usePathname: () => "/",
+  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
+}));
+
+const { decideGuestNudge, guestNudgeAllowedOn } = await import(
+  "@/lib/guest-nudge"
+);
 const { GuestNudge } = await import("@/app/guest-nudge");
 
 const NOW = 1_000_000;
@@ -69,6 +76,22 @@ describe("decideGuestNudge", () => {
         now: NOW,
       }),
     ).toEqual({ show: true, markSeen: false });
+  });
+});
+
+describe("guestNudgeAllowedOn", () => {
+  it("never interrupts play routes", () => {
+    expect(guestNudgeAllowedOn("/play/A2K9P7")).toBe(false);
+    expect(guestNudgeAllowedOn("/play/find/tank-arena")).toBe(false);
+    expect(guestNudgeAllowedOn("/play/new/tic-tac-toe")).toBe(false);
+    expect(guestNudgeAllowedOn("/play")).toBe(false);
+  });
+
+  it("allows every other route", () => {
+    expect(guestNudgeAllowedOn("/")).toBe(true);
+    expect(guestNudgeAllowedOn("/games/tank-arena")).toBe(true);
+    expect(guestNudgeAllowedOn("/playground")).toBe(true);
+    expect(guestNudgeAllowedOn(null)).toBe(true);
   });
 });
 

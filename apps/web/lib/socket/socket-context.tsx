@@ -46,6 +46,7 @@ export function SocketProvider({
       path: "/socket.io",
       withCredentials: true,
       transports: ["websocket"],
+      autoConnect: false,
       reconnection: true,
       reconnectionDelay: 500,
       reconnectionDelayMax: 5000,
@@ -58,8 +59,10 @@ export function SocketProvider({
     s.on("connect", onConnect);
     s.on("disconnect", onDisconnect);
     s.io.on("reconnect_attempt", onReconnectAttempt);
+    const connectTimer = setTimeout(() => s.connect(), 0);
 
     return () => {
+      clearTimeout(connectTimer);
       s.off("connect", onConnect);
       s.off("disconnect", onDisconnect);
       s.io.off("reconnect_attempt", onReconnectAttempt);
