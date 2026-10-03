@@ -1,13 +1,14 @@
 "use client";
 
 import type { TankAction, TankArenaState, TankKind } from "@kyzen/shared/types";
-import { type RefObject, useEffect, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { FaDoorOpen } from "react-icons/fa6";
 import {
   ActionBar,
   AirstrikeBanner,
   ReplayBar,
   Roster,
+  RoundBanner,
   StatusBanner,
   TopBar,
 } from "./hud";
@@ -63,8 +64,22 @@ function spectatorText(phase: TankArenaState["phase"], player: boolean) {
 
 export function MatchHud(props: MatchHudProps) {
   const selecting = props.phase === "select";
+  const prevRound = useRef(props.round);
+  const [showBanner, setShowBanner] = useState(false);
+
+  useEffect(() => {
+    if (props.round > prevRound.current && props.round > 0) {
+      setShowBanner(true);
+      const timer = setTimeout(() => setShowBanner(false), 2500);
+      prevRound.current = props.round;
+      return () => clearTimeout(timer);
+    }
+    prevRound.current = props.round;
+  }, [props.round]);
+
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col gap-2 p-2 sm:p-3">
+      <RoundBanner round={props.round} visible={showBanner} />
       <HudTop {...props} selecting={selecting} />
       <HudBanners {...props} />
       {selecting ? (

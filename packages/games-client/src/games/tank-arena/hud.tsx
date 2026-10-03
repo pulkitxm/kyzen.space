@@ -88,12 +88,17 @@ export function RoundTimer({
   }, [deadline, active]);
 
   const urgent = active && seconds !== null && seconds <= 5;
+  const critical = active && seconds !== null && seconds <= 3;
   return (
     <CountdownRing deadline={deadline} active={active} size={46} stroke={3}>
       <span
         className={[
-          "font-bold text-sm tabular-nums",
-          urgent ? "text-red-300" : "text-slate-50",
+          "font-bold text-sm tabular-nums transition-all duration-200",
+          critical
+            ? "scale-110 animate-pulse text-red-400"
+            : urgent
+              ? "text-red-300"
+              : "text-slate-50",
         ].join(" ")}
       >
         <span aria-hidden="true">{seconds ?? "--"}</span>
@@ -164,16 +169,31 @@ function HealthBar({
   scene?: boolean;
 }) {
   const fraction = maxHp > 0 ? Math.min(1, Math.max(0, hp / maxHp)) : 0;
+  const [trail, setTrail] = useState(fraction);
+
+  useEffect(() => {
+    if (fraction >= trail) {
+      setTrail(fraction);
+      return;
+    }
+    const timeout = setTimeout(() => setTrail(fraction), 400);
+    return () => clearTimeout(timeout);
+  }, [fraction, trail]);
+
   return (
     <div
       className={[
-        "w-full overflow-hidden rounded-full bg-black/55 ring-1 ring-white/20",
+        "relative w-full overflow-hidden rounded-full bg-black/55 ring-1 ring-white/20",
         slim ? "h-1.5" : "h-2",
       ].join(" ")}
     >
       <div
+        className="absolute inset-y-0 left-0 rounded-full bg-red-500/70 transition-[width] duration-500"
+        style={{ width: `${trail * 100}%` }}
+      />
+      <div
         data-hp-fill={scene ? "" : undefined}
-        className="h-full rounded-full transition-[width] duration-300"
+        className="relative h-full rounded-full transition-[width] duration-200"
         style={{
           width: `${fraction * 100}%`,
           backgroundColor: cssColor(color),
@@ -333,10 +353,10 @@ export function ActionBar({
                   disabled={!slot.enabled || locked}
                   onClick={() => onSelect(slot.action)}
                   className={[
-                    "flex h-16 w-full min-w-14 flex-col items-center justify-center gap-0.5 rounded-lg border text-lg outline-none transition focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-40 md:w-20",
+                    "flex h-18 w-full min-w-16 flex-col items-center justify-center gap-1 rounded-xl border-2 text-xl outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-40 md:w-22",
                     isSelected
-                      ? "border-white bg-white/20 shadow-[0_0_12px_rgba(125,211,252,0.45)]"
-                      : "border-white/15 bg-white/5 enabled:hover:bg-white/12",
+                      ? "scale-105 border-sky-300 bg-gradient-to-b from-white/25 to-white/10 shadow-[0_0_20px_rgba(125,211,252,0.5),inset_0_1px_0_rgba(255,255,255,0.3)]"
+                      : "border-white/20 bg-gradient-to-b from-white/8 to-white/3 enabled:hover:scale-102 enabled:hover:border-white/30 enabled:hover:bg-white/12",
                   ].join(" ")}
                 >
                   <ActionIcon kind={kind} action={slot.action} />
@@ -374,10 +394,10 @@ export function ActionBar({
         disabled={locked || pending || !connected}
         aria-keyshortcuts="Enter"
         className={[
-          "flex h-14 items-center justify-center gap-2 rounded-xl px-6 font-bold text-base uppercase tracking-wide shadow-lg outline-none transition focus-visible:ring-2 focus-visible:ring-sky-300 md:h-18",
+          "flex h-16 items-center justify-center gap-2 rounded-2xl border-2 px-8 font-black text-lg uppercase tracking-wider outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-sky-300 md:h-20",
           locked
-            ? "bg-emerald-500/80 text-emerald-950"
-            : "bg-rose-600 text-white enabled:hover:bg-rose-500 disabled:opacity-60",
+            ? "border-emerald-300/50 bg-gradient-to-b from-emerald-400 to-emerald-600 text-emerald-950 shadow-[0_4px_20px_rgba(52,211,153,0.4)]"
+            : "border-rose-400/50 bg-gradient-to-b from-rose-500 to-rose-700 text-white shadow-[0_4px_20px_rgba(244,63,94,0.4)] enabled:hover:scale-105 enabled:hover:shadow-[0_6px_28px_rgba(244,63,94,0.5)] disabled:opacity-60",
         ].join(" ")}
       >
         {locked ? (
@@ -463,6 +483,76 @@ export function StatusBanner({ children }: { children: ReactNode }) {
       className={`${PANEL} pointer-events-none px-4 py-2 text-center font-medium text-sm`}
     >
       {children}
+    </div>
+  );
+}
+
+export function RoundBanner({
+  round,
+  visible,
+}: {
+  round: number;
+  visible: boolean;
+}) {
+  const [show, setShow] = useState(false);
+  const [displayRound, setDisplayRound] = useState(round);
+
+  useEffect(() => {
+    if (visible && round > 0) {
+      setDisplayRound(round);
+      setShow(true);
+      const timer = setTimeout(() => setShow(false), 2200);
+      return () => clearTimeout(timer);
+    }
+  }, [visible, round]);
+
+  if (!show) return null;
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="flex animate-[roundBannerIn_0.4s_ease-out,roundBannerOut_0.5s_ease-in_1.7s_forwards] flex-col items-center"
+        style={{
+          textShadow:
+            "0 4px 24px rgba(0,0,0,0.8), 0 0 60px rgba(0,150,255,0.4)",
+        }}
+      >
+        <span className="font-black text-sky-300 text-sm uppercase tracking-[0.4em]">
+          Round
+        </span>
+        <span
+          className="font-black text-7xl text-white tabular-nums sm:text-9xl"
+          style={{
+            textShadow:
+              "0 0 40px rgba(100,200,255,0.6), 0 8px 32px rgba(0,0,0,0.7)",
+          }}
+        >
+          {displayRound}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function EventToast({
+  message,
+  color,
+  icon,
+}: {
+  message: string;
+  color: string;
+  icon?: ReactNode;
+}) {
+  return (
+    <div
+      className="flex animate-[toastIn_0.3s_ease-out,toastOut_0.4s_ease-in_2s_forwards] items-center gap-2 rounded-lg px-3 py-2 font-semibold text-sm shadow-lg"
+      style={{
+        backgroundColor: color,
+        boxShadow: `0 4px 20px ${color}40`,
+      }}
+    >
+      {icon}
+      {message}
     </div>
   );
 }
