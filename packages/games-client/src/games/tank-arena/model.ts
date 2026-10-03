@@ -253,6 +253,18 @@ export function statBars(kind: TankKind): StatBar[] {
   });
 }
 
+export function tooltipShift(
+  anchor: { left: number; width: number },
+  width: number,
+  bounds: { left: number; right: number },
+  margin = 8,
+) {
+  const start = anchor.left + anchor.width / 2 - width / 2;
+  const min = bounds.left + margin;
+  const max = Math.max(min, bounds.right - margin - width);
+  return Math.min(Math.max(start, min), max) - start;
+}
+
 export function secondsLeft(deadline: number | null | undefined, now: number) {
   if (deadline == null) return null;
   return Math.max(0, Math.ceil((deadline - now) / 1000));

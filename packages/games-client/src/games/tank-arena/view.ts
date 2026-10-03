@@ -124,7 +124,10 @@ export type ArenaHandle = {
   dispose: () => void;
 };
 
-export type PreviewHandle = {
-  setKind: (kind: TankModelKind, color: number) => void;
-  dispose: () => void;
+export type PreviewRequest = {
+  color: number;
+  kinds: TankModelKind[];
+  frames: number;
+  width: number;
+  height: number;
 };

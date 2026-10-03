@@ -10,10 +10,6 @@ mock.module("../src/games/tank-arena/scene", () => ({
     mounted.push("arena");
     return null;
   },
-  mountPreview: () => {
-    mounted.push("preview");
-    return null;
-  },
 }));
 
 const { TankArenaBoard } = await import("../src/games/tank-arena/client");
@@ -127,6 +123,7 @@ describe("TankArenaBoard", () => {
     expect(html).toContain("0 of 2 ready");
     expect(html).toContain("rotating preview");
     expect(html).toContain('data-mode="select"');
+    expect(html).not.toContain("animate-pulse");
   });
 
   test("a submitted pick is shown as locked for everyone", () => {
@@ -254,11 +251,11 @@ describe("TankArenaBoard", () => {
     expect(html).toContain("alpha is locked in");
   });
 
-  test("a fresh resolution without a deadline waits instead of being skipped", () => {
+  test("a reloaded resolution without a deadline waits without flashing the replay bar", () => {
     const resolved = lockAll(planning(2));
     const html = render(resolved, { deadline: null });
-    expect(html).toContain('data-mode="replay"');
-    expect(html).toContain("Round 1 in motion");
+    expect(html).toContain('data-mode="plan"');
+    expect(html).not.toContain("in motion");
     expect(settleReplay(resolved, null, true, Date.now())).toEqual({
       decided: false,
       done: null,
@@ -322,6 +319,24 @@ describe("TankArenaBoard", () => {
     );
     expect(html).toContain('data-mode="finished"');
     expect(html).not.toContain("Lock in");
+  });
+
+  test("the round countdown stops and hides once the match is over", () => {
+    const state = planning(2);
+    const finished = {
+      ...state,
+      phase: "finished" as const,
+      outcome: { winnerRoles: ["p1"], draw: false },
+    };
+    const live = render(state);
+    expect(live).toContain("No timer");
+    const over = render(finished, {
+      status: "completed",
+      deadline: Date.now() + 15_000,
+    });
+    expect(over).toContain("Match over");
+    expect(over).not.toContain("seconds left");
+    expect(over).not.toContain("No timer");
   });
 
   test("unreadable state renders an alert instead of crashing", () => {

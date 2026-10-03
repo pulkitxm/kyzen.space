@@ -1,11 +1,7 @@
 import {
   Color,
-  CylinderGeometry,
-  DirectionalLight,
   Group,
-  HemisphereLight,
-  Mesh,
-  MeshStandardMaterial,
+  type Mesh,
   PerspectiveCamera,
   Plane,
   Raycaster,
@@ -27,11 +23,9 @@ import type {
   ArenaLayout,
   ArenaMountOptions,
   CameraFocus,
-  PreviewHandle,
   SceneEvent,
   SceneFrame,
   SceneTank,
-  TankModelKind,
 } from "../view";
 import { disposeTree } from "./dispose";
 import { Effects, ParticleField } from "./effects";
@@ -120,6 +114,7 @@ export function mountArena(
   let reducedMotion = options.reducedMotion;
   let insets = { top: 0, bottom: 0 };
   let ticker: ((dtMs: number) => void) | null = null;
+  let tickerLast = 0;
   let width = 1;
   let height = 1;
   let disposed = false;
@@ -389,7 +384,11 @@ export function mountArena(
     const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
     last = now;
     time += dt;
-    ticker?.(dt * 1000);
+    if (ticker) {
+      const realMs = Math.max(0, now - tickerLast);
+      tickerLast = now;
+      ticker(realMs);
+    }
     environment.update(time, dt);
     columns.update(time);
     const scale = (tank: SceneTank) =>
@@ -497,6 +496,7 @@ export function mountArena(
     },
     setTicker: (next) => {
       ticker = next;
+      tickerLast = deps.now();
     },
     screenToWorld: (clientX, clientY) => {
       const rect = canvas.getBoundingClientRect();
@@ -530,132 +530,6 @@ export function mountArena(
       models.clear();
       disposeTree(scene, [kit]);
       composer.dispose();
-      renderer.dispose();
-      renderer.forceContextLoss();
-      canvas.remove();
-    },
-  };
-}
-
-export function mountPreview(
-  container: HTMLElement,
-  kind: TankModelKind,
-  color: number,
-  deps: SceneDeps = browserDeps,
-): PreviewHandle | null {
-  let renderer: ReturnType<SceneDeps["createRenderer"]>;
-  try {
-    renderer = deps.createRenderer({ shadows: false, alpha: true });
-  } catch {
-    return null;
-  }
-  const canvas = renderer.domElement;
-  canvas.setAttribute("aria-hidden", "true");
-  container.appendChild(canvas);
-  const scene = new Scene();
-  const camera = new PerspectiveCamera(30, 1, 0.1, 50);
-  camera.position.set(0, 2.2, 7.2);
-  camera.lookAt(0, 0.7, 0);
-  scene.add(new HemisphereLight(0xcfeaff, 0x1b2836, 1.6));
-  const key = new DirectionalLight(0xffffff, 2.2);
-  key.position.set(3, 5, 4);
-  scene.add(key);
-  const rim = new DirectionalLight(0x6fe8ff, 1.6);
-  rim.position.set(-4, 2, -3);
-  scene.add(rim);
-  const pedestal = new Mesh(
-    new CylinderGeometry(1.9, 2.1, 0.22, 40),
-    new MeshStandardMaterial({
-      color: 0x22313f,
-      metalness: 0.7,
-      roughness: 0.35,
-      emissive: 0x0b3a4a,
-    }),
-  );
-  pedestal.position.y = -0.11;
-  scene.add(pedestal);
-  const turntable = new Group();
-  scene.add(turntable);
-  const kit = createTankKit();
-  let model: TankModel | null = null;
-  let current = { kind, color };
-  const fake: SceneTank = {
-    role: "preview",
-    name: "",
-    kind,
-    color,
-    x: 0,
-    y: 0,
-    vx: 0,
-    vy: 0,
-    halfWidth: MODEL_SIZE[kind].halfWidth,
-    height: MODEL_SIZE[kind].height,
-    hp: 1,
-    maxHp: 1,
-    alive: true,
-    aim: 24,
-    shield: 0,
-    leaping: false,
-    local: false,
-  };
-
-  function build() {
-    if (model) {
-      turntable.remove(model.root);
-      model.dispose();
-    }
-    model = new TankModel(kit, current.kind, current.color, true);
-    model.root.position.x = 0;
-    turntable.add(model.root);
-  }
-  build();
-
-  function resize() {
-    const w = Math.max(1, container.clientWidth);
-    const h = Math.max(1, container.clientHeight);
-    renderer.setPixelRatio(deps.pixelRatio());
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  }
-  const observer = deps.observeResize(container, resize);
-  resize();
-
-  let disposed = false;
-  let handle = 0;
-  let last = deps.now();
-  let time = 0;
-  function tick() {
-    if (disposed) return;
-    const now = deps.now();
-    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
-    last = now;
-    time += dt;
-    turntable.rotation.y = time * 0.7;
-    if (model) {
-      fake.aim = 18 + Math.sin(time * 1.3) * 14;
-      model.update(fake, dt, time, 1);
-      model.root.position.set(0, 0, 0);
-    }
-    renderer.render(scene, camera);
-    handle = deps.requestFrame(tick);
-  }
-  handle = deps.requestFrame(tick);
-
-  return {
-    setKind: (nextKind, nextColor) => {
-      if (current.kind === nextKind && current.color === nextColor) return;
-      current = { kind: nextKind, color: nextColor };
-      fake.kind = nextKind;
-      fake.color = nextColor;
-      build();
-    },
-    dispose: () => {
-      if (disposed) return;
-      disposed = true;
-      deps.cancelFrame(handle);
-      observer.disconnect();
-      disposeTree(scene, [kit]);
       renderer.dispose();
       renderer.forceContextLoss();
       canvas.remove();

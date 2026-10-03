@@ -280,6 +280,7 @@ function TankArenaMatch({
       data-mode={mode}
     >
       <ArenaCanvas
+        deferred={state.phase === "select"}
         reducedMotion={reducedMotion}
         interactive={planning}
         label={`Tank Arena, ${label}. Drag from your tank to aim, or use the arrow keys.`}

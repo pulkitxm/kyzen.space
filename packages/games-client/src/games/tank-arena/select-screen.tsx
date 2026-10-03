@@ -2,48 +2,49 @@
 
 import { TANK_KINDS, TANKS } from "@kyzen/games-core";
 import type { TankKind } from "@kyzen/shared/types";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useReducedMotion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import { FaCheck, FaLock } from "react-icons/fa6";
 import { ActionIcon, RoundTimer } from "./hud";
 import { cssColor, type RosterEntry, statBars } from "./model";
+import { PREVIEW_FRAME_MS, usePreviewFrames } from "./previews";
 import { PANEL } from "./styles";
-import type { PreviewHandle } from "./view";
 
-function TankPreview({ kind, color }: { kind: TankKind; color: number }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const handleRef = useRef<PreviewHandle | null>(null);
-  const [failed, setFailed] = useState(false);
-  const initial = useEffectEvent(() => ({ kind, color }));
+function TankPreview({
+  kind,
+  frames,
+}: {
+  kind: TankKind;
+  frames: ImageBitmap[] | null;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const reducedMotion = useReducedMotion() ?? false;
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    let cancelled = false;
-    import("./scene")
-      .then((module) => {
-        if (cancelled) return;
-        const start = initial();
-        const handle = module.mountPreview(container, start.kind, start.color);
-        if (!handle) setFailed(true);
-        handleRef.current = handle;
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
-    return () => {
-      cancelled = true;
-      handleRef.current?.dispose();
-      handleRef.current = null;
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    const first = frames?.[0];
+    if (!canvas || !context || !frames || !first) return;
+    canvas.width = first.width;
+    canvas.height = first.height;
+    let index = 0;
+    const draw = () => {
+      const frame = frames[index];
+      if (!frame) return;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(frame, 0, 0);
     };
-  }, []);
-
-  useEffect(() => {
-    handleRef.current?.setKind(kind, color);
-  }, [kind, color]);
+    draw();
+    if (reducedMotion) return;
+    const id = window.setInterval(() => {
+      index = (index + 1) % frames.length;
+      draw();
+    }, PREVIEW_FRAME_MS);
+    return () => window.clearInterval(id);
+  }, [frames, reducedMotion]);
 
   return (
     <div
-      ref={containerRef}
       role="img"
       aria-label={`${TANKS[kind].name} rotating preview`}
       className="relative h-32 w-full shrink-0 overflow-hidden rounded-xl bg-radial from-sky-800/60 via-slate-900/50 to-transparent sm:h-40"
@@ -51,17 +52,22 @@ function TankPreview({ kind, color }: { kind: TankKind; color: number }) {
         boxShadow: "inset 0 -20px 30px -10px rgba(0,0,0,0.5)",
       }}
     >
+      {frames ? (
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-y-0 left-1/2 aspect-3/2 h-full -translate-x-1/2"
+        />
+      ) : (
+        <p className="absolute inset-0 flex items-center justify-center font-black text-3xl text-white/70 uppercase tracking-widest">
+          {TANKS[kind].name}
+        </p>
+      )}
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 h-8"
         style={{
           background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent)",
         }}
       />
-      {failed ? (
-        <p className="absolute inset-0 flex items-center justify-center font-black text-3xl text-white/70 uppercase tracking-widest">
-          {TANKS[kind].name}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -69,14 +75,14 @@ function TankPreview({ kind, color }: { kind: TankKind; color: number }) {
 function TankCard({
   kind,
   focused,
-  color,
+  frames,
   picked,
   disabled,
   onFocus,
 }: {
   kind: TankKind;
   focused: boolean;
-  color: number;
+  frames: ImageBitmap[] | null;
   picked: boolean;
   disabled: boolean;
   onFocus: () => void;
@@ -95,7 +101,7 @@ function TankCard({
           : "border-white/10 bg-linear-to-br from-white/8 to-white/2 enabled:hover:scale-[1.01] enabled:hover:border-white/20 enabled:hover:bg-white/10",
       ].join(" ")}
     >
-      <TankPreview kind={kind} color={color} />
+      <TankPreview kind={kind} frames={frames} />
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-baseline gap-2">
           <span className="font-black text-xl uppercase tracking-wider">
@@ -184,6 +190,7 @@ export function SelectScreen({
   onSecond?: (seconds: number) => void;
 }) {
   const [focused, setFocused] = useState<TankKind>(picked ?? "bastion");
+  const previews = usePreviewFrames(previewColor);
   const shown = picked ?? focused;
   const lockedCount = entries.filter((entry) => entry.locked).length;
   const done = submitted || picked !== null;
@@ -216,7 +223,7 @@ export function SelectScreen({
             key={kind}
             kind={kind}
             focused={shown === kind}
-            color={previewColor}
+            frames={previews?.[kind] ?? null}
             picked={picked === kind}
             disabled={hasPicked}
             onFocus={() => setFocused(kind)}

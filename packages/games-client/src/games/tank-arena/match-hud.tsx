@@ -143,6 +143,7 @@ function HudTop(props: MatchHudProps & { selecting: boolean }) {
             round={props.round}
             phaseLabel={props.label}
             deadline={props.deadline}
+            timerShown={props.live && props.mode !== "finished"}
             timerActive={props.timerActive}
             locked={props.summary.locked}
             total={props.summary.total}

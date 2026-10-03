@@ -1,7 +1,14 @@
 "use client";
 
 import type { TankAction, TankKind } from "@kyzen/shared/types";
-import { type ReactNode, useEffect, useEffectEvent, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from "react";
 import {
   FaAnglesUp,
   FaBurst,
@@ -25,6 +32,7 @@ import {
   cssColor,
   type RosterEntry,
   secondsLeft,
+  tooltipShift,
 } from "./model";
 import { PANEL } from "./styles";
 
@@ -114,6 +122,7 @@ export function TopBar({
   round,
   phaseLabel,
   deadline,
+  timerShown,
   timerActive,
   locked,
   total,
@@ -122,6 +131,7 @@ export function TopBar({
   round: number;
   phaseLabel: string;
   deadline: number | null;
+  timerShown: boolean;
   timerActive: boolean;
   locked: number;
   total: number;
@@ -131,11 +141,13 @@ export function TopBar({
     <div
       className={`${PANEL} pointer-events-auto flex items-center gap-3 px-3 py-1.5`}
     >
-      <RoundTimer
-        deadline={deadline}
-        active={timerActive}
-        onSecond={onSecond}
-      />
+      {timerShown ? (
+        <RoundTimer
+          deadline={deadline}
+          active={timerActive}
+          onSecond={onSecond}
+        />
+      ) : null}
       <div className="min-w-0 leading-tight">
         <p className="font-semibold text-sm">
           {round === 0 ? "Tank select" : `Round ${round}`}
@@ -302,6 +314,39 @@ export function Nameplates({ entries }: { entries: RosterEntry[] }) {
   );
 }
 
+function useTooltipShifts(toolbarRef: RefObject<HTMLDivElement | null>) {
+  const [shifts, setShifts] = useState<number[]>([]);
+  useEffect(() => {
+    const toolbar = toolbarRef.current;
+    const board = toolbar?.closest<HTMLElement>("[data-mode]");
+    if (!toolbar || !board || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const bounds = board.getBoundingClientRect();
+      const next = [...toolbar.children].map((slot) => {
+        const tooltip = slot.querySelector<HTMLElement>("[role=tooltip]");
+        return tooltip
+          ? tooltipShift(
+              slot.getBoundingClientRect(),
+              tooltip.offsetWidth,
+              bounds,
+            )
+          : 0;
+      });
+      setShifts((current) =>
+        current.length === next.length &&
+        current.every((value, i) => value === next[i])
+          ? current
+          : next,
+      );
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(board);
+    observer.observe(toolbar);
+    return () => observer.disconnect();
+  }, [toolbarRef]);
+  return shifts;
+}
+
 export function ActionBar({
   kind,
   slots,
@@ -326,6 +371,8 @@ export function ActionBar({
   onLock: () => void;
 }) {
   const info = actionInfo(kind, selected);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const shifts = useTooltipShifts(toolbarRef);
   return (
     <div
       className={[
@@ -335,6 +382,7 @@ export function ActionBar({
     >
       <div className={`${PANEL} flex flex-col gap-1.5 p-2`}>
         <div
+          ref={toolbarRef}
           role="toolbar"
           aria-label="Actions"
           className="grid grid-cols-5 gap-1.5"
@@ -369,6 +417,7 @@ export function ActionBar({
                   id={describedBy}
                   role="tooltip"
                   className={`${PANEL} pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-48 -translate-x-1/2 p-2 text-[11px] leading-snug opacity-0 transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100`}
+                  style={{ marginLeft: shifts[index] ?? 0 }}
                 >
                   <span className="block font-semibold">
                     {index + 1}. {details.label}

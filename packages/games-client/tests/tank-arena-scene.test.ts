@@ -11,12 +11,21 @@ import {
   type Object3D,
   Scene,
 } from "three";
-import { mountArena, mountPreview } from "../src/games/tank-arena/scene/arena";
+import {
+  PREVIEW_FRAMES,
+  previewRequest,
+} from "../src/games/tank-arena/previews";
+import { mountArena } from "../src/games/tank-arena/scene/arena";
 import {
   collectResources,
   disposeTree,
 } from "../src/games/tank-arena/scene/dispose";
 import { mergeNonIndexed } from "../src/games/tank-arena/scene/merge";
+import {
+  createPreviewStudio,
+  type PreviewDeps,
+  renderPreviews,
+} from "../src/games/tank-arena/scene/preview";
 import {
   pixelRatioCap,
   type SceneDeps,
@@ -306,9 +315,6 @@ describe("arena scene lifecycle", () => {
         failing,
       ),
     ).toBeNull();
-    expect(
-      mountPreview(container(calls), "bastion", 0xffffff, failing),
-    ).toBeNull();
     expect(calls.appended).toBeUndefined();
   });
 
@@ -356,20 +362,174 @@ describe("arena scene lifecycle", () => {
     handle?.dispose();
   });
 
-  test("the tank preview spins, swaps models, and disposes its context", () => {
+  test("the replay ticker gets real elapsed time even when frames are slow", () => {
     const calls: Calls = {};
     const { deps, step } = fakeDeps(calls);
-    const preview = mountPreview(container(calls), "bastion", 0x3edcff, deps);
-    if (!preview) throw new Error("preview failed");
-    step();
-    preview.setKind("kestrel", 0xff4d5e);
-    step();
-    expect(calls.render).toBe(2);
-    preview.dispose();
-    expect(calls.rendererDispose).toBe(1);
-    expect(calls.forceContextLoss).toBe(1);
-    expect(calls.cancelFrame).toBe(1);
-    expect(calls.disconnect).toBe(1);
+    const handle = mountArena(
+      container(calls),
+      {
+        overlay: null,
+        minimap: null,
+        reducedMotion: false,
+        onContextLost: () => {},
+        onContextRestored: () => {},
+      },
+      deps,
+    );
+    if (!handle) throw new Error("scene failed to mount");
+    step(40);
+    const received: number[] = [];
+    handle.setTicker((ms) => received.push(ms));
+    step(125);
+    step(125);
+    step(16);
+    expect(received).toEqual([125, 125, 16]);
+    handle.dispose();
+  });
+});
+
+describe("tank preview studio", () => {
+  test("poses one shared turntable per tank and releases it", () => {
+    const expectQuiet = silenceConsole();
+    const angles: number[] = [];
+    const calls = { render: 0, compile: 0 };
+    const studio = createPreviewStudio(
+      {
+        render: () => {
+          calls.render += 1;
+          angles.push(studio.turntable.rotation.y);
+        },
+        compile: () => {
+          calls.compile += 1;
+        },
+      },
+      1.5,
+    );
+    studio.compile("bastion", 0x3edcff);
+    studio.compile("kestrel", 0x3edcff);
+    for (let i = 0; i < 12; i++) studio.render("bastion", 0x3edcff, i, 12);
+    expect(calls).toEqual({ render: 12, compile: 2 });
+    expect(studio.turntable.children.length).toBe(1);
+    const step = (angles[1] ?? 0) - (angles[0] ?? 0);
+    expect(step).toBeCloseTo((Math.PI * 2) / 12, 6);
+    expect((angles[11] ?? 0) - (angles[0] ?? 0)).toBeCloseTo(
+      (Math.PI * 2 * 11) / 12,
+      6,
+    );
+    studio.dispose();
+    expect(studio.turntable.children.length).toBe(0);
+    expectQuiet();
+  });
+
+  function previewHarness(settleAfter = 2) {
+    const frames = new Map<number, () => void>();
+    let next = 1;
+    let clock = 0;
+    const stats = { renders: 0, captures: 0, closed: 0, disposed: 0, polls: 0 };
+    const perSlice: number[] = [];
+    const deps: PreviewDeps = {
+      createSurface: () => ({
+        compile: () => {},
+        render: () => {
+          stats.renders += 1;
+          clock += 3;
+        },
+        settled: () => {
+          stats.polls += 1;
+          return stats.polls > settleAfter;
+        },
+        capture: () => {
+          stats.captures += 1;
+          return Promise.resolve({
+            close: () => {
+              stats.closed += 1;
+            },
+          } as unknown as ImageBitmap);
+        },
+        dispose: () => {
+          stats.disposed += 1;
+        },
+      }),
+      requestFrame: (callback) => {
+        const id = next++;
+        frames.set(id, callback);
+        return id;
+      },
+      cancelFrame: (id) => {
+        frames.delete(id);
+      },
+      now: () => clock,
+    };
+    const step = () => {
+      const before = stats.renders;
+      const pending = [...frames.values()];
+      frames.clear();
+      for (const callback of pending) callback();
+      perSlice.push(stats.renders - before);
+      return pending.length > 0;
+    };
+    return { deps, stats, perSlice, step, pending: () => frames.size };
+  }
+
+  test("previews render in small slices across animation frames", async () => {
+    const expectQuiet = silenceConsole();
+    const { deps, stats, perSlice, step, pending } = previewHarness();
+    const delivered: [string, number][] = [];
+    renderPreviews(
+      previewRequest(0x3edcff, 1),
+      (kind, frames) => delivered.push([kind, frames.length]),
+      deps,
+    );
+    let slices = 0;
+    while (step()) slices += 1;
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(stats.renders).toBe(PREVIEW_FRAMES * 2);
+    expect(stats.polls).toBe(3);
+    expect(Math.max(...perSlice)).toBeLessThanOrEqual(3);
+    expect(slices).toBeGreaterThan(20);
+    expect(delivered).toEqual([
+      ["bastion", PREVIEW_FRAMES],
+      ["kestrel", PREVIEW_FRAMES],
+    ]);
+    expect(stats.disposed).toBe(1);
+    expect(stats.closed).toBe(0);
+    expect(pending()).toBe(0);
+    expectQuiet();
+  });
+
+  test("cancelling a preview job releases every captured frame", async () => {
+    const { deps, stats, step } = previewHarness(0);
+    const delivered: string[] = [];
+    const job = renderPreviews(
+      previewRequest(0x3edcff, 1),
+      (kind) => delivered.push(kind),
+      deps,
+    );
+    for (let i = 0; i < 5; i++) step();
+    job.cancel();
+    expect(step()).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(stats.captures).toBeGreaterThan(0);
+    expect(stats.closed).toBe(stats.captures);
+    expect(stats.disposed).toBe(1);
+    expect(delivered).toEqual([]);
+  });
+
+  test("preview frames are small and capped in resolution", () => {
+    const low = previewRequest(0x3edcff, 1);
+    expect(low).toEqual({
+      color: 0x3edcff,
+      kinds: ["bastion", "kestrel"],
+      frames: PREVIEW_FRAMES,
+      width: 240,
+      height: 160,
+    });
+    expect(previewRequest(0x3edcff, 3)).toMatchObject({
+      width: 360,
+      height: 240,
+    });
+    expect(previewRequest(0x3edcff, Number.NaN).height).toBe(160);
   });
 });
 

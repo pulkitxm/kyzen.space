@@ -13,6 +13,7 @@ import { type ArenaStatus, createArenaLifecycle } from "./arena-lifecycle";
 import type { ArenaHandle } from "./view";
 
 export function ArenaCanvas({
+  deferred,
   reducedMotion,
   interactive,
   label,
@@ -23,6 +24,7 @@ export function ArenaCanvas({
   onAimEnd,
   children,
 }: {
+  deferred: boolean;
   reducedMotion: boolean;
   interactive: boolean;
   label: string;
@@ -37,6 +39,8 @@ export function ArenaCanvas({
   const overlayRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<number | null>(null);
   const [status, setStatus] = useState<ArenaStatus>("loading");
+  const [armed, setArmed] = useState(!deferred);
+  if (!armed && !deferred) setArmed(true);
 
   const report = useEffectEvent((handle: ArenaHandle | null, failed: boolean) =>
     onReady(handle, failed),
@@ -45,8 +49,12 @@ export function ArenaCanvas({
   const minimapCanvas = useEffectEvent(() => minimap.current);
 
   useEffect(() => {
+    import("./scene").catch(() => {});
+  }, []);
+
+  useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!armed || !container) return;
     let cancelled = false;
     const lifecycle = createArenaLifecycle((next, handle) => {
       setStatus(next);
@@ -72,7 +80,7 @@ export function ArenaCanvas({
       lifecycle.dispose();
       report(null, false);
     };
-  }, []);
+  }, [armed]);
 
   const release = (event: PointerEvent<HTMLDivElement>) => {
     if (draggingRef.current !== event.pointerId) return;
@@ -138,7 +146,10 @@ export function ArenaCanvas({
       {status === "loading" ? (
         <div
           aria-hidden="true"
-          className="absolute inset-0 animate-pulse bg-linear-to-b from-sky-950/60 to-slate-950/80"
+          className={[
+            "absolute inset-0 bg-linear-to-b from-sky-950/60 to-slate-950/80",
+            armed ? "animate-pulse" : "",
+          ].join(" ")}
         />
       ) : null}
     </div>

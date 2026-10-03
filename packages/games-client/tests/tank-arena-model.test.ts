@@ -28,6 +28,7 @@ import {
   TEAM_PALETTE,
   teamColor,
   teamColors,
+  tooltipShift,
 } from "../src/games/tank-arena/model";
 
 function seats(count: number, teams = false): Seat[] {
@@ -403,6 +404,17 @@ describe("HUD derivations", () => {
     expect(secondsLeft(10_500, 0)).toBe(11);
     expect(secondsLeft(1000, 5000)).toBe(0);
     expect(secondsLeft(null, 0)).toBeNull();
+  });
+
+  test("action tooltips are clamped inside the board", () => {
+    const board = { left: 100, right: 900 };
+    expect(tooltipShift({ left: 400, width: 88 }, 192, board)).toBe(0);
+    const first = tooltipShift({ left: 110, width: 88 }, 192, board);
+    expect(154 - 96 + first).toBe(108);
+    const last = tooltipShift({ left: 800, width: 88 }, 192, board);
+    expect(844 + 96 + last).toBe(892);
+    const narrow = { left: 100, right: 250 };
+    expect(tooltipShift({ left: 110, width: 40 }, 192, narrow)).toBe(74);
   });
 });
 

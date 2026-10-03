@@ -9,11 +9,17 @@ import {
   replayCursor,
   replayDurationMs,
   replayOffset,
+  replayPlayer,
+  type SoundName,
   sceneContext,
   sceneEvents,
   stateScene,
 } from "../src/games/tank-arena/replay";
-import type { SceneFrame, SceneTank } from "../src/games/tank-arena/view";
+import type {
+  SceneEvent,
+  SceneFrame,
+  SceneTank,
+} from "../src/games/tank-arena/view";
 
 const players = [
   { userId: "u1", username: "alpha", role: "p1" },
@@ -234,6 +240,70 @@ describe("replay timing", () => {
     expect(replayOffset({ ...base, now: 19_000 })).toBe(0);
     expect(replayOffset({ ...base, now: 24_500 })).toBeNull();
     expect(replayOffset({ ...base, deadline: null, now: 0 })).toBeNull();
+  });
+});
+
+describe("replay player", () => {
+  function oneSecond() {
+    const frames = Array.from({ length: 61 }, (_, i) =>
+      frame([tank({ x: i })]),
+    );
+    const events: SceneEvent[][] = frames.map((_, i) =>
+      i === 30 ? [{ type: "explode", x: 30, y: 0, radius: 2 }] : [],
+    );
+    const sounds: SoundName[][] = frames.map((_, i) =>
+      i === 30 ? ["explode"] : [],
+    );
+    return { frames, events, sounds };
+  }
+
+  function play(startMs: number, tickMs: number, ticks = 10_000) {
+    const shown: number[] = [];
+    const emitted: SceneEvent[] = [];
+    const played: SoundName[] = [];
+    let doneAt: number | null = null;
+    let clock = startMs;
+    const player = replayPlayer(oneSecond(), startMs, 64, {
+      frame: (next) => shown.push(next.tanks[0]?.x ?? -1),
+      events: (next) => emitted.push(...next),
+      sound: (sound) => played.push(sound),
+      done: () => {
+        doneAt = clock;
+      },
+    });
+    for (let i = 0; i < ticks && doneAt === null; i++) {
+      clock += tickMs;
+      player.advance(tickMs);
+    }
+    return { shown, emitted, played, doneAt: doneAt as number | null };
+  }
+
+  test("ends on schedule at eight frames per second by skipping frames", () => {
+    const slow = play(0, 125);
+    expect(slow.doneAt).toBe(1000);
+    expect(slow.shown).toEqual([0, 7.5, 15, 22.5, 30, 37.5, 45, 52.5, 60]);
+    expect(slow.emitted).toEqual([{ type: "explode", x: 30, y: 0, radius: 2 }]);
+    expect(slow.played).toEqual(["explode"]);
+  });
+
+  test("interpolates smoothly at high frame rates and still ends on time", () => {
+    const fast = play(0, 4);
+    expect(fast.doneAt).toBe(1000);
+    expect(fast.shown.length).toBe(251);
+    for (let i = 1; i < fast.shown.length; i++) {
+      expect((fast.shown[i] ?? 0) - (fast.shown[i - 1] ?? 0)).toBeCloseTo(
+        0.24,
+        6,
+      );
+    }
+  });
+
+  test("resumes mid replay and drops stale sounds after a stall", () => {
+    const late = play(400, 600, 1);
+    expect(late.shown[0]).toBe(24);
+    expect(late.doneAt).toBe(1000);
+    expect(late.emitted).toEqual([{ type: "explode", x: 30, y: 0, radius: 2 }]);
+    expect(late.played).toEqual([]);
   });
 });
 

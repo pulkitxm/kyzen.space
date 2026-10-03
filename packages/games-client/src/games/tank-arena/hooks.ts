@@ -32,10 +32,9 @@ import {
 } from "./model";
 import {
   buildReplay,
-  interpolateFrame,
-  replayCursor,
   replayDurationMs,
   replayOffset,
+  replayPlayer,
   type SceneContext,
   stateScene,
 } from "./replay";
@@ -46,7 +45,6 @@ export type SceneState = { handle: ArenaHandle | null; failed: boolean };
 const DOT_SPACING = 0.6;
 const MAX_DOTS = 160;
 const LOCK_RETRY_MS = 5000;
-const SOUND_WINDOW_MS = 300;
 
 function roundTimeOf(state: TankArenaState) {
   return tankArenaEngine.roundTimeMs?.(state) ?? 0;
@@ -238,23 +236,16 @@ export function useResolutionReplay(input: {
   const settled: ReplaySettlement = liveArrival
     ? { decided: true, done: null }
     : settleReplay(state, deadline, live, mounted.at);
-  const decided = settled.decided;
   const active =
     round !== null &&
     watched !== round &&
+    settled.decided &&
     settled.done !== round &&
     !scene.failed;
   const finish = useCallback(
     () => watchedRound.set(round),
     [watchedRound, round],
   );
-
-  const hold = useEffectEvent((handle: ArenaHandle) => {
-    const before = state.resolution?.before;
-    if (before) handle.setFrame(stateScene(before, ctx, planAngles(state)));
-    handle.setAim(null);
-    handle.setAirstrike(null);
-  });
 
   const start = useEffectEvent((handle: ArenaHandle) => {
     const data = buildReplay(state, ctx, planAngles(state));
@@ -265,43 +256,31 @@ export function useResolutionReplay(input: {
       roundTimeMs: roundTimeOf(state),
       durationMs: data.durationMs,
     });
-    let elapsed = offset ?? (liveArrival ? 0 : data.durationMs);
-    let emitted = replayCursor(elapsed, data.frames.length).index;
-    const first = data.frames[emitted] ?? data.frames[0];
-    if (first) handle.setFrame(first);
     handle.setAim(null);
     handle.setAirstrike(null);
     handle.setFocus({ mode: "action" });
-    handle.setTicker((dt) => {
-      elapsed += dt;
-      const cursor = replayCursor(elapsed, data.frames.length);
-      for (let i = emitted + 1; i <= cursor.index; i++) {
-        handle.emit(data.events[i] ?? []);
-        const frameTime = (i * 1000) / 60;
-        if (elapsed - frameTime < SOUND_WINDOW_MS) {
-          for (const sound of data.sounds[i] ?? []) sounds.play(sound);
-        }
-      }
-      emitted = Math.max(emitted, cursor.index);
-      const a = data.frames[cursor.index];
-      const b = data.frames[cursor.index + 1] ?? a;
-      if (a && b) handle.setFrame(interpolateFrame(a, b, cursor.t, ctx.width));
-      if (cursor.done) {
-        handle.setTicker(null);
-        finish();
-      }
-    });
+    const player = replayPlayer(
+      data,
+      offset ?? (liveArrival ? 0 : data.durationMs),
+      ctx.width,
+      {
+        frame: (frame) => handle.setFrame(frame),
+        events: (events) => handle.emit(events),
+        sound: (sound) => sounds.play(sound),
+        done: () => {
+          handle.setTicker(null);
+          finish();
+        },
+      },
+    );
+    handle.setTicker(player.advance);
     return () => handle.setTicker(null);
   });
 
   useEffect(() => {
     if (round === null || !active || !scene.handle) return;
-    if (!decided) {
-      hold(scene.handle);
-      return;
-    }
     return start(scene.handle);
-  }, [round, active, decided, scene.handle]);
+  }, [round, active, scene.handle]);
 
   return { active, round, skip: finish };
 }

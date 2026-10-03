@@ -503,6 +503,54 @@ export function interpolateFrame(
   };
 }
 
+const SOUND_WINDOW_MS = 300;
+
+export type ReplaySink = {
+  frame: (frame: SceneFrame) => void;
+  events: (events: SceneEvent[]) => void;
+  sound: (sound: SoundName) => void;
+  done: () => void;
+};
+
+export function replayPlayer(
+  data: Pick<Replay, "frames" | "events" | "sounds">,
+  startMs: number,
+  width: number,
+  sink: ReplaySink,
+) {
+  const count = data.frames.length;
+  let elapsed = Math.max(0, startMs);
+  let emitted = replayCursor(elapsed, count).index;
+  let finished = false;
+
+  const show = (cursor: ReturnType<typeof replayCursor>) => {
+    const a = data.frames[cursor.index];
+    const b = data.frames[cursor.index + 1] ?? a;
+    if (a && b) sink.frame(interpolateFrame(a, b, cursor.t, width));
+  };
+  show(replayCursor(elapsed, count));
+
+  return {
+    advance: (realMs: number) => {
+      if (finished) return;
+      elapsed += Math.max(0, realMs);
+      const cursor = replayCursor(elapsed, count);
+      for (let i = emitted + 1; i <= cursor.index; i++) {
+        sink.events(data.events[i] ?? []);
+        const frameTime = (i * 1000) / STEPS_PER_SECOND;
+        if (elapsed - frameTime >= SOUND_WINDOW_MS) continue;
+        for (const sound of data.sounds[i] ?? []) sink.sound(sound);
+      }
+      emitted = Math.max(emitted, cursor.index);
+      show(cursor);
+      if (cursor.done) {
+        finished = true;
+        sink.done();
+      }
+    },
+  };
+}
+
 export function replayOffset(input: {
   now: number;
   deadline: number | null | undefined;
