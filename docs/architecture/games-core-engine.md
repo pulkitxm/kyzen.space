@@ -2,7 +2,7 @@
 
 ## What this is / why it matters
 
-`@kyzen/games-core` is the **framework-agnostic brain** of every game in the lobby. It is now **logic-only**: it contains no React, no Express, no socket code - just the concrete engines and a registry that turns a single hand-written array of game definitions into all the lookups the rest of the monorepo needs. The *contracts* it builds on - the `GameEngine<State, Input>` interface, the `GameDefinition` shape, and every game's strict Zod schemas + inferred types - live in **`@kyzen/shared/types`**. games-core declares `@kyzen/shared` as its only dependency and imports those types/schemas from there (`packages/games-core/package.json:14`).
+`@kyzen/games-core` is the **framework-agnostic brain** of every game in the lobby. It is now **logic-only**: it contains no React, no Express, no socket code - just the concrete engines and a registry that turns a single hand-written array of game definitions into all the lookups the rest of the monorepo needs. The *contracts* it builds on - the `GameEngine<State, Input>` interface, the `GameDefinition` shape, and every game's strict Zod schemas + inferred types - live in **`@kyzen/shared/types`**. games-core depends on `@kyzen/shared`, whose types and schemas it imports, and on the deterministic `@kyzen/physics` package that simulated games use (`packages/games-core/package.json`).
 
 This document covers the **logic + registry layer** specifically:
 
@@ -193,6 +193,10 @@ Why this matters so much: the server treats `reduce()` as the **authority**. It 
 - It is reproducible - replaying the move log from the initial state yields the same state.
 - It is safe to run against client-supplied input - the engine's guards + schema parse reject anything malformed or illegal, so a malicious client cannot place two marks, move out of turn, overwrite a cell, or move after the game ends.
 - Client and server agree - the client can predict the next state with the same engine the server will authoritatively apply, so optimistic UI stays consistent.
+
+### Simulated rounds and `@kyzen/physics`
+
+An engine whose rounds play out as motion (Tank Arena today) keeps the same contract by simulating inside `reduce` and storing only rounded results. Tank Arena's `simulateRound(input)` builds a fresh `@kyzen/physics` `World` from the pre-resolution snapshot on every call, steps it at 1/60 s until everything rests (with step caps), and returns the final tanks plus the event log; `reduce` rounds positions to 4 decimals before persisting them. The resolution stores that snapshot and the revealed plans, so every client calls the same `simulateRound(resolutionInput(state))` and replays the identical frames, which a golden checksum test checks under Bun and Node. The board's aim guide (`previewTrajectory`) and the bots step the same `World` code with the same rules, so a guide is the real path until its first contact and bots predict their shots and jumps with the resolution's integrator. Simulation code may only use exactly specified math; see [./physics.md](./physics.md).
 
 ## Assembling a `GameDefinition`
 

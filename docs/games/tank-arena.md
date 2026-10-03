@@ -40,9 +40,9 @@ There are exactly two tanks, both free. Constants live in `TANKS`
 | | Bastion (heavy) | Kestrel (light) |
 | --- | --- | --- |
 | Max HP | 160 | 120 |
-| Mass (knockback divisor) | 1.8 | 0.75 |
+| Mass | 1.8 | 0.75 |
 | Collider (half width x half height) | 1.4 x 1.2 | 1.05 x 0.9 |
-| Max jump speed | 15 m/s | 23 m/s |
+| Max jump speed | 15 m/s (a 27 N s launch on 1.8 mass) | 23 m/s (a 17.25 N s launch on 0.75 mass) |
 | Max shot speed | 32 m/s | 34 m/s |
 | Accuracy | 55: spread +-3.0 deg, aim guide shows 40% of the arc | 85: spread +-0.8 deg, guide shows 85% of the arc |
 | Armor | takes 15% less damage | none |
@@ -62,7 +62,8 @@ There are exactly two tanks, both free. Constants live in `TANKS`
   normal and keeps 90% of its speed, and the projectile now belongs to Bastion's
   team. Allied projectiles pass through.
 - **Thruster Leap:** a jump at up to 1.4x Kestrel's max jump speed (32.2 m/s).
-  Kestrel is untouchable while airborne during the leap. On its first landing a
+  Kestrel is untouchable while airborne during the leap: shots, blasts, and
+  mines ignore it, but it still collects pickups. On its first landing a
   shockwave hits enemies within 3.5 m for 22 damage with knockback 18.
 
 **Cooldowns:** a cooldown of N means the special cannot be chosen in the next N
@@ -80,8 +81,9 @@ do not aim ignore them.
   with terrain, an enemy tank, an enemy shield bubble, or a mine, or after 6 s.
   25 damage, radius 3.0.
 - **Jump:** velocity `power * maxJumpSpeed` along the aimed angle, which must
-  point upward (10 to 170 degrees). Collects pickups it passes through,
-  including airborne ones.
+  point upward (10 to 170 degrees). The launch replaces any motion the tank
+  still had, so the same plan from the same position always takes exactly the
+  same path. Collects pickups it passes through, including airborne ones.
 - **Shield:** a bubble of radius `halfWidth + 0.9` for the whole resolution.
   Enemy projectiles detonate on its surface. It absorbs incoming damage up to the
   tank's shield capacity and halves knockback. Leftover capacity is lost at the
@@ -105,7 +107,21 @@ are removed when they fall below the water line.
   resolution from the round's seeded generator, so a locked plan never reveals
   the exact shot in advance.
 - The aim guide draws only part of the predicted arc: 40% for Bastion and 85%
-  for Kestrel.
+  for Kestrel. The arc comes from `previewTrajectory`, which builds the same
+  physics world as the resolution from the current state with only your plan
+  and no spread, and steps it with the same code. With zero spread the guide
+  is the real path step for step until the first contact (a hit, a landing, a
+  wall, or anything another player does that reaches you); accuracy only
+  decides how much of it is drawn. A jump guide runs until the tank comes to
+  rest. Siege Mortar shows its middle shell and Starfall its rocket up to the
+  split.
+- Dragging on the board aims in world space. The press point is converted to
+  world coordinates, and each pointer move carries it by the pointer's world
+  displacement, measured with one camera for both ends. The angle points from
+  the tank's center to that point and the power is its distance over 9 m. Zoom,
+  canvas size, device pixel ratio, and camera follow or shake therefore never
+  change the plan a drag produces. Angles are rounded to 0.1 degree and power
+  to 0.01, and the arrow keys change them in 2 degree and 0.05 steps.
 - Directions use deterministic polynomial sine and cosine (only `+ - * /`), never
   `Math.sin` or `Math.cos`, so every runtime computes the same trajectory.
 
@@ -120,8 +136,10 @@ are removed when they fall below the water line.
   Bastion armor 0.85x, own blasts 0.5x, Plating 0.5x. They stack
   multiplicatively and the result is rounded to a whole number.
 - **Shields** absorb damage before HP.
-- **Knockback:** velocity `knockback * falloff / mass` away from the blast
-  center, halved while shielded.
+- **Knockback:** an impulse of `knockback * falloff` (halved while shielded)
+  away from the blast center, so the tank's velocity changes by
+  `knockback * falloff / mass`: Bastion is pushed 2.4 times less than Kestrel by
+  the same blast. An impulse with an upward part lifts the tank off the ground.
 - HP can drop below zero during a resolution; it is clamped to 0 afterwards.
 
 | Source | Damage | Radius | Knockback |
@@ -133,6 +151,31 @@ are removed when they fall below the water line.
 | Mine | 40 | 2.5 | 12 |
 | Airstrike bomb | 28 | 2.6 | 10 |
 | Self-destruct | 20 | 3.2 | 10 |
+
+## Physics
+
+Every resolution runs in one `@kyzen/physics` world (see
+[physics.md](../architecture/physics.md)) built from the stored snapshot, at a
+fixed step of 1/60 s with gravity 30 m/s^2 and semi-implicit Euler
+integration.
+
+- **Tanks** are boxes with the collider sizes and masses above. They land
+  exactly on top faces (landings do not bounce), stop at walls and ceilings and
+  bounce off them with restitution 0.15, and slide with Coulomb friction 7/15,
+  a ground deceleration of 14 m/s^2. A tank stands on a platform as long as any
+  part of its base overlaps it, including the very edge. Tanks do not collide
+  with each other.
+- **Projectiles** are points swept along their whole step, so they never
+  tunnel through terrain, tanks, shields, walls, or mines at any speed. They
+  stop at the first of these they reach; allied tanks, shields, and walls are
+  ignored.
+- **Mines and pickups** are sensors that report every tank overlapping them
+  each step; mines also stop projectiles.
+- **Portals** wrap tanks and projectiles, and every collision and line of
+  sight check sees the nearest image across the seam.
+- **Determinism:** only exactly specified arithmetic is used, so the server,
+  every browser, and the replay compute bit-identical frames. Golden checksums
+  of a scripted match and of repeated jumps are checked under Bun and Node.
 
 ## Rounds and timers
 
@@ -289,8 +332,9 @@ cause (`destroyed`, `fell`, or `forfeit`).
 ## Bots
 
 `botMove(state, role, difficulty)` is pure and deterministic: it seeds its own
-generator from the game seed, round, and role, and uses the same projectile
-integrator as the simulation.
+generator from the game seed, round, and role, and predicts shots and jumps in
+physics worlds with the same step, collision, and projectile rules as the
+resolution (against enemies' current positions, without shields or walls).
 
 - **Easy:** picks Bastion or Kestrel at random. In 15% of rounds it jumps
   randomly. Otherwise it fires a missile at the nearest enemy along the analytic
@@ -324,7 +368,7 @@ integrator as the simulation.
 
 ```ts
 {
-  version: 1;
+  version: 2;
   seed: number;
   round: number;
   phase: "select" | "plan" | "finished";
@@ -359,6 +403,8 @@ integrator as the simulation.
 }
 ```
 
+- `version` is 2. Version 1 states came from the earlier physics and no longer
+  replay bit for bit, so they are not accepted.
 - `round` is 0 during tank select and counts up to 40.
 - `submitted` lists the roles that already selected or locked this round.
 - `plans` holds this round's hidden plans.
@@ -452,11 +498,29 @@ What remains is mostly the bots' own aim search: a hard bot takes about 1 to
 2.5 ms per move, so 64 hard bots spend roughly 90 to 160 ms of synchronous CPU
 per round, and the public state is about 0.53 KB per tank.
 
-The engine alone (`packages/games-core/tests/tank-arena-determinism.test.ts`,
-three rounds per size, same machine) resolves a round of 128 tanks in about
-3.5 ms on average (5.6 ms worst) with a 67.7 KB public state, and a round of 256
-tanks in about 6 to 7.5 ms on average (10.6 to 15.6 ms worst) with a 135.6 KB
-public state.
+The engine alone, measured before and after the move to `@kyzen/physics`, with
+the procedure of the performance test in
+`packages/games-core/tests/tank-arena-determinism.test.ts`: N tanks in two
+teams, tank select by normal bots, then three rounds in which every tank locks a
+hard bot's move. "Resolve" is the `reduce` call that resolves a round and "Hard
+bot" is one `botMove` call. Values are medians of three runs, averaged over two
+interleaved before and after passes on one Apple Silicon laptop under Bun 1.4.2;
+the machine was shared, so treat them as approximate.
+
+| Tanks | Resolve avg ms | Resolve max ms | Hard bot avg ms | Hard bot max ms | Public state KB |
+| --- | --- | --- | --- | --- | --- |
+| 2 | 0.10 to 0.12 | 0.17 to 0.17 | 1.25 to 1.69 | 2.29 to 3.04 | 1.4 |
+| 4 | 0.08 to 0.10 | 0.14 to 0.15 | 0.73 to 0.84 | 1.96 to 2.17 | 2.4 |
+| 8 | 0.18 to 0.15 | 0.35 to 0.23 | 0.93 to 0.94 | 2.60 to 2.45 | 4.6 |
+| 16 | 0.29 to 0.23 | 0.43 to 0.37 | 1.03 to 0.92 | 2.82 to 2.49 | 8.6 |
+| 32 | 0.50 to 0.44 | 0.76 to 0.71 | 1.05 to 0.93 | 3.33 to 2.73 | 17.2 |
+| 64 | 0.98 to 0.84 | 1.52 to 1.28 | 1.01 to 0.91 | 2.92 to 2.58 | 33.8 |
+| 128 | 2.05 to 1.55 | 3.32 to 2.49 | 1.02 to 0.92 | 3.06 to 2.74 | 67.6 |
+| 256 | 4.01 to 3.56 | 6.22 to 5.29 | 1.02 to 0.94 | 3.40 to 3.24 | 135.6 |
+
+Resolution is as fast or faster from 8 tanks up, and a hard bot still takes
+about 1 ms per move on average (up to about 3 ms) from 8 tanks up. In 2 and 4
+tank matches hard bots are slower, by about 0.1 to 0.4 ms per move.
 
 **Larger human counts** were not measured end to end. What is known: each
 human lock is its own transaction and its own broadcast of the full public
