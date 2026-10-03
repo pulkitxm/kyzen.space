@@ -1,6 +1,6 @@
 "use client";
 
-import { listGameMeta } from "@kyzen/games-core";
+import { getDefinition, listGameMeta } from "@kyzen/games-core";
 import { CHAT_EVENTS, TIC_TAC_TOE } from "@kyzen/shared/constants";
 import type { ConversationJson, GameType } from "@kyzen/shared/types";
 import { useRouter } from "next/navigation";
@@ -22,9 +22,11 @@ export function GameLauncher({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [selectedGameType, setSelectedGameType] = useState(gameType);
 
   const gameName =
-    listGameMeta().find((m) => m.type === gameType)?.name ?? "Game";
+    listGameMeta().find((m) => m.type === selectedGameType)?.name ?? "Game";
+  const multiplayer = getDefinition(selectedGameType).engine.minPlayers > 2;
   const isGroup = conversation.kind === "group";
   const others = conversation.members.filter((m) => m.id !== userId);
 
@@ -40,7 +42,7 @@ export function GameLauncher({
         CHAT_EVENTS.createGameInConversation,
         {
           conversationId: conversation.id,
-          gameType,
+          gameType: selectedGameType,
           seatingMode,
           challengedUserId,
         },
@@ -64,6 +66,19 @@ export function GameLauncher({
           />
           <GlassPane className="absolute bottom-full left-0 z-20 mb-2 w-60 rounded-xl border border-border bg-card p-1 shadow-xl">
             <div className="px-2 py-1 font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
+              Choose a game
+            </div>
+            {listGameMeta().map((meta) => (
+              <button
+                key={meta.type}
+                type="button"
+                onClick={() => setSelectedGameType(meta.type)}
+                className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm outline-none hover:bg-surface-overlay ${selectedGameType === meta.type ? "bg-surface-overlay text-primary" : ""}`}
+              >
+                {meta.name}
+              </button>
+            ))}
+            <div className="mt-1 border-border border-t px-2 py-1 font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
               {gameName}
             </div>
             <button
@@ -73,16 +88,17 @@ export function GameLauncher({
             >
               Open game · anyone can join
             </button>
-            {others.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => void create("challenge", m.id)}
-                className="block w-full truncate rounded-lg px-2 py-1.5 text-left text-sm outline-none hover:bg-surface-overlay"
-              >
-                Challenge {m.displayName ?? m.username}
-              </button>
-            ))}
+            {!multiplayer &&
+              others.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => void create("challenge", m.id)}
+                  className="block w-full truncate rounded-lg px-2 py-1.5 text-left text-sm outline-none hover:bg-surface-overlay"
+                >
+                  Challenge {m.displayName ?? m.username}
+                </button>
+              ))}
           </GlassPane>
         </>
       ) : null}

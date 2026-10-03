@@ -386,9 +386,9 @@ export function CarFootballGameClient({
           const directionX = Math.cos(own.yaw);
           const directionZ = Math.sin(own.yaw);
           target.set(
-            own.position.x - directionX * 13,
+            THREE.MathUtils.clamp(own.position.x - directionX * 13, -36, 36),
             own.position.z + 8,
-            own.position.y - directionZ * 13,
+            THREE.MathUtils.clamp(own.position.y - directionZ * 13, -22, 22),
           );
           camera.position.lerp(target, 0.08);
           camera.lookAt(
