@@ -462,13 +462,29 @@ export function ReplayBar({
 }) {
   return (
     <div
-      className={`${PANEL} pointer-events-auto flex items-center gap-3 px-3 py-2`}
+      className={`${PANEL} pointer-events-auto flex items-center gap-4 px-4 py-2.5`}
+      style={{
+        background:
+          "linear-gradient(135deg, rgba(15,23,42,0.92), rgba(30,41,59,0.88))",
+        borderColor: "rgba(239,68,68,0.3)",
+      }}
     >
-      <p className="font-medium text-sm">Round {round} in motion</p>
+      <div className="flex items-center gap-2">
+        <span
+          className="size-2.5 animate-pulse rounded-full bg-red-500"
+          style={{ boxShadow: "0 0 8px rgba(239,68,68,0.6)" }}
+        />
+        <span className="font-black text-red-400 text-xs uppercase tracking-wider">
+          Live
+        </span>
+      </div>
+      <p className="font-bold text-sm">
+        Round <span className="tabular-nums">{round}</span> in motion
+      </p>
       <button
         type="button"
         onClick={onSkip}
-        className="flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1.5 font-semibold text-xs outline-none transition hover:bg-white/25 focus-visible:ring-2 focus-visible:ring-sky-300"
+        className="ml-auto flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-4 py-1.5 font-bold text-xs outline-none transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-sky-300"
       >
         <FaForwardFast aria-hidden="true" /> Skip
       </button>
