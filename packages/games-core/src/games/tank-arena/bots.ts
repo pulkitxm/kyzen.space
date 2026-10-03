@@ -1,14 +1,12 @@
-import { boxDistance, boxTouchesCircle } from "@kyzen/physics";
+import { boxDistance } from "@kyzen/physics";
 import type {
   BotDifficulty,
   TankAction,
   TankArenaMove,
-  TankArenaPickup,
   TankArenaState,
   TankArenaTank,
   TankKind,
 } from "@kyzen/shared/types";
-import { lineOfSight } from "./arena";
 import {
   BLASTS,
   type BlastKind,
@@ -16,17 +14,14 @@ import {
   GRAVITY,
   JUMP_MAX_ANGLE,
   JUMP_MIN_ANGLE,
-  LEAP_SPEED_FACTOR,
   MIN_POWER,
   MINE_RADIUS,
   MODULE_WIDTH,
   MORTAR_FAN_DEG,
-  PICKUP_RADIUS,
   PLATING_FACTOR,
   SELF_DAMAGE_FACTOR,
   TANK_KINDS,
   TANKS,
-  WATER_Y,
 } from "./constants";
 import {
   arenaWidth,
@@ -46,14 +41,20 @@ import {
   wrapDelta,
 } from "./math";
 import {
-  type BodyState,
-  blastFactor,
-  muzzleDistance,
-  stepBody,
+  type ArenaBody,
+  type ArenaWorld,
+  addPickup,
+  addTank,
+  addTarget,
+  arenaWorld,
+  blastFalloff,
+  jumpSpeed,
+  launchTank,
+  lineOfSight,
+  muzzlePoint,
   type TraceHit,
-  type TraceTarget,
-  traceProjectile,
-} from "./simulate";
+  traceShot,
+} from "./world";
 
 type State = TankArenaState;
 type Move = TankArenaMove;
@@ -65,7 +66,9 @@ type Context = {
   me: LiveTank;
   team: string;
   enemies: LiveTank[];
-  targets: TraceTarget[];
+  shots: ArenaWorld;
+  jumps: ArenaWorld;
+  pickups: ArenaBody[];
   rng: Rng;
 };
 
@@ -103,13 +106,15 @@ function contextFor(state: State, index: number, rng: Rng): Context | null {
         live(tank) && state.seats[i]?.team !== team,
     )
     .sort((a, b) => distanceSq(width, me, a) - distanceSq(width, me, b));
-  const targets = enemies.slice(0, TARGET_LIMIT).map((tank) => ({
-    x: tank.x,
-    y: tank.y,
-    hw: TANKS[tank.kind].halfWidth,
-    hh: TANKS[tank.kind].halfHeight,
-  }));
-  return { state, width, me, team, enemies, targets, rng };
+  const shots = arenaWorld(state.modules);
+  enemies.slice(0, TARGET_LIMIT).forEach((tank, i) => {
+    addTarget(shots, tank.kind, tank.x, tank.y, i);
+  });
+  const jumps = arenaWorld(state.modules);
+  const pickups = state.pickups.map((pickup, i) =>
+    addPickup(jumps, pickup.x, pickup.y, i),
+  );
+  return { state, width, me, team, enemies, shots, jumps, pickups, rng };
 }
 
 function lock(state: State, aim: Aim): Move {
@@ -143,15 +148,13 @@ function impactOf(ctx: Context, hit: TraceHit, blast: BlastKind): Impact {
     const dy = enemy.y - hit.y;
     miss = Math.min(miss, Math.sqrt(dx * dx + dy * dy));
     if (hit.kind === "water") continue;
-    const factor = blastFactor(
-      ctx.width,
+    const factor = blastFalloff(
+      ctx.shots,
       hit.x,
       hit.y,
       spec.radius,
-      enemy.x,
-      enemy.y,
-      enemySpec.halfWidth,
-      enemySpec.halfHeight,
+      enemy,
+      enemy.kind,
     );
     if (factor <= 0) continue;
     let dealt = spec.damage * factor * (1 - enemySpec.armor);
@@ -161,15 +164,13 @@ function impactOf(ctx: Context, hit: TraceHit, blast: BlastKind): Impact {
   }
   if (hit.kind === "water") return { damage: 0, miss: miss + MISS_CAP };
   const mySpec = TANKS[ctx.me.kind];
-  const self = blastFactor(
-    ctx.width,
+  const self = blastFalloff(
+    ctx.shots,
     hit.x,
     hit.y,
     spec.radius,
-    ctx.me.x,
-    ctx.me.y,
-    mySpec.halfWidth,
-    mySpec.halfHeight,
+    ctx.me,
+    ctx.me.kind,
   );
   if (self > 0)
     damage -=
@@ -186,19 +187,14 @@ function traceFrom(
   ctx: Context,
   angle: number,
   speed: number,
-  stopAtApex: boolean,
+  splitsAtApex: boolean,
 ): TraceHit {
-  const distance = muzzleDistance(ctx.me.kind);
-  const c = dcos(angle);
-  const s = dsin(angle);
-  return traceProjectile(
-    ctx.width,
-    ctx.me.x + c * distance,
-    ctx.me.y + s * distance,
-    c * speed,
-    s * speed,
-    ctx.targets,
-    { stopAtApex },
+  return traceShot(
+    ctx.shots,
+    muzzlePoint(ctx.me.kind, ctx.me.x, ctx.me.y, angle),
+    dcos(angle) * speed,
+    dsin(angle) * speed,
+    { splitsAtApex },
   );
 }
 
@@ -215,14 +211,9 @@ function volleyOf(ctx: Context, aim: Aim): Impact[] {
   return CLUSTER_OFFSETS.map((offset) =>
     impactOf(
       ctx,
-      traceProjectile(
-        ctx.width,
-        rocket.x,
-        rocket.y,
-        rocket.vx + offset,
-        rocket.vy,
-        ctx.targets,
-      ),
+      traceShot(ctx.shots, rocket, rocket.vx + offset, rocket.vy, {
+        age: rocket.steps,
+      }),
       "bomblet",
     ),
   );
@@ -317,7 +308,7 @@ function enemyThreat(ctx: Context): number {
   for (const enemy of ctx.enemies) {
     if (distanceSq(ctx.width, ctx.me, enemy) > 45 * 45) continue;
     const ex = ctx.me.x + wrapDelta(ctx.me.x, enemy.x, ctx.width);
-    if (lineOfSight(ctx.me.x, ctx.me.y, ex, enemy.y)) threat += 22;
+    if (lineOfSight(ctx.shots, ctx.me.x, ctx.me.y, ex, enemy.y)) threat += 22;
   }
   return threat;
 }
@@ -325,36 +316,56 @@ function enemyThreat(ctx: Context): number {
 function mostDangerous(ctx: Context): LiveTank | null {
   for (const enemy of ctx.enemies) {
     const ex = ctx.me.x + wrapDelta(ctx.me.x, enemy.x, ctx.width);
-    if (lineOfSight(ctx.me.x, ctx.me.y, ex, enemy.y)) return enemy;
+    if (lineOfSight(ctx.shots, ctx.me.x, ctx.me.y, ex, enemy.y)) return enemy;
   }
   return null;
 }
 
-function landsSafely(body: BodyState, width: number, steps: number): boolean {
+function jumpFrom(ctx: Context, angle: number, speed: number): ArenaBody {
+  const body = addTank(
+    ctx.jumps,
+    ctx.me.kind,
+    { x: ctx.me.x, y: ctx.me.y, vx: 0, vy: 0 },
+    0,
+    0,
+  );
+  launchTank(ctx.jumps, body, angle, speed, false);
+  return body;
+}
+
+function landsSafely(world: ArenaWorld, body: ArenaBody, steps: number) {
   for (let i = 0; i < steps; i++) {
-    stepBody(body, width);
-    if (body.y < WATER_Y) return false;
+    world.step();
+    if (body.removed) return false;
     if (body.supported && body.vx === 0) return true;
   }
   return false;
 }
 
-function jumpToPickup(ctx: Context, speedFactor: number): Aim | null {
-  const spec = TANKS[ctx.me.kind];
-  const pickups = [...ctx.state.pickups]
-    .map((pickup) => ({
-      pickup,
+function landingOf(
+  ctx: Context,
+  angle: number,
+  speed: number,
+): { x: number; y: number } | null {
+  const body = jumpFrom(ctx, angle, speed);
+  const safe = landsSafely(ctx.jumps, body, 240);
+  ctx.jumps.destroyBody(body);
+  return safe ? { x: body.x, y: body.y } : null;
+}
+
+function jumpToPickup(ctx: Context, leap: boolean): Aim | null {
+  const pickups = ctx.state.pickups
+    .map((pickup, index) => ({
+      index,
       distance: Math.abs(wrapDelta(ctx.me.x, pickup.x, ctx.width)),
     }))
     .filter((entry) => entry.distance < 24)
     .sort((a, b) => a.distance - b.distance)
     .slice(0, 2);
-  for (const { pickup } of pickups) {
+  for (const { index } of pickups) {
     for (let angle = 20; angle <= 160; angle += 10)
       for (const power of [0.35, 0.5, 0.65, 0.8, 1]) {
-        if (
-          reaches(ctx, pickup, angle, power * spec.maxJumpSpeed * speedFactor)
-        )
+        if (reaches(ctx, index, angle, jumpSpeed(ctx.me.kind, power, leap)))
           return { action: "jump", angle, power };
       }
   }
@@ -363,39 +374,31 @@ function jumpToPickup(ctx: Context, speedFactor: number): Aim | null {
 
 function reaches(
   ctx: Context,
-  pickup: TankArenaPickup,
+  index: number,
   angle: number,
   speed: number,
 ): boolean {
-  const spec = TANKS[ctx.me.kind];
-  const body: BodyState = {
-    x: ctx.me.x,
-    y: ctx.me.y,
-    vx: dcos(angle) * speed,
-    vy: dsin(angle) * speed,
-    hw: spec.halfWidth,
-    hh: spec.halfHeight,
-    supported: false,
-  };
-  for (let i = 0; i < 240; i++) {
-    stepBody(body, ctx.width);
-    if (body.y < WATER_Y) return false;
-    const px = body.x + wrapDelta(body.x, pickup.x, ctx.width);
-    if (
-      boxTouchesCircle(
-        body.x,
-        body.y,
-        body.hw,
-        body.hh,
-        px,
-        pickup.y,
-        PICKUP_RADIUS,
+  const target = ctx.pickups[index];
+  const body = jumpFrom(ctx, angle, speed);
+  try {
+    for (let i = 0; i < 240; i++) {
+      const events = ctx.jumps.step();
+      if (body.removed) return false;
+      if (
+        events.some(
+          (event) =>
+            event.type === "sensor" &&
+            event.body === body &&
+            event.sensor === target,
+        )
       )
-    )
-      return landsSafely(body, ctx.width, 150);
-    if (body.supported && body.vx === 0) return false;
+        return landsSafely(ctx.jumps, body, 150);
+      if (body.supported && body.vx === 0) return false;
+    }
+    return false;
+  } finally {
+    ctx.jumps.destroyBody(body);
   }
-  return false;
 }
 
 function nearMine(ctx: Context): boolean {
@@ -417,21 +420,10 @@ function nearMine(ctx: Context): boolean {
 }
 
 function escapeJump(ctx: Context): Aim | null {
-  const spec = TANKS[ctx.me.kind];
   for (const angle of [60, 120, 45, 135, 75, 105])
-    for (const power of [0.7, 0.5, 0.9]) {
-      const body: BodyState = {
-        x: ctx.me.x,
-        y: ctx.me.y,
-        vx: dcos(angle) * power * spec.maxJumpSpeed,
-        vy: dsin(angle) * power * spec.maxJumpSpeed,
-        hw: spec.halfWidth,
-        hh: spec.halfHeight,
-        supported: false,
-      };
-      if (landsSafely(body, ctx.width, 240))
+    for (const power of [0.7, 0.5, 0.9])
+      if (landingOf(ctx, angle, jumpSpeed(ctx.me.kind, power, false)))
         return { action: "jump", angle, power };
-    }
   return null;
 }
 
@@ -454,27 +446,17 @@ function easyPlan(ctx: Context): Move {
 }
 
 function reposition(ctx: Context, current: Scored | null): Aim | null {
-  const spec = TANKS[ctx.me.kind];
   let best: Scored | null = null;
   const bar = (current?.score ?? -Infinity) + REPOSITION_GAIN;
   for (const angle of [30, 55, 80, 100, 125, 150])
     for (const power of [0.45, 0.7, 1]) {
-      const speed = power * spec.maxJumpSpeed;
-      const body: BodyState = {
-        x: ctx.me.x,
-        y: ctx.me.y,
-        vx: dcos(angle) * speed,
-        vy: dsin(angle) * speed,
-        hw: spec.halfWidth,
-        hh: spec.halfHeight,
-        supported: false,
-      };
-      if (!landsSafely(body, ctx.width, 240)) continue;
-      const shot = bestShot(
-        { ...ctx, me: { ...ctx.me, x: body.x, y: body.y } },
-        24,
-        0,
+      const landing = landingOf(
+        ctx,
+        angle,
+        jumpSpeed(ctx.me.kind, power, false),
       );
+      if (!landing) continue;
+      const shot = bestShot({ ...ctx, me: { ...ctx.me, ...landing } }, 24, 0);
       if (shot && shot.score > bar && (!best || shot.score > best.score))
         best = { ...shot, action: "jump", angle, power };
     }
@@ -487,7 +469,7 @@ function normalPlan(ctx: Context): Move {
   if (me.hp < spec.maxHp * 0.35 && mostDangerous(ctx))
     return lock(state, { action: "shield", angle: 90, power: 0.5 });
   if (state.pickups.length > 0 && rng() < 0.2) {
-    const jump = jumpToPickup(ctx, 1);
+    const jump = jumpToPickup(ctx, false);
     if (jump) return lock(state, jump);
   }
   const best = bestShot(ctx, 32, 0);
@@ -536,10 +518,10 @@ function hardPlan(ctx: Context): Move {
   }
   const best = bestShot(ctx, 128, 4);
   if (state.pickups.length > 0 && (!danger || !best || best.damage < 8)) {
-    const jump = jumpToPickup(ctx, 1);
+    const jump = jumpToPickup(ctx, false);
     if (jump) return lock(state, jump);
     if (me.kind === "kestrel" && canUse(state, me.role, "specialB")) {
-      const leap = jumpToPickup(ctx, LEAP_SPEED_FACTOR);
+      const leap = jumpToPickup(ctx, true);
       if (leap) return lock(state, { ...leap, action: "specialB" });
     }
   }

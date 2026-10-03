@@ -155,7 +155,7 @@ export type TankArenaResolution = z.infer<typeof resolutionSchema>;
 
 export const tankArenaStateSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
     secret: z.array(word).length(TANK_ARENA_SECRET_WORDS).optional(),
     round: roundNumber,
     phase: z.enum(["select", "plan", "finished"]),

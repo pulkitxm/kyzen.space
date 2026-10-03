@@ -23,6 +23,7 @@ const DEFAULT_REST_SPEED = 0.05;
 const DEFAULT_REST_STEPS = 20;
 const POINT: Shape = { type: "point" };
 const NO_BODIES: readonly never[] = [];
+const NO_EVENTS: readonly never[] = [];
 
 export type WorldConfig = {
   terrain: Terrain;
@@ -46,11 +47,14 @@ function accepts<T>(
   );
 }
 
-function reachOf(shape: Shape): number {
-  if (shape.type === "box") return shape.halfWidth;
+function extentOf(shape: Shape, axis: "x" | "y"): number {
+  if (shape.type === "box")
+    return axis === "x" ? shape.halfWidth : shape.halfHeight;
   if (shape.type === "circle") return shape.radius;
   if (shape.type === "segment")
-    return Math.max(Math.abs(shape.x0), Math.abs(shape.x1));
+    return axis === "x"
+      ? Math.max(Math.abs(shape.x0), Math.abs(shape.x1))
+      : Math.max(Math.abs(shape.y0), Math.abs(shape.y1));
   return 0;
 }
 
@@ -66,6 +70,9 @@ export class World<T> {
   private readonly bullets: Body<T>[] = [];
   private readonly statics: Body<T>[] = [];
   private readonly grid: Body<T>[][];
+  private readonly doomed: Body<T>[] = [];
+  private readonly followers: Body<T>[] = [];
+  private events: PhysicsEvent<T>[] | null = null;
   private gridDirty = false;
   private reach = 0;
   private sensors = 0;
@@ -98,14 +105,17 @@ export class World<T> {
     if (def.kind !== "static" && !(mass > 0))
       throw new Error("Moving bodies need a positive mass");
     const follow = def.kind === "static" ? (def.follow ?? null) : null;
+    const shape: Shape = def.kind === "bullet" ? POINT : def.shape;
     const body: Body<T> = {
       id: this.nextId++,
       kind: def.kind,
-      shape: def.kind === "bullet" ? POINT : def.shape,
+      shape,
       mass,
       invMass: mass > 0 ? 1 / mass : 0,
       sensor: def.kind === "static" && (def.sensor ?? false),
       follow,
+      extentX: extentOf(shape, "x"),
+      extentY: extentOf(shape, "y"),
       x: this.wrapPosition(follow ? follow.x : def.x),
       y: follow ? follow.y : def.y,
       vx: def.kind === "static" ? 0 : (def.vx ?? 0),
@@ -133,10 +143,11 @@ export class World<T> {
       body.supported = this.isSupported(body);
     } else {
       this.statics.push(body);
+      if (body.follow) this.followers.push(body);
       if (body.sensor) this.sensors += 1;
     }
     body.cell = this.terrain.cellIndex(body.x);
-    this.reach = Math.max(this.reach, reachOf(body.shape));
+    this.reach = Math.max(this.reach, body.extentX);
     this.gridDirty = true;
     return body;
   }
@@ -152,26 +163,26 @@ export class World<T> {
     if (body.kind === "dynamic") remove(this.dynamics, body);
     else {
       remove(this.statics, body);
+      if (body.follow) remove(this.followers, body);
       if (body.sensor) this.sensors -= 1;
     }
     this.gridDirty = true;
-    for (const other of this.statics.filter((item) => item.follow === body))
+    for (const other of this.followers.filter((item) => item.follow === body))
       this.destroyBody(other);
   }
 
-  step(): PhysicsEvent<T>[] {
-    const events: PhysicsEvent<T>[] = [];
-    const sunk: Body<T>[] = [];
+  step(): readonly PhysicsEvent<T>[] {
     for (const body of this.dynamics)
-      if (!body.sleeping && this.integrate(body, events)) sunk.push(body);
-    for (const body of sunk) this.destroyBody(body);
+      if (!body.sleeping && this.integrate(body)) this.doomed.push(body);
+    this.removeDoomed();
     this.syncGrid();
-    const lost: Body<T>[] = [];
     for (const bullet of this.bullets)
-      if (this.moveBullet(bullet, events)) lost.push(bullet);
-    for (const body of lost) this.destroyBody(body);
+      if (this.moveBullet(bullet)) this.doomed.push(bullet);
+    this.removeDoomed();
     if (this.sensors > 0)
-      for (const body of this.dynamics) this.senseOverlaps(body, events);
+      for (const body of this.dynamics) this.senseOverlaps(body);
+    const events = this.events ?? NO_EVENTS;
+    this.events = null;
     return events;
   }
 
@@ -241,6 +252,17 @@ export class World<T> {
     return this.terrain.wrap ? wrapX(x, this.terrain.width) : x;
   }
 
+  private emit(event: PhysicsEvent<T>): void {
+    if (this.events) this.events.push(event);
+    else this.events = [event];
+  }
+
+  private removeDoomed(): void {
+    if (this.doomed.length === 0) return;
+    for (const body of this.doomed) this.destroyBody(body);
+    this.doomed.length = 0;
+  }
+
   private wake(body: Body<T>): void {
     body.sleeping = false;
     body.restSteps = 0;
@@ -255,7 +277,7 @@ export class World<T> {
     );
   }
 
-  private integrate(body: Body<T>, events: PhysicsEvent<T>[]): boolean {
+  private integrate(body: Body<T>): boolean {
     const shape = body.shape as BoxShape;
     const airborne = !body.supported;
     const gravity = this.gravity * body.gravityScale;
@@ -271,12 +293,12 @@ export class World<T> {
     body.supported = false;
     const dy = body.vy * this.dt;
     if (dy !== 0) this.moveY(body, shape, dy);
-    this.wrapBody(body, events);
+    this.wrapBody(body);
     if (body.y < this.killY) {
-      events.push({ type: "fall", body });
+      this.emit({ type: "fall", body });
       return true;
     }
-    if (airborne && body.supported) events.push({ type: "land", body });
+    if (airborne && body.supported) this.emit({ type: "land", body });
     if (
       body.supported &&
       body.vx * body.vx + body.vy * body.vy < this.restSpeed * this.restSpeed
@@ -327,15 +349,15 @@ export class World<T> {
     }
   }
 
-  private wrapBody(body: Body<T>, events: PhysicsEvent<T>[]): void {
+  private wrapBody(body: Body<T>): void {
     if (!this.terrain.wrap) return;
     if (body.x >= 0 && body.x < this.terrain.width) return;
     const fromX = body.x;
     body.x = wrapX(body.x, this.terrain.width);
-    events.push({ type: "wrap", body, fromX, toX: body.x });
+    this.emit({ type: "wrap", body, fromX, toX: body.x });
   }
 
-  private moveBullet(body: Body<T>, events: PhysicsEvent<T>[]): boolean {
+  private moveBullet(body: Body<T>): boolean {
     body.vy -= this.gravity * body.gravityScale * this.dt;
     const dx = body.vx * this.dt;
     const dy = body.vy * this.dt;
@@ -354,7 +376,7 @@ export class World<T> {
       this.normalAt(x, y, dx, dy);
       body.x = this.wrapPosition(x);
       body.y = y;
-      events.push({
+      this.emit({
         type: "hit",
         body,
         other: this.hitBody,
@@ -367,9 +389,9 @@ export class World<T> {
     }
     body.x += dx;
     body.y += dy;
-    this.wrapBody(body, events);
+    this.wrapBody(body);
     if (body.y < this.killY) {
-      events.push({ type: "fall", body });
+      this.emit({ type: "fall", body });
       return true;
     }
     return false;
@@ -383,7 +405,7 @@ export class World<T> {
       body.cell = cell;
       this.gridDirty = true;
     }
-    for (const body of this.statics) {
+    for (const body of this.followers) {
       if (!body.follow) continue;
       body.x = body.follow.x;
       body.y = body.follow.y;
@@ -434,13 +456,23 @@ export class World<T> {
     let best = this.terrain.cast(x0, y0, dx, dy);
     this.hitBody = null;
     if (this.all.length === this.bullets.length) return best;
-    const lo = Math.min(x0, x0 + dx) - this.reach;
-    const hi = Math.max(x0, x0 + dx) + this.reach;
+    const left = Math.min(x0, x0 + dx);
+    const right = Math.max(x0, x0 + dx);
+    const bottom = Math.min(y0, y0 + dy);
+    const top = Math.max(y0, y0 + dy);
+    const lo = left - this.reach;
+    const hi = right + this.reach;
     const last = this.lastCell(lo, hi);
     for (let k = this.firstCell(lo, hi); k <= last; k++) {
       for (const body of this.cellAt(k)) {
-        if (!accepts(layer, mask, group, body)) continue;
+        if (
+          body.y - body.extentY > top ||
+          body.y + body.extentY < bottom ||
+          !accepts(layer, mask, group, body)
+        )
+          continue;
         const bx = this.terrain.wrap ? x0 + this.delta(x0, body.x) : body.x;
+        if (bx - body.extentX > right || bx + body.extentX < left) continue;
         const t = this.sweepBody(body, bx, x0, y0, dx, dy);
         if (t >= 0 && (best < 0 || t < best)) {
           best = t;
@@ -573,7 +605,7 @@ export class World<T> {
             : 0;
   }
 
-  private senseOverlaps(body: Body<T>, events: PhysicsEvent<T>[]): void {
+  private senseOverlaps(body: Body<T>): void {
     const shape = body.shape as BoxShape;
     const lo = body.x - shape.halfWidth - this.reach;
     const hi = body.x + shape.halfWidth + this.reach;
@@ -607,7 +639,7 @@ export class World<T> {
                 other.shape.halfWidth,
                 other.shape.halfHeight,
               );
-        if (touching) events.push({ type: "sensor", body, sensor: other });
+        if (touching) this.emit({ type: "sensor", body, sensor: other });
       }
     }
   }

@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { datan2, dcos, dsin } from "../src/games/tank-arena/math";
-import { traceProjectile } from "../src/games/tank-arena/simulate";
+import { spreadFor } from "../src/games/tank-arena/simulate";
+import {
+  addTank,
+  addTarget,
+  arenaWorld,
+  traceShot,
+} from "../src/games/tank-arena/world";
 import {
   aimVector,
   BLASTS,
@@ -10,13 +16,24 @@ import {
   GRAVITY,
   MIN_FALLOFF,
   previewTrajectory,
+  type RoundInput,
+  resolutionInput,
   type SimEvent,
   STEP,
   simulateRound,
   TANKS,
   WATER_Y,
 } from "../src/index";
-import { input, plan, run, started, tank } from "./tank-arena-fixtures";
+import {
+  input,
+  lock,
+  lockAll,
+  plan,
+  run,
+  started,
+  tank,
+  withTanks,
+} from "./tank-arena-fixtures";
 
 function eventsOf<T extends SimEvent["type"]>(
   events: SimEvent[],
@@ -121,12 +138,12 @@ describe("missiles", () => {
 
   test("never tunnel through thin terrain or tanks at any speed", () => {
     for (const speed of [40, 600, 6000]) {
-      const wall = traceProjectile(64, 20, 3, -speed, 0, []);
+      const world = arenaWorld(2);
+      const wall = traceShot(world, { x: 20, y: 3 }, -speed, 0);
       expect(wall.kind).toBe("terrain");
       expect(wall.x).toBeCloseTo(3, 1);
-      const target = traceProjectile(64, 20, 1.2, -speed, 0, [
-        { x: 10, y: 0.9, hw: 1.05, hh: 0.9 },
-      ]);
+      addTarget(world, "kestrel", 10, 0.9, 0);
+      const target = traceShot(world, { x: 20, y: 1.2 }, -speed, 0);
       expect(target.kind).toBe("target");
       expect(target.x).toBeCloseTo(11.05, 1);
     }
@@ -145,19 +162,155 @@ describe("missiles", () => {
   });
 });
 
+function pathOf(frames: readonly Frame[], role: string) {
+  return frames.map((frame) => {
+    const t = frame.tanks.find((item) => item.role === role);
+    return { x: t?.x, y: t?.y };
+  });
+}
+
+function framesOf(round: RoundInput): Frame[] {
+  const frames: Frame[] = [];
+  simulateRound(round, (frame) => frames.push(frame));
+  return frames;
+}
+
 describe("jumps", () => {
-  test("land on platforms and slide to rest", () => {
+  test("land on every kind of platform and slide to rest", () => {
+    const top = (result: ReturnType<typeof run>) => result.tanks[0]?.y;
+    const floor = run([tank("p1", "kestrel", 25)], {
+      p1: plan("jump", 80, 0.75),
+    });
+    expect(top(floor)).toBe(TANKS.kestrel.halfHeight);
     const barricade = run([tank("p1", "kestrel", 27.5)], {
       p1: plan("jump", 75, 0.65),
     });
-    expect(barricade.tanks[0]?.y).toBe(2.2 + TANKS.kestrel.halfHeight);
+    expect(top(barricade)).toBe(2.2 + TANKS.kestrel.halfHeight);
     expect(barricade.tanks[0]?.x).toBeGreaterThan(30 - TANKS.kestrel.halfWidth);
     expect(barricade.tanks[0]?.x).toBeLessThan(31 + TANKS.kestrel.halfWidth);
     const roof = run([tank("p1", "kestrel", 14)], {
       p1: plan("specialB", 100, 0.9),
     });
-    expect(roof.tanks[0]?.y).toBe(8 + TANKS.kestrel.halfHeight);
+    expect(top(roof)).toBe(8 + TANKS.kestrel.halfHeight);
     expect(eventsOf(roof.events, "land")).toHaveLength(1);
+    const ledge = run([tank("p1", "kestrel", 19)], {
+      p1: plan("specialB", 85, 0.95),
+    });
+    expect(top(ledge)).toBe(8.5 + TANKS.kestrel.halfHeight);
+    const island = run([tank("p1", "kestrel", 8, { y: 8.9 })], {
+      p1: plan("specialB", 75, 0.8),
+    });
+    expect(top(island)).toBe(15 + TANKS.kestrel.halfHeight);
+  });
+
+  test("walls stop a jump at their face and ceilings stop it at their underside", () => {
+    const wall = pathOf(
+      framesOf(
+        input([tank("p1", "kestrel", 4.5)], { p1: plan("jump", 160, 0.6) }),
+      ),
+      "p1",
+    );
+    expect(Math.min(...wall.map((p) => p.x ?? 99))).toBe(
+      3 + TANKS.kestrel.halfWidth,
+    );
+    const ceiling = pathOf(
+      framesOf(input([tank("p1", "kestrel", 5)], { p1: plan("jump", 90, 1) })),
+      "p1",
+    );
+    expect(Math.max(...ceiling.map((p) => p.y ?? 0))).toBe(
+      7 - TANKS.kestrel.halfHeight,
+    );
+    expect(ceiling.at(-1)).toEqual({ x: 5, y: TANKS.kestrel.halfHeight });
+  });
+
+  test("a tank resting on the very edge of a ledge stays put for ten seconds", () => {
+    const edge = 29.5 + TANKS.kestrel.halfWidth - 0.01;
+    const world = arenaWorld(2);
+    const body = addTank(
+      world,
+      "kestrel",
+      { x: edge, y: 9.4, vx: 0, vy: 0 },
+      1,
+      0,
+    );
+    for (let i = 0; i < 600; i++) world.step();
+    expect([body.x, body.y, body.removed]).toEqual([edge, 9.4, false]);
+    const off = addTank(
+      world,
+      "kestrel",
+      { x: edge + 0.02, y: 9.4, vx: 0, vy: 0 },
+      1,
+      1,
+    );
+    for (let i = 0; i < 60; i++) world.step();
+    expect(off.y).toBeLessThan(8);
+  });
+
+  test("the same jump from the same state follows the same path every time", () => {
+    const paths = [1, 7, 99].flatMap((seed) =>
+      [1, 12].map((round) =>
+        pathOf(
+          framesOf(
+            input(
+              [tank("p1", "kestrel", 19), tank("p2", "bastion", 50)],
+              { p1: plan("jump", 68, 0.85), p2: plan("missile", 120, 0.6) },
+              { seed, round },
+            ),
+          ),
+          "p1",
+        ).slice(0, 60),
+      ),
+    );
+    for (const path of paths) expect(path).toEqual(paths[0] ?? []);
+  });
+
+  test("repeated identical jumps through the engine trace identical lines", () => {
+    let state = withTanks(started(["kestrel", "bastion"]), (t) =>
+      t.role === "p1" ? { ...t, x: 32.5 } : t,
+    );
+    const lines: string[] = [];
+    for (let round = 1; round <= 3; round++) {
+      state = lockAll(state, { p1: lock(round, "jump", 90, 0.8) });
+      const replay = resolutionInput(state);
+      if (!replay) throw new Error("no resolution");
+      lines.push(JSON.stringify(pathOf(framesOf(replay), "p1")));
+      expect(state.tanks[0]?.x).toBe(32.5);
+    }
+    expect(new Set(lines).size).toBe(1);
+  });
+
+  test("the heavier tank jumps lower and is pushed less by the same input", () => {
+    const apex = (kind: "bastion" | "kestrel") =>
+      Math.max(
+        ...pathOf(
+          framesOf(
+            input([tank("p1", kind, 32.5)], { p1: plan("jump", 90, 0.8) }),
+          ),
+          "p1",
+        ).map((p) => p.y ?? 0),
+      ) - TANKS[kind].halfHeight;
+    expect(apex("bastion")).toBeLessThan(apex("kestrel"));
+    expect(apex("bastion")).toBeGreaterThan((0.8 * 15) ** 2 / 60 - 0.15);
+    expect(apex("bastion")).toBeLessThan((0.8 * 15) ** 2 / 60);
+    const kick = (kind: "bastion" | "kestrel") => {
+      const x = 20 + TANKS[kind].halfWidth + 0.8;
+      const frames = framesOf(
+        input(
+          [tank("p2", kind, x)],
+          {},
+          { airstrike: { round: 1, columns: [20] } },
+        ),
+      );
+      const hit = frames.find((frame) =>
+        frame.events.some((event) => event.type === "explode"),
+      )?.tanks[0];
+      return Math.sqrt((hit?.vx ?? 0) ** 2 + (hit?.vy ?? 0) ** 2);
+    };
+    expect(kick("bastion")).toBeLessThan(kick("kestrel"));
+    expect(kick("bastion") * TANKS.bastion.mass).toBeCloseTo(
+      kick("kestrel") * TANKS.kestrel.mass,
+      9,
+    );
   });
 
   test("collect airborne pickups along the way", () => {
@@ -602,6 +755,65 @@ describe("aim guide", () => {
     expect(preview.visibleFraction).toBe(1);
     const leap = previewTrajectory(state, "p1", "specialB", 75, 0.65);
     expect(leap.points.length).toBeGreaterThan(preview.points.length);
+  });
+
+  test("the jump guide is the real path point for point", () => {
+    let live = withTanks(started(["kestrel", "bastion"], { seed: 5 }), (t) =>
+      t.role === "p1" ? { ...t, x: 19 } : { ...t, x: 50 },
+    );
+    const guide = previewTrajectory(live, "p1", "jump", 68, 0.85).points;
+    live = lockAll(live, {
+      p1: lock(1, "jump", 68, 0.85),
+      p2: lock(1, "missile", 150, 0.7),
+    });
+    const replay = resolutionInput(live);
+    if (!replay) throw new Error("no resolution");
+    const real = [
+      { x: 19, y: TANKS.kestrel.halfHeight },
+      ...pathOf(framesOf(replay), "p1"),
+    ];
+    expect(guide.length).toBeGreaterThan(40);
+    expect(real.slice(0, guide.length)).toEqual(guide);
+  });
+
+  test("the shot guide is the real path point for point until impact", () => {
+    for (const [action, angle, power] of [
+      ["missile", 52, 0.8],
+      ["specialA", 40, 0.9],
+    ] as const) {
+      let live = withTanks(started(["bastion", "kestrel"], { seed: 9 }), (t) =>
+        t.role === "p1" ? { ...t, x: 7 } : { ...t, x: 25 },
+      );
+      const before = live;
+      live = lockAll(live, {
+        p1: lock(1, action, angle, power),
+        p2: lock(1, "jump", 100, 0.5),
+      });
+      const resolution = live.resolution;
+      const replay = resolutionInput(live);
+      if (!resolution || !replay) throw new Error("no resolution");
+      const spread = spreadFor(resolution, "p1", "bastion");
+      const guide = previewTrajectory(
+        before,
+        "p1",
+        action,
+        angle + spread,
+        power,
+      ).points;
+      const tracked = action === "specialA" ? 2 : 1;
+      const frames = framesOf(replay);
+      const fired = eventsOf(frames[0]?.events ?? [], "fire").find(
+        (event) => event.id === tracked,
+      );
+      const flight = frames
+        .map((frame) => frame.projectiles.find((p) => p.id === tracked))
+        .filter((p) => p !== undefined)
+        .map((p) => ({ x: p.x, y: p.y }));
+      expect(fired && { x: fired.x, y: fired.y }).toEqual(guide[0]);
+      expect(flight.length).toBeGreaterThan(10);
+      expect(guide.slice(1, flight.length + 1)).toEqual(flight);
+      expect(guide).toHaveLength(flight.length + 2);
+    }
   });
 
   test("walls preview their segment and passive actions have no guide", () => {

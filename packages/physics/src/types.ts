@@ -60,6 +60,8 @@ export type Body<T> = {
   readonly invMass: number;
   readonly sensor: boolean;
   readonly follow: Body<T> | null;
+  readonly extentX: number;
+  readonly extentY: number;
   x: number;
   y: number;
   vx: number;

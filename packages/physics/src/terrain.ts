@@ -69,11 +69,22 @@ export class Terrain {
   cast(x0: number, y0: number, dx: number, dy: number): number {
     let best = -1;
     this.hitBox = null;
-    const first = this.spanCell(Math.min(x0, x0 + dx));
-    const last = this.spanCell(Math.max(x0, x0 + dx));
+    const left = Math.min(x0, x0 + dx);
+    const right = Math.max(x0, x0 + dx);
+    const bottom = Math.min(y0, y0 + dy);
+    const top = Math.max(y0, y0 + dy);
+    const first = this.spanCell(left);
+    const last = this.spanCell(right);
     for (let k = first; k <= last; k++) {
       const shift = this.shiftOf(k);
       for (const box of this.cellAt(k)) {
+        if (
+          box.minY > top ||
+          box.maxY < bottom ||
+          box.minX + shift > right ||
+          box.maxX + shift < left
+        )
+          continue;
         const t = sweepPointBox(
           x0,
           y0,

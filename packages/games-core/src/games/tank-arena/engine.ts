@@ -122,7 +122,7 @@ function createInitialState(seats: Seat[], options: SetupOptions): State {
     xs[seatIdx] = slot?.x ?? 0;
   });
   return {
-    version: 1,
+    version: 2,
     secret,
     round: 0,
     phase: "select",

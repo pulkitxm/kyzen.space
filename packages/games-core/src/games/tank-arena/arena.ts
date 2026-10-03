@@ -1,5 +1,10 @@
-import { ceilDiv, sweepPointBox } from "@kyzen/physics";
-import { MINE_LIFT, MODULE_WIDTH, WATER_Y } from "./constants";
+import { ceilDiv, Terrain } from "@kyzen/physics";
+import {
+  MINE_LIFT,
+  MODULE_WIDTH,
+  TERRAIN_CELL_WIDTH,
+  WATER_Y,
+} from "./constants";
 
 export type Box = { x0: number; y0: number; x1: number; y1: number };
 
@@ -17,7 +22,7 @@ export type Arena = {
   mineAnchors: Anchor[];
 };
 
-export const MODULE_BOXES: readonly Box[] = [
+const MODULE_BOXES: readonly Box[] = [
   { x0: 0, y0: -3, x1: 13, y1: 0 },
   { x0: 17, y0: -3, x1: 32, y1: 0 },
   { x0: 2, y0: 7, x1: 10.5, y1: 8 },
@@ -89,65 +94,23 @@ export function buildArena(modules: number): Arena {
   };
 }
 
-export const sweepBox = sweepPointBox;
+const terrains = new Map<number, Terrain>();
 
-export function sweepTerrain(
-  x0: number,
-  y0: number,
-  dx: number,
-  dy: number,
-): number {
-  let best = -1;
-  const first = Math.floor(Math.min(x0, x0 + dx) / MODULE_WIDTH);
-  const last = Math.floor(Math.max(x0, x0 + dx) / MODULE_WIDTH);
-  for (let k = first; k <= last; k++) {
-    const shift = k * MODULE_WIDTH;
-    for (const box of MODULE_BOXES) {
-      const t = sweepBox(
-        x0,
-        y0,
-        dx,
-        dy,
-        box.x0 + shift,
-        box.y0,
-        box.x1 + shift,
-        box.y1,
-      );
-      if (t >= 0 && (best < 0 || t < best)) best = t;
-    }
+export function terrainFor(modules: number): Terrain {
+  let terrain = terrains.get(modules);
+  if (!terrain) {
+    terrain = new Terrain({
+      boxes: buildArena(modules).boxes.map((box) => ({
+        minX: box.x0,
+        minY: box.y0,
+        maxX: box.x1,
+        maxY: box.y1,
+      })),
+      width: modules * MODULE_WIDTH,
+      wrap: true,
+      cellWidth: TERRAIN_CELL_WIDTH,
+    });
+    terrains.set(modules, terrain);
   }
-  return best;
-}
-
-const LOS_INSET = 0.01;
-
-export function lineOfSight(
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-): boolean {
-  const dx = x1 - x0;
-  const dy = y1 - y0;
-  const first = Math.floor(Math.min(x0, x1) / MODULE_WIDTH);
-  const last = Math.floor(Math.max(x0, x1) / MODULE_WIDTH);
-  for (let k = first; k <= last; k++) {
-    const shift = k * MODULE_WIDTH;
-    for (const box of MODULE_BOXES) {
-      if (
-        sweepBox(
-          x0,
-          y0,
-          dx,
-          dy,
-          box.x0 + shift + LOS_INSET,
-          box.y0 + LOS_INSET,
-          box.x1 + shift - LOS_INSET,
-          box.y1 - LOS_INSET,
-        ) >= 0
-      )
-        return false;
-    }
-  }
-  return true;
+  return terrain;
 }

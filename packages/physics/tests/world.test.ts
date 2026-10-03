@@ -53,7 +53,7 @@ function run(sim: World<string>, steps: number) {
 }
 
 function ofType<K extends PhysicsEvent<string>["type"]>(
-  events: PhysicsEvent<string>[],
+  events: readonly PhysicsEvent<string>[],
   type: K,
 ) {
   return events.filter(

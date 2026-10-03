@@ -16,6 +16,7 @@ export const STEP = 1 / 60;
 export const STEPS_PER_SECOND = 60;
 export const GRAVITY = 30;
 export const MODULE_WIDTH = 32;
+export const TERRAIN_CELL_WIDTH = 8;
 export const WATER_Y = -6;
 export const MAX_ROUND = TANK_ARENA_MAX_ROUND;
 
@@ -29,7 +30,7 @@ export const AIRSTRIKE_MAX_STEPS = 240;
 export const SELF_DESTRUCT_MAX_STEPS = 120;
 export const REST_STEPS = 20;
 export const REST_SPEED = 0.05;
-export const FRICTION = 14;
+export const GROUND_FRICTION = 7 / 15;
 export const RESTITUTION = 0.15;
 export const PROJECTILE_LIFETIME_STEPS = 360;
 
