@@ -6,7 +6,9 @@ import { FaDoorOpen } from "react-icons/fa6";
 import {
   ActionBar,
   AirstrikeBanner,
+  type MatchResult,
   ReplayBar,
+  ResultBanner,
   Roster,
   RoundBanner,
   StatusBanner,
@@ -62,10 +64,26 @@ function spectatorText(phase: TankArenaState["phase"], player: boolean) {
     : "Your tank is out. Spectating the rest of the match.";
 }
 
+function deriveMatchResult(
+  mode: BoardMode,
+  player: boolean,
+  roster: RosterEntry[],
+): MatchResult {
+  if (mode !== "finished") return null;
+  const alive = roster.filter((e) => e.alive);
+  const localEntry = roster.find((e) => e.local);
+  if (alive.length === 0) return "draw";
+  if (!player || !localEntry) return null;
+  return localEntry.alive ? "victory" : "defeat";
+}
+
 export function MatchHud(props: MatchHudProps) {
   const selecting = props.phase === "select";
   const prevRound = useRef(props.round);
   const [showBanner, setShowBanner] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+
+  const matchResult = deriveMatchResult(props.mode, props.player, props.roster);
 
   useEffect(() => {
     if (props.round > prevRound.current && props.round > 0) {
@@ -77,9 +95,17 @@ export function MatchHud(props: MatchHudProps) {
     prevRound.current = props.round;
   }, [props.round]);
 
+  useEffect(() => {
+    if (matchResult) {
+      const timer = setTimeout(() => setShowResult(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [matchResult]);
+
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col gap-2 p-2 sm:p-3">
       <RoundBanner round={props.round} visible={showBanner} />
+      <ResultBanner result={matchResult} visible={showResult} />
       <HudTop {...props} selecting={selecting} />
       <HudBanners {...props} />
       {selecting ? (

@@ -572,3 +572,82 @@ export function EventToast({
     </div>
   );
 }
+
+export type MatchResult = "victory" | "defeat" | "draw" | null;
+
+export function ResultBanner({
+  result,
+  visible,
+}: {
+  result: MatchResult;
+  visible: boolean;
+}) {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (visible && result) {
+      setShow(true);
+    }
+  }, [visible, result]);
+
+  if (!show || !result) return null;
+
+  const config = {
+    victory: {
+      title: "Victory",
+      subtitle: "You are the last tank standing",
+      bgFrom: "from-emerald-600/90",
+      bgTo: "to-emerald-900/90",
+      textColor: "text-emerald-100",
+      titleColor: "text-emerald-300",
+      glow: "rgba(52,211,153,0.5)",
+      border: "border-emerald-400/40",
+    },
+    defeat: {
+      title: "Defeated",
+      subtitle: "Your tank was destroyed",
+      bgFrom: "from-red-700/90",
+      bgTo: "to-red-950/90",
+      textColor: "text-red-100",
+      titleColor: "text-red-300",
+      glow: "rgba(239,68,68,0.5)",
+      border: "border-red-400/40",
+    },
+    draw: {
+      title: "Draw",
+      subtitle: "No tank survived",
+      bgFrom: "from-slate-600/90",
+      bgTo: "to-slate-900/90",
+      textColor: "text-slate-100",
+      titleColor: "text-slate-300",
+      glow: "rgba(148,163,184,0.5)",
+      border: "border-slate-400/40",
+    },
+  };
+
+  const { title, subtitle, bgFrom, bgTo, textColor, titleColor, glow, border } =
+    config[result];
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className={`flex animate-[resultIn_0.6s_ease-out] flex-col items-center rounded-3xl border-2 ${border} bg-gradient-to-b ${bgFrom} ${bgTo} px-12 py-8 backdrop-blur-md sm:px-20 sm:py-12`}
+        style={{
+          boxShadow: `0 0 60px ${glow}, 0 20px 40px rgba(0,0,0,0.5)`,
+        }}
+      >
+        <span
+          className={`font-black text-5xl uppercase tracking-[0.15em] sm:text-7xl ${titleColor}`}
+          style={{
+            textShadow: `0 0 40px ${glow}, 0 4px 12px rgba(0,0,0,0.5)`,
+          }}
+        >
+          {title}
+        </span>
+        <span className={`mt-2 text-base sm:text-lg ${textColor}`}>
+          {subtitle}
+        </span>
+      </div>
+    </div>
+  );
+}
