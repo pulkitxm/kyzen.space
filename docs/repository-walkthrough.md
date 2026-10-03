@@ -1,6 +1,6 @@
 # Repository walkthrough
 
-Read this first, then [Adding a game](adding-a-game.md) when you want to build one. The [architecture index](architecture/README.md) links the detailed subsystem references. Tic-tac-toe is the currently registered playable game.
+Read this first, then [Adding a game](adding-a-game.md) when you want to build one. The [architecture index](architecture/README.md) links the detailed subsystem references. Tic-tac-toe and Tank Arena are the currently registered playable games.
 
 ## The whole system
 
@@ -42,7 +42,7 @@ The default app runs on one port, 3000. `apps/web/server.ts` creates the server 
 | `vid-tutorials` | Separate Remotion project for tutorial videos, outside the app runtime |
 | `scripts` and `.github/workflows` | Verification, maintenance, and documentation publishing |
 
-The server imports game rules and schemas, never React boards. Browser code never imports database repositories. A board receives the current game and a move callback; it does not own a socket. These boundaries are the reason adding another ordinary turn-based game does not require changing the server or app routes.
+The server imports game rules and schemas, never React boards. Browser code never imports database repositories. A board receives the current game and a move callback; it does not own a socket. These boundaries are the reason adding another turn-based or simultaneous-round game does not require changing the server or app routes.
 
 ## What happens when someone plays
 
@@ -84,13 +84,13 @@ This creates local Postgres and Redis, applies the development schema, and loads
 
 Production `docker compose up --build -d` runs only the app, reading external database URLs from `.env`; migrations are explicit. Vercel hosts the frontend with the persistent backend deployed separately. [Deployment](deployment.md) contains the full commands, environment settings, and hosting boundaries.
 
-With the combined app running against local synthetic data, `bun run --cwd apps/web smoke:game` exercises homepage rendering, guest auth, two authenticated socket players, completion, reconnect recovery, and persisted history. [Testing](architecture/testing.md) describes the other checks.
+With the combined app running against local synthetic data, `bun run --cwd apps/web smoke:game` exercises homepage rendering, guest auth, authenticated socket players in tic-tac-toe and Tank Arena (private lobby with a bot, public 1v1 and 2v2), completion, reconnect recovery, and persisted history. [Testing](architecture/testing.md) describes the other checks.
 
 ## Add the next game
 
 Implement its schemas in shared, pure rules and metadata in games-core, and board in games-client. Register the slug, definition, and board in the three existing registries. Add engine tests and a rules document. Optional config fields drive the existing setup form; optional music and tutorial assets come from metadata.
 
-Reuse the existing game page, room events, session, database tables, chat placement, profiles, results, and rematches. Follow [Adding a game](adding-a-game.md) for exact paths and contracts, using tic-tac-toe as the working example. Matchmaking currently pairs two players; larger match groups need a platform extension. Continuous realtime games need an explicit server runner extension; a `step` method alone is not a playable implementation.
+Reuse the existing game page, room events, session, database tables, chat placement, profiles, results, and rematches. Follow [Adding a game](adding-a-game.md) for exact paths and contracts, using tic-tac-toe as the working example. Matchmaking sizes each group with the engine's `playerCount(config)`, so a definition can offer 1v1 and team queues. Continuous realtime games need an explicit server runner extension; a `step` method alone is not a playable implementation.
 
 ## How the wiki stays current
 

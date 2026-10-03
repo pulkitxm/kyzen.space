@@ -29,7 +29,7 @@ bun run dev
 
 `db:start` uses the same local Postgres and Redis services without starting the app container. If you override their exposed ports, update the host URLs in `.env` too. The documented Bun commands load the root `.env`. Runtime containers and Vercel also accept injected environment variables. There is no workspace env symlink.
 
-With the combined app running against local synthetic data, `bun run --cwd apps/web smoke:game` verifies the rendered homepage, guest sign-in, authenticated socket connections, room creation, five moves, reconnect recovery, and persisted completion. It also verifies public matching, participant authorization, identity redaction, short-lived chat, mutual friendship, and permanent messaging. It creates fresh synthetic guests and refuses remote origins.
+With the combined app running against local synthetic data, `bun run --cwd apps/web smoke:game` verifies the rendered homepage, guest sign-in, authenticated socket connections, room creation, five moves, reconnect recovery, and persisted completion. It also plays Tank Arena in a private team lobby with a bot and in public 1v1 and 2v2 matches, checking hidden plans, replayed rounds, and team results. It also verifies public matching, participant authorization, identity redaction, short-lived chat, mutual friendship, and permanent messaging. It creates fresh synthetic guests and refuses remote origins.
 
 ## Docker with external databases
 

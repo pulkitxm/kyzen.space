@@ -69,7 +69,7 @@ bun run db:push
 bun run --cwd apps/server test:integration
 ```
 
-For runtime or UI changes, also run `bun run build` and exercise the affected flow. With the combined app running against local synthetic data, this verifies guest sign-in, authenticated sockets, a complete two-player game, reconnect recovery, and persisted completion:
+For runtime or UI changes, also run `bun run build` and exercise the affected flow. With the combined app running against local synthetic data, this verifies guest sign-in, authenticated sockets, complete tic-tac-toe and Tank Arena games (a private team lobby with a bot, public 1v1 and 2v2 matches), hidden-plan redaction, reconnect recovery, and persisted completion:
 
 ```bash
 bun run --cwd apps/web smoke:game

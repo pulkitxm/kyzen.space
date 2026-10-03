@@ -36,7 +36,7 @@ The gate prints why it is waiting every five seconds. The default deadline is fi
 
 ## Isolated runtime checks
 
-Integration tests create disposable Postgres and Redis containers with unique names and temporary ports, apply the schema, run the real integration suite, then clean up. Smoke tests build and boot the production image, verify database/Redis health and the Redis probe, and run two authenticated synthetic players through a complete game and reconnect. They then run the same flow against the development Compose setup, including reseeding.
+Integration tests create disposable Postgres and Redis containers with unique names and temporary ports, apply the schema, run the real integration suite, then clean up. Smoke tests build and boot the production image, verify database/Redis health and the Redis probe, and run authenticated synthetic players through complete tic-tac-toe and Tank Arena games, including a private team lobby with a bot, public 1v1 and 2v2 matches, and reconnects. They then run the same flow against the development Compose setup, including reseeding.
 
 Every runtime invocation has its own network, containers, volumes, credentials, and synthetic fixtures. It does not use the development database or modify a local `.env`. Development Compose overrides remove local env-file inputs and replace all published ports. Containers, temporary images, volumes, and scratch files are removed after success or failure.
 
