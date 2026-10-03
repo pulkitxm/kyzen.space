@@ -82,6 +82,22 @@ export function datan2(y: number, x: number): number {
   return normalizeAngle(radians / DEG);
 }
 
+const bits = new DataView(new ArrayBuffer(8));
+
+export function checksum(values: Iterable<number>): number {
+  let hash = 0x811c9dc5;
+  for (const value of values) {
+    if (Number.isNaN(value)) {
+      bits.setUint32(0, 0x7ff80000);
+      bits.setUint32(4, 0);
+    } else bits.setFloat64(0, value === 0 ? 0 : value);
+    hash = Math.imul(hash ^ bits.getUint32(0), 0x01000193);
+    hash = Math.imul(hash ^ bits.getUint32(4), 0x01000193);
+    hash ^= hash >>> 15;
+  }
+  return hash >>> 0;
+}
+
 export function round4(value: number): number {
   return Math.round(value * 10_000) / 10_000 + 0;
 }
