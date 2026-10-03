@@ -235,13 +235,15 @@ function moveBall(state: CarFootballState, dt: number): CarFootballTeam | null {
       Math.sign(ball.position.y) * (FIELD_HALF_WIDTH - BALL_RADIUS);
     ball.velocity.y *= -0.78;
   }
-  if (Math.abs(ball.position.x) >= FIELD_HALF_LENGTH) {
+  if (Math.abs(ball.position.x) > FIELD_HALF_LENGTH - BALL_RADIUS) {
     const inGoal =
       Math.abs(ball.position.y) < GOAL_HALF_WIDTH - BALL_RADIUS &&
       ball.position.z < GOAL_HEIGHT - BALL_RADIUS;
-    if (inGoal) return ball.position.x > 0 ? "blue" : "orange";
-  }
-  if (Math.abs(ball.position.x) > FIELD_HALF_LENGTH - BALL_RADIUS) {
+    if (inGoal) {
+      if (Math.abs(ball.position.x) >= FIELD_HALF_LENGTH)
+        return ball.position.x > 0 ? "blue" : "orange";
+      return null;
+    }
     ball.position.x =
       Math.sign(ball.position.x) * (FIELD_HALF_LENGTH - BALL_RADIUS);
     ball.velocity.x *= -0.78;

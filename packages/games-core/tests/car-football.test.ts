@@ -101,6 +101,30 @@ describe("Turbo Pitch engine", () => {
     });
   });
 
+  test("a normally moving ball crosses the open goal mouth", () => {
+    const state = advance(initial(), 91);
+    state.ball.position.x = FIELD_HALF_LENGTH - BALL_RADIUS - 0.2;
+    state.ball.velocity.x = 20;
+    let current = state;
+    for (let tick = 0; tick < 5; tick++) {
+      current =
+        carFootballEngine.step?.(current, new Map(), STEP).state ?? current;
+      if (current.score.blue) break;
+    }
+    expect(current.score.blue).toBe(1);
+    expect(current.phase).toBe("goal");
+  });
+
+  test("the goal frame still rebounds a ball outside the opening", () => {
+    const state = advance(initial(), 91);
+    state.ball.position.x = FIELD_HALF_LENGTH - BALL_RADIUS - 0.2;
+    state.ball.position.y = 10;
+    state.ball.velocity.x = 20;
+    const current = carFootballEngine.step?.(state, new Map(), STEP).state;
+    expect(current?.score.blue).toBe(0);
+    expect(current?.ball.velocity.x).toBeLessThan(0);
+  });
+
   test("a tied regulation match enters sudden-death overtime", () => {
     const state = advance(initial(), 91);
     state.timeRemaining = STEP / 2;
