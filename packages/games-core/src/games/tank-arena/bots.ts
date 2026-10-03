@@ -27,15 +27,21 @@ import {
   TANKS,
   WATER_Y,
 } from "./constants";
-import { arenaWidth, canUse, defaultKind, seatIndex } from "./helpers";
+import {
+  arenaWidth,
+  canUse,
+  defaultKind,
+  seatIndex,
+  secretOf,
+} from "./helpers";
 import {
   clamp,
   datan2,
   dcos,
-  deriveRng,
   dsin,
   normalizeAngle,
   type Rng,
+  secretRng,
   wrapDelta,
 } from "./math";
 import {
@@ -589,7 +595,7 @@ export function botMove(
   difficulty: BotDifficulty,
 ): Move {
   const index = seatIndex(state, role);
-  const rng = deriveRng(state.seed, state.round, role, "bot");
+  const rng = secretRng(secretOf(state), state.round, role, "bot");
   if (state.phase === "select")
     return {
       type: "select",

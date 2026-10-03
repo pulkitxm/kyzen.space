@@ -44,7 +44,7 @@ import {
   WALL_SPEED_KEEP,
   WATER_Y,
 } from "./constants";
-import { dcos, deriveRng, dsin, hashValues, wrapDelta, wrapX } from "./math";
+import { dcos, deriveRng, dsin, wrapDelta, wrapX } from "./math";
 
 export type RoundSeat = { role: string; team: string };
 
@@ -258,16 +258,6 @@ type World = {
   allEvents: SimEvent[];
 };
 
-const ACTION_CODES: Record<string, number> = {
-  missile: 1,
-  jump: 2,
-  shield: 3,
-  specialA: 4,
-  specialB: 5,
-  idle: 6,
-  forfeit: 7,
-};
-
 const QUERY_MARGIN = 2.5;
 const BLAST_NUDGE = 0.02;
 
@@ -284,36 +274,12 @@ export function muzzleDistance(kind: TankKind): number {
   );
 }
 
-function plansDigest(
-  seats: readonly RoundSeat[],
-  plans: Readonly<Record<string, TankArenaPlan>>,
-): number {
-  const values: (number | string)[] = [];
-  for (const seat of seats) {
-    const plan = plans[seat.role];
-    if (!plan) continue;
-    values.push(
-      seat.role,
-      ACTION_CODES[plan.action] ?? 0,
-      Math.round(plan.angle * 10_000),
-      Math.round(plan.power * 10_000),
-    );
-  }
-  return hashValues(values);
-}
-
 function spreadFor(
-  input: Pick<RoundInput, "seed" | "round" | "seats" | "plans">,
+  input: Pick<RoundInput, "seed" | "round">,
   role: string,
   kind: TankKind,
 ): number {
-  const rng = deriveRng(
-    input.seed,
-    input.round,
-    role,
-    "spread",
-    plansDigest(input.seats, input.plans),
-  );
+  const rng = deriveRng(input.seed, input.round, role, "spread");
   return (rng() * 2 - 1) * TANKS[kind].spreadDeg;
 }
 

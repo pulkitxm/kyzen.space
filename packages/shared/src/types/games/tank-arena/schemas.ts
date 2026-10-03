@@ -2,23 +2,21 @@ import { z } from "zod";
 import { botDifficultySchema, lobbyConfigSchema } from "../lobby";
 
 export const TANK_ARENA_MAX_ROUND = 40;
-export const TANK_ARENA_MAX_SEATS = 256;
+export const TANK_ARENA_SECRET_WORDS = 8;
 
-const MAX_MODULES = TANK_ARENA_MAX_SEATS / 2;
-const MAX_ITEMS = 4096;
-const MAX_COLUMNS = 2 * (3 + MAX_MODULES);
 const MAX_COOLDOWN = 8;
 const MAX_HP = 160;
 const MAX_STEPS = 900;
 
-const coordinate = z.number().finite().min(-100_000).max(100_000);
+const coordinate = z.number().finite().min(-1e12).max(1e12);
 const velocity = z.number().finite().min(-10_000).max(10_000);
-const itemId = z.number().int().min(0).max(1_000_000);
+const itemId = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const word = z.number().int().min(0).max(4_294_967_295);
 const roundNumber = z.number().int().min(0).max(TANK_ARENA_MAX_ROUND);
 const playRound = z.number().int().min(1).max(TANK_ARENA_MAX_ROUND);
 
-export const tankRoleSchema = z.string().regex(/^p[1-9]\d{0,2}$/);
-const tankTeamSchema = z.string().regex(/^([A-Z]|p[1-9]\d{0,2})$/);
+export const tankRoleSchema = z.string().regex(/^p[1-9]\d*$/);
+const tankTeamSchema = z.string().regex(/^([A-Z]|p[1-9]\d*)$/);
 
 export const tankKindSchema = z.enum(["bastion", "kestrel"]);
 export type TankKind = z.infer<typeof tankKindSchema>;
@@ -92,7 +90,7 @@ export type TankArenaMine = z.infer<typeof mineSchema>;
 const airstrikeSchema = z
   .object({
     round: playRound,
-    columns: z.array(coordinate).min(1).max(MAX_COLUMNS),
+    columns: z.array(coordinate).min(1),
   })
   .strict();
 export type TankArenaAirstrike = z.infer<typeof airstrikeSchema>;
@@ -120,9 +118,9 @@ export type TankEliminationCause = z.infer<typeof eliminationCauseSchema>;
 
 const snapshotSchema = z
   .object({
-    tanks: z.array(tankSchema).max(TANK_ARENA_MAX_SEATS),
-    pickups: z.array(pickupSchema).max(MAX_ITEMS),
-    mines: z.array(mineSchema).max(MAX_ITEMS),
+    tanks: z.array(tankSchema),
+    pickups: z.array(pickupSchema),
+    mines: z.array(mineSchema),
     airstrike: airstrikeSchema.nullable(),
   })
   .strict();
@@ -131,31 +129,26 @@ export type TankArenaSnapshot = z.infer<typeof snapshotSchema>;
 const resolutionSchema = z
   .object({
     round: playRound,
+    seed: word,
     steps: z.number().int().min(1).max(MAX_STEPS),
     before: snapshotSchema,
     plans: z.record(tankRoleSchema, planSchema),
-    damage: z
-      .array(
-        z
-          .object({
-            role: tankRoleSchema,
-            amount: z.number().int().min(0).max(100_000),
-          })
-          .strict(),
-      )
-      .max(TANK_ARENA_MAX_SEATS),
-    collected: z
-      .array(
-        z.object({ role: tankRoleSchema, kind: tankPickupKindSchema }).strict(),
-      )
-      .max(MAX_ITEMS),
-    eliminated: z
-      .array(
-        z
-          .object({ role: tankRoleSchema, cause: eliminationCauseSchema })
-          .strict(),
-      )
-      .max(TANK_ARENA_MAX_SEATS),
+    damage: z.array(
+      z
+        .object({
+          role: tankRoleSchema,
+          amount: z.number().int().min(0).max(100_000),
+        })
+        .strict(),
+    ),
+    collected: z.array(
+      z.object({ role: tankRoleSchema, kind: tankPickupKindSchema }).strict(),
+    ),
+    eliminated: z.array(
+      z
+        .object({ role: tankRoleSchema, cause: eliminationCauseSchema })
+        .strict(),
+    ),
   })
   .strict();
 export type TankArenaResolution = z.infer<typeof resolutionSchema>;
@@ -163,33 +156,31 @@ export type TankArenaResolution = z.infer<typeof resolutionSchema>;
 export const tankArenaStateSchema = z
   .object({
     version: z.literal(1),
-    seed: z.number().int().min(0).max(4_294_967_295),
+    secret: z.array(word).length(TANK_ARENA_SECRET_WORDS).optional(),
     round: roundNumber,
     phase: z.enum(["select", "plan", "finished"]),
-    modules: z.number().int().min(2).max(MAX_MODULES),
-    seats: z.array(seatSchema).min(1).max(TANK_ARENA_MAX_SEATS),
-    tanks: z.array(tankSchema).min(1).max(TANK_ARENA_MAX_SEATS),
-    pickups: z.array(pickupSchema).max(MAX_ITEMS),
-    mines: z.array(mineSchema).max(MAX_ITEMS),
+    modules: z.number().int().min(2),
+    seats: z.array(seatSchema).min(1),
+    tanks: z.array(tankSchema).min(1),
+    pickups: z.array(pickupSchema),
+    mines: z.array(mineSchema),
     nextId: itemId,
     airstrike: airstrikeSchema.nullable(),
-    submitted: z.array(tankRoleSchema).max(TANK_ARENA_MAX_SEATS),
+    submitted: z.array(tankRoleSchema),
     plans: z.record(tankRoleSchema, planSchema),
     resolution: resolutionSchema.nullable(),
-    eliminated: z
-      .array(
-        z
-          .object({
-            role: tankRoleSchema,
-            round: roundNumber,
-            cause: eliminationCauseSchema,
-          })
-          .strict(),
-      )
-      .max(TANK_ARENA_MAX_SEATS),
+    eliminated: z.array(
+      z
+        .object({
+          role: tankRoleSchema,
+          round: roundNumber,
+          cause: eliminationCauseSchema,
+        })
+        .strict(),
+    ),
     outcome: z
       .object({
-        winnerRoles: z.array(tankRoleSchema).max(TANK_ARENA_MAX_SEATS),
+        winnerRoles: z.array(tankRoleSchema),
         draw: z.boolean(),
       })
       .strict()

@@ -22,7 +22,7 @@ function field(config: unknown, key: string): unknown {
 }
 
 export function newSeed(): number {
-  return randomInt(2 ** 31);
+  return randomInt(2 ** 48 - 1);
 }
 
 export function initialState(

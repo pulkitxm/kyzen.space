@@ -53,7 +53,7 @@ export {
 } from "./series";
 export {
   TANK_ARENA_MAX_ROUND,
-  TANK_ARENA_MAX_SEATS,
+  TANK_ARENA_SECRET_WORDS,
   type TankAction,
   type TankArenaAirstrike,
   type TankArenaConfig,

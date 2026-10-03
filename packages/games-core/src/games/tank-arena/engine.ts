@@ -43,9 +43,18 @@ import {
   isJumpAction,
   roleForSeat,
   seatIndex,
+  secretOf,
   teamsOf,
 } from "./helpers";
-import { ceilDiv, deriveRng, round4, wrapDelta, wrapX } from "./math";
+import {
+  ceilDiv,
+  deriveSecret,
+  round4,
+  secretRng,
+  secretWord,
+  wrapDelta,
+  wrapX,
+} from "./math";
 import { type RoundInput, simulateRound } from "./simulate";
 
 type State = TankArenaState;
@@ -62,13 +71,13 @@ export function isStrikeRound(round: number): boolean {
 }
 
 export function airstrikeFor(
-  seed: number,
+  secret: readonly number[],
   modules: number,
   round: number,
 ): TankArenaAirstrike {
   const count = (3 + modules) * (round >= 25 ? 2 : 1);
   const spacing = (modules * MODULE_WIDTH) / count;
-  const offset = deriveRng(seed, round, "airstrike")() * spacing;
+  const offset = secretRng(secret, round, "airstrike")() * spacing;
   return {
     round,
     columns: Array.from({ length: count }, (_, i) =>
@@ -98,10 +107,10 @@ function interleave(seats: readonly Seat[]): number[] {
 }
 
 function createInitialState(seats: Seat[], options: SetupOptions): State {
-  const seed = options.seed >>> 0;
+  const secret = deriveSecret(options.seed);
   const modules = modulesFor(seats.length);
   const slots = buildArena(modules).spawnSlots;
-  const offset = Math.floor(deriveRng(seed, 0, "spawn")() * slots.length);
+  const offset = Math.floor(secretRng(secret, 0, "spawn")() * slots.length);
   const xs: number[] = new Array(seats.length).fill(0);
   interleave(seats).forEach((seatIdx, order) => {
     const slot =
@@ -113,7 +122,7 @@ function createInitialState(seats: Seat[], options: SetupOptions): State {
   });
   return {
     version: 1,
-    seed,
+    secret,
     round: 0,
     phase: "select",
     modules,
@@ -203,11 +212,11 @@ function decideOutcome(
 }
 
 export function roundInputOf(
-  state: Pick<State, "seed" | "modules" | "seats">,
-  resolution: Pick<TankArenaResolution, "round" | "before" | "plans">,
+  state: Pick<State, "modules" | "seats">,
+  resolution: Pick<TankArenaResolution, "round" | "seed" | "before" | "plans">,
 ): RoundInput {
   return {
-    seed: state.seed,
+    seed: resolution.seed,
     round: resolution.round,
     modules: state.modules,
     seats: state.seats,
@@ -223,16 +232,46 @@ export function resolutionInput(state: State): RoundInput | null {
   return state.resolution ? roundInputOf(state, state.resolution) : null;
 }
 
-function farFrom(
-  width: number,
-  anchor: Anchor,
-  points: readonly { x: number; y: number }[],
-  distance: number,
-): boolean {
-  return points.every((point) => {
-    const dx = wrapDelta(anchor.x, point.x, width);
-    const dy = point.y - anchor.y;
-    return dx * dx + dy * dy >= distance * distance;
+type Point = { x: number; y: number };
+
+function moduleBuckets(points: readonly Point[], modules: number): Point[][] {
+  const buckets: Point[][] = Array.from({ length: modules }, () => []);
+  for (const point of points)
+    buckets[Math.min(modules - 1, Math.floor(point.x / MODULE_WIDTH))]?.push(
+      point,
+    );
+  return buckets;
+}
+
+function near(width: number, a: Point, b: Point, distance: number): boolean {
+  const dx = wrapDelta(a.x, b.x, width);
+  const dy = b.y - a.y;
+  return dx * dx + dy * dy < distance * distance;
+}
+
+function freeAnchors(
+  state: State,
+  anchors: readonly Anchor[],
+  tanks: readonly TankArenaTank[],
+  items: readonly Point[],
+  clearance: number,
+): Anchor[] {
+  const width = arenaWidth(state);
+  const living = moduleBuckets(
+    tanks.filter((tank) => tank.alive),
+    state.modules,
+  );
+  const placed = moduleBuckets(items, state.modules);
+  return anchors.filter((anchor) => {
+    const home = Math.floor(anchor.x / MODULE_WIDTH);
+    for (const offset of [-1, 0, 1]) {
+      const m = (home + offset + state.modules) % state.modules;
+      if (living[m]?.some((tank) => near(width, anchor, tank, clearance)))
+        return false;
+      if (placed[m]?.some((item) => near(width, anchor, item, ITEM_SPACING)))
+        return false;
+    }
+    return true;
   });
 }
 
@@ -247,38 +286,41 @@ function spawnItems(
   const players = state.seats.length;
   const width = arenaWidth(state);
   const arena = buildArena(state.modules);
-  const living = tanks.filter((tank) => tank.alive);
   let id = nextId;
   if (round >= 2 && round % 2 === 0) {
-    const rng = deriveRng(state.seed, round, "pickups");
+    const rng = secretRng(secretOf(state), round, "pickups");
     const cap = 2 + Math.floor(players / 2);
     const count = Math.min(ceilDiv(players, 4), cap - pickups.length);
+    let free = freeAnchors(
+      state,
+      arena.pickupAnchors,
+      tanks,
+      [...pickups, ...mines],
+      ITEM_SPACING,
+    );
     for (let i = 0; i < count; i++) {
-      const items = [...pickups, ...mines];
-      const free = arena.pickupAnchors.filter(
-        (anchor) =>
-          farFrom(width, anchor, living, ITEM_SPACING) &&
-          farFrom(width, anchor, items, ITEM_SPACING),
-      );
       const anchor = free[Math.floor(rng() * free.length)];
       const kind = PICKUP_KINDS[Math.floor(rng() * PICKUP_KINDS.length)];
       if (!anchor || !kind) break;
       pickups.push({ id: id++, kind, x: anchor.x, y: anchor.y });
+      free = free.filter((other) => !near(width, other, anchor, ITEM_SPACING));
     }
   }
   if (round >= 3 && round % 3 === 0) {
-    const rng = deriveRng(state.seed, round, "mines");
+    const rng = secretRng(secretOf(state), round, "mines");
     const count = ceilDiv(players, 4);
+    let free = freeAnchors(
+      state,
+      arena.mineAnchors,
+      tanks,
+      [...pickups, ...mines],
+      MINE_TANK_CLEARANCE,
+    );
     for (let i = 0; i < count; i++) {
-      const items = [...pickups, ...mines];
-      const free = arena.mineAnchors.filter(
-        (anchor) =>
-          farFrom(width, anchor, living, MINE_TANK_CLEARANCE) &&
-          farFrom(width, anchor, items, ITEM_SPACING),
-      );
       const anchor = free[Math.floor(rng() * free.length)];
       if (!anchor) break;
       mines.push({ id: id++, x: anchor.x, y: anchor.y });
+      free = free.filter((other) => !near(width, other, anchor, ITEM_SPACING));
     }
   }
   return id;
@@ -341,7 +383,10 @@ function resolveRound(state: State): State {
     mines: state.mines,
     airstrike: state.airstrike,
   };
-  const result = simulateRound(roundInputOf(state, { round, before, plans }));
+  const seed = secretWord(secretOf(state), round, "round");
+  const result = simulateRound(
+    roundInputOf(state, { round, seed, before, plans }),
+  );
   const outputs = new Map(result.tanks.map((tank) => [tank.role, tank]));
   const eliminatedNow: { role: string; cause: TankEliminationCause }[] = [];
   const tanks = state.tanks.map((tank): TankArenaTank => {
@@ -406,12 +451,13 @@ function resolveRound(state: State): State {
     nextId,
     airstrike:
       !finished && isStrikeRound(round + 1)
-        ? airstrikeFor(state.seed, state.modules, round + 1)
+        ? airstrikeFor(secretOf(state), state.modules, round + 1)
         : null,
     submitted: [],
     plans: {},
     resolution: {
       round,
+      seed,
       steps: result.steps,
       before,
       plans,
@@ -459,7 +505,10 @@ function reduce(
     return reject("Choose a tank before locking a plan");
   if (move.round < state.round) return reject("That round is already over");
   if (move.round > state.round) return reject("That round has not started");
-  if (state.submitted.includes(role))
+  if (
+    state.submitted.includes(role) &&
+    (move.type !== "forfeit" || state.plans[role]?.action === "forfeit")
+  )
     return reject("You already submitted this round");
   if (move.type === "lock") {
     if (move.action === "specialA" && tank.cooldowns.specialA > 0)
@@ -524,8 +573,9 @@ function autoMove(state: State, role: string, strikes: number): Move {
 }
 
 function publicState(state: State): State {
+  const { secret: _secret, ...shown } = state;
   return {
-    ...state,
+    ...shown,
     plans: {},
     tanks:
       state.phase === "select"

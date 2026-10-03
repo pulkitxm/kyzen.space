@@ -6,6 +6,8 @@ import type {
 } from "@kyzen/shared/types";
 import { MODULE_WIDTH } from "./constants";
 
+const HIDDEN_SECRET: readonly number[] = [0, 0, 0, 0, 0, 0, 0, 0];
+
 type State = TankArenaState;
 
 export function roleForSeat(index: number): string {
@@ -71,4 +73,8 @@ export function canUse(
   if (action === "specialA") return tank.cooldowns.specialA === 0;
   if (action === "specialB") return tank.cooldowns.specialB === 0;
   return true;
+}
+
+export function secretOf(state: Pick<State, "secret">): readonly number[] {
+  return state.secret ?? HIDDEN_SECRET;
 }

@@ -28,7 +28,7 @@ function tank(role: string) {
 function state(): TankArenaState {
   return {
     version: 1,
-    seed: 12,
+    secret: [1, 2, 3, 4, 5, 6, 7, 4_294_967_295],
     round: 1,
     phase: "plan",
     modules: 2,
@@ -111,10 +111,47 @@ describe("tank arena state schema", () => {
     expect(parsed).toEqual(value);
   });
 
+  test("accepts public states without the secret", () => {
+    const { secret: _secret, ...shown } = state();
+    expect(tankArenaStateSchema.safeParse(shown).success).toBe(true);
+  });
+
+  test("does not cap the player count", () => {
+    const count = 1000;
+    const roles = Array.from({ length: count }, (_, i) => `p${i + 1}`);
+    const value = {
+      ...state(),
+      modules: count / 2,
+      seats: roles.map((role) => ({ role, team: role, bot: null })),
+      tanks: roles.map((role) => ({ ...tank(role), x: 31_990 })),
+      submitted: roles,
+      airstrike: {
+        round: 6,
+        columns: Array.from({ length: 503 }, (_, i) => i * 63),
+      },
+      pickups: Array.from({ length: 502 }, (_, i) => ({
+        id: i,
+        kind: "repair" as const,
+        x: i * 63,
+        y: 1,
+      })),
+      mines: Array.from({ length: 2500 }, (_, i) => ({
+        id: 600 + i,
+        x: i * 12,
+        y: 0.25,
+      })),
+      nextId: 5_000_000,
+    };
+    expect(tankArenaStateSchema.safeParse(value).success).toBe(true);
+  });
+
   test("is strict at every level", () => {
     const value = state();
     const variants: unknown[] = [
       { ...value, extra: true },
+      { ...value, seed: 12 },
+      { ...value, secret: [1, 2, 3] },
+      { ...value, secret: [1, 2, 3, 4, 5, 6, 7, 2 ** 32] },
       { ...value, version: 2 },
       { ...value, phase: "replay" },
       { ...value, round: 41 },
@@ -153,6 +190,7 @@ describe("tank arena state schema", () => {
     const value = state();
     const resolution = {
       round: 1,
+      seed: 3_000_000_000,
       steps: 120,
       before: {
         tanks: value.tanks,
@@ -174,6 +212,8 @@ describe("tank arena state schema", () => {
       { ...resolution, damage: [{ role: "p2", amount: 2.5 }] },
       { ...resolution, before: { ...resolution.before, extra: 1 } },
       { ...resolution, events: [] },
+      { ...resolution, seed: -1 },
+      { ...resolution, seed: 2 ** 32 },
     ])
       expect(
         tankArenaStateSchema.safeParse({ ...value, resolution: broken })

@@ -5,6 +5,7 @@ import {
   tankArenaMoveSchema,
   tankArenaStateSchema,
 } from "@kyzen/shared/types";
+import { deriveSecret } from "../src/games/tank-arena/math";
 import {
   aliveTeams,
   canUse,
@@ -81,20 +82,21 @@ describe("tank arena definition", () => {
 });
 
 describe("initial state", () => {
-  test("sizes the map from the seat count and keeps the seed", () => {
+  test("sizes the map from the seat count and stretches the seed", () => {
     for (const [count, modules] of [
       [2, 2],
       [4, 2],
       [5, 3],
       [8, 4],
       [64, 32],
+      [256, 128],
     ] as const) {
       const state = engine.createInitialState(seats(count), {
         config: {},
         seed: 5,
       });
       expect(state.modules).toBe(modules);
-      expect(state.seed).toBe(5);
+      expect(state.secret).toEqual(deriveSecret(5));
       expect(state.phase).toBe("select");
       expect(state.round).toBe(0);
       expect(tankArenaStateSchema.safeParse(state).success).toBe(true);
@@ -283,6 +285,118 @@ describe("lock validation", () => {
       round: 1,
     });
     expect(tankArenaStateSchema.safeParse(shown).success).toBe(true);
+  });
+});
+
+describe("leaving the match", () => {
+  test("a forfeit replaces a locked plan at any time", () => {
+    const locked = apply(duel(), "p1", lock(1, "missile", 0, 1));
+    const left = apply(locked, "p1", { type: "forfeit", round: 1 });
+    expect(left.plans.p1).toEqual({
+      action: "forfeit",
+      angle: 90,
+      power: 0.15,
+    });
+    expect(left.submitted).toEqual(["p1"]);
+    expect(engine.pendingRoles?.(left)).toEqual(["p2"]);
+    expect(rejection(left, "p1", { type: "forfeit", round: 1 })).toBe(
+      "You already submitted this round",
+    );
+    expect(rejection(left, "p1", lock(1, "idle"))).toBe(
+      "You already submitted this round",
+    );
+    const after = apply(left, "p2", lock(1, "idle"));
+    expect(after.resolution?.plans.p1?.action).toBe("forfeit");
+    expect(after.outcome).toEqual({ winnerRoles: ["p2"], draw: false });
+    let selecting = engine.createInitialState(seats(2), {
+      config: {},
+      seed: 1,
+    });
+    selecting = apply(selecting, "p1", {
+      type: "select",
+      round: 0,
+      tank: "kestrel",
+    });
+    selecting = apply(selecting, "p1", { type: "forfeit", round: 0 });
+    const done = apply(selecting, "p2", {
+      type: "select",
+      round: 0,
+      tank: "bastion",
+    });
+    expect(done.outcome).toEqual({ winnerRoles: ["p2"], draw: false });
+  });
+});
+
+describe("hidden information", () => {
+  const masterSeed = 1_987_654_321;
+
+  function midGame(rounds: number): TankArenaState {
+    let state = started(["kestrel", "bastion", "kestrel", "bastion"], {
+      teams: true,
+      seed: masterSeed,
+    });
+    for (let round = 1; round <= rounds && state.phase === "plan"; round++)
+      for (const role of engine.pendingRoles?.(state) ?? [])
+        state = apply(
+          state,
+          role,
+          engine.botMove?.(state, role, "normal") as TankArenaMove,
+        );
+    return state;
+  }
+
+  test("public state carries neither the master seed nor the secret", () => {
+    const state = midGame(4);
+    const shown = engine.publicState?.(state) as TankArenaState;
+    const text = JSON.stringify(shown);
+    expect(state.secret).toEqual(deriveSecret(masterSeed));
+    expect("secret" in shown).toBe(false);
+    expect(text).not.toContain(String(masterSeed));
+    for (const word of state.secret ?? [])
+      expect(text).not.toContain(String(word));
+    expect(tankArenaStateSchema.safeParse(shown).success).toBe(true);
+  });
+
+  test("aimed bot moves cannot be reproduced without the server secret", () => {
+    const state = midGame(0);
+    const shown = engine.publicState?.(state) as TankArenaState;
+    for (const difficulty of ["easy", "normal", "hard"] as const)
+      for (const role of ["p1", "p2", "p3", "p4"]) {
+        const truth = engine.botMove?.(state, role, difficulty);
+        expect(engine.botMove?.(shown, role, difficulty)).not.toEqual(truth);
+        for (const guess of [0, 1, 42, masterSeed + 1])
+          expect(
+            engine.botMove?.(
+              { ...shown, secret: deriveSecret(guess) },
+              role,
+              difficulty,
+            ),
+          ).not.toEqual(truth);
+        expect(
+          engine.botMove?.(
+            { ...shown, secret: deriveSecret(masterSeed) },
+            role,
+            difficulty,
+          ),
+        ).toEqual(truth);
+      }
+  });
+
+  test("spreads, spawns, and airstrikes stay unpredictable until announced", () => {
+    let state = midGame(0);
+    for (let round = 1; round < 8; round++) state = idleRound(state);
+    expect(state.round).toBe(8);
+    const shown = engine.publicState?.(state) as TankArenaState;
+    const truth = idleRound(state);
+    const guessed = idleRound({ ...shown, secret: deriveSecret(12345) });
+    expect(guessed.resolution?.seed).not.toBe(truth.resolution?.seed);
+    expect(guessed.pickups).not.toEqual(truth.pickups);
+    expect(truth.airstrike?.round).toBe(9);
+    expect(guessed.airstrike?.columns).not.toEqual(truth.airstrike?.columns);
+    const exact = idleRound({ ...shown, secret: deriveSecret(masterSeed) });
+    expect(JSON.stringify(engine.publicState?.(exact))).toBe(
+      JSON.stringify(engine.publicState?.(truth)),
+    );
   });
 });
 
@@ -546,7 +660,9 @@ describe("airstrikes and spawns", () => {
     expect(state.pickups.length).toBeLessThanOrEqual(3);
     for (const mine of state.mines)
       for (const t of state.tanks) {
-        expect(Math.abs(mine.x - t.x)).toBeGreaterThanOrEqual(4);
+        const dx = Math.abs(mine.x - t.x);
+        const wrapped = Math.min(dx, state.modules * 32 - dx);
+        expect(Math.hypot(wrapped, mine.y - t.y)).toBeGreaterThanOrEqual(4);
       }
   });
 });

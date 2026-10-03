@@ -8,6 +8,7 @@ import type {
   TankArenaMove,
   TankArenaState,
 } from "@kyzen/shared/types";
+import { chachaBlock, deriveSecret } from "../src/games/tank-arena/math";
 import {
   canUse,
   type Frame,
@@ -17,9 +18,9 @@ import {
 import { apply, engine, lock, seats, started } from "./tank-arena-fixtures";
 
 const GOLDEN_STATE =
-  "79c7a4e0dc3650392a4c7342e1b8a541c847188ed12850d1983d230c021a24c6";
+  "a2106fd20659f05f006f9d095e9d0a6d7f8020649ff46a6a63dea4bbb933ca55";
 const GOLDEN_FRAMES =
-  "7e3cc443c93f44aefd7b03c4da6b71c957880384cd4b40e62e8e03c7daf9d8d5";
+  "b1ddd52bd7721ff8b0f410f043dcb53f42c1828fa0d83e45ef47a1d8530700a6";
 
 const SCRIPT: Record<string, [TankAction, number, number][]> = {
   p1: [
@@ -181,6 +182,38 @@ describe("determinism", () => {
     }
   });
 
+  test("the secret derivation uses a standard ChaCha20 block", () => {
+    const key = [
+      0x03020100, 0x07060504, 0x0b0a0908, 0x0f0e0d0c, 0x13121110, 0x17161514,
+      0x1b1a1918, 0x1f1e1d1c,
+    ];
+    expect(
+      chachaBlock(key, 1, 0x09000000, 0x4a000000, 0).map((word) =>
+        word.toString(16).padStart(8, "0"),
+      ),
+    ).toEqual([
+      "e4e7f110",
+      "15593bd1",
+      "1fdd0f50",
+      "c47120a3",
+      "c7f4d1c7",
+      "0368c033",
+      "9aaa2204",
+      "4e6cd4c3",
+      "466482d2",
+      "09aa9f07",
+      "05d7c214",
+      "a2028bd9",
+      "d19c12b5",
+      "b94e16de",
+      "e883d0cb",
+      "4e3c50a2",
+    ]);
+    expect(deriveSecret(7)).toEqual(deriveSecret(7));
+    expect(deriveSecret(7)).not.toEqual(deriveSecret(8));
+    expect(deriveSecret(2 ** 40)).not.toEqual(deriveSecret(0));
+  });
+
   test("simulation sources use only exactly specified math", () => {
     const folder = join(import.meta.dir, "..", "src", "games", "tank-arena");
     const allowed = new Set([
@@ -204,9 +237,9 @@ describe("determinism", () => {
 });
 
 describe("performance", () => {
-  test("resolution and hard bots stay fast up to 64 tanks", () => {
+  test("resolution and hard bots stay fast up to 256 tanks", () => {
     const rows: string[] = [];
-    for (const count of [2, 4, 8, 16, 32, 64]) {
+    for (const count of [2, 4, 8, 16, 32, 64, 128, 256]) {
       const seated = seats(count, { teams: true });
       let state = engine.createInitialState(seated, { config: {}, seed: 99 });
       for (const seat of seated)
@@ -243,12 +276,14 @@ describe("performance", () => {
           }
         });
       }
+      const publicKb =
+        JSON.stringify(engine.publicState?.(state)).length / 1024;
       rows.push(
-        `${count} tanks: resolve avg ${(resolveTotal / rounds).toFixed(2)} ms max ${resolveMax.toFixed(2)} ms, hard bot avg ${(botTotal / botCalls).toFixed(2)} ms max ${botMax.toFixed(2)} ms`,
+        `${count} tanks: resolve avg ${(resolveTotal / rounds).toFixed(2)} ms max ${resolveMax.toFixed(2)} ms, hard bot avg ${(botTotal / botCalls).toFixed(2)} ms max ${botMax.toFixed(2)} ms, public state ${publicKb.toFixed(1)} KB`,
       );
-      expect(resolveMax).toBeLessThan(250);
-      expect(botMax).toBeLessThan(500);
+      expect(resolveMax).toBeLessThan(1000);
+      expect(botMax).toBeLessThan(1000);
     }
     console.info(rows.join("\n"));
-  });
+  }, 120_000);
 });
