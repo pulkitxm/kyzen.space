@@ -48,6 +48,8 @@ export function PublicMatchPanel({
   const messageEnd = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
+  const pendingClientId = useRef<string | null>(null);
   const active = game.status === "active";
 
   useSocketEvent<MatchMessage>("match:message", (message) => {
@@ -99,19 +101,25 @@ export function PublicMatchPanel({
   }, [socket, game.id]);
 
   const send = async () => {
-    if (!socket?.connected || !body.trim() || busy) return;
+    if (!socket?.connected || !body.trim() || sending.current) return;
+    sending.current = true;
     setBusy(true);
+    const clientId = pendingClientId.current ?? crypto.randomUUID();
+    pendingClientId.current = clientId;
     try {
-      await emitAck(socket, "match:message", {
-        gameId: game.id,
-        clientId: crypto.randomUUID(),
-        body: body.trim(),
-      });
+      const result = await emitAck<{ ok: true; message: MatchMessage }>(
+        socket,
+        "match:message",
+        { gameId: game.id, clientId, body: body.trim() },
+      );
+      pendingClientId.current = null;
+      setMessages((previous) => mergeMessages(previous, [result.message]));
       setBody("");
       setError(null);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Message failed");
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   };
@@ -251,11 +259,13 @@ export function PublicMatchPanel({
               <input
                 aria-label="Match message"
                 value={body}
-                onChange={(event) => setBody(event.target.value)}
+                onChange={(event) => {
+                  pendingClientId.current = null;
+                  setBody(event.target.value);
+                }}
                 maxLength={1000}
                 placeholder="Send a message..."
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                disabled={busy}
               />
               <Button
                 type="submit"
