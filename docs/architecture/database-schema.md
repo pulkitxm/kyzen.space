@@ -60,6 +60,7 @@ export const game = pgTable(
     gameType: text("game_type").notNull(),
     status: text("status").$type<GameStatus>().notNull().default("waiting"),
     winner: text("winner"),
+    winners: jsonb("winners").$type<string[]>().notNull().default([]),
     gameState: jsonb("game_state").$type<unknown>(),
     config: jsonb("config").$type<unknown>(),
     conversationId: uuid("conversation_id").references(() => conversation.id, {
@@ -89,10 +90,12 @@ export const game = pgTable(
 
 **`seriesId` links a rematch series.** `seriesId` (`schema.ts:124`) is a nullable `uuid` **self-FK** to `game.id` (`onDelete: "set null"`), backed by the `game_series_idx` index (`schema.ts:134`). Its meaning is *the id of the first game in the series*: a brand-new game's series is itself (`createGame` generates the row id app-side with `randomUUID()` and defaults `seriesId` to that same id, `games.ts:34`/`:44`), and a rematch copies its parent's `seriesId`. So every game in a rematch series - root included - shares one `seriesId`, and the whole series is a single flat query (`WHERE series_id = X`, `getSeriesGames`) rather than a predecessor-pointer chain to walk. The `series_id` column stays nullable for FK-set-null safety, but in practice every game has one. See [`database.md`](./database.md) for `getSeriesGames` / `findLiveGameInConversation` and [`realtime.md`](./realtime.md) for the rematch flow.
 
+**`winners` records every winner; `winner` summarizes.** On completion the server maps the engine's `Outcome.winnerRoles` to seat user ids and stores them in `winners` (`jsonb`, default `[]`). For a draw, `winners` lists the co-drawers (empty when every seat drew). `winner` stays as the summary used by cards, series, and older readers: the user id when exactly one seat won, `"draw"` for any draw, otherwise `null` (a shared team win). Stats follow the same rule: listed seats win (or draw on a draw), every other human seat loses, and bot seats never receive stats.
+
 `move` and `game_player` add the constraints that make the generic model safe:
 
 - **`move`** (`schema.ts:138`) - `unique("move_game_number_uq").on(gameId, moveNumber)` keeps move numbers dense and unique per game, so the DB itself rejects a duplicate / double-submit. `onDelete: "cascade"` drops a game's move log with it. `move.game_id` references the UUID `game.id`, not the code.
-- **`game_player`** (`schema.ts:153`) - one row per seat (a normalization of the old `players` JSONB array). `unique("game_player_uq").on(gameId, userId)` makes it impossible to seat a user twice; `index("game_player_user_idx").on(userId)` turns "all games for this user" into a fast indexed join. `seatOrder` preserves turn order; `role` is the engine's per-seat role string (`"X"` / `"O"`). Its `game_id` also references the UUID `game.id`.
+- **`game_player`** (`schema.ts:153`) - one row per seat (a normalization of the old `players` JSONB array). `unique("game_player_uq").on(gameId, userId)` makes it impossible to seat a user twice; `index("game_player_user_idx").on(userId)` turns "all games for this user" into a fast indexed join. `seatOrder` preserves turn order; `role` is the engine's per-seat role string (`"X"` / `"O"`, from `engine.roleForSeat(seatOrder)`). Its `game_id` also references the UUID `game.id`. Bot seats are ordinary rows with `user_id = "bot:<n>"` and username `"<Difficulty> Bot"`; they have no `user` or `user_profile` row, which is why `game_player.user_id` has no foreign key.
 
 ### Auth, chat, social, profile
 
@@ -144,4 +147,6 @@ The remaining tables are conventional relational shapes - one line each:
 
 `game.publicMatch` identifies participant-only anonymous games. `matchmaking_ticket` stores one leased ticket per account, with socket ownership, registered game type, canonical config, queue age, and expiry. Match creation and both seats are committed with ticket removal.
 
-`match_message` is separate from permanent conversations. It stores sender IDs privately, deduplicates client UUIDs per match/sender, and expires messages after seven days. APIs hide all messages after game completion. `match_friend_choice` records each participant's independent consent; an accepted friendship requires both choices. All three tables cascade on account or game deletion where applicable. See [public matchmaking](matchmaking.md).
+`match_message` is separate from permanent conversations and serves every active game without a conversation (public matches and private standalone rooms). It stores sender IDs privately, deduplicates client UUIDs per match/sender, and expires messages after seven days. APIs hide all messages after game completion. `match_friend_choice` records one participant's consent toward one specific participant (`target_user_id`, unique per `(game_id, user_id, target_user_id)`), so any pair in an N-player match can connect; an accepted friendship requires both directions. All three tables cascade on account or game deletion where applicable. See [public matchmaking](matchmaking.md).
+
+Migration `0012_simultaneous_platform` adds `game.winners` (backfilled from single-user `winner` values) and `match_friend_choice.target_user_id` (backfilled with the other seat of existing two-player choices) with the widened unique constraint.

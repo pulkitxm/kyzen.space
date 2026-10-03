@@ -167,25 +167,22 @@ Repositories occasionally need a SQL expression Drizzle's builder doesn't model 
 
 ### `profiles.bumpStats` - read-modify-write of JSONB
 
-`bumpStats` (`profiles.ts:170`) is a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. It's called once per player from the realtime `finalize` helper when a game completes (`apps/server/src/realtime/turn-based.ts:142`) and from `abortGame` when a timed-out game ends by forfeit (`turn-based.ts:213`). Because the `stats` object is small and the call sites are serialized within one move handler, this is fine in practice - but it's a read-modify-write, not an atomic SQL increment, so keep that in mind if stat updates ever fan out across concurrent writers.
+`bumpStats` (`profiles.ts`) is a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. Game completion no longer calls it: `games.persistGameMove` and `games.abortActiveGame` update stats inside their own transaction, locking each human seat's profile row in user-id order, so a completion is counted exactly once even when moves race. Bot seats (`bot:<n>`) are skipped.
 
 ## Data-flow walkthrough: persisting a move
 
-This is the database layer's busiest path, and where the "client is never trusted" insight becomes concrete. A player taps the board, the client emits `make_move`, and the server's turn-based handler `handleMakeMove` runs (`apps/server/src/realtime/turn-based.ts:297`):
+This is the database layer's busiest path, and where the "client is never trusted" insight becomes concrete. A player taps the board, the client emits `make_move`, and `handleMakeMove` resolves the room code and calls the runner's `submitMove` inside the per-game lock (`apps/server/src/realtime/game-runner.ts`):
 
-1. **Load the aggregate.** `games.getGameByCode(payload.gameId)` (`games.ts:100`) returns the `GameRecord` - game row + seats - resolved from the public room **code** the client sent (the wire never carries the UUID). The handler checks `status === "active"` and that the socket's `userId` is actually a seated player. The DB join is what makes the seat check possible.
-2. **Validate with the shared schemas.** `def.moveSchema.safeParse(payload.moveData)` validates the *client's* input (`turn-based.ts:315`), and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB (`turn-based.ts:317`). Both schemas come from the same `GameDefinition` the client imports. A bad move or corrupt state is rejected before any write.
-3. **Reduce - authoritatively.** `def.engine.reduce(...)` (`turn-based.ts:320`) computes the next state on the server. The client's opinion about legality is irrelevant.
-4. **Allocate a move number.** `games.nextMoveNumber(gameRow.id)` (`games.ts:201`) returns `max(moveNumber) + 1` - keyed on the internal UUID `gameRow.id`, since `move.game_id` FKs the UUID. The `move_game_number_uq` constraint is the backstop if two moves race to the same number.
-5. **Append the move.** `games.addMove(...)` (`games.ts:209`) inserts the validated move into the append-only `move` table.
-6. **Persist new state.** `games.updateGame(gameRow.id, { gameState: result.state })` (`games.ts:165`) writes the engine's output back to the `game.game_state` JSONB and bumps `updatedAt`. The shared `applyMove` helper (`turn-based.ts:152`) runs the same persist path for both real and timer auto-moves.
-7. **Finalize on game over.** If the engine's outcome is `completed`, `finalize` (`turn-based.ts:123`) calls `games.updateGame` again (status / `completedAt` / `winner`) and `profiles.bumpStats` (`profiles.ts:170`) once per seat.
+1. **Load the aggregate.** `games.getGameById(id)` returns the `GameRecord` - game row + seats. The runner checks `status === "active"` and that the socket's `userId` holds a seat.
+2. **Validate with the shared schemas.** `def.moveSchema.safeParse(moveData)` validates the *client's* input and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB. A bad move or corrupt state is rejected before any write.
+3. **Reduce - authoritatively.** `def.engine.reduce(...)` computes the next state on the server.
+4. **Persist with compare-and-swap.** `games.persistGameMove({ previous, playerId, moveData, gameState, outcome })` opens one transaction: it locks the active row only if its `game_state` still equals `previous.gameState`, writes the new state, allocates `max(moveNumber) + 1`, appends the move, and on a completed outcome writes `status`, `completedAt`, `winners` (user ids of `winnerRoles`), and `winner` (single winner, `"draw"`, or `null`) and updates every human seat's `user_profile.stats` under row locks. It returns `null` when the state changed underneath, and the runner reloads and retries up to three times.
 
 In arrows:
 
-`make_move` → `handleMakeMove` → `games.getGameByCode` → `moveSchema/stateSchema.safeParse` → `engine.reduce` → `games.nextMoveNumber` → `games.addMove` → `games.updateGame` → `finalize` → `profiles.bumpStats` → broadcast one `game_state` `{ game, move }`.
+`make_move` → `handleMakeMove` → `submitMove` (lock) → `games.getGameById` → `moveSchema/stateSchema.safeParse` → `engine.reduce` → `games.persistGameMove` (state CAS, move, winners, stats) → broadcast one redacted `game_state` `{ game, move }`.
 
-Notice that no SQL appears anywhere in `turn-based.ts` - only `games.*` and `profiles.*` calls. That's the layering working as intended. The full realtime side of this story is in [`realtime.md`](./realtime.md).
+Lobby starts use `games.startLobby` (locks the waiting row, verifies seats and config, inserts bot seats, activates), lobby edits use `games.configureLobby`, and `games.seatPlayer` locks the waiting row and refuses an occupied seat order. Aborts use `games.abortActiveGame(previous, winners)` with the same expected-state guard. Notice that no SQL appears anywhere in the realtime layer - only repository calls. The full realtime side of this story is in [`realtime.md`](./realtime.md).
 
 ## Artificial latency: `latency.ts`
 
