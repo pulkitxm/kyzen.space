@@ -1,5 +1,6 @@
 "use client";
 
+import { CAR_FOOTBALL_BOOST_PADS } from "@kyzen/shared/constants";
 import {
   type CarFootballMove,
   type CarFootballState,
@@ -280,6 +281,7 @@ export function CarFootballGameClient({
   connected,
   userId,
   makeMove,
+  onViewProfile,
 }: GameClientProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<CarFootballState | null>(null);
@@ -289,6 +291,9 @@ export function CarFootballGameClient({
   const wasGroundedRef = useRef(true);
   const audio = useGameAudio();
   const [renderError, setRenderError] = useState(false);
+  const [ballCamera, setBallCamera] = useState(false);
+  const ballCameraRef = useRef(false);
+  ballCameraRef.current = ballCamera;
   const parsed = carFootballStateSchema.safeParse(game.gameState);
   const state = parsed.success ? parsed.data : null;
   const role =
@@ -327,6 +332,20 @@ export function CarFootballGameClient({
     host.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     addArena(scene);
+    const pads = CAR_FOOTBALL_BOOST_PADS.map((pad) => {
+      const mesh = new THREE.Mesh(
+        new THREE.TorusGeometry(1.6, 0.18, 8, 24),
+        new THREE.MeshStandardMaterial({
+          color: 0xffdc6b,
+          emissive: 0xffa500,
+          emissiveIntensity: 2,
+        }),
+      );
+      mesh.rotation.x = Math.PI / 2;
+      mesh.position.set(pad.x, 0.25, pad.y);
+      scene.add(mesh);
+      return mesh;
+    });
     const ball = makeBall();
     scene.add(ball);
     const cars = new Map<string, THREE.Group>();
@@ -354,6 +373,11 @@ export function CarFootballGameClient({
     const tick = () => {
       const current = stateRef.current;
       if (current) {
+        pads.forEach((pad, index) => {
+          pad.material.emissiveIntensity =
+            current.boostPads[index] === 0 ? 2 : 0;
+          pad.scale.setScalar(current.boostPads[index] === 0 ? 1 : 0.55);
+        });
         ball.position.lerp(
           new THREE.Vector3(
             current.ball.position.x,
@@ -383,8 +407,13 @@ export function CarFootballGameClient({
         }
         const own = current.cars.find((car) => car.role === role);
         if (own) {
-          const directionX = Math.cos(own.yaw);
-          const directionZ = Math.sin(own.yaw);
+          const ballAngle = Math.atan2(
+            current.ball.position.y - own.position.y,
+            current.ball.position.x - own.position.x,
+          );
+          const cameraAngle = ballCameraRef.current ? ballAngle : own.yaw;
+          const directionX = Math.cos(cameraAngle);
+          const directionZ = Math.sin(cameraAngle);
           target.set(
             THREE.MathUtils.clamp(own.position.x - directionX * 13, -36, 36),
             own.position.z + 8,
@@ -392,9 +421,15 @@ export function CarFootballGameClient({
           );
           camera.position.lerp(target, 0.08);
           camera.lookAt(
-            own.position.x + directionX * 7,
-            own.position.z + 1.5,
-            own.position.y + directionZ * 7,
+            ballCameraRef.current
+              ? current.ball.position.x
+              : own.position.x + directionX * 7,
+            ballCameraRef.current
+              ? current.ball.position.z
+              : own.position.z + 1.5,
+            ballCameraRef.current
+              ? current.ball.position.y
+              : own.position.y + directionZ * 7,
           );
         } else {
           camera.position.lerp(new THREE.Vector3(0, 40, 48), 0.04);
@@ -437,6 +472,8 @@ export function CarFootballGameClient({
         (target instanceof HTMLElement && target.isContentEditable)
       )
         return;
+      if (event.code === "KeyC" && !event.repeat)
+        setBallCamera((enabled) => !enabled);
       keys.add(event.code);
       if (
         ["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
@@ -469,8 +506,10 @@ export function CarFootballGameClient({
         Arena is loading
       </div>
     );
-  const clock = `${Math.floor(state.timeRemaining / 60)}:${Math.floor(
-    state.timeRemaining % 60,
+  const clockSeconds =
+    state.phase === "overtime" ? state.overtimeSeconds : state.timeRemaining;
+  const clock = `${Math.floor(clockSeconds / 60)}:${Math.floor(
+    clockSeconds % 60,
   )
     .toString()
     .padStart(2, "0")}`;
@@ -491,10 +530,47 @@ export function CarFootballGameClient({
       <div className="pointer-events-none absolute top-4 left-1/2 flex -translate-x-1/2 items-center gap-4 rounded-2xl border border-white/20 bg-[#071727]/80 px-5 py-3 font-bold shadow-xl backdrop-blur-md">
         <span className="text-sky-300">{state.score.blue}</span>
         <span className="min-w-13 text-center text-sm tabular-nums">
-          {state.phase === "overtime" ? "OT" : clock}
+          {state.phase === "overtime" ? `+${clock}` : clock}
         </span>
         <span className="text-orange-300">{state.score.orange}</span>
       </div>
+      <div className="absolute top-20 left-3 space-y-1 rounded-xl bg-[#071727]/75 p-2 text-xs">
+        {game.players.map((player) => (
+          <button
+            key={player.userId}
+            type="button"
+            disabled={!onViewProfile}
+            onClick={() => onViewProfile?.(player)}
+            className={`block max-w-36 truncate text-left ${player.role.startsWith("blue") ? "text-sky-300" : "text-orange-300"}`}
+          >
+            {player.userId === userId ? "You" : player.username} ·{" "}
+            {player.role.endsWith("1") ? "1" : "2"}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        aria-pressed={ballCamera}
+        onClick={() => setBallCamera((enabled) => !enabled)}
+        className="absolute top-20 right-3 rounded-xl border border-white/20 bg-[#071727]/80 px-3 py-2 text-xs"
+      >
+        {ballCamera ? "Ball camera" : "Car camera"} · C
+      </button>
+      {state.endReason ? (
+        <p className="absolute inset-x-0 bottom-20 text-center text-sm">
+          {state.endReason === "forfeit"
+            ? "A team disconnected for 45 seconds. Match forfeited."
+            : "All players disconnected. Match ended as a draw."}
+        </p>
+      ) : null}
+      {!connected ? (
+        <div
+          role="status"
+          className="absolute inset-x-0 top-36 bg-[#071727]/90 p-3 text-center text-sm"
+        >
+          Reconnecting. Controls will resume automatically.
+        </div>
+      ) : null}
       {state.phase === "kickoff" || state.phase === "goal" ? (
         <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-[#071727]/75 px-8 py-5 text-center font-black text-2xl tracking-wide backdrop-blur-md">
           {state.phase === "goal"
@@ -514,7 +590,8 @@ export function CarFootballGameClient({
         </div>
       ) : null}
       <div className="pointer-events-none absolute bottom-4 left-4 hidden rounded-lg bg-[#071727]/75 px-3 py-2 text-white/80 text-xs backdrop-blur-sm md:block">
-        W/S drive · A/D steer · Space jump · Shift boost · Ctrl handbrake
+        W/S drive · A/D steer · Space jump / dodge · Shift boost · Ctrl
+        handbrake · C camera
       </div>
       {controlled ? (
         <div className="absolute inset-x-3 bottom-3 flex items-end justify-between md:hidden">
@@ -539,6 +616,13 @@ export function CarFootballGameClient({
             </TouchButton>
           </div>
           <div className="flex gap-2">
+            <TouchButton
+              code="ControlLeft"
+              label="Handbrake"
+              keys={controlKeysRef}
+            >
+              H
+            </TouchButton>
             <TouchButton code="Space" label="Jump" keys={controlKeysRef}>
               <FaCarSide aria-hidden="true" />
             </TouchButton>

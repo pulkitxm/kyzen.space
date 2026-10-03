@@ -23,6 +23,7 @@ type Loop = {
   lastAccepted: Map<string, number>;
   timer: ReturnType<typeof setInterval>;
   tick: number;
+  startedAt: number;
   persisting: Promise<unknown> | null;
 };
 
@@ -49,6 +50,7 @@ export function startRealtimeGame(io: IOServer, game: GameRecord): void {
     lastAccepted: new Map(),
     timer: undefined as unknown as ReturnType<typeof setInterval>,
     tick: 0,
+    startedAt: Date.now(),
     persisting: null,
   };
   const step = definition.engine.step;
@@ -62,7 +64,16 @@ export function startRealtimeGame(io: IOServer, game: GameRecord): void {
         latest && now - latest.receivedAt <= 250 ? latest.value : NO_INPUT,
       );
     }
-    const result = step(loop.state, inputs, dt);
+    const absent = loop.game.players
+      .filter(
+        (player) =>
+          now - (loop.inputs.get(player.role)?.receivedAt ?? loop.startedAt) >
+          45000,
+      )
+      .map((player) => player.role);
+    const result =
+      definition.engine.onPlayersAbsent?.(loop.state, absent) ??
+      step(loop.state, inputs, dt);
     loop.state = result.state;
     loop.tick += 1;
     if (loop.tick % 2 === 0 || result.outcome.status === "completed") {

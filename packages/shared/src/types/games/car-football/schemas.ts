@@ -16,13 +16,17 @@ const carFootballCarSchema = z
     boost: z.number().min(0).max(100),
     grounded: z.boolean(),
     jumpHeld: z.boolean(),
+    jumpsUsed: z.number().int().min(0).max(2).default(0),
   })
   .strict();
 
 export const carFootballStateSchema = z
   .object({
     phase: phaseSchema,
+    endReason: z.enum(["forfeit", "abandoned"]).nullable().default(null),
     timeRemaining: z.number().min(0),
+    overtimeSeconds: z.number().min(0).default(0),
+    boostPads: z.array(z.number().min(0)).length(6).default([0, 0, 0, 0, 0, 0]),
     pauseRemaining: z.number().min(0),
     score: z
       .object({

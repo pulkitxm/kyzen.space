@@ -1,4 +1,4 @@
-import { CAR_FOOTBALL } from "@kyzen/shared/constants";
+import { CAR_FOOTBALL, CAR_FOOTBALL_BOOST_PADS } from "@kyzen/shared/constants";
 import type {
   CarFootballMove,
   CarFootballState,
@@ -46,6 +46,7 @@ function kickoffCar(
     boost: 33,
     grounded: true,
     jumpHeld: false,
+    jumpsUsed: 0,
   };
 }
 
@@ -66,6 +67,7 @@ function resetKickoff(
       velocity: { x: 0, y: 0, z: 0 },
     },
     cars: kickoffCars(),
+    boostPads: CAR_FOOTBALL_BOOST_PADS.map(() => 0),
   };
 }
 
@@ -104,8 +106,19 @@ function moveCar(
   if (boosting && !car.grounded) car.velocity.z += 6 * dt;
   car.boost = Math.max(0, Math.min(100, car.boost + (boosting ? -32 : 5) * dt));
 
-  if (input?.jump && !car.jumpHeld && car.grounded) {
-    car.velocity.z = 9.5;
+  if (input?.jump && !car.jumpHeld && car.jumpsUsed < 2) {
+    car.velocity.z =
+      car.jumpsUsed === 0 ? 9.5 : Math.max(5, car.velocity.z + 5);
+    if (car.jumpsUsed === 1) {
+      const dodgeX = directionX * throttle - directionY * steer;
+      const dodgeY = directionY * throttle + directionX * steer;
+      const length = Math.hypot(dodgeX, dodgeY);
+      if (length > 0) {
+        car.velocity.x += (dodgeX / length) * 13;
+        car.velocity.y += (dodgeY / length) * 13;
+      }
+    }
+    car.jumpsUsed += 1;
     car.grounded = false;
   }
   car.jumpHeld = input?.jump ?? false;
@@ -125,6 +138,7 @@ function moveCar(
     car.position.z = CAR_HEIGHT;
     car.velocity.z = 0;
     car.grounded = true;
+    car.jumpsUsed = 0;
   }
   if (car.position.z >= CEILING - CAR_HEIGHT) {
     car.position.z = CEILING - CAR_HEIGHT;
@@ -275,7 +289,10 @@ export const carFootballEngine: GameEngine<CarFootballState, CarFootballMove> =
       return resetKickoff(
         {
           phase: "kickoff",
+          endReason: null,
           timeRemaining: MATCH_SECONDS,
+          overtimeSeconds: 0,
+          boostPads: CAR_FOOTBALL_BOOST_PADS.map(() => 0),
           pauseRemaining: 0,
           score: { blue: 0, orange: 0 },
           lastScorer: null,
@@ -289,12 +306,38 @@ export const carFootballEngine: GameEngine<CarFootballState, CarFootballMove> =
       );
     },
 
+    onPlayersAbsent(state, roles) {
+      const blueAbsent = state.cars
+        .filter((car) => car.team === "blue")
+        .every((car) => roles.includes(car.role));
+      const orangeAbsent = state.cars
+        .filter((car) => car.team === "orange")
+        .every((car) => roles.includes(car.role));
+      if (!blueAbsent && !orangeAbsent) return null;
+      const draw = blueAbsent && orangeAbsent;
+      return {
+        state: {
+          ...state,
+          phase: "finished",
+          endReason: draw ? "abandoned" : "forfeit",
+        },
+        outcome: {
+          status: "completed",
+          winnerRole: draw ? null : blueAbsent ? "orange-1" : "blue-1",
+          draw,
+        },
+      };
+    },
+
     step(state, inputs, dt) {
       if (state.phase === "finished")
         return { state, outcome: outcomeFor(state) };
       const next: CarFootballState = {
         ...state,
         score: { ...state.score },
+        boostPads: state.boostPads.map((cooldown) =>
+          Math.max(0, cooldown - dt),
+        ),
         ball: {
           position: { ...state.ball.position },
           velocity: { ...state.ball.velocity },
@@ -315,6 +358,23 @@ export const carFootballEngine: GameEngine<CarFootballState, CarFootballMove> =
       }
 
       for (const car of next.cars) moveCar(car, inputs.get(car.role), dt);
+      for (const [index, pad] of CAR_FOOTBALL_BOOST_PADS.entries()) {
+        if (next.boostPads[index] !== 0) continue;
+        const car = next.cars.find(
+          (candidate) =>
+            candidate.boost < 100 &&
+            candidate.position.z < 2 &&
+            Math.hypot(
+              candidate.position.x - pad.x,
+              candidate.position.y - pad.y,
+            ) < 2.5,
+        );
+        if (car) {
+          car.boost = 100;
+          next.boostPads[index] = 8;
+        }
+      }
+      if (next.phase === "overtime") next.overtimeSeconds += dt;
       collideCars(next.cars);
       collideBallWithCars(next);
       const scorer = moveBall(next, dt);

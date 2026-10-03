@@ -13,6 +13,7 @@ export const carFootballMeta: GameMeta = {
     "Four players join a room, two on blue and two on orange.",
     "Drive with W and S, steer with A and D, jump with Space, and boost with Shift.",
     "Push the ball into the opposing goal. The higher score after three minutes wins.",
+    "Tap jump again in the air to dodge, collect gold boost pads, and toggle ball camera with C.",
     "A tied match goes to sudden-death overtime.",
   ],
 };

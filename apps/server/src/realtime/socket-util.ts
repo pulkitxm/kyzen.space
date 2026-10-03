@@ -63,7 +63,7 @@ export function registerGameEvent<T extends { gameId: string }>(
       const start = performance.now();
       try {
         await run(data);
-        slog.info(
+        slog[event === "make_move" ? "debug" : "info"](
           {
             event,
             gameId: data.gameId,

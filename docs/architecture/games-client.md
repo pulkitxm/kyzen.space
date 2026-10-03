@@ -2,7 +2,7 @@
 
 `@kyzen/games-client` contains React boards and common board primitives. `@kyzen/games-core` contains pure engines; the authoritative server imports that package without importing React.
 
-Turbo Pitch mounts a Three.js arena through the ordinary `GameClientProps` board contract. The board renders authoritative ball and car snapshots, sends bounded control intents through `makeMove`, and owns keyboard and touch input locally. It does not create its own socket or manage chat, profiles, or the room lifecycle.
+Turbo Pitch mounts a Three.js arena through the ordinary `GameClientProps` board contract. The board renders authoritative ball and car snapshots, sends bounded control intents through `makeMove`, and owns keyboard and touch input locally. The arena provides boost pickup indicators, a toggleable ball camera, team profile buttons, touch controls, and reconnect feedback. It does not create its own socket or manage chat, profiles, or the room lifecycle.
 
 ## Board contract
 

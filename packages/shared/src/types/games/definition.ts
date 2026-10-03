@@ -1,4 +1,4 @@
-import type { ZodType } from "zod";
+import type { ZodType, ZodTypeDef } from "zod";
 import type { GameCategoryId } from "./categories";
 import type { GameType } from "./core";
 import type { GameEngine } from "./engine";
@@ -29,7 +29,7 @@ export interface ConfigField {
 export interface GameDefinition<S = unknown, I = unknown, C = unknown> {
   meta: GameMeta;
   engine: GameEngine<S, I>;
-  stateSchema: ZodType<S>;
+  stateSchema: ZodType<S, ZodTypeDef, unknown>;
   moveSchema: ZodType<I>;
   configSchema: ZodType<C>;
   configFields?: ConfigField[];

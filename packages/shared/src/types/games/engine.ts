@@ -33,5 +33,10 @@ export interface GameEngine<State, Input> {
     dt: number,
   ): StepResult<State>;
 
+  onPlayersAbsent?(
+    state: State,
+    roles: readonly string[],
+  ): StepResult<State> | null;
+
   readonly tickRate?: number;
 }

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { CAR_FOOTBALL_BOOST_PADS } from "@kyzen/shared/constants";
 import {
   carFootballMoveSchema,
   carFootballStateSchema,
@@ -123,6 +124,83 @@ describe("Turbo Pitch engine", () => {
     const current = carFootballEngine.step?.(state, new Map(), STEP).state;
     expect(current?.score.blue).toBe(0);
     expect(current?.ball.velocity.x).toBeLessThan(0);
+  });
+
+  test("allows one aerial dodge, requires release, and resets after landing", () => {
+    let state = advance(initial(), 91);
+    const controls = {
+      throttle: 1,
+      steer: 0,
+      jump: true,
+      boost: false,
+      handbrake: false,
+    };
+    const step = (jump: boolean) => {
+      state =
+        carFootballEngine.step?.(
+          state,
+          new Map([["blue-1", { ...controls, jump }]]),
+          STEP,
+        ).state ?? state;
+    };
+    step(true);
+    expect(state.cars[0]?.jumpsUsed).toBe(1);
+    step(true);
+    expect(state.cars[0]?.jumpsUsed).toBe(1);
+    step(false);
+    const speed = state.cars[0]?.velocity.x ?? 0;
+    step(true);
+    expect(state.cars[0]?.jumpsUsed).toBe(2);
+    expect(state.cars[0]?.velocity.x).toBeGreaterThan(speed + 10);
+    step(false);
+    step(true);
+    expect(state.cars[0]?.jumpsUsed).toBe(2);
+    state = advance(state, 150);
+    expect(state.cars[0]?.jumpsUsed).toBe(0);
+  });
+
+  test("boost pickups refill once and recharge after eight seconds", () => {
+    let state = advance(initial(), 91);
+    const car = state.cars[0];
+    const pad = CAR_FOOTBALL_BOOST_PADS[0];
+    if (!car) throw new Error("Missing car");
+    car.position.x = pad.x;
+    car.position.y = pad.y;
+    car.boost = 0;
+    state = advance(state, 1);
+    expect(state.cars[0]?.boost).toBe(100);
+    expect(state.boostPads[0]).toBe(8);
+    const after = state.cars[0];
+    if (!after) throw new Error("Missing car");
+    after.boost = 0;
+    state = advance(state, 1);
+    expect(state.cars[0]?.boost).toBeLessThan(1);
+    state = advance(state, 241);
+    expect(state.cars[0]?.boost).toBe(100);
+  });
+
+  test("a missing teammate can reconnect but an absent team forfeits", () => {
+    const state = advance(initial(), 91);
+    expect(carFootballEngine.onPlayersAbsent?.(state, ["blue-1"])).toBeNull();
+    const result = carFootballEngine.onPlayersAbsent?.(state, [
+      "blue-1",
+      "blue-2",
+    ]);
+    expect(result?.outcome).toEqual({
+      status: "completed",
+      winnerRole: "orange-1",
+      draw: false,
+    });
+    expect(result?.state.endReason).toBe("forfeit");
+    const abandoned = carFootballEngine.onPlayersAbsent?.(
+      state,
+      carFootballEngine.roles,
+    );
+    expect(abandoned?.outcome).toEqual({
+      status: "completed",
+      winnerRole: null,
+      draw: true,
+    });
   });
 
   test("a tied regulation match enters sudden-death overtime", () => {

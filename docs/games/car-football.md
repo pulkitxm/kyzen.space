@@ -6,7 +6,9 @@ Turbo Pitch is an original four-player car football game. Two blue cars play aga
 
 Drive forward and backward, steer, jump, boost, and use the handbrake. Driving and jumping move the car through the field. Boost consumes a regenerating meter and gives a stronger acceleration, including in the air.
 
-Desktop controls are W/S for throttle, A/D for steering, Space to jump, Shift to boost, and Ctrl for the handbrake. Touch controls show steering, throttle, jump, and boost buttons on narrow screens. The arena uses original procedural models, cover art, and synthesized music and effects.
+A second press of Jump in the air performs one additional jump; hold a direction to dodge with a burst of speed. Landing restores both jumps. Six gold boost pads refill the meter and recharge eight seconds after pickup.
+
+Desktop controls are W/S for throttle, A/D for steering, Space to jump, Shift to boost, and Ctrl for the handbrake, and C to switch between car and ball camera. Touch controls show steering, throttle, jump, boost, and handbrake buttons on narrow screens. The arena uses original procedural models, cover art, and synthesized music and effects.
 
 ## Arena and scoring
 
@@ -15,6 +17,8 @@ The field is 80 units long and 50 units wide. The ball starts at the center. Eac
 ## Teams and seats
 
 The four roles are `blue-1`, `orange-1`, `blue-2`, and `orange-2`. Room seats are assigned in that order. The engine stores roles and teams, never user identities. The shared game shell supplies room codes, chat, profiles, and result surfaces.
+
+If both members of a team stop sending controls for 45 seconds, that team forfeits. A lone disconnected teammate has time to rejoin while the other teammate keeps playing. If all players leave, the match closes as a draw. Reconnecting restores the latest authoritative state.
 
 ## State and input
 
