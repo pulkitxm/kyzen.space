@@ -6,6 +6,7 @@ import { installFakeRegistry } from "./support/runtime";
 type AnyGame = {
   id: string;
   code: string;
+  publicMatch?: boolean;
   gameType: string;
   status: string;
   winner: string | null;
@@ -32,6 +33,8 @@ let createInput: {
   gameState?: unknown;
 } | null;
 let createdConfig: unknown = null;
+const rematchCalls: Record<string, unknown>[] = [];
+let existingRoom: AnyGame | null = null;
 const notifyCalls: { userId: string; type: string }[] = [];
 const sentCards: { gameId: string }[] = [];
 
@@ -45,6 +48,23 @@ mock.module("@kyzen/database", () => ({
   games: {
     getGameByCode: async () => prev,
     findLiveGameInConversation: async () => liveGame,
+    createRematch: async (input: AnyGame) => {
+      rematchCalls.push(input);
+      if (existingRoom) return { game: existingRoom, created: false };
+      return {
+        game: {
+          ...input,
+          id: "room-id",
+          code: "ROOM22",
+          winner: null,
+          startedAt: null,
+          completedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        created: true,
+      };
+    },
     createGame: async (input: AnyGame) => {
       createInput = {
         players: input.players,
@@ -96,6 +116,9 @@ mock.module("../src/chat/messages-service", () => ({
 installFakeRegistry();
 
 const { rematchGame } = await import("../src/chat/games-in-chat-service");
+const { attachGameChatHandlers } = await import(
+  "../src/realtime/games-in-chat"
+);
 
 function freshPrev(over: Partial<AnyGame> = {}): AnyGame {
   return {
@@ -131,6 +154,8 @@ describe("rematchGame", () => {
     createdConfig = null;
     notifyCalls.length = 0;
     sentCards.length = 0;
+    rematchCalls.length = 0;
+    existingRoom = null;
   });
 
   test("creates an active rematch with loser first and inherited seriesId", async () => {
@@ -179,12 +204,105 @@ describe("rematchGame", () => {
     expect(createInput).toBeNull();
   });
 
-  test("rejects a rematch of a game with no conversation", async () => {
-    prev = freshPrev({ conversationId: null });
+  test("rejects a rematch of a public match", async () => {
+    prev = freshPrev({ conversationId: null, publicMatch: true });
     const res = await rematchGame({ userId: "u1", gameId: "OLDGM1" });
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.status).toBe(400);
     expect(createInput).toBeNull();
+    expect(rematchCalls).toEqual([]);
+  });
+
+  test("a private room rematch opens a waiting room hosted by the requester", async () => {
+    const config = {
+      mode: "teams",
+      teams: { u1: "A", u2: "B" },
+      bots: [{ id: "bot:1", difficulty: "hard", team: "A" }],
+    };
+    prev = freshPrev({
+      gameType: FAKE_ROUNDS,
+      conversationId: null,
+      config,
+      players: [
+        { userId: "u1", username: "aman", role: "P1" },
+        { userId: "u2", username: "riya", role: "P2" },
+        { userId: "bot:1", username: "Bot 1 (Hard)", role: "P3" },
+      ],
+    });
+    const res = await rematchGame({ userId: "u2", gameId: "OLDGM1" });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.game.id).toBe("ROOM22");
+    expect(res.value.recipients).toEqual(["u1"]);
+    expect(rematchCalls).toEqual([
+      expect.objectContaining({
+        gameType: FAKE_ROUNDS,
+        status: "waiting",
+        players: [{ userId: "u2", username: "aman", role: "P1" }],
+        gameState: null,
+        config,
+        conversationId: null,
+        creatorUserId: "u2",
+        seatingMode: "open",
+        seriesId: "series1",
+      }),
+    ]);
+    expect(createInput).toBeNull();
+    expect(sentCards).toEqual([]);
+    expect(notifyCalls).toEqual([]);
+  });
+
+  test("a repeated private room rematch returns the same room without new invitations", async () => {
+    prev = freshPrev({ conversationId: null });
+    existingRoom = freshPrev({
+      id: "room-id",
+      code: "ROOM22",
+      status: "waiting",
+      conversationId: null,
+    });
+    const res = await rematchGame({ userId: "u2", gameId: "OLDGM1" });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.game.id).toBe("ROOM22");
+    expect(res.value.recipients).toEqual([]);
+  });
+
+  test("the rematch event invites the other humans of a private room by user room", async () => {
+    prev = freshPrev({
+      conversationId: null,
+      players: [
+        { userId: "u1", username: "aman", role: "X" },
+        { userId: "u2", username: "riya", role: "O" },
+      ],
+    });
+    const emits: { room: string; event: string; payload: unknown }[] = [];
+    const io = {
+      to: (room: string) => ({
+        emit: (event: string, payload: unknown) =>
+          emits.push({ room, event, payload }),
+      }),
+    };
+    const handlers = new Map<
+      string,
+      (payload: unknown, ack: unknown) => void
+    >();
+    const socket = {
+      data: { userId: "u1" },
+      on: (event: string, fn: (payload: unknown, ack: unknown) => void) =>
+        handlers.set(event, fn),
+    };
+    attachGameChatHandlers(io as never, socket as never);
+    const ack = await new Promise((resolve) =>
+      handlers.get("game:rematch")?.({ gameId: "OLDGM1" }, resolve),
+    );
+    expect(ack).toEqual({ ok: true, gameId: "ROOM22" });
+    expect(emits).toEqual([
+      {
+        room: "user:u2",
+        event: "game:rematch_created",
+        payload: { newGameId: "ROOM22", previousGameId: "OLDGM1" },
+      },
+    ]);
   });
 
   test("seats the loser of a decisive O win as the first role", async () => {

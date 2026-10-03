@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const BOT_ID_PREFIX = "bot:";
 
+export const LOBBY_MAX_BOTS = 64;
+
 export function isBotId(id: string): boolean {
   return id.startsWith(BOT_ID_PREFIX);
 }
@@ -28,7 +30,7 @@ export const lobbyConfigSchema = z
   .object({
     mode: z.enum(["ffa", "teams"]).default("ffa"),
     teams: z.record(z.string().min(1), teamIdSchema).default({}),
-    bots: z.array(lobbyBotSchema).default([]),
+    bots: z.array(lobbyBotSchema).max(LOBBY_MAX_BOTS).default([]),
   })
   .strict()
   .refine(

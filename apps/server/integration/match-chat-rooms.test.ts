@@ -1,8 +1,9 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { db, friends, games, matchChat, schema } from "@kyzen/database";
-import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import { TANK_ARENA, TIC_TAC_TOE } from "@kyzen/shared/constants";
 import type { Socket } from "socket.io";
 import { createGameInConversation } from "../src/chat/games-in-chat-service";
+import { leaveRoom } from "../src/realtime/lobby";
 import { createStandaloneGame } from "../src/realtime/rooms-service";
 import { handleJoinRoom } from "../src/realtime/turn-based";
 import { turnTimers } from "../src/realtime/turn-timer";
@@ -18,7 +19,10 @@ afterAll(async () => {
   await h.cleanup();
 });
 
-const io = { to: () => ({ emit: () => {} }) } as never;
+const io = {
+  to: () => ({ emit: () => {} }),
+  in: () => ({ socketsLeave: () => {} }),
+} as never;
 
 async function publicMatch(users: TestUser[]): Promise<string> {
   const [row] = await db
@@ -154,6 +158,45 @@ describe.skipIf(!DB_UP)("private room match chat", () => {
     ).rejects.toThrow("Match not found");
     await expect(
       matchChat.chooseMatchFriend(created.code, guest.id, host.id),
+    ).rejects.toThrow("Match not found");
+  });
+
+  it("lets seated players coordinate in a waiting lobby", async () => {
+    const host = await h.makeUser("lhost");
+    const guest = await h.makeUser("lguest");
+    const outsider = await h.makeUser("lout");
+    const created = unwrap(
+      await createStandaloneGame({
+        userId: host.id,
+        gameType: TANK_ARENA,
+        config: { mode: "teams" },
+      }),
+    );
+    const room = await games.getGameByCode(created.code);
+    if (room) h.trackGame(room.id);
+    await handleJoinRoom(
+      io,
+      {
+        data: { userId: guest.id },
+        join: () => {},
+        emit: () => {},
+      } as never as Socket,
+      { gameId: created.code },
+    );
+    expect((await games.getGameByCode(created.code))?.status).toBe("waiting");
+
+    const sent = await message(created.code, host, "lobby synthetic plan");
+    const reply = await message(created.code, guest, "lobby synthetic reply");
+    expect(
+      (await matchChat.readMatchChat(created.code, guest.id)).messages,
+    ).toEqual([sent, reply]);
+    await expect(message(created.code, outsider, "not seated")).rejects.toThrow(
+      "Match not found",
+    );
+
+    expect(await leaveRoom(io, guest.id, created.code)).toEqual({ ok: true });
+    await expect(
+      matchChat.readMatchChat(created.code, guest.id),
     ).rejects.toThrow("Match not found");
   });
 

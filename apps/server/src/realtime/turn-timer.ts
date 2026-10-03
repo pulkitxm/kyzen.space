@@ -1,3 +1,5 @@
+import type { GameJson } from "@kyzen/shared/types";
+
 const FIRST_TURN_MS = 30_000;
 const BASE_MS = 30_000;
 const MIN_MS = 10_000;
@@ -87,11 +89,11 @@ export class TurnTimerManager {
   }
 
   isFirstTurn(gameId: string, role: string): boolean {
-    return !this.seat(gameId, role).started;
+    return !this.games.get(gameId)?.seats.get(role)?.started;
   }
 
   strikes(gameId: string, role: string): number {
-    return this.seat(gameId, role).strikes;
+    return this.games.get(gameId)?.seats.get(role)?.strikes ?? 0;
   }
 
   setStrikes(gameId: string, role: string, value: number): void {
@@ -149,3 +151,14 @@ export class TurnTimerManager {
 }
 
 export const turnTimers = new TurnTimerManager();
+
+export function withTimerFields(game: GameJson, gameId: string): GameJson {
+  return {
+    ...game,
+    turnDeadline: turnTimers.deadline(gameId),
+    players: game.players.map((player) => ({
+      ...player,
+      timeoutStrikes: turnTimers.strikes(gameId, player.role),
+    })),
+  };
+}

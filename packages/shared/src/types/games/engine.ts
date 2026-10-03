@@ -47,6 +47,8 @@ export interface GameEngine<State, Input> {
 
   publicMove?(state: State, move: Input): unknown;
 
+  resultDelayMs?(state: State): number;
+
   playerCount?(config: unknown): number;
 
   step?(

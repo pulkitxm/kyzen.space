@@ -1,5 +1,5 @@
 import { ANON_MAX_FRIENDS } from "@kyzen/shared/constants";
-import { isBotId, type MatchMessage } from "@kyzen/shared/types";
+import { isBotId, isGameLive, type MatchMessage } from "@kyzen/shared/types";
 import {
   and,
   count,
@@ -75,20 +75,19 @@ export async function readMatchChat(code: string, userId: string) {
       .select()
       .from(matchFriendChoice)
       .where(eq(matchFriendChoice.gameId, row.id));
-    const rows =
-      row.status === "active"
-        ? await tx
-            .select()
-            .from(matchMessage)
-            .where(
-              and(
-                eq(matchMessage.gameId, row.id),
-                gt(matchMessage.expiresAt, new Date()),
-              ),
-            )
-            .orderBy(desc(matchMessage.createdAt), desc(matchMessage.id))
-            .limit(100)
-        : [];
+    const rows = isGameLive(row.status)
+      ? await tx
+          .select()
+          .from(matchMessage)
+          .where(
+            and(
+              eq(matchMessage.gameId, row.id),
+              gt(matchMessage.expiresAt, new Date()),
+            ),
+          )
+          .orderBy(desc(matchMessage.createdAt), desc(matchMessage.id))
+          .limit(100)
+      : [];
     const chosen = choices
       .filter((choice) => choice.userId === userId)
       .map((choice) => choice.targetUserId);
@@ -144,7 +143,7 @@ export async function sendMatchMessage(input: {
 }): Promise<MatchMessage> {
   return db.transaction(async (tx) => {
     const { row, players } = await participant(tx, input.code, input.userId);
-    if (row.status !== "active") throw new Error("Match chat has ended");
+    if (!isGameLive(row.status)) throw new Error("Match chat has ended");
     const [existing] = await tx
       .select()
       .from(matchMessage)

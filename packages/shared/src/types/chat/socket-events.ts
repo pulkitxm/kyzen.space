@@ -62,7 +62,10 @@ export type ClientCreateGameInConversation = z.infer<
 
 export type ClientRematch = z.infer<typeof clientRematchSchema>;
 
-export type ServerRematchCreated = { newGameId: string };
+export type ServerRematchCreated = {
+  newGameId: string;
+  previousGameId?: string;
+};
 
 export type ServerMessageNew = { message: MessageJson; clientId?: string };
 

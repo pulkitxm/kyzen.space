@@ -75,6 +75,7 @@ describe("lobby seats", () => {
         bots: [
           { id: "bot:7", difficulty: "normal", team: "A" },
           { id: "bot:3", difficulty: "hard", team: "B" },
+          { id: "bot:4", difficulty: "hard", team: "B" },
         ],
       }),
     );
@@ -83,10 +84,12 @@ describe("lobby seats", () => {
       { role: "P2", team: "P2", bot: null },
       { role: "P3", team: "P3", bot: "normal" },
       { role: "P4", team: "P4", bot: "hard" },
+      { role: "P5", team: "P5", bot: "hard" },
     ]);
     expect(bots).toEqual([
-      { userId: "bot:7", username: "Normal Bot", role: "P3" },
-      { userId: "bot:3", username: "Hard Bot", role: "P4" },
+      { userId: "bot:7", username: "Bot 1 (Normal)", role: "P3" },
+      { userId: "bot:3", username: "Bot 2 (Hard)", role: "P4" },
+      { userId: "bot:4", username: "Bot 3 (Hard)", role: "P5" },
     ]);
   });
 

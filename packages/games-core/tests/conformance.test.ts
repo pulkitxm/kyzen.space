@@ -234,6 +234,14 @@ for (const def of DEFINITIONS) {
       expect(Number.isFinite(engine.roundTimeMs(state))).toBe(true);
     });
 
+    test("resultDelayMs is a finite, non-negative delay", () => {
+      const { engine } = def;
+      if (!engine.resultDelayMs) return;
+      const delay = engine.resultDelayMs(initial(def));
+      expect(Number.isFinite(delay)).toBe(true);
+      expect(delay).toBeGreaterThanOrEqual(0);
+    });
+
     test("botMove returns a legal move at every difficulty", () => {
       const { engine } = def;
       if (!engine.botMove || !engine.reduce) return;

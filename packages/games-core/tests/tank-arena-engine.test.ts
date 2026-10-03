@@ -454,6 +454,37 @@ describe("round clock", () => {
     );
     expect(engine.pendingRoles?.(second)).toEqual(["p1", "p2"]);
   });
+
+  test("result delay covers the latest replay plus the results banner", () => {
+    const selecting = engine.createInitialState(seats(2), {
+      config: {},
+      seed: 1,
+    });
+    expect(engine.resultDelayMs?.(selecting)).toBe(0);
+    expect(engine.resultDelayMs?.(duel())).toBe(0);
+    const second = idleRound(duel());
+    const replay =
+      Math.round(((second.resolution?.steps ?? 0) * 1000) / 60) + RESULTS_MS;
+    expect(engine.resultDelayMs?.(second)).toBe(replay);
+    expect(engine.roundTimeMs?.(second)).toBe(PLANNING_MS + replay);
+
+    const finished = lockAll(second, {
+      p1: { type: "forfeit", round: second.round },
+    });
+    expect(finished.phase).toBe("finished");
+    const final = finished.resolution?.steps ?? 0;
+    expect(engine.resultDelayMs?.(finished)).toBe(
+      Math.round((final * 1000) / 60) + RESULTS_MS,
+    );
+  });
+
+  test("a game decided during tank select has no result delay", () => {
+    let state = engine.createInitialState(seats(2), { config: {}, seed: 1 });
+    state = apply(state, "p1", { type: "forfeit", round: 0 });
+    state = apply(state, "p2", { type: "select", round: 0, tank: "kestrel" });
+    expect(state.phase).toBe("finished");
+    expect(engine.resultDelayMs?.(state)).toBe(0);
+  });
 });
 
 describe("cooldowns", () => {

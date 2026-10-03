@@ -4,7 +4,13 @@ import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import type { GameRecord, GameType } from "@kyzen/shared/types";
 import { inArray } from "drizzle-orm";
 import type { Server, Socket } from "socket.io";
-import { startRoom } from "../src/realtime/lobby";
+import { __timerInternals } from "../src/realtime/game-runner";
+import {
+  configureRoom,
+  kickPlayer,
+  leaveRoom,
+  startRoom,
+} from "../src/realtime/lobby";
 import { initialState, publicSeats } from "../src/realtime/setup";
 import { handleMakeMove } from "../src/realtime/turn-based";
 import { turnTimers } from "../src/realtime/turn-timer";
@@ -13,6 +19,8 @@ import {
   type FakeMove,
   type FakeState,
   fakeRoundsDefinition,
+  LEAVE,
+  REPLAY_MS,
 } from "../tests/support/fake-rounds";
 import { installFakeRegistry } from "../tests/support/runtime";
 import { createHarness, DB_UP, type TestUser } from "./harness";
@@ -27,9 +35,13 @@ afterAll(async () => {
 
 const engine = fakeRoundsDefinition.engine;
 const wire: unknown[] = [];
+const left: string[] = [];
 const io = {
   to: () => ({
     emit: (_event: string, payload: unknown) => wire.push(payload),
+  }),
+  in: (room: string) => ({
+    socketsLeave: () => left.push(room),
   }),
 } as unknown as Server;
 
@@ -134,8 +146,8 @@ describe.skipIf(!DB_UP)("simultaneous lobbies against PostgreSQL", () => {
     expect(started.players.map((p) => [p.userId, p.username, p.role])).toEqual([
       [a.id, a.username, "P1"],
       [b.id, b.username, "P2"],
-      ["bot:1", "Hard Bot", "P3"],
-      ["bot:2", "Easy Bot", "P4"],
+      ["bot:1", "Bot 1 (Hard)", "P3"],
+      ["bot:2", "Bot 2 (Easy)", "P4"],
     ]);
     expect(await games.listMoves(started.id)).toHaveLength(2);
 
@@ -256,6 +268,141 @@ describe.skipIf(!DB_UP)("simultaneous lobbies against PostgreSQL", () => {
       ),
     ).toBe(false);
     expect((await record(code)).players).toHaveLength(2);
+  });
+});
+
+describe.skipIf(!DB_UP)("lobby rules against PostgreSQL", () => {
+  it("rejects configuring or starting teams mode with a single team", async () => {
+    const a = await h.makeUser("ta1");
+    const b = await h.makeUser("tb1");
+    const together = {
+      mode: "teams",
+      teams: { [a.id]: "A", [b.id]: "A" },
+      bots: [],
+    };
+    const code = await lobby([a, b], together);
+    expect(await startRoom(io, a.id, code)).toEqual({
+      ok: false,
+      error: "Teams mode needs players on at least two teams",
+    });
+    expect(
+      await configureRoom(io, a.id, code, {
+        ...together,
+        bots: [{ id: "bot:1", difficulty: "easy", team: "A" }],
+      }),
+    ).toEqual({
+      ok: false,
+      error: "Teams mode needs players on at least two teams",
+    });
+    expect(
+      await configureRoom(io, a.id, code, {
+        ...together,
+        teams: { [a.id]: "A", [b.id]: "A", stranger: "B" },
+      }),
+    ).toEqual({
+      ok: false,
+      error: "Teams can only list seated players and bots",
+    });
+    expect((await record(code)).status).toBe("waiting");
+    expect(
+      await configureRoom(io, a.id, code, {
+        mode: "teams",
+        teams: { [a.id]: "A", [b.id]: "B" },
+        bots: [],
+      }),
+    ).toEqual({ ok: true });
+    expect(await startRoom(io, a.id, code)).toEqual({ ok: true });
+    expect((await record(code)).players.map((player) => player.userId)).toEqual(
+      [a.id, b.id],
+    );
+  });
+
+  it("lets a guest leave and the host remove a guest before the start", async () => {
+    const a = await h.makeUser("la");
+    const b = await h.makeUser("lb");
+    const c = await h.makeUser("lc");
+    const d = await h.makeUser("ld");
+    const code = await lobby([a, b, c, d], {
+      mode: "teams",
+      teams: { [a.id]: "A", [b.id]: "B", [c.id]: "A", [d.id]: "B" },
+      bots: [],
+    });
+    left.length = 0;
+    expect(await leaveRoom(io, a.id, code)).toEqual({
+      ok: false,
+      error: "The host cannot leave the lobby",
+    });
+    expect(await leaveRoom(io, b.id, code)).toEqual({ ok: true });
+    expect(await kickPlayer(io, b.id, code, c.id)).toEqual({
+      ok: false,
+      error: "Only the host can change the lobby",
+    });
+    expect(await kickPlayer(io, a.id, code, b.id)).toEqual({
+      ok: false,
+      error: "Player not found",
+    });
+    expect(await kickPlayer(io, a.id, code, c.id)).toEqual({ ok: true });
+    const after = await record(code);
+    expect(after.players.map((player) => [player.userId, player.role])).toEqual(
+      [
+        [a.id, "P1"],
+        [d.id, "P2"],
+      ],
+    );
+    expect(after.config).toEqual({
+      mode: "teams",
+      teams: { [a.id]: "A", [d.id]: "B" },
+      bots: [],
+    });
+    expect(left).toEqual([`user:${b.id}`, `user:${c.id}`]);
+    expect(await startRoom(io, a.id, code)).toEqual({ ok: true });
+    expect(await kickPlayer(io, a.id, code, d.id)).toEqual({
+      ok: false,
+      error: "Game already started",
+    });
+  });
+
+  it("paces bot-only rounds on the bot clock instead of resolving them at once", async () => {
+    const a = await h.makeUser("bo");
+    const code = await lobby([a], {
+      mode: "ffa",
+      teams: {},
+      bots: [
+        { id: "bot:1", difficulty: "hard", team: "A" },
+        { id: "bot:2", difficulty: "easy", team: "A" },
+      ],
+      rounds: 3,
+    });
+    expect(await startRoom(io, a.id, code)).toEqual({ ok: true });
+    const id = (await record(code)).id;
+    const before = Date.now();
+    await handleMakeMove(io, socket(a.id), {
+      gameId: code,
+      moveData: { round: 1, value: LEAVE },
+    });
+    const waiting = await record(code);
+    expect((waiting.gameState as FakeState).round).toBe(2);
+    expect(await games.listMoves(id)).toHaveLength(3);
+    expect(turnTimers.armedKey(id)).toBe("bots:round:2");
+    const deadline = turnTimers.deadline(id) ?? 0;
+    expect(deadline).toBeGreaterThanOrEqual(before + REPLAY_MS);
+    expect(deadline).toBeLessThanOrEqual(Date.now() + REPLAY_MS);
+
+    await __timerInternals.onBotClock(io, id, "bots:round:1");
+    expect(await games.listMoves(id)).toHaveLength(3);
+
+    await __timerInternals.onBotClock(io, id, "bots:round:2");
+    const rows = await games.listMoves(id);
+    expect(rows.map((row) => [row.moveNumber, row.playerId])).toEqual([
+      [1, "bot:1"],
+      [2, "bot:2"],
+      [3, a.id],
+      [4, "bot:1"],
+      [5, "bot:2"],
+    ]);
+    expect(((await record(code)).gameState as FakeState).round).toBe(3);
+    expect(turnTimers.armedKey(id)).toBe("bots:round:3");
+    turnTimers.dispose(id);
   });
 });
 

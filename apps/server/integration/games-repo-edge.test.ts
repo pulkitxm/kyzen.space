@@ -177,3 +177,130 @@ describe.skipIf(!DB_UP)("findLiveGameInConversation status filter", () => {
     ).toBeNull();
   });
 });
+
+describe.skipIf(!DB_UP)(
+  "batched moves, lobby removal, and rematch rooms",
+  () => {
+    it("persistGameMoves writes a batch with consecutive numbers under one state check", async () => {
+      const a = await h.makeUser("batchA");
+      const record = await createSoloGame(a, { status: "active" });
+      const next = {
+        board: ["X", "O", null, null, null, null, null, null, null],
+      };
+      const saved = await games.persistGameMoves({
+        previous: record,
+        moves: [
+          { playerId: a.id, moveData: { row: 0, col: 0 } },
+          { playerId: "bot:1", moveData: { row: 0, col: 1 } },
+        ],
+        gameState: next,
+        outcome: { status: "active" },
+      });
+      expect(saved?.moves.map((row) => [row.moveNumber, row.playerId])).toEqual(
+        [
+          [1, a.id],
+          [2, "bot:1"],
+        ],
+      );
+      expect(saved?.game.gameState).toEqual(next);
+
+      const stale = await games.persistGameMoves({
+        previous: record,
+        moves: [{ playerId: a.id, moveData: { row: 2, col: 2 } }],
+        gameState: emptyState,
+        outcome: { status: "active" },
+      });
+      expect(stale).toBeNull();
+      expect(
+        (await games.listMoves(record.id)).map((row) => row.moveNumber),
+      ).toEqual([1, 2]);
+      expect((await games.getGameById(record.id))?.gameState).toEqual(next);
+    });
+
+    it("removeLobbyPlayer compacts seats, renumbers roles, and drops the team entry", async () => {
+      const [a, b, c] = await Promise.all(
+        ["rmA", "rmB", "rmC"].map((label) => h.makeUser(label)),
+      );
+      if (!a || !b || !c) throw new Error("users missing");
+      const record = await games.createGame({
+        gameType: TIC_TAC_TOE,
+        status: "waiting",
+        players: [a, b, c].map((user, index) => ({
+          userId: user.id,
+          username: user.username,
+          role: `P${index + 1}`,
+        })),
+        gameState: null,
+        config: {
+          mode: "teams",
+          teams: { [a.id]: "A", [b.id]: "B" },
+          bots: [],
+        },
+        creatorUserId: a.id,
+        seatingMode: "open",
+      });
+      h.trackGame(record.id);
+      const roleForSeat = (index: number) => `P${index + 1}`;
+      const updated = await games.removeLobbyPlayer({
+        gameId: record.id,
+        userId: b.id,
+        roleForSeat,
+      });
+      expect(updated?.players.map((p) => [p.userId, p.role])).toEqual([
+        [a.id, "P1"],
+        [c.id, "P2"],
+      ]);
+      expect(updated?.config).toEqual({
+        mode: "teams",
+        teams: { [a.id]: "A" },
+        bots: [],
+      });
+      expect(
+        await games.removeLobbyPlayer({
+          gameId: record.id,
+          userId: b.id,
+          roleForSeat,
+        }),
+      ).toBeNull();
+      const d = await h.makeUser("rmD");
+      expect(
+        await games.seatPlayer(
+          record.id,
+          { userId: d.id, username: d.username, role: "P3" },
+          2,
+        ),
+      ).toBe(true);
+      expect(
+        (await games.getPlayers(record.id)).map((p) => [p.userId, p.role]),
+      ).toEqual([
+        [a.id, "P1"],
+        [c.id, "P2"],
+        [d.id, "P3"],
+      ]);
+    });
+
+    it("createRematch opens one live room per series even under concurrent clicks", async () => {
+      const [a, b] = await Promise.all(
+        ["crA", "crB"].map((label) => h.makeUser(label)),
+      );
+      if (!a || !b) throw new Error("users missing");
+      const finished = await createSoloGame(a, { status: "completed" });
+      const open = (user: TestUser) =>
+        games.createRematch({
+          gameType: TIC_TAC_TOE,
+          status: "waiting",
+          players: [{ userId: user.id, username: user.username, role: "X" }],
+          gameState: null,
+          creatorUserId: user.id,
+          seatingMode: "open",
+          seriesId: finished.seriesId ?? finished.id,
+        });
+      const results = await Promise.all([open(a), open(b), open(a)]);
+      for (const result of results) h.trackGame(result.game.id);
+      expect(results.filter((result) => result.created)).toHaveLength(1);
+      expect(new Set(results.map((result) => result.game.code)).size).toBe(1);
+      const series = await games.getSeriesGames(finished.seriesId ?? "");
+      expect(series.map((row) => row.status)).toEqual(["completed", "waiting"]);
+    });
+  },
+);

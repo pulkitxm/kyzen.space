@@ -84,6 +84,21 @@ export const clientRoomStartSchema = z
   .strict();
 export type ClientRoomStart = z.infer<typeof clientRoomStartSchema>;
 
+export const clientRoomLeaveSchema = z
+  .object({
+    gameId: gameCodeSchema,
+  })
+  .strict();
+export type ClientRoomLeave = z.infer<typeof clientRoomLeaveSchema>;
+
+export const clientRoomKickSchema = z
+  .object({
+    gameId: gameCodeSchema,
+    userId: z.string().min(1),
+  })
+  .strict();
+export type ClientRoomKick = z.infer<typeof clientRoomKickSchema>;
+
 export const clientMatchFriendSchema = z
   .object({
     gameId: gameCodeSchema,

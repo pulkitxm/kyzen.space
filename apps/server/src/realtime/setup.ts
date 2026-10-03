@@ -53,8 +53,8 @@ export function lobbySettings(config: unknown): LobbyConfig {
   return parsed.success ? parsed.data : DEFAULT_LOBBY;
 }
 
-function botUsername(difficulty: BotDifficulty): string {
-  return `${difficulty.charAt(0).toUpperCase()}${difficulty.slice(1)} Bot`;
+function botUsername(position: number, difficulty: BotDifficulty): string {
+  return `Bot ${position} (${difficulty.charAt(0).toUpperCase()}${difficulty.slice(1)})`;
 }
 
 export function lobbySeats(
@@ -92,7 +92,7 @@ export function lobbySeats(
   });
   const bots = lobby.bots.map((bot, index) => ({
     userId: bot.id,
-    username: botUsername(bot.difficulty),
+    username: botUsername(index + 1, bot.difficulty),
     role: engine.roleForSeat(humans.length + index),
   }));
   return { seats, bots };

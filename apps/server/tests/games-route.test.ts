@@ -41,6 +41,7 @@ mock.module("@kyzen/database", () => ({
 }));
 
 const { gamesRouter } = await import("../src/api/routes/games");
+const { turnTimers } = await import("../src/realtime/turn-timer");
 
 function record(over: Record<string, unknown> = {}) {
   return {
@@ -115,6 +116,41 @@ describe("GET /api/games/:gameId", () => {
     expect(body.game.id).not.toBe(UUID);
     expect(body.moves[0]?.gameId).toBe(CODE);
     expect(body.moves[0]?.gameId).not.toBe(UUID);
+  });
+
+  test("carries the turn deadline and strikes exactly like socket payloads", async () => {
+    found = record();
+    turnTimers.reset();
+    turnTimers.arm(UUID, "turn:test", 30_000, () => {}, "X");
+    turnTimers.setStrikes(UUID, "O", 2);
+    const deadline = turnTimers.deadline(UUID);
+    const res = await gamesRouter.request(`/${CODE}`);
+    turnTimers.reset();
+    const body = (await res.json()) as {
+      game: {
+        turnDeadline: number | null;
+        players: { userId: string; timeoutStrikes: number }[];
+      };
+    };
+    expect(deadline).not.toBeNull();
+    expect(body.game.turnDeadline).toBe(deadline as number);
+    expect(body.game.players.map((p) => [p.userId, p.timeoutStrikes])).toEqual([
+      ["u1", 0],
+      ["u2", 2],
+    ]);
+  });
+
+  test("an unclocked game reports no deadline and zero strikes", async () => {
+    found = record({ status: "completed" });
+    const res = await gamesRouter.request(`/${CODE}`);
+    const body = (await res.json()) as {
+      game: {
+        turnDeadline: number | null;
+        players: { timeoutStrikes: number }[];
+      };
+    };
+    expect(body.game.turnDeadline).toBeNull();
+    expect(body.game.players.map((p) => p.timeoutStrikes)).toEqual([0, 0]);
   });
 
   test("passes a lowercase code through and serializes the stored canonical code", async () => {

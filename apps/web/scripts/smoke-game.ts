@@ -409,8 +409,9 @@ function verifyResolution(state: TankArenaState): void {
   if (result.steps !== state.resolution.steps)
     throw new Error(`Round ${state.resolution.round} replayed a new length`);
   const width = arenaWidth(state);
+  const tanks = new Map(state.tanks.map((tank) => [tank.role, tank]));
   for (const out of result.tanks) {
-    const tank = state.tanks.find((entry) => entry.role === out.role);
+    const tank = tanks.get(out.role);
     if (!tank) throw new Error(`Round replay invented ${out.role}`);
     const dx = Math.abs(round4(out.x) - tank.x) % width;
     const drift = Math.min(dx, width - dx) + Math.abs(round4(out.y) - tank.y);
@@ -434,8 +435,9 @@ async function verifyTankGame(
   const outcome = state.outcome;
   if (game.status !== "completed" || state.phase !== "finished" || !outcome)
     throw new Error("The Tank Arena game did not complete");
+  const winnerRoles = new Set(outcome.winnerRoles);
   const winners = game.players
-    .filter((player) => outcome.winnerRoles.includes(player.role))
+    .filter((player) => winnerRoles.has(player.role))
     .map((player) => player.userId);
   const winner = outcome.draw
     ? "draw"
@@ -474,12 +476,13 @@ async function verifyTankGame(
     throw new Error(
       `Expected ${expectedMoves} persisted moves, found ${moves.length}`,
     );
+  const seatRoles = new Map(
+    game.players.map((player) => [player.userId, player.role]),
+  );
   for (const move of moves) {
     const data = move.moveData as TankArenaMove;
     if (data.type === "select") continue;
-    const role = game.players.find(
-      (player) => player.userId === move.playerId,
-    )?.role;
+    const role = seatRoles.get(move.playerId);
     const plan = role
       ? record?.resolved.get(data.round)?.resolution?.plans[role]
       : undefined;
@@ -579,7 +582,8 @@ async function privateTankLobby(pool: Guest[]): Promise<string> {
     JSON.stringify(tankState(opening.game).seats) !==
       JSON.stringify(expectedSeats) ||
     !opening.game.players.some(
-      (player) => player.userId === "bot:1" && player.username === "Normal Bot",
+      (player) =>
+        player.userId === "bot:1" && player.username === "Bot 1 (Normal)",
     )
   )
     throw new Error("The started lobby has the wrong seats");
@@ -611,8 +615,9 @@ async function privateTankLobby(pool: Guest[]): Promise<string> {
   await playTankRounds(code, seats, 2);
   await forfeitTeam(code, seats, "A");
   const { snapshot, state, rounds } = await verifyTankGame(code, host.guest);
+  const winnerIds = new Set(snapshot.game.winners);
   const names = snapshot.game.players
-    .filter((player) => snapshot.game.winners?.includes(player.userId))
+    .filter((player) => winnerIds.has(player.userId))
     .map((player) => player.username);
   const team = state.outcome?.draw
     ? "a draw"
@@ -624,21 +629,22 @@ async function matchTankQueue(
   players: TankPlayer[],
   config: { mode: "ffa" | "teams" },
 ): Promise<string> {
-  let code: string | null = null;
-  for (const [index, player] of players.entries()) {
-    const ack = (await player.socket
-      .timeout(8000)
-      .emitWithAck("game:queue_join", { gameType: TANK_ARENA, config })) as {
-      ok: boolean;
-      gameId: string | null;
-    };
-    if (!ack.ok) throw new Error("Tank Arena queue join failed");
-    if (index < players.length - 1 && ack.gameId)
+  const [player, ...waiting] = players;
+  if (!player) throw new Error("The Tank Arena queue did not match");
+  const ack = (await player.socket
+    .timeout(8000)
+    .emitWithAck("game:queue_join", { gameType: TANK_ARENA, config })) as {
+    ok: boolean;
+    gameId: string | null;
+  };
+  if (!ack.ok) throw new Error("Tank Arena queue join failed");
+  if (waiting.length) {
+    if (ack.gameId)
       throw new Error("The Tank Arena queue matched before it filled");
-    code = ack.gameId;
+    return matchTankQueue(waiting, config);
   }
-  if (!code) throw new Error("The Tank Arena queue did not match");
-  return code;
+  if (!ack.gameId) throw new Error("The Tank Arena queue did not match");
+  return ack.gameId;
 }
 
 async function seatPublicTank(
@@ -648,20 +654,21 @@ async function seatPublicTank(
   const identities = new RegExp(
     players.map((player) => player.guest.userId).join("|"),
   );
-  const seats: TankSeat[] = [];
-  for (const player of players) {
-    const snapshot = await fetchTank(code, player.guest);
-    const viewer = snapshot.game.viewerId;
-    const role = snapshot.game.players.find(
-      (entry) => entry.userId === viewer,
-    )?.role;
-    if (!role || viewer !== `${code}:${role}`)
-      throw new Error("A public Tank Arena seat has no alias");
-    if (identities.test(JSON.stringify(snapshot)))
-      throw new Error("A public Tank Arena snapshot leaked an identity");
-    await joinTankRoom(player, code);
-    seats.push({ player, role });
-  }
+  const seats = await Promise.all(
+    players.map(async (player): Promise<TankSeat> => {
+      const snapshot = await fetchTank(code, player.guest);
+      const viewer = snapshot.game.viewerId;
+      const role = snapshot.game.players.find(
+        (entry) => entry.userId === viewer,
+      )?.role;
+      if (!role || viewer !== `${code}:${role}`)
+        throw new Error("A public Tank Arena seat has no alias");
+      if (identities.test(JSON.stringify(snapshot)))
+        throw new Error("A public Tank Arena snapshot leaked an identity");
+      await joinTankRoom(player, code);
+      return { player, role };
+    }),
+  );
   return { seats, identities };
 }
 
@@ -718,8 +725,8 @@ async function publicTankTeams(pool: Guest[]): Promise<string> {
   const losing = roleTeam(opening, first.role);
   if (!losing) throw new Error("The first 2v2 seat has no team");
   const forfeited = played.game.status === "active";
-  const snapshot = await forfeitTeam(code, seats, losing);
-  const { state } = await verifyTankGame(code, first.player.guest);
+  await forfeitTeam(code, seats, losing);
+  const { snapshot, state } = await verifyTankGame(code, first.player.guest);
   const winningTeam = state.outcome?.draw
     ? null
     : roleTeam(state, state.outcome?.winnerRoles[0] ?? "");

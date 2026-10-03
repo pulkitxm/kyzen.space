@@ -188,7 +188,7 @@ The nine-element `board` array is index-mapped as `board[row * 3 + col]`. All `n
    - Checks `ctx.role === state.currentTurn` → `"X" === "X"` ✓
    - Checks `board[0]` is `null` ✓
    - Returns `{ board: ["X",null,…], currentTurn: "O" }`.
-4. **Persist** - `games.persistGameMove(...)` checks that `game_state` is still the state that was reduced, writes the new `game_state`, and inserts the move row; the row's `player_id` holds the mover's user id.
+4. **Persist** - `games.persistGameMoves(...)` checks that `game_state` is still the state that was reduced, writes the new `game_state`, and inserts the move rows (one per submission, consecutive numbers); the row's `player_id` holds the mover's user id.
 
 ```
 move row
@@ -205,7 +205,7 @@ game row (updated)
 
 ### Phase 4 - Bob replies `{1,0}` then `{2,1}`; Alice completes the top row and wins
 
-Play alternates `X, O, X, O, X`: Bob takes `{1,0}` (move 2), Alice `{0,1}` (move 3), Bob `{2,1}` (move 4), and Alice closes the top row with `{0,2}` (move 5). On that last move `reduce` returns a `ReduceResult` whose `outcome` is `{ status: "completed", winnerRoles: ["X"], draw: false }` (roles, **not** user ids). `games.persistGameMove` maps the roles to user ids, writes `game.winners = ["u-alice"]` and the summary `game.winner = "u-alice"`, flips `status` to `"completed"`, sets `completedAt`, and updates each human player's stats in the same transaction.
+Play alternates `X, O, X, O, X`: Bob takes `{1,0}` (move 2), Alice `{0,1}` (move 3), Bob `{2,1}` (move 4), and Alice closes the top row with `{0,2}` (move 5). On that last move `reduce` returns a `ReduceResult` whose `outcome` is `{ status: "completed", winnerRoles: ["X"], draw: false }` (roles, **not** user ids). `games.persistGameMoves` maps the roles to user ids, writes `game.winners = ["u-alice"]` and the summary `game.winner = "u-alice"`, flips `status` to `"completed"`, sets `completedAt`, and updates each human player's stats in the same transaction.
 
 ```
 game row (final)
@@ -322,7 +322,7 @@ host emits room:start (lobby engines)                  (lobby.ts)
 client emits make_move { gameId, moveData }            (game-runner.ts, under the game lock)
   → def.moveSchema.safeParse / def.stateSchema.safeParse
   → result = def.engine.reduce(state, { role }, input)
-  → games.persistGameMove: state CAS, move row, winners/winner/stats on completion
+  → games.persistGameMoves: state CAS, move rows, winners/winner/stats on completion
   → broadcast one redacted game_state { game, move }; bots move next
 ```
 

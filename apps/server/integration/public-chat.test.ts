@@ -160,10 +160,9 @@ describe.skipIf(!DB_UP)("anonymous public match privacy", () => {
       { row: 0, col: 0 },
     );
     if (!result?.ok) throw new Error("Synthetic move failed");
-    await games.persistGameMove({
+    await games.persistGameMoves({
       previous: game,
-      playerId: a.id,
-      moveData: { row: 0, col: 0 },
+      moves: [{ playerId: a.id, moveData: { row: 0, col: 0 } }],
       gameState: result.state,
       outcome: result.outcome,
     });

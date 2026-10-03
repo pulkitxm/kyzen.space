@@ -1,10 +1,9 @@
 import { type GamePlayer, type GameRecord, games } from "@kyzen/database";
 import { getDefinition } from "@kyzen/games-core";
-import {
-  type GameDefinition,
-  type GameJson,
-  isBotId,
-  type ServerGameStatePayload,
+import type {
+  GameDefinition,
+  Outcome,
+  ServerGameStatePayload,
 } from "@kyzen/shared/types";
 import type { Server as IOServer } from "socket.io";
 import {
@@ -24,12 +23,13 @@ import {
   decideTimeout,
   turnLimitMs,
   turnTimers,
+  withTimerFields,
 } from "./turn-timer";
 
 const log = childLogger({ mod: "game-runner" });
 
 const MAX_RETRIES = 3;
-const MAX_BOT_MOVES = 1000;
+const MAX_BOT_BATCHES = 1000;
 
 type Loaded = { definition: GameDefinition; state: unknown };
 
@@ -38,6 +38,8 @@ type Submission = { player: GamePlayer; moveData: unknown; auto?: boolean };
 type CommitResult =
   | { ok: true; game: GameRecord }
   | { ok: false; error: string; stale: boolean };
+
+type Settled = { game: GameRecord; error: string | null };
 
 function stableKey(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableKey).join(",")}]`;
@@ -53,20 +55,10 @@ function stableKey(value: unknown): string {
 }
 
 function loadState(row: GameRecord): Loaded | null {
+  if (row.status !== "active") return null;
   const definition = getDefinition(row.gameType);
   const parsed = definition.stateSchema.safeParse(row.gameState);
   return parsed.success ? { definition, state: parsed.data } : null;
-}
-
-function withTimerFields(game: GameJson, gameId: string): GameJson {
-  return {
-    ...game,
-    turnDeadline: turnTimers.deadline(gameId),
-    players: game.players.map((p) => ({
-      ...p,
-      timeoutStrikes: turnTimers.strikes(gameId, p.role),
-    })),
-  };
 }
 
 export async function emitFullState(
@@ -79,6 +71,21 @@ export async function emitFullState(
     moves: serializeMoves(moves, gameRow),
   };
   emitToGame(io, gameRow.code, "game_state", payload);
+}
+
+function pendingOf(row: GameRecord, loaded: Loaded) {
+  return pendingPlayers(
+    row.players,
+    actingRoles(loaded.definition.engine, loaded.state),
+  );
+}
+
+function botClockDelay(row: GameRecord, loaded: Loaded): number {
+  const { engine } = loaded.definition;
+  if (!engine.botMove) return 0;
+  const pending = pendingOf(row, loaded);
+  if (pending.humans.length || !pending.bots.length) return 0;
+  return engine.resultDelayMs?.(loaded.state) ?? 0;
 }
 
 function scheduleTurn(io: IOServer, row: GameRecord, loaded: Loaded): void {
@@ -111,15 +118,19 @@ function scheduleRound(io: IOServer, row: GameRecord, loaded: Loaded): void {
     turnTimers.clear(row.id);
     return;
   }
-  if (turnTimers.armedKey(row.id) === clock.key && turnTimers.deadline(row.id))
+  const delay = botClockDelay(row, loaded);
+  const key = delay > 0 ? `bots:${clock.key}` : clock.key;
+  if (turnTimers.armedKey(row.id) === key && turnTimers.deadline(row.id))
     return;
-  turnTimers.arm(row.id, clock.key, clock.limitMs, () => {
-    void onRoundTimeout(io, row.id, clock.key);
+  turnTimers.arm(row.id, key, delay > 0 ? delay : clock.limitMs, () => {
+    void (delay > 0
+      ? onBotClock(io, row.id, key)
+      : onRoundTimeout(io, row.id, key));
   });
 }
 
 function schedule(io: IOServer, row: GameRecord): void {
-  const loaded = row.status === "active" ? loadState(row) : null;
+  const loaded = loadState(row);
   if (!loaded) {
     turnTimers.clear(row.id);
     return;
@@ -137,10 +148,10 @@ async function finish(io: IOServer, row: GameRecord): Promise<void> {
   await broadcastGameCard(io, row.id);
 }
 
-async function commitMove(
+async function commitMoves(
   io: IOServer,
   row: GameRecord,
-  submission: Submission,
+  submissions: Submission[],
 ): Promise<CommitResult> {
   if (row.status !== "active")
     return { ok: false, error: "Game is not active", stale: false };
@@ -148,58 +159,98 @@ async function commitMove(
   const { engine } = definition;
   if (!engine.reduce)
     return { ok: false, error: "Game does not accept moves", stale: false };
-  const move = definition.moveSchema.safeParse(submission.moveData);
-  if (!move.success) return { ok: false, error: "Invalid move", stale: false };
-  const state = definition.stateSchema.safeParse(row.gameState);
-  if (!state.success)
+  const parsed = definition.stateSchema.safeParse(row.gameState);
+  if (!parsed.success)
     return { ok: false, error: "Corrupt game state", stale: false };
-  const result = engine.reduce(
-    state.data,
-    { role: submission.player.role },
-    move.data,
-  );
-  if (!result.ok) return { ok: false, error: result.error, stale: false };
+  let state = parsed.data;
+  let outcome: Outcome = { status: "active" };
+  const accepted: Submission[] = [];
+  for (const submission of submissions) {
+    const move = definition.moveSchema.safeParse(submission.moveData);
+    const result = move.success
+      ? engine.reduce(state, { role: submission.player.role }, move.data)
+      : null;
+    if (!move.success || !result?.ok) {
+      const error = result && !result.ok ? result.error : "Invalid move";
+      if (!accepted.length) return { ok: false, error, stale: false };
+      log.warn(
+        { gameId: row.id, role: submission.player.role, err: error },
+        "batched move rejected",
+      );
+      break;
+    }
+    state = result.state;
+    outcome = result.outcome;
+    accepted.push({ ...submission, moveData: move.data });
+    if (outcome.status === "completed") break;
+  }
 
-  const persisted = await games.persistGameMove({
+  const persisted = await games.persistGameMoves({
     previous: row,
-    playerId: submission.player.userId,
-    moveData: move.data,
-    gameState: result.state,
-    outcome: result.outcome,
+    moves: accepted.map((submission) => ({
+      playerId: submission.player.userId,
+      moveData: submission.moveData,
+    })),
+    gameState: state,
+    outcome,
   });
   if (!persisted)
     return { ok: false, error: "Game changed, try again", stale: true };
-  const { game, move: moveRow } = persisted;
+  const { game } = persisted;
 
-  if (!submission.auto)
-    turnTimers.resetStrikes(game.id, submission.player.role);
+  for (const submission of accepted)
+    if (!submission.auto)
+      turnTimers.resetStrikes(game.id, submission.player.role);
   schedule(io, game);
 
-  const delta = serializeMove(moveRow, game);
+  const last = persisted.moves.at(-1);
+  const delta = last ? serializeMove(last, game) : undefined;
   const payload: ServerGameStatePayload = {
     game: withTimerFields(serializeGame(game), game.id),
-    move: submission.auto ? { ...delta, auto: true } : delta,
+    ...(delta
+      ? { move: accepted.at(-1)?.auto ? { ...delta, auto: true } : delta }
+      : {}),
   };
   emitToGame(io, game.code, "game_state", payload);
   if (game.status === "completed") await finish(io, game);
   return { ok: true, game };
 }
 
-function nextBotSubmission(row: GameRecord): Submission | null {
+async function commitFresh(
+  io: IOServer,
+  row: GameRecord,
+  build: (row: GameRecord) => Submission[],
+): Promise<Settled> {
+  let current = row;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const submissions = build(current);
+    if (!submissions.length) return { game: current, error: null };
+    const result = await commitMoves(io, current, submissions);
+    if (result.ok) return { game: result.game, error: null };
+    if (!result.stale) return { game: current, error: result.error };
+    current = (await games.getGameById(current.id)) ?? current;
+  }
+  return { game: current, error: "Game is busy, try again" };
+}
+
+function botSubmissions(row: GameRecord): Submission[] {
   const loaded = loadState(row);
   const engine = loaded?.definition.engine;
-  if (!loaded || !engine?.botMove) return null;
-  const roles = actingRoles(engine, loaded.state);
-  const [player] = pendingPlayers(row.players, roles).bots;
-  if (!player) return null;
-  return {
+  if (!loaded || !engine?.botMove) return [];
+  return pendingOf(row, loaded).bots.map((player) => ({
     player,
-    moveData: engine.botMove(
+    moveData: engine.botMove?.(
       loaded.state,
       player.role,
       botDifficulty(row.config, player.userId) ?? "normal",
     ),
-  };
+  }));
+}
+
+function dueBotSubmissions(row: GameRecord): Submission[] {
+  const loaded = loadState(row);
+  if (!loaded || botClockDelay(row, loaded) > 0) return [];
+  return botSubmissions(row);
 }
 
 export async function settle(
@@ -207,21 +258,15 @@ export async function settle(
   row: GameRecord,
 ): Promise<GameRecord> {
   let current = row;
-  for (let step = 0; step < MAX_BOT_MOVES; step++) {
-    if (current.status !== "active") break;
-    const submission = nextBotSubmission(current);
-    if (!submission) break;
-    const result = await commitMove(io, current, submission);
-    if (result.ok) current = result.game;
-    else if (result.stale)
-      current = (await games.getGameById(current.id)) ?? current;
-    else {
-      log.warn(
-        { gameId: current.id, role: submission.player.role, err: result.error },
-        "bot move rejected",
-      );
+  for (let batch = 0; batch < MAX_BOT_BATCHES; batch++) {
+    const result = await commitFresh(io, current, dueBotSubmissions);
+    const advanced = result.game !== current;
+    current = result.game;
+    if (result.error) {
+      log.warn({ gameId: current.id, err: result.error }, "bot moves rejected");
       break;
     }
+    if (!advanced) break;
   }
   schedule(io, current);
   return current;
@@ -240,7 +285,7 @@ export function submitMove(
       if (row.status !== "active") return "Game is not active";
       const player = row.players.find((p) => p.userId === userId);
       if (!player) return "Not a player in this game";
-      const result = await commitMove(io, row, { player, moveData });
+      const result = await commitMoves(io, row, [{ player, moveData }]);
       if (result.ok) {
         await settle(io, result.game);
         return null;
@@ -317,50 +362,37 @@ function onTurnTimeout(
       turnTimers.clear(gameId);
       return;
     }
-    const result = await commitMove(io, row, {
-      player,
-      moveData: engine.autoMove(loaded.state, role, strikes),
-      auto: true,
-    });
+    const result = await commitMoves(io, row, [
+      {
+        player,
+        moveData: engine.autoMove(loaded.state, role, strikes),
+        auto: true,
+      },
+    ]);
     if (result.ok) await settle(io, result.game);
     else turnTimers.clear(gameId);
   });
 }
 
-async function autoSubmit(
-  io: IOServer,
+function timeoutSubmissions(
   row: GameRecord,
-  player: GamePlayer,
-  strikes: number,
   roundKey: string,
-): Promise<GameRecord> {
-  let current = row;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const loaded = loadState(current);
-    if (!loaded || current.status !== "active") return current;
-    const { engine } = loaded.definition;
-    if (
-      roundClock(engine, loaded.state)?.key !== roundKey ||
-      !actingRoles(engine, loaded.state).includes(player.role) ||
-      !engine.autoMove
-    )
-      return current;
-    const result = await commitMove(io, current, {
-      player,
-      moveData: engine.autoMove(loaded.state, player.role, strikes),
-      auto: true,
-    });
-    if (result.ok) return result.game;
-    if (!result.stale) {
-      log.warn(
-        { gameId: current.id, role: player.role, err: result.error },
-        "auto move rejected",
-      );
-      return current;
-    }
-    current = (await games.getGameById(current.id)) ?? current;
-  }
-  return current;
+  strikes: Map<string, number>,
+): Submission[] {
+  const loaded = loadState(row);
+  const engine = loaded?.definition.engine;
+  if (!loaded || !engine?.autoMove) return [];
+  if (roundClock(engine, loaded.state)?.key !== roundKey) return [];
+  const pending = pendingOf(row, loaded);
+  return [...pending.humans, ...pending.bots].map((player) => ({
+    player,
+    moveData: engine.autoMove?.(
+      loaded.state,
+      player.role,
+      strikes.get(player.role) ?? 0,
+    ),
+    auto: true,
+  }));
 }
 
 function onRoundTimeout(
@@ -369,32 +401,56 @@ function onRoundTimeout(
   roundKey: string,
 ): Promise<void> {
   return withGameLock(gameId, async () => {
-    let row = await games.getGameById(gameId);
-    if (row?.status !== "active") {
-      turnTimers.clear(gameId);
-      return;
-    }
-    const loaded = loadState(row);
-    if (!loaded) {
+    const row = await games.getGameById(gameId);
+    const loaded = row ? loadState(row) : null;
+    if (!row || !loaded) {
       turnTimers.clear(gameId);
       return;
     }
     const { engine } = loaded.definition;
     if (roundClock(engine, loaded.state)?.key !== roundKey) return;
     turnTimers.clear(gameId);
-    const pending = pendingPlayers(
-      row.players,
-      actingRoles(engine, loaded.state),
-    );
-    for (const player of [...pending.humans, ...pending.bots]) {
-      if (row.status !== "active") break;
-      const human = !isBotId(player.userId);
-      const strikes = human ? turnTimers.strikes(gameId, player.role) : 0;
-      if (human) turnTimers.setStrikes(gameId, player.role, strikes + 1);
-      row = await autoSubmit(io, row, player, strikes, roundKey);
+    const strikes = new Map<string, number>();
+    for (const player of pendingOf(row, loaded).humans) {
+      const previous = turnTimers.strikes(gameId, player.role);
+      strikes.set(player.role, previous);
+      turnTimers.setStrikes(gameId, player.role, previous + 1);
     }
-    await settle(io, row);
+    const result = await commitFresh(io, row, (current) =>
+      timeoutSubmissions(current, roundKey, strikes),
+    );
+    if (result.error)
+      log.warn({ gameId, err: result.error }, "auto moves rejected");
+    await settle(io, result.game);
   });
 }
 
-export const __timerInternals = { onTurnTimeout, onRoundTimeout };
+function onBotClock(io: IOServer, gameId: string, key: string): Promise<void> {
+  return withGameLock(gameId, async () => {
+    const row = await games.getGameById(gameId);
+    const loaded = row ? loadState(row) : null;
+    if (!row || !loaded) {
+      turnTimers.clear(gameId);
+      return;
+    }
+    const roundKey = roundClock(loaded.definition.engine, loaded.state)?.key;
+    if (!roundKey || `bots:${roundKey}` !== key) return;
+    turnTimers.clear(gameId);
+    let result = await commitFresh(io, row, (current) => {
+      const fresh = loadState(current);
+      const freshKey = fresh
+        ? roundClock(fresh.definition.engine, fresh.state)?.key
+        : null;
+      return freshKey === roundKey ? botSubmissions(current) : [];
+    });
+    if (result.error) {
+      log.warn({ gameId, err: result.error }, "bot moves rejected");
+      result = await commitFresh(io, result.game, (current) =>
+        timeoutSubmissions(current, roundKey, new Map()),
+      );
+    }
+    await settle(io, result.game);
+  });
+}
+
+export const __timerInternals = { onTurnTimeout, onRoundTimeout, onBotClock };

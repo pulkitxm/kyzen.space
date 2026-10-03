@@ -29,6 +29,9 @@ describe("@kyzen/database barrel surface", () => {
     expect(typeof games.createGame).toBe("function");
     expect(typeof games.getGameByCode).toBe("function");
     expect(typeof games.findLiveGameInConversation).toBe("function");
+    expect(typeof games.persistGameMoves).toBe("function");
+    expect(typeof games.removeLobbyPlayer).toBe("function");
+    expect(typeof games.createRematch).toBe("function");
     expect(typeof profiles.bumpStats).toBe("function");
     expect(typeof accountMerge.mergeAccounts).toBe("function");
   });

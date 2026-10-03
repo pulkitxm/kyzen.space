@@ -8,8 +8,7 @@ import type {
 
 type Persist = {
   previous: GameRecord;
-  playerId: string;
-  moveData: unknown;
+  moves: { playerId: string; moveData: unknown }[];
   gameState: unknown;
   outcome: Outcome;
 };
@@ -21,7 +20,7 @@ function clone<T>(value: T): T {
 }
 
 function tick(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  return new Promise((resolve) => setImmediate(resolve));
 }
 
 export function createMemoryGames() {
@@ -30,6 +29,7 @@ export function createMemoryGames() {
   const completions: { gameId: string; winners: string[]; draw: boolean }[] =
     [];
   const casMisses: string[] = [];
+  const persists: number[] = [];
   const matchmakingCalls: {
     seats: Seat[];
     createState: (seats: Seat[]) => unknown;
@@ -80,7 +80,7 @@ export function createMemoryGames() {
       return row ? clone(row) : null;
     },
     listMoves: async (gameId: string) => clone(moves.get(gameId) ?? []),
-    persistGameMove: async (input: Persist) => {
+    persistGameMoves: async (input: Persist) => {
       await hooks.beforePersist?.(input);
       await tick();
       const current = stored(input.previous.id);
@@ -89,9 +89,10 @@ export function createMemoryGames() {
         JSON.stringify(current.gameState) !==
           JSON.stringify(input.previous.gameState)
       ) {
-        casMisses.push(input.playerId);
+        casMisses.push(...input.moves.map((entry) => entry.playerId));
         return null;
       }
+      persists.push(input.moves.length);
       const completed = input.outcome.status === "completed";
       const winners =
         input.outcome.status === "completed"
@@ -121,7 +122,9 @@ export function createMemoryGames() {
       if (completed) completions.push({ gameId: updated.id, winners, draw });
       return {
         game: clone(updated),
-        move: clone(appendMove(updated.id, input.playerId, input.moveData)),
+        moves: input.moves.map((entry) =>
+          clone(appendMove(updated.id, entry.playerId, entry.moveData)),
+        ),
       };
     },
     abortActiveGame: async (previous: GameRecord, winners: string[]) => {
@@ -157,6 +160,29 @@ export function createMemoryGames() {
       const updated = { ...stored(id), ...clone(patch), updatedAt: new Date() };
       rows.set(id, updated);
       return clone(updated);
+    },
+    removeLobbyPlayer: async (input: {
+      gameId: string;
+      userId: string;
+      roleForSeat: (index: number) => string;
+    }) => {
+      await tick();
+      const current = stored(input.gameId);
+      if (
+        current.status !== "waiting" ||
+        !current.players.some((player) => player.userId === input.userId)
+      )
+        return null;
+      current.players = current.players
+        .filter((player) => player.userId !== input.userId)
+        .map((player, index) => ({
+          ...player,
+          role: input.roleForSeat(index),
+        }));
+      const teams = (current.config as { teams?: Record<string, string> })
+        ?.teams;
+      if (teams) delete teams[input.userId];
+      return clone(current);
     },
     configureLobby: async (gameId: string, config: unknown) => {
       const current = stored(gameId);
@@ -230,6 +256,7 @@ export function createMemoryGames() {
     moves,
     completions,
     casMisses,
+    persists,
     matchmakingCalls,
     hooks,
     put,
@@ -239,6 +266,7 @@ export function createMemoryGames() {
       moves.clear();
       completions.length = 0;
       casMisses.length = 0;
+      persists.length = 0;
       matchmakingCalls.length = 0;
       hooks.beforePersist = null;
     },

@@ -167,7 +167,7 @@ Repositories occasionally need a SQL expression Drizzle's builder doesn't model 
 
 ### `profiles.bumpStats` - read-modify-write of JSONB
 
-`bumpStats` (`profiles.ts`) is a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. Game completion no longer calls it: `games.persistGameMove` and `games.abortActiveGame` update stats inside their own transaction, locking each human seat's profile row in user-id order, so a completion is counted exactly once even when moves race. Bot seats (`bot:<n>`) are skipped.
+`bumpStats` (`profiles.ts`) is a read-modify-write on a JSONB column: it loads the profile, clones `stats`, increments the per-`gameType` counters, and writes the whole object back. Game completion no longer calls it: `games.persistGameMoves` and `games.abortActiveGame` update stats inside their own transaction, locking each human seat's profile row in user-id order, so a completion is counted exactly once even when moves race. Bot seats (`bot:<n>`) are skipped.
 
 ## Data-flow walkthrough: persisting a move
 
@@ -176,11 +176,11 @@ This is the database layer's busiest path, and where the "client is never truste
 1. **Load the aggregate.** `games.getGameById(id)` returns the `GameRecord` - game row + seats. The runner checks `status === "active"` and that the socket's `userId` holds a seat.
 2. **Validate with the shared schemas.** `def.moveSchema.safeParse(moveData)` validates the *client's* input and `def.stateSchema.safeParse(gameRow.gameState)` validates the *stored* JSONB. A bad move or corrupt state is rejected before any write.
 3. **Reduce - authoritatively.** `def.engine.reduce(...)` computes the next state on the server.
-4. **Persist with compare-and-swap.** `games.persistGameMove({ previous, playerId, moveData, gameState, outcome })` opens one transaction: it locks the active row only if its `game_state` still equals `previous.gameState`, writes the new state, allocates `max(moveNumber) + 1`, appends the move, and on a completed outcome writes `status`, `completedAt`, `winners` (user ids of `winnerRoles`), and `winner` (single winner, `"draw"`, or `null`) and updates every human seat's `user_profile.stats` under row locks. It returns `null` when the state changed underneath, and the runner reloads and retries up to three times.
+4. **Persist with compare-and-swap.** `games.persistGameMoves({ previous, moves, gameState, outcome })` opens one transaction: it locks the active row only if its `game_state` still equals `previous.gameState`, writes the new state, appends every move in `moves` with consecutive move numbers starting at `max(moveNumber) + 1` (one entry for a player submission; several for a batch of bot or timeout submissions), and on a completed outcome writes `status`, `completedAt`, `winners` (user ids of `winnerRoles`), and `winner` (single winner, `"draw"`, or `null`) and updates every human seat's `user_profile.stats` under row locks. It returns `null` when the state changed underneath, and the runner reloads and retries up to three times.
 
 In arrows:
 
-`make_move` → `handleMakeMove` → `submitMove` (lock) → `games.getGameById` → `moveSchema/stateSchema.safeParse` → `engine.reduce` → `games.persistGameMove` (state CAS, move, winners, stats) → broadcast one redacted `game_state` `{ game, move }`.
+`make_move` → `handleMakeMove` → `submitMove` (lock) → `games.getGameById` → `moveSchema/stateSchema.safeParse` → `engine.reduce` → `games.persistGameMoves` (state CAS, moves, winners, stats) → broadcast one redacted `game_state` `{ game, move }`.
 
 Lobby starts use `games.startLobby` (locks the waiting row, verifies seats and config, inserts bot seats, activates), lobby edits use `games.configureLobby`, and `games.seatPlayer` locks the waiting row and refuses an occupied seat order. Aborts use `games.abortActiveGame(previous, winners)` with the same expected-state guard. Notice that no SQL appears anywhere in the realtime layer - only repository calls. The full realtime side of this story is in [`realtime.md`](./realtime.md).
 

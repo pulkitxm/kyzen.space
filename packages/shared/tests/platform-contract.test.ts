@@ -6,9 +6,12 @@ import {
   botId,
   clientMatchFriendSchema,
   clientRoomConfigureSchema,
+  clientRoomKickSchema,
+  clientRoomLeaveSchema,
   clientRoomStartSchema,
   gameJsonSchema,
   isBotId,
+  LOBBY_MAX_BOTS,
   type LobbyConfig,
   lobbyBotSchema,
   lobbyConfigSchema,
@@ -79,6 +82,22 @@ describe("lobby config", () => {
     expect(lobbyConfigSchema.safeParse({ mode: "duel" }).success).toBe(false);
     expect(lobbyConfigSchema.safeParse({ rounds: 3 }).success).toBe(false);
   });
+
+  test("caps a lobby at LOBBY_MAX_BOTS bots", () => {
+    const bots = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: botId(index + 1),
+        difficulty: "hard",
+        team: "A",
+      }));
+    expect(LOBBY_MAX_BOTS).toBe(64);
+    expect(
+      lobbyConfigSchema.safeParse({ bots: bots(LOBBY_MAX_BOTS) }).success,
+    ).toBe(true);
+    expect(
+      lobbyConfigSchema.safeParse({ bots: bots(LOBBY_MAX_BOTS + 1) }).success,
+    ).toBe(false);
+  });
 });
 
 describe("lobby and match wire payloads", () => {
@@ -99,6 +118,32 @@ describe("lobby and match wire payloads", () => {
     expect(
       clientRoomConfigureSchema.safeParse({ gameId: "K7P2QX", extra: 1 })
         .success,
+    ).toBe(false);
+  });
+
+  test("room:leave and room:kick are strict and normalize the code", () => {
+    expect(clientRoomLeaveSchema.parse({ gameId: "k7p2qx" })).toEqual({
+      gameId: "K7P2QX",
+    });
+    expect(
+      clientRoomLeaveSchema.safeParse({ gameId: "K7P2QX", userId: "u2" })
+        .success,
+    ).toBe(false);
+    expect(
+      clientRoomKickSchema.parse({ gameId: "k7p2qx", userId: "u2" }),
+    ).toEqual({ gameId: "K7P2QX", userId: "u2" });
+    expect(clientRoomKickSchema.safeParse({ gameId: "K7P2QX" }).success).toBe(
+      false,
+    );
+    expect(
+      clientRoomKickSchema.safeParse({ gameId: "K7P2QX", userId: "" }).success,
+    ).toBe(false);
+    expect(
+      clientRoomKickSchema.safeParse({
+        gameId: "K7P2QX",
+        userId: "u2",
+        reason: "x",
+      }).success,
     ).toBe(false);
   });
 

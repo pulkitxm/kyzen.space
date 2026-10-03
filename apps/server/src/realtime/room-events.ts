@@ -2,11 +2,13 @@ import {
   clientCreateRoomSchema,
   clientJoinByCodeSchema,
   clientRoomConfigureSchema,
+  clientRoomKickSchema,
+  clientRoomLeaveSchema,
   clientRoomStartSchema,
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import { childLogger } from "../logger";
-import { configureRoom, startRoom } from "./lobby";
+import { configureRoom, kickPlayer, leaveRoom, startRoom } from "./lobby";
 import { createStandaloneGame, validateJoinByCode } from "./rooms-service";
 import { rateLimiter } from "./socket-util";
 
@@ -16,6 +18,7 @@ type AckFn = (res: unknown) => void;
 
 export function attachRoomHandlers(io: IOServer, socket: Socket): void {
   const createAllowed = rateLimiter(10, 60_000);
+  const startAllowed = rateLimiter(10, 60_000);
   const joinAllowed = rateLimiter(30, 60_000);
   const lobbyAllowed = rateLimiter(60, 60_000);
 
@@ -99,11 +102,62 @@ export function attachRoomHandlers(io: IOServer, socket: Socket): void {
         cb?.({ ok: false, error: "Invalid payload" });
         return;
       }
+      if (!startAllowed()) {
+        cb?.({ ok: false, error: "Too many starts, slow down" });
+        return;
+      }
       try {
         cb?.(await startRoom(io, socket.data.userId, parsed.data.gameId));
       } catch (err) {
         log.error({ err, userId: socket.data.userId }, "room:start failed");
         cb?.({ ok: false, error: "Could not start the game" });
+      }
+    })();
+  });
+
+  socket.on("room:leave", (payload: unknown, cb?: AckFn) => {
+    void (async () => {
+      const parsed = clientRoomLeaveSchema.safeParse(payload);
+      if (!parsed.success) {
+        cb?.({ ok: false, error: "Invalid payload" });
+        return;
+      }
+      if (!lobbyAllowed()) {
+        cb?.({ ok: false, error: "Too many changes, slow down" });
+        return;
+      }
+      try {
+        cb?.(await leaveRoom(io, socket.data.userId, parsed.data.gameId));
+      } catch (err) {
+        log.error({ err, userId: socket.data.userId }, "room:leave failed");
+        cb?.({ ok: false, error: "Could not leave the lobby" });
+      }
+    })();
+  });
+
+  socket.on("room:kick", (payload: unknown, cb?: AckFn) => {
+    void (async () => {
+      const parsed = clientRoomKickSchema.safeParse(payload);
+      if (!parsed.success) {
+        cb?.({ ok: false, error: "Invalid payload" });
+        return;
+      }
+      if (!lobbyAllowed()) {
+        cb?.({ ok: false, error: "Too many changes, slow down" });
+        return;
+      }
+      try {
+        cb?.(
+          await kickPlayer(
+            io,
+            socket.data.userId,
+            parsed.data.gameId,
+            parsed.data.userId,
+          ),
+        );
+      } catch (err) {
+        log.error({ err, userId: socket.data.userId }, "room:kick failed");
+        cb?.({ ok: false, error: "Could not remove the player" });
       }
     })();
   });

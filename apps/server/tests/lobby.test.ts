@@ -11,7 +11,9 @@ import {
 
 const memory = installRuntime();
 
-const { configureRoom, startRoom } = await import("../src/realtime/lobby");
+const { configureRoom, kickPlayer, leaveRoom, startRoom } = await import(
+  "../src/realtime/lobby"
+);
 const { handleJoinRoom } = await import("../src/realtime/turn-based");
 const { createStandaloneGame, validateJoinByCode } = await import(
   "../src/realtime/rooms-service"
@@ -79,6 +81,64 @@ describe("room:configure", () => {
     expect(result).toEqual({ ok: false, error: "Invalid game config" });
   });
 
+  test("more than LOBBY_MAX_BOTS bots are rejected", async () => {
+    const row = memory.put(lobbyRow(["h1"], lobbyConfig()));
+    const { io } = fakeIo();
+    const bots = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `bot:${index + 1}`,
+        difficulty: "easy",
+        team: "A",
+      }));
+    expect(
+      await configureRoom(io, "h1", row.code, lobbyConfig({ bots: bots(65) })),
+    ).toEqual({ ok: false, error: "Invalid game config" });
+    expect(memory.stored(row.id).config).toEqual(lobbyConfig());
+  });
+
+  test("team entries must name seated players or configured bots", async () => {
+    const row = memory.put(lobbyRow(["h1", "h2"], lobbyConfig()));
+    const { io } = fakeIo();
+    const stranger = lobbyConfig({
+      mode: "teams",
+      teams: { h1: "A", h2: "B", ghost: "A" },
+    });
+    expect(await configureRoom(io, "h1", row.code, stranger)).toEqual({
+      ok: false,
+      error: "Teams can only list seated players and bots",
+    });
+    const known = lobbyConfig({
+      mode: "teams",
+      teams: { h1: "A", h2: "B", "bot:1": "B" },
+      bots: [BOTS[0]],
+    });
+    expect(await configureRoom(io, "h1", row.code, known)).toEqual({
+      ok: true,
+    });
+  });
+
+  test("teams mode must split the seats over at least two teams", async () => {
+    const row = memory.put(lobbyRow(["h1", "h2"], lobbyConfig()));
+    const { io } = fakeIo();
+    const together = lobbyConfig({
+      mode: "teams",
+      teams: { h1: "A", h2: "A" },
+    });
+    expect(await configureRoom(io, "h1", row.code, together)).toEqual({
+      ok: false,
+      error: "Teams mode needs players on at least two teams",
+    });
+    const alone = memory.put(lobbyRow(["h1"], lobbyConfig()));
+    expect(
+      await configureRoom(
+        io,
+        "h1",
+        alone.code,
+        lobbyConfig({ mode: "teams", teams: { h1: "B" } }),
+      ),
+    ).toEqual({ ok: true });
+  });
+
   test("a config that overfills the table is rejected", async () => {
     const row = memory.put(lobbyRow(["h1", "h2", "h3"], lobbyConfig()));
     const { io } = fakeIo();
@@ -136,8 +196,8 @@ describe("room:start", () => {
     ).toEqual([
       { userId: "h1", username: "name-h1", role: "P1" },
       { userId: "h2", username: "name-h2", role: "P2" },
-      { userId: "bot:1", username: "Hard Bot", role: "P3" },
-      { userId: "bot:2", username: "Easy Bot", role: "P4" },
+      { userId: "bot:1", username: "Bot 1 (Hard)", role: "P3" },
+      { userId: "bot:2", username: "Bot 2 (Easy)", role: "P4" },
     ]);
     const state = stored.gameState as FakeState;
     expect(state.seats).toEqual([
@@ -162,6 +222,25 @@ describe("room:start", () => {
       (seat) => seat.team,
     );
     expect(teams).toEqual(["B", "A", "A"]);
+  });
+
+  test("teams mode cannot start with every seat on one team", async () => {
+    const row = memory.put(
+      lobbyRow(
+        ["h1", "h2"],
+        lobbyConfig({
+          mode: "teams",
+          teams: { h1: "A", h2: "A" },
+          bots: [{ id: "bot:1", difficulty: "easy", team: "A" }],
+        }),
+      ),
+    );
+    const { io } = fakeIo();
+    expect(await startRoom(io, "h1", row.code)).toEqual({
+      ok: false,
+      error: "Teams mode needs players on at least two teams",
+    });
+    expect(memory.stored(row.id).status).toBe("waiting");
   });
 
   test("free-for-all seats are their own teams", async () => {
@@ -238,5 +317,94 @@ describe("lobby seating", () => {
     expect(row?.gameState).toBeNull();
     expect(row?.config).toEqual({ mode: "teams", teams: {}, bots: [] });
     expect(row?.players.map((p) => p.role)).toEqual(["P1"]);
+  });
+});
+
+describe("room:leave and room:kick", () => {
+  function teamsLobby(humans: string[]) {
+    return memory.put(
+      lobbyRow(
+        humans,
+        lobbyConfig({
+          mode: "teams",
+          teams: Object.fromEntries(
+            humans.map((id, index) => [id, index % 2 ? "B" : "A"]),
+          ),
+        }),
+      ),
+    );
+  }
+
+  test("a guest leaving compacts the seats and drops their team", async () => {
+    const row = teamsLobby(["h1", "h2", "h3"]);
+    const { io, emits, leaves } = fakeIo();
+    expect(await leaveRoom(io, "h2", row.code)).toEqual({ ok: true });
+    const stored = memory.stored(row.id);
+    expect(stored.players.map((p) => [p.userId, p.role])).toEqual([
+      ["h1", "P1"],
+      ["h3", "P2"],
+    ]);
+    expect(stored.config).toEqual(
+      lobbyConfig({ mode: "teams", teams: { h1: "A", h3: "A" } }),
+    );
+    expect(leaves).toEqual([{ room: "user:h2", left: `game:${row.code}` }]);
+    expect(lastGame(emits).players.map((p) => p.userId)).toEqual(["h1", "h3"]);
+  });
+
+  test("the host, outsiders, and started games cannot leave", async () => {
+    const row = teamsLobby(["h1", "h2"]);
+    const { io } = fakeIo();
+    expect(await leaveRoom(io, "h1", row.code)).toEqual({
+      ok: false,
+      error: "The host cannot leave the lobby",
+    });
+    expect(await leaveRoom(io, "h9", row.code)).toEqual({
+      ok: false,
+      error: "You are not in this lobby",
+    });
+    await startRoom(io, "h1", row.code);
+    expect(await leaveRoom(io, "h2", row.code)).toEqual({
+      ok: false,
+      error: "Game already started",
+    });
+    expect(memory.stored(row.id).players).toHaveLength(2);
+  });
+
+  test("the host can remove a guest, who is told and taken out of the room", async () => {
+    const row = teamsLobby(["h1", "h2", "h3"]);
+    const { io, emits, leaves } = fakeIo();
+    expect(await kickPlayer(io, "h1", row.code, "h3")).toEqual({ ok: true });
+    expect(memory.stored(row.id).players.map((p) => p.userId)).toEqual([
+      "h1",
+      "h2",
+    ]);
+    expect(leaves).toEqual([{ room: "user:h3", left: `game:${row.code}` }]);
+    expect(emits).toContainEqual({
+      room: "user:h3",
+      event: "game_error",
+      payload: { message: "Removed from the room" },
+    });
+    expect(emits.filter((emit) => emit.room === `game:${row.code}`)).toEqual([
+      expect.objectContaining({ event: "game_state" }),
+    ]);
+  });
+
+  test("only the host can remove someone, and never themselves", async () => {
+    const row = teamsLobby(["h1", "h2", "h3"]);
+    const { io, emits } = fakeIo();
+    expect(await kickPlayer(io, "h2", row.code, "h3")).toEqual({
+      ok: false,
+      error: "Only the host can change the lobby",
+    });
+    expect(await kickPlayer(io, "h1", row.code, "h1")).toEqual({
+      ok: false,
+      error: "The host cannot leave the lobby",
+    });
+    expect(await kickPlayer(io, "h1", row.code, "h9")).toEqual({
+      ok: false,
+      error: "Player not found",
+    });
+    expect(memory.stored(row.id).players).toHaveLength(3);
+    expect(emits).toEqual([]);
   });
 });

@@ -64,24 +64,8 @@ export async function createGame(input: CreateGameInput): Promise<GameRecord> {
   throw new Error("Failed to allocate a unique game code");
 }
 
-export async function getPlayers(gameId: string): Promise<GamePlayer[]> {
-  const rows = await db
-    .select({
-      userId: gamePlayer.userId,
-      username: gamePlayer.username,
-      role: gamePlayer.role,
-      avatar: userProfile.avatar,
-    })
-    .from(gamePlayer)
-    .leftJoin(userProfile, eq(userProfile.userId, gamePlayer.userId))
-    .where(eq(gamePlayer.gameId, gameId))
-    .orderBy(gamePlayer.seatOrder);
-  return rows.map((r) => ({
-    userId: r.userId,
-    username: r.username,
-    role: r.role,
-    avatar: r.avatar ?? null,
-  }));
+export function getPlayers(gameId: string): Promise<GamePlayer[]> {
+  return playersIn(db, gameId);
 }
 
 export async function getGameById(id: string): Promise<GameRecord | null> {
@@ -183,6 +167,104 @@ export async function configureLobby(
     .returning();
   if (!row) return null;
   return toGameRecord(row, await getPlayers(gameId));
+}
+
+async function playersIn(
+  executor: typeof db | Transaction,
+  gameId: string,
+): Promise<GamePlayer[]> {
+  const rows = await executor
+    .select({
+      userId: gamePlayer.userId,
+      username: gamePlayer.username,
+      role: gamePlayer.role,
+      avatar: userProfile.avatar,
+    })
+    .from(gamePlayer)
+    .leftJoin(userProfile, eq(userProfile.userId, gamePlayer.userId))
+    .where(eq(gamePlayer.gameId, gameId))
+    .orderBy(gamePlayer.seatOrder);
+  return rows.map((r) => ({ ...r, avatar: r.avatar ?? null }));
+}
+
+export async function removeLobbyPlayer(input: {
+  gameId: string;
+  userId: string;
+  roleForSeat: (index: number) => string;
+}): Promise<GameRecord | null> {
+  return db.transaction(async (tx) => {
+    const [locked] = await tx
+      .select({ id: game.id })
+      .from(game)
+      .where(and(eq(game.id, input.gameId), eq(game.status, "waiting")))
+      .for("update");
+    if (!locked) return null;
+    const removed = await tx
+      .delete(gamePlayer)
+      .where(
+        and(
+          eq(gamePlayer.gameId, locked.id),
+          eq(gamePlayer.userId, input.userId),
+        ),
+      )
+      .returning({ id: gamePlayer.id });
+    if (!removed.length) return null;
+    const remaining = await tx
+      .select({ id: gamePlayer.id })
+      .from(gamePlayer)
+      .where(eq(gamePlayer.gameId, locked.id))
+      .orderBy(gamePlayer.seatOrder);
+    for (const [index, seat] of remaining.entries())
+      await tx
+        .update(gamePlayer)
+        .set({ seatOrder: index, role: input.roleForSeat(index) })
+        .where(eq(gamePlayer.id, seat.id));
+    const [updated] = await tx
+      .update(game)
+      .set({
+        config: sql`${game.config} #- array['teams', ${input.userId}]::text[]`,
+        updatedAt: new Date(),
+      })
+      .where(eq(game.id, locked.id))
+      .returning();
+    if (!updated) throw new Error("Lobby could not be updated");
+    return toGameRecord(updated, await playersIn(tx, locked.id));
+  });
+}
+
+export async function createRematch(
+  input: CreateGameInput & { seriesId: string },
+): Promise<{ game: GameRecord; created: boolean }> {
+  createGameInputSchema.parse(input);
+  for (let attempt = 1; attempt <= GAME_CODE_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${input.seriesId}))`,
+        );
+        const [live] = await tx
+          .select()
+          .from(game)
+          .where(
+            and(
+              eq(game.seriesId, input.seriesId),
+              inArray(game.status, ["waiting", "active"]),
+            ),
+          )
+          .orderBy(desc(game.createdAt))
+          .limit(1);
+        if (live)
+          return {
+            game: toGameRecord(live, await playersIn(tx, live.id)),
+            created: false,
+          };
+        return { game: await insertGame(tx, input), created: true };
+      });
+    } catch (error) {
+      if (!isGameCodeCollision(error)) throw error;
+    }
+  }
+  throw new Error("Failed to allocate a unique game code");
 }
 
 export async function startLobby(input: {
@@ -500,13 +582,13 @@ function resolveWinners(
   };
 }
 
-export async function persistGameMove(input: {
+export async function persistGameMoves(input: {
   previous: GameRecord;
-  playerId: string;
-  moveData: unknown;
+  moves: { playerId: string; moveData: unknown }[];
   gameState: unknown;
   outcome: Outcome;
-}): Promise<{ game: GameRecord; move: MoveRow } | null> {
+}): Promise<{ game: GameRecord; moves: MoveRow[] } | null> {
+  if (!input.moves.length) throw new Error("No moves to save");
   return db.transaction(async (tx) => {
     const [locked] = await tx
       .select()
@@ -545,16 +627,20 @@ export async function persistGameMove(input: {
       .select({ next: sql<number>`coalesce(max(${move.moveNumber}), 0) + 1` })
       .from(move)
       .where(eq(move.gameId, locked.id));
-    const [saved] = await tx
+    const first = Number(number?.next ?? 1);
+    const saved = await tx
       .insert(move)
-      .values({
-        gameId: locked.id,
-        playerId: input.playerId,
-        moveData: input.moveData,
-        moveNumber: number?.next ?? 1,
-      })
+      .values(
+        input.moves.map((entry, index) => ({
+          gameId: locked.id,
+          playerId: entry.playerId,
+          moveData: entry.moveData,
+          moveNumber: first + index,
+        })),
+      )
       .returning();
-    if (!updated || !saved) throw new Error("Move could not be saved");
+    if (!updated || saved.length !== input.moves.length)
+      throw new Error("Moves could not be saved");
     if (completed)
       await updateMatchStats(
         tx,
@@ -562,7 +648,10 @@ export async function persistGameMove(input: {
         result.winners,
         outcome.status === "completed" && outcome.draw,
       );
-    return { game: toGameRecord(updated, input.previous.players), move: saved };
+    return {
+      game: toGameRecord(updated, input.previous.players),
+      moves: saved.sort((a, b) => a.moveNumber - b.moveNumber),
+    };
   });
 }
 

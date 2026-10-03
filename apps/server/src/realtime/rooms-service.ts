@@ -1,10 +1,13 @@
-import { games, profiles } from "@kyzen/database";
+import { type GameRecord, games, profiles } from "@kyzen/database";
 import { getDefinition, hasEngine } from "@kyzen/games-core";
 import {
+  type GameJson,
   type GameType,
+  isBotId,
   isGameOver,
   type ServerJoinByCodeResult,
 } from "@kyzen/shared/types";
+import { serializeGame } from "../api/serialize";
 import { fail, ok, type ServiceResult } from "../chat/result";
 import { initialState, lobbySettings, plainSeats } from "./setup";
 
@@ -76,4 +79,42 @@ export async function validateJoinByCode(input: {
   }
 
   return { ok: true, code: gameRow.code };
+}
+
+export async function rematchRoom(
+  prev: GameRecord,
+  userId: string,
+): Promise<ServiceResult<{ game: GameJson; recipients: string[] }>> {
+  if (prev.publicMatch || prev.conversationId)
+    return fail("Rematch is only available for private rooms", 400);
+  const definition = getDefinition(prev.gameType);
+  const profile = await profiles.getProfileByUserId(userId);
+  if (!profile) return fail("Profile not found", 400);
+  const host = {
+    userId,
+    username: profile.username,
+    role: definition.engine.roleForSeat(0),
+  };
+  const { game, created } = await games.createRematch({
+    gameType: prev.gameType,
+    status: "waiting",
+    players: [host],
+    gameState: definition.engine.lobby
+      ? null
+      : initialState(definition, plainSeats([host]), prev.config),
+    config: prev.config,
+    conversationId: null,
+    creatorUserId: userId,
+    seatingMode: "open",
+    challengedUserId: null,
+    seriesId: prev.seriesId ?? prev.id,
+  });
+  return ok({
+    game: serializeGame(game),
+    recipients: created
+      ? prev.players
+          .map((player) => player.userId)
+          .filter((id) => id !== userId && !isBotId(id))
+      : [],
+  });
 }

@@ -34,13 +34,12 @@ export function teamsOf(
   state: State,
   tanks: readonly TankArenaTank[],
 ): string[] {
-  const teams: string[] = [];
+  const teams = new Set<string>();
   tanks.forEach((tank, index) => {
     const team = state.seats[index]?.team;
-    if (tank.alive && team !== undefined && !teams.includes(team))
-      teams.push(team);
+    if (tank.alive && team !== undefined) teams.add(team);
   });
-  return teams;
+  return [...teams];
 }
 
 export function aliveTeams(state: State): string[] {

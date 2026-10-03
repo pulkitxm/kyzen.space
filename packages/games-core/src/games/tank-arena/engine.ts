@@ -61,8 +61,9 @@ type State = TankArenaState;
 type Move = TankArenaMove;
 
 function rolesOfTeams(state: State, teams: readonly string[]): string[] {
+  const wanted = new Set(teams);
   return state.seats
-    .filter((seat) => teams.includes(seat.team))
+    .filter((seat) => wanted.has(seat.team))
     .map((seat) => seat.role);
 }
 
@@ -159,8 +160,9 @@ function createInitialState(seats: Seat[], options: SetupOptions): State {
 
 function pendingRoles(state: State): string[] {
   if (state.phase === "finished") return [];
+  const submitted = new Set(state.submitted);
   return state.tanks
-    .filter((tank) => tank.alive && !state.submitted.includes(tank.role))
+    .filter((tank) => tank.alive && !submitted.has(tank.role))
     .map((tank) => tank.role);
 }
 
@@ -172,6 +174,10 @@ function roundTimeMs(state: State): number {
   if (state.phase === "select") return SELECT_MS;
   if (state.round <= 1 || !state.resolution) return FIRST_PLANNING_MS;
   return PLANNING_MS + replayMs(state.resolution.steps);
+}
+
+function resultDelayMs(state: State): number {
+  return state.resolution ? replayMs(state.resolution.steps) : 0;
 }
 
 function outcomeOf(state: State): Outcome {
@@ -521,9 +527,10 @@ function reduce(
     )
       return reject("Jump angle must point upward (10 to 170 degrees)");
   }
+  const already = new Set(state.submitted);
   const submitted = state.seats
     .map((seat) => seat.role)
-    .filter((other) => other === role || state.submitted.includes(other));
+    .filter((other) => other === role || already.has(other));
   let next: State;
   if (move.type === "select") {
     next = {
@@ -612,6 +619,7 @@ export const tankArenaEngine: GameEngine<State, Move> = {
   roundOf: (state) => state.round,
   pendingRoles,
   roundTimeMs,
+  resultDelayMs,
   botMove,
   publicState,
   publicMove,

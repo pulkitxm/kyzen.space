@@ -3,6 +3,7 @@ import { isGameCode } from "@kyzen/shared/types";
 import { Hono } from "hono";
 import { getAuth } from "../../auth";
 import { computeSeriesScore } from "../../chat/series";
+import { withTimerFields } from "../../realtime/turn-timer";
 import type { LoggerEnv } from "../middleware/logger";
 import { serializeGame, serializeMoves, serializeSeries } from "../serialize";
 
@@ -38,7 +39,7 @@ export const gamesRouter = new Hono<LoggerEnv>()
     }
     const moves = await games.listMoves(found.id);
     return c.json({
-      game: serializeGame(found, viewerId),
+      game: withTimerFields(serializeGame(found, viewerId), found.id),
       moves: serializeMoves(moves, found),
     });
   });

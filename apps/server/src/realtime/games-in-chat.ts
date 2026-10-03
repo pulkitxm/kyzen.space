@@ -2,13 +2,14 @@ import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
   clientCreateGameInConversationSchema,
   clientRematchSchema,
+  type ServerRematchCreated,
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
 import {
   createGameInConversation,
   rematchGame,
 } from "../chat/games-in-chat-service";
-import { emitToGame } from "./rooms";
+import { emitToGame, emitToUser } from "./rooms";
 
 export function attachGameChatHandlers(io: IOServer, socket: Socket): void {
   socket.on(
@@ -55,10 +56,22 @@ export function attachGameChatHandlers(io: IOServer, socket: Socket): void {
           ack?.({ ok: false, error: res.error });
           return;
         }
-        emitToGame(io, parsed.data.gameId, CHAT_EVENTS.rematchCreated, {
-          newGameId: res.value.game.id,
-        });
-        ack?.({ ok: true, gameId: res.value.game.id });
+        const { game, recipients } = res.value;
+        const created: ServerRematchCreated = {
+          newGameId: game.id,
+          previousGameId: parsed.data.gameId,
+        };
+        if (recipients)
+          for (const userId of recipients)
+            emitToUser(io, userId, CHAT_EVENTS.rematchCreated, created);
+        else
+          emitToGame(
+            io,
+            parsed.data.gameId,
+            CHAT_EVENTS.rematchCreated,
+            created,
+          );
+        ack?.({ ok: true, gameId: game.id });
       })();
     },
   );

@@ -15,6 +15,7 @@ import {
 } from "@kyzen/shared/types";
 import { serializeGame } from "../api/serialize";
 import { notify } from "../realtime/notify";
+import { rematchRoom } from "../realtime/rooms-service";
 import { initialState, plainSeats } from "../realtime/setup";
 import { sendMessage } from "./messages-service";
 import { computeRematchSeating } from "./rematch-seating";
@@ -150,21 +151,22 @@ export async function createGameInConversation(input: {
 export async function rematchGame(input: {
   userId: string;
   gameId: string;
-}): Promise<ServiceResult<{ game: GameJson }>> {
+}): Promise<ServiceResult<{ game: GameJson; recipients: string[] | null }>> {
   const prev = await games.getGameByCode(input.gameId);
   if (!prev) return fail("Game not found", 404);
   if (prev.status !== "completed") return fail("Game is not finished", 400);
   if (!prev.players.some((p) => p.userId === input.userId)) {
     return fail("Not a player in this game", 403);
   }
-  if (!prev.conversationId) return fail("Game is not in a conversation", 400);
   if (!hasEngine(prev.gameType)) return fail("Unsupported game type", 400);
+  if (!prev.conversationId) return rematchRoom(prev, input.userId);
 
   const existingLive = await games.findLiveGameInConversation(
     prev.conversationId,
     prev.gameType,
   );
-  if (existingLive) return ok({ game: serializeGame(existingLive) });
+  if (existingLive)
+    return ok({ game: serializeGame(existingLive), recipients: null });
 
   const definition = getDefinition(prev.gameType);
   const { engine } = definition;
@@ -212,5 +214,5 @@ export async function rematchGame(input: {
   });
   if (!announced.ok) return fail(announced.error, announced.status);
 
-  return ok({ game: serializeGame(created) });
+  return ok({ game: serializeGame(created), recipients: null });
 }

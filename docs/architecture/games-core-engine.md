@@ -81,6 +81,7 @@ export interface GameEngine<State, Input> {
   botMove?(state: State, role: string, difficulty: BotDifficulty): Input;
   publicState?(state: State): unknown;
   publicMove?(state: State, move: Input): unknown;
+  resultDelayMs?(state: State): number;
   playerCount?(config: unknown): number;
   step?(state: State, inputs: Map<string, Input>, dt: number): StepResult<State>;
   readonly tickRate?: number;
@@ -91,7 +92,8 @@ Key design points:
 
 - **Seating.** `roleForSeat(index)` names the role of seat `index`; the server seats players in order and never asks the client. `maxPlayers` may be `Number.POSITIVE_INFINITY`. `minPlayers` decides when a non-lobby game starts and is checked again (counting bots) when a lobby starts.
 - **Modes.** `"turn-based"` engines implement `reduce` plus optional `currentRole` and `autoMove` for the turn clock. `"simultaneous"` engines also implement `reduce`, but every pending role submits each round: `pendingRoles(state)` lists roles that still owe an input, `roundOf(state)` is a monotonic round number (the platform re-arms the round clock whenever it changes), `roundTimeMs(state)` is the full allowance for the round that just opened (including any replay playback of the previous resolution), and `autoMove(state, role, strikes)` produces the input submitted for a human who misses the deadline. `strikes` is the number of consecutive earlier rounds that role already timed out (0 on the first timeout), so the engine decides what a long-absent player does. Duplicate and stale-round inputs must be rejected by `reduce`. `"realtime"` engines implement `step`; no server loop runs them yet.
-- **Bots and lobbies.** `lobby: { teams, bots }` makes private rooms wait for the host to configure and start them (see [realtime.md](./realtime.md)). `botMove(state, role, difficulty)` returns a bot seat's input; the platform submits it as soon as that role is pending.
+- **Bots and lobbies.** `lobby: { teams, bots }` makes private rooms wait for the host to configure and start them (see [realtime.md](./realtime.md)). `botMove(state, role, difficulty)` returns a bot seat's input. While a human is pending, the platform submits every pending bot's move at once, computed on the same state, reduced in memory, and saved in one transaction. When only bots are pending, it first waits `resultDelayMs(state)`.
+- **Result delay.** `resultDelayMs(state)` is the time the client needs to present the final state before results: for Tank Arena, the replay of the final resolution plus the results banner, and 0 when there is no final resolution (for example a game decided during tank select). Engines that replay each round return the same measure for an unfinished state (the replay of the latest resolution), which the runner uses to pace bot-only rounds so spectators see every round. Engines without it get no delay.
 - **Hidden information.** `publicState(state)` returns what every viewer may see; `publicMove(state, move)` redacts a persisted move given the *current* state (for example "locked" until its round resolves, then the full move so clients can verify replays). The server applies both to every snapshot, move delta, and HTTP response.
 - **Public queues.** `playerCount(config)` sizes a public match group (default 2). `GameDefinition.queues` lists find-page variants, each with the config sent with `game:queue_join`.
 
@@ -318,8 +320,8 @@ The same engine that informs the client validates the move on the server. Walkth
 2. **Lock and reload** - `submitMove` runs inside the per-game mutex (`game-lock.ts`), re-reads the game by id, and rejects an inactive game or a caller without a seat. The user→role mapping is the server's, never the client's.
 3. **Validate** - `def.moveSchema` parses the untrusted input (`"Invalid move"`), and `def.stateSchema` re-narrows the stored JSONB (`"Corrupt game state"`).
 4. **Run the authoritative `reduce`** with `{ role }`. `!result.ok` sends the engine's own error back.
-5. **Persist with compare-and-swap** - `games.persistGameMove` locks the row, checks the previous state, appends the move, writes the new state, and on completion maps `winnerRoles` to user ids (`game.winners`, `game.winner`) and updates human stats in the same transaction. A miss caused by another process reloads and retries up to three times.
-6. **Clock, broadcast, bots** - the runner re-arms the turn or round clock, emits one redacted `game_state` `{ game, move }`, emits `game_over` on completion, and then submits `botMove` inputs for any pending bot seats.
+5. **Persist with compare-and-swap** - `games.persistGameMoves` locks the row, checks the previous state, appends the moves with consecutive numbers, writes the new state, and on completion maps `winnerRoles` to user ids (`game.winners`, `game.winner`) and updates human stats in the same transaction. A miss caused by another process reloads and retries up to three times.
+6. **Clock, broadcast, bots** - the runner re-arms the turn or round clock, emits one redacted `game_state` `{ game, move }`, emits `game_over` on completion, and then submits the `botMove` inputs of every pending bot seat as one batch (one transaction, one broadcast).
 
 Seating mirrors this: `ensureSeated` checks `maxPlayers` (counting configured bots in a lobby), assigns `engine.roleForSeat(players.length)`, and, for non-lobby games, starts the game with a fresh `createInitialState(seats, { config, seed })` once `minPlayers` are seated. Lobby games start only through `room:start`, which builds every seat (humans, then bots) and creates the state once. A **rematch** pre-seats the prior players before the first `join_room`; see [`realtime.md`](./realtime.md).
 
@@ -337,7 +339,7 @@ Seating mirrors this: `ensureSeated` checks `maxPlayers` (counting configured bo
 - **`moveSchema` rejects junk** - `undefined`, a string, and a bogus object all fail to parse.
 - **`configSchema` accepts the declared defaults**, and every public queue config parses and sizes a group within the player bounds.
 - **`reduce` does not mutate input state** - the purity check described above.
-- **Hooks return legal input** - `autoMove` (at several strike counts) and `botMove` (at every difficulty) produce moves that parse and that `reduce` accepts for the acting role; a simultaneous opening round has pending roles and a positive finite deadline.
+- **Hooks return legal input** - `autoMove` (at several strike counts) and `botMove` (at every difficulty) produce moves that parse and that `reduce` accepts for the acting role; a simultaneous opening round has pending roles and a positive finite deadline; `resultDelayMs`, when present, is finite and non-negative.
 - **Outcome shape** - an `autoMove` playout that completes names only seat roles in `winnerRoles`, and a decisive result names at least one winner.
 - **`meta.categoryId` is a known category**.
 - **`coverImage`, when set, is a `/games/` path** (`:98`) - cover art lives under `public/games/`.

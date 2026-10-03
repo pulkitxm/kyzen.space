@@ -49,13 +49,17 @@ export function installRuntime(
 
 export function fakeIo() {
   const emits: Emit[] = [];
+  const leaves: { room: string; left: string }[] = [];
   const io = {
     to: (room: string) => ({
       emit: (event: string, payload: unknown) =>
         emits.push({ room, event, payload }),
     }),
+    in: (room: string) => ({
+      socketsLeave: (left: string) => leaves.push({ room, left }),
+    }),
   };
-  return { emits, io: io as never };
+  return { emits, leaves, io: io as never };
 }
 
 export function fakeSocket(userId: string) {

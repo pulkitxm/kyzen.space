@@ -10,6 +10,7 @@ import { lobbyConfigSchema } from "@kyzen/shared/types";
 export const FAKE_ROUNDS = "fake-rounds";
 export const ROUND_MS = 10_000;
 export const REPLAY_MS = 2_000;
+export const LEAVE = -99;
 
 export type FakeMove = { round: number; value: number };
 
@@ -20,6 +21,7 @@ export type FakeState = {
   seats: Seat[];
   locked: Record<string, number>;
   scores: Record<string, number>;
+  out: string[];
   over: boolean;
 };
 
@@ -91,6 +93,7 @@ export const fakeRoundsEngine: GameEngine<FakeState, FakeMove> = {
       seats: seats.map((seat) => ({ ...seat })),
       locked: {},
       scores: Object.fromEntries(seats.map((seat) => [seat.role, 0])),
+      out: [],
       over: false,
     };
   },
@@ -99,21 +102,29 @@ export const fakeRoundsEngine: GameEngine<FakeState, FakeMove> = {
     if (state.over) return { ok: false, error: "Game is over" };
     if (!state.seats.some((seat) => seat.role === ctx.role))
       return { ok: false, error: "Not a player" };
+    if (state.out.includes(ctx.role)) return { ok: false, error: "Out" };
     if (input.round !== state.round) return { ok: false, error: "Stale round" };
     if (ctx.role in state.locked) return { ok: false, error: "Already locked" };
     const locked = { ...state.locked, [ctx.role]: input.value };
-    if (Object.keys(locked).length < state.seats.length) {
-      const next = { ...state, locked };
+    const out =
+      input.value === LEAVE ? [...state.out, ctx.role] : [...state.out];
+    if (
+      state.seats.some(
+        (seat) => !(seat.role in locked) && !out.includes(seat.role),
+      )
+    ) {
+      const next = { ...state, locked, out };
       return { ok: true, state: next, outcome: outcomeOf(next) };
     }
     const scores = { ...state.scores };
     for (const [role, value] of Object.entries(locked))
-      scores[role] = (scores[role] ?? 0) + value;
+      if (value !== LEAVE) scores[role] = (scores[role] ?? 0) + value;
     const next: FakeState = {
       ...state,
       round: state.round + 1,
       locked: {},
       scores,
+      out,
       over: state.round >= state.rounds,
     };
     return { ok: true, state: next, outcome: outcomeOf(next) };
@@ -123,7 +134,11 @@ export const fakeRoundsEngine: GameEngine<FakeState, FakeMove> = {
     if (state.over) return [];
     return state.seats
       .map((seat) => seat.role)
-      .filter((role) => !(role in state.locked));
+      .filter((role) => !(role in state.locked) && !state.out.includes(role));
+  },
+
+  resultDelayMs(state) {
+    return state.round > 1 ? REPLAY_MS : 0;
   },
 
   roundOf(state) {
@@ -167,6 +182,7 @@ const stateSchema = parser<FakeState>((value) =>
   isObject(value) &&
   typeof value.round === "number" &&
   Array.isArray(value.seats) &&
+  Array.isArray(value.out) &&
   isObject(value.locked) &&
   isObject(value.scores)
     ? (value as FakeState)

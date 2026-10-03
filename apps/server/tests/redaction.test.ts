@@ -59,6 +59,7 @@ describe("hidden information", () => {
       seats: [],
       locked: { P1: SECRET },
       scores: { P1: 1, P2: 2 },
+      out: [],
       over: false,
     };
     const game = { ...row, status: "active" as const, gameState: state };
