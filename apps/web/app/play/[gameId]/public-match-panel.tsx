@@ -19,6 +19,8 @@ import {
   useSocketEvent,
 } from "@/lib/socket/socket-context";
 
+type MatchPeer = { playerId: string; username: string };
+
 function mergeMessages(previous: MatchMessage[], incoming: MatchMessage[]) {
   const messages = new Map(previous.map((message) => [message.id, message]));
   for (const message of incoming) messages.set(message.id, message);
@@ -44,6 +46,7 @@ export function PublicMatchPanel({
     chosen: false,
     mutual: false,
     peerUsername: null as string | null,
+    peers: [] as MatchPeer[],
   });
   const messageEnd = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,17 +59,19 @@ export function PublicMatchPanel({
     if (message.gameId === game.id && active)
       setMessages((previous) => mergeMessages(previous, [message]));
   });
-  useSocketEvent<{ gameId: string; peerUsername: string | null }>(
-    "match:friends",
-    (event) => {
-      if (event.gameId === game.id)
-        setSocial({
-          chosen: true,
-          mutual: true,
-          peerUsername: event.peerUsername,
-        });
-    },
-  );
+  useSocketEvent<{
+    gameId: string;
+    peerUsername: string | null;
+    peers?: MatchPeer[];
+  }>("match:friends", (event) => {
+    if (event.gameId === game.id)
+      setSocial({
+        chosen: true,
+        mutual: true,
+        peerUsername: event.peerUsername,
+        peers: event.peers ?? [],
+      });
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -77,6 +82,7 @@ export function PublicMatchPanel({
           chosen: boolean;
           mutual: boolean;
           peerUsername: string | null;
+          peers?: MatchPeer[];
         }>(`/api/matches/${game.id}/messages`);
         if (mounted) {
           setMessages((previous) => mergeMessages(previous, result.messages));
@@ -84,6 +90,7 @@ export function PublicMatchPanel({
             chosen: result.chosen,
             mutual: result.mutual,
             peerUsername: result.peerUsername,
+            peers: result.peers ?? [],
           });
           setError(null);
         }
@@ -131,11 +138,13 @@ export function PublicMatchPanel({
         ok: true;
         mutual: boolean;
         peerUsername: string | null;
+        peers?: MatchPeer[];
       }>(socket, "match:friend", { gameId: game.id });
       setSocial({
         chosen: true,
         mutual: result.mutual,
         peerUsername: result.peerUsername,
+        peers: result.peers ?? [],
       });
       setError(null);
     } catch (failure) {
@@ -172,7 +181,9 @@ export function PublicMatchPanel({
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold text-sm">Match chat</h2>
           <p className="mt-0.5 flex items-center gap-1.5 text-muted-foreground text-xs">
-            {opponent?.username ?? "Opponent"}
+            {game.players.length > 2
+              ? "All four players"
+              : (opponent?.username ?? "Opponent")}
           </p>
         </div>
         {social.mutual ? (
@@ -191,7 +202,11 @@ export function PublicMatchPanel({
             size="sm"
             disabled={busy || social.chosen || !socket?.connected}
             aria-label={social.chosen ? "Friend request sent" : "Add friend"}
-            title={social.chosen ? "Friend request sent" : "Add friend"}
+            title={
+              social.chosen
+                ? "Connection enabled"
+                : "Connect with players who also opt in"
+            }
             className="size-8 shrink-0 p-0"
           >
             {social.chosen ? (
@@ -202,6 +217,23 @@ export function PublicMatchPanel({
           </Button>
         )}
       </header>
+      {game.players.length > 2 ? (
+        <div className="space-y-2 border-border border-b px-4 py-3 text-xs">
+          <p className="text-muted-foreground">
+            Connect shares your profile and adds every player who also chooses
+            Connect as a friend.
+          </p>
+          {social.peers.map((peer) => (
+            <Link
+              key={peer.playerId}
+              className="block text-primary"
+              href={`/chat/${encodeURIComponent(peer.username)}`}
+            >
+              Message {peer.username}
+            </Link>
+          ))}
+        </div>
+      ) : null}
       {active ? (
         <>
           <div
@@ -220,7 +252,11 @@ export function PublicMatchPanel({
                       className={`flex flex-col gap-1 ${mine ? "items-end" : "items-start"}`}
                     >
                       <span className="px-1 text-[10px] text-muted-foreground">
-                        {mine ? "You" : (opponent?.username ?? "Opponent")}
+                        {mine
+                          ? "You"
+                          : (game.players.find(
+                              (player) => player.userId === message.authorId,
+                            )?.username ?? "Player")}
                       </span>
                       <p
                         className={`wrap-break-word max-w-[90%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${mine ? "rounded-br-md bg-primary text-primary-foreground" : "rounded-bl-md border border-border bg-card text-card-foreground"}`}
@@ -243,7 +279,7 @@ export function PublicMatchPanel({
                 </div>
                 <p className="font-medium text-sm">Say hello</p>
                 <p className="mt-1 max-w-52 text-muted-foreground text-xs leading-relaxed">
-                  Chat with your opponent while you play.
+                  Chat with the other players while you play.
                 </p>
               </div>
             )}
@@ -302,8 +338,8 @@ export function PublicMatchPanel({
           </summary>
           <p className="mt-2">
             Chat disappears when the match ends. Messages are kept for safety
-            for 7 days, then deleted. Profiles are shared only when both players
-            add each other.
+            for 7 days, then deleted. Profiles are shared only between players
+            who both choose Connect.
           </p>
         </details>
         {error ? (

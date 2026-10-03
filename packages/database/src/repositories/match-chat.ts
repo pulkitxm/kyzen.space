@@ -54,26 +54,32 @@ export async function readMatchChat(code: string, userId: string) {
             .orderBy(desc(matchMessage.createdAt), desc(matchMessage.id))
             .limit(100)
         : [];
-    const peer = players.find((player) => player.userId !== userId);
-    const [connection] = peer
-      ? await tx
+    const peers: { playerId: string; username: string }[] = [];
+    const chosen = choices.some((choice) => choice.userId === userId);
+    if (chosen) {
+      for (const peer of players.filter((player) => player.userId !== userId)) {
+        if (!choices.some((choice) => choice.userId === peer.userId)) continue;
+        const [connection] = await tx
           .select()
           .from(friendship)
-          .where(eq(friendship.pairKey, pairKey(userId, peer.userId)))
-      : [];
-    const mutual =
-      choices.length === players.length && connection?.status === "accepted";
-    const [profile] =
-      mutual && peer
-        ? await tx
-            .select({ username: userProfile.username })
-            .from(userProfile)
-            .where(eq(userProfile.userId, peer.userId))
-        : [];
+          .where(eq(friendship.pairKey, pairKey(userId, peer.userId)));
+        if (connection?.status !== "accepted") continue;
+        const [profile] = await tx
+          .select({ username: userProfile.username })
+          .from(userProfile)
+          .where(eq(userProfile.userId, peer.userId));
+        if (profile)
+          peers.push({
+            playerId: `${code}:${peer.role}`,
+            username: profile.username,
+          });
+      }
+    }
     return {
-      chosen: choices.some((choice) => choice.userId === userId),
-      mutual,
-      peerUsername: profile?.username ?? null,
+      chosen,
+      mutual: peers.length > 0,
+      peerUsername: peers[0]?.username ?? null,
+      peers,
       messages: rows.reverse().map(
         (message): MatchMessage => ({
           id: message.id,
@@ -149,20 +155,68 @@ export async function sendMatchMessage(input: {
   });
 }
 
+async function connectPair(tx: Transaction, userIds: string[]) {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext(${pairKey(userIds[0] ?? "", userIds[1] ?? "")}))`,
+  );
+  const key = pairKey(userIds[0] ?? "", userIds[1] ?? "");
+  const [existing] = await tx
+    .select()
+    .from(friendship)
+    .where(eq(friendship.pairKey, key));
+  if (existing?.status !== "accepted") {
+    for (const id of [...userIds].sort()) {
+      const [account] = await tx
+        .select()
+        .from(user)
+        .where(eq(user.id, id))
+        .for("update");
+      const [total] = await tx
+        .select({ value: count() })
+        .from(friendship)
+        .where(
+          or(
+            and(
+              eq(friendship.requesterId, id),
+              inArray(friendship.status, ["pending", "accepted"]),
+            ),
+            and(
+              eq(friendship.addresseeId, id),
+              eq(friendship.status, "accepted"),
+            ),
+          ),
+        );
+      if (account?.isAnonymous && (total?.value ?? 0) >= ANON_MAX_FRIENDS)
+        throw new Error("Guest friend limit reached");
+    }
+    await tx
+      .insert(friendship)
+      .values({
+        requesterId: userIds[0] ?? "",
+        addresseeId: userIds[1] ?? "",
+        pairKey: key,
+        status: "accepted",
+        respondedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: friendship.pairKey,
+        set: {
+          status: "accepted",
+          respondedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+  }
+}
+
 export async function chooseMatchFriend(code: string, userId: string) {
   return db.transaction(async (tx) => {
     const { row, players } = await participant(tx, code, userId);
     if (
-      players.length !== 2 ||
-      (row.status !== "active" &&
-        (!row.completedAt ||
-          Date.now() - row.completedAt.getTime() > 15 * 60000))
+      row.status !== "active" &&
+      (!row.completedAt || Date.now() - row.completedAt.getTime() > 15 * 60000)
     )
       throw new Error("The connection window has ended");
-    const userIds = players.map((player) => player.userId);
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${pairKey(userIds[0] ?? "", userIds[1] ?? "")}))`,
-    );
     await tx
       .insert(matchFriendChoice)
       .values({ gameId: row.id, userId })
@@ -171,56 +225,20 @@ export async function chooseMatchFriend(code: string, userId: string) {
       .select()
       .from(matchFriendChoice)
       .where(eq(matchFriendChoice.gameId, row.id));
-    if (choices.length < 2) return { mutual: false, userIds };
-    const key = pairKey(userIds[0] ?? "", userIds[1] ?? "");
-    const [existing] = await tx
-      .select()
-      .from(friendship)
-      .where(eq(friendship.pairKey, key));
-    if (existing?.status !== "accepted") {
-      for (const id of [...userIds].sort()) {
-        const [account] = await tx
-          .select()
-          .from(user)
-          .where(eq(user.id, id))
-          .for("update");
-        const [total] = await tx
-          .select({ value: count() })
-          .from(friendship)
-          .where(
-            or(
-              and(
-                eq(friendship.requesterId, id),
-                inArray(friendship.status, ["pending", "accepted"]),
-              ),
-              and(
-                eq(friendship.addresseeId, id),
-                eq(friendship.status, "accepted"),
-              ),
-            ),
-          );
-        if (account?.isAnonymous && (total?.value ?? 0) >= ANON_MAX_FRIENDS)
-          throw new Error("Guest friend limit reached");
-      }
-      await tx
-        .insert(friendship)
-        .values({
-          requesterId: userIds[0] ?? "",
-          addresseeId: userIds[1] ?? "",
-          pairKey: key,
-          status: "accepted",
-          respondedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: friendship.pairKey,
-          set: {
-            status: "accepted",
-            respondedAt: new Date(),
-            updatedAt: new Date(),
-          },
-        });
+    const connections: string[][] = [];
+    for (const peer of players
+      .filter((player) => player.userId !== userId)
+      .sort((a, b) => a.userId.localeCompare(b.userId))) {
+      if (!choices.some((choice) => choice.userId === peer.userId)) continue;
+      const pair = [userId, peer.userId].sort();
+      await connectPair(tx, pair);
+      connections.push(pair);
     }
-    return { mutual: true, userIds };
+    return {
+      mutual: connections.length > 0,
+      userIds: players.map((player) => player.userId),
+      connections,
+    };
   });
 }
 

@@ -1,4 +1,4 @@
-import { friends, matchChat, profiles } from "@kyzen/database";
+import { friends, matchChat } from "@kyzen/database";
 import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
   clientJoinRoomSchema,
@@ -36,24 +36,18 @@ export function attachMatchChatHandlers(io: IOServer, socket: Socket): void {
       parsed.data.gameId,
       socket.data.userId,
     );
-    if (result.mutual) {
-      const other = result.userIds.find((id) => id !== socket.data.userId);
-      if (other) {
-        const dm = await createDm(socket.data.userId, other);
-        if (!dm.ok) throw new Error(dm.error);
-      }
-      const connection = await friends.getFriendshipBetween(
-        result.userIds[0] ?? "",
-        result.userIds[1] ?? "",
-      );
-      for (const id of result.userIds) {
-        const peerId = result.userIds.find((candidate) => candidate !== id);
-        const peerProfile = peerId
-          ? await profiles.getProfileByUserId(peerId)
-          : null;
+    for (const pair of result.connections) {
+      const [first, second] = pair;
+      if (!first || !second) continue;
+      const dm = await createDm(first, second);
+      if (!dm.ok) throw new Error(dm.error);
+      const connection = await friends.getFriendshipBetween(first, second);
+      for (const id of pair) {
+        const social = await matchChat.readMatchChat(parsed.data.gameId, id);
         emitToUser(io, id, "match:friends", {
           gameId: parsed.data.gameId,
-          peerUsername: peerProfile?.username ?? null,
+          peerUsername: social.peerUsername,
+          peers: social.peers,
         });
         const friendship = connection
           ? await assembleFriendship(connection, id)
@@ -62,14 +56,15 @@ export function attachMatchChatHandlers(io: IOServer, socket: Socket): void {
           emitToUser(io, id, CHAT_EVENTS.friendAccepted, { friendship });
       }
     }
-    const peer = result.mutual
-      ? result.userIds.find((id) => id !== socket.data.userId)
-      : null;
-    const profile = peer ? await profiles.getProfileByUserId(peer) : null;
+    const social = await matchChat.readMatchChat(
+      parsed.data.gameId,
+      socket.data.userId,
+    );
     cb?.({
       ok: true,
-      mutual: result.mutual,
-      peerUsername: profile?.username ?? null,
+      mutual: social.mutual,
+      peerUsername: social.peerUsername,
+      peers: social.peers,
     });
   });
 }

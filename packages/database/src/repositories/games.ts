@@ -299,7 +299,7 @@ export async function joinMatchmaking(input: {
           joinedAt: ticket?.samePool ? ticket.joinedAt : new Date(),
         },
       });
-    const [opponent] = await tx
+    const opponents = await tx
       .select()
       .from(matchmakingTicket)
       .where(
@@ -311,11 +311,16 @@ export async function joinMatchmaking(input: {
         ),
       )
       .orderBy(matchmakingTicket.joinedAt, matchmakingTicket.userId)
-      .limit(1);
-    if (!opponent) return null;
-    const userIds = randomInt(2)
-      ? [opponent.userId, input.userId]
-      : [input.userId, opponent.userId];
+      .limit(input.roles.length - 1);
+    if (opponents.length < input.roles.length - 1) return null;
+    const userIds = [...opponents.map((ticket) => ticket.userId), input.userId];
+    for (let index = userIds.length - 1; index > 0; index--) {
+      const other = randomInt(index + 1);
+      [userIds[index], userIds[other]] = [
+        userIds[other] ?? "",
+        userIds[index] ?? "",
+      ];
+    }
     const players = userIds.map((userId, index) => ({
       userId,
       username: `Player ${index + 1}`,

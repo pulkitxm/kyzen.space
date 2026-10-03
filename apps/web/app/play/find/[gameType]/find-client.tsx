@@ -104,7 +104,7 @@ export function FindClient({
 
   return (
     <SearchingScreen
-      title="Finding you an opponent..."
+      title="Finding players..."
       subtitle={
         error ??
         `${gameName} · ${formatElapsed(elapsed)} · Anonymous public match`

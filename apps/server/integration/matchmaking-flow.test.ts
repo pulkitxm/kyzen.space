@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { conversations, db, games, schema } from "@kyzen/database";
 import { getDefinition } from "@kyzen/games-core";
-import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import { CAR_FOOTBALL, TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { eq } from "drizzle-orm";
 import { createHarness, DB_UP } from "./harness";
 
@@ -24,6 +24,34 @@ async function join(userId: string, config: unknown = {}, owner = userId) {
 afterAll(() => h.cleanup());
 
 describe.skipIf(!DB_UP)("transactional public matchmaking", () => {
+  it("waits for four players and assigns two complete teams exactly once", async () => {
+    const users = await Promise.all(
+      [0, 1, 2, 3].map((index) => h.makeUser(`team${index}`)),
+    );
+    const engine = getDefinition(CAR_FOOTBALL).engine;
+    const queue = (userId: string) =>
+      games.joinMatchmaking({
+        userId,
+        owner: userId,
+        gameType: CAR_FOOTBALL,
+        config: {},
+        roles: engine.roles,
+        gameState: engine.createInitialState([]),
+      });
+    for (const user of users.slice(0, 3))
+      expect(await queue(user.id)).toBeNull();
+    const result = await queue(users[3]?.id ?? "");
+    if (!result) throw new Error("Missing four-player match");
+    h.trackGame(result.code);
+    expect(result.userIds.sort()).toEqual(users.map((user) => user.id).sort());
+    const game = await games.getGameByCode(result.code);
+    expect(game?.players.map((player) => player.role)).toEqual([
+      ...engine.roles,
+    ]);
+    for (const user of users)
+      expect((await queue(user.id))?.code).toBe(result.code);
+  });
+
   it("seats strangers atomically without creating a DM and resumes the same match", async () => {
     const a = await h.makeUser("a");
     const b = await h.makeUser("b");

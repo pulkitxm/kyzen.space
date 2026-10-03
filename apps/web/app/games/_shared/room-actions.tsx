@@ -1,6 +1,5 @@
 "use client";
 
-import { CAR_FOOTBALL } from "@kyzen/shared/constants";
 import {
   type GameMeta,
   isGameCode,
@@ -97,21 +96,15 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
 
   return (
     <div className="w-full space-y-3">
-      {meta.type !== CAR_FOOTBALL ? (
-        <button
-          type="button"
-          onClick={play}
-          disabled={busy !== null}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-4 font-semibold text-base text-primary-foreground shadow-lg outline-none transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
-        >
-          <FaPlay size={16} aria-hidden="true" />
-          {busy === "play" ? "Finding a match..." : "Play now"}
-        </button>
-      ) : (
-        <p className="rounded-2xl border border-border bg-surface-raised p-4 text-muted-foreground text-sm">
-          Create a room and invite three players for a 2v2 match.
-        </p>
-      )}
+      <button
+        type="button"
+        onClick={play}
+        disabled={busy !== null}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-4 font-semibold text-base text-primary-foreground shadow-lg outline-none transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
+      >
+        <FaPlay size={16} aria-hidden="true" />
+        {busy === "play" ? "Finding a match..." : "Play now"}
+      </button>
 
       <p className="pt-2 font-semibold text-muted-foreground text-xs uppercase tracking-[0.25em]">
         Play with friends

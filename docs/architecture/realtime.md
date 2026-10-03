@@ -8,6 +8,10 @@ Everything live in this app - chat messages, typing dots, presence, friend reque
 2. **Multiplexes two logically separate "lanes" onto that single connection** - a **chat lane** (chat, friends, typing, presence, in-chat game creation, notifications) and a **game lane** (`join_room` / `make_move` / `leave_room`). They share a connection but are wired and validated independently - **both lanes validate every inbound payload with shared Zod schemas**. The browser opens **one** Socket.IO connection (the web app's `SocketProvider`); the shared game session uses it rather than boards dialing their own - see [games-client](./games-client.md).
 3. **Runs game actions through authoritative handlers.** Turn-based games validate and persist every move through `reduce`. Realtime games use the same authenticated room and move envelope, but validate bounded controls and apply them in a fixed-tick server loop through `step`.
 
+## Team matchmaking
+
+The public queue uses the engine seat count and assigns all required roles atomically. Turbo Pitch waits for four tickets; two-player games keep their existing matching behavior. Match chat labels every sender by their public seat. Choosing Connect opts into connections with other consenting participants; identities are revealed only for accepted pairs.
+
 ## Realtime game loop
 
 `realtime-game.ts` owns active process-local loops. The first room join after all seats fill starts a loop from the validated stored state. Each loop keeps the latest accepted controls per role, drops controls after 250 ms without an update, steps the pure engine at its declared tick rate, and broadcasts snapshots at half that rate. It persists a recovery snapshot every second. A reconnecting player receives the current in-memory state through the shared `join_room` path. A process restart resumes from the latest stored snapshot when a player rejoins.

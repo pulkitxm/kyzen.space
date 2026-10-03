@@ -33,10 +33,9 @@ export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
     const config = definition.configSchema.safeParse(parsed.data.config ?? {});
     if (
       !config.success ||
-      definition.engine.minPlayers !== 2 ||
-      definition.engine.maxPlayers !== 2 ||
-      definition.engine.mode !== "turn-based" ||
-      !definition.engine.reduce
+      definition.engine.minPlayers !== definition.engine.maxPlayers ||
+      definition.engine.minPlayers < 2 ||
+      !(definition.engine.reduce || definition.engine.step)
     ) {
       cb?.({ ok: false, error: "Unsupported public match configuration" });
       return;
@@ -46,9 +45,11 @@ export function attachMatchmakingHandlers(io: IOServer, socket: Socket): void {
       owner: socket.id,
       gameType: parsed.data.gameType,
       config: config.data,
-      roles: definition.engine.roles.slice(0, 2),
+      roles: definition.engine.roles.slice(0, definition.engine.minPlayers),
       gameState: definition.engine.createInitialState(
-        definition.engine.roles.slice(0, 2).map((role) => ({ role })),
+        definition.engine.roles
+          .slice(0, definition.engine.minPlayers)
+          .map((role) => ({ role })),
       ),
     });
     if (match) await ensureMatchClock(io, match.code);

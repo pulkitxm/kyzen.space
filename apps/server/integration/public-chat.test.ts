@@ -9,7 +9,7 @@ import {
   schema,
 } from "@kyzen/database";
 import { getDefinition } from "@kyzen/games-core";
-import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import { CAR_FOOTBALL, TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { eq } from "drizzle-orm";
 import type { Server, Socket } from "socket.io";
 import { serializeGame, serializeMove } from "../src/api/serialize";
@@ -40,6 +40,47 @@ async function fixture() {
 }
 
 describe.skipIf(!DB_UP)("anonymous public match privacy", () => {
+  it("connects only consenting pairs in a four-player match", async () => {
+    const users = await Promise.all(
+      [0, 1, 2, 3].map((index) => h.makeUser(`team${index}`)),
+    );
+    const engine = getDefinition(CAR_FOOTBALL).engine;
+    const game = await games.createGame({
+      publicMatch: true,
+      gameType: CAR_FOOTBALL,
+      status: "active",
+      players: users.map((user, index) => ({
+        userId: user.id,
+        username: user.username,
+        role: engine.roles[index] ?? "",
+      })),
+      gameState: engine.createInitialState([]),
+    });
+    h.trackGame(game.id);
+    const [a, b, c, d] = users;
+    if (!a || !b || !c || !d) throw new Error("Missing fixture");
+    expect((await matchChat.chooseMatchFriend(game.code, a.id)).mutual).toBe(
+      false,
+    );
+    expect((await matchChat.readMatchChat(game.code, b.id)).peers).toEqual([]);
+    expect((await matchChat.chooseMatchFriend(game.code, b.id)).mutual).toBe(
+      true,
+    );
+    expect(
+      (await matchChat.readMatchChat(game.code, a.id)).peers.map(
+        (peer) => peer.username,
+      ),
+    ).toEqual([b.username]);
+    expect((await matchChat.readMatchChat(game.code, c.id)).peers).toEqual([]);
+    await matchChat.chooseMatchFriend(game.code, c.id);
+    expect((await matchChat.readMatchChat(game.code, a.id)).peers).toHaveLength(
+      2,
+    );
+    expect(await friends.getFriendshipBetween(a.id, d.id)).toBeNull();
+    const wire = await matchChat.readMatchChat(game.code, d.id);
+    expect(JSON.stringify(wire)).not.toContain(a.username);
+  });
+
   it("redacts identities from snapshots, winners, and moves", async () => {
     const { a, b, game } = await fixture();
     const snapshot = serializeGame({ ...game, winner: a.id }, a.id);
