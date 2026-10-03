@@ -1,4 +1,5 @@
 export { GAMES } from "./games";
+export * from "./games/tank-arena";
 export { ticTacToeDefinition } from "./games/tic-tac-toe";
 export {
   emptyBoard,
