@@ -5,7 +5,11 @@ import type {
   ServerGameStatePayload,
 } from "@kyzen/shared/types";
 import type { Socket } from "socket.io-client";
-import { bindGameSession, mergeGameMoves } from "../src/session";
+import {
+  bindGameSession,
+  mergeGameMoves,
+  mergeGameSnapshot,
+} from "../src/session";
 
 const game: GameJson = {
   id: "A2K9P7",
@@ -122,5 +126,21 @@ describe("shared game session", () => {
     });
     expect(resynced.map((item) => item.moveNumber)).toEqual([1, 2, 3]);
     expect(mergeGameMoves(resynced, { game, moves: [] })).toEqual([]);
+  });
+
+  test("keeps the viewer identity when a shared broadcast omits it", () => {
+    const viewer = { ...game, publicMatch: true, viewerId: "A2K9P7:X" };
+    const broadcast = {
+      ...game,
+      publicMatch: true,
+      status: "completed" as const,
+    };
+    expect(mergeGameSnapshot(viewer, broadcast)).toEqual({
+      ...broadcast,
+      viewerId: "A2K9P7:X",
+    });
+    const fresh = { ...broadcast, viewerId: "A2K9P7:O" };
+    expect(mergeGameSnapshot(viewer, fresh)).toBe(fresh);
+    expect(mergeGameSnapshot(game, broadcast)).toBe(broadcast);
   });
 });

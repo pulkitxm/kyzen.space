@@ -78,7 +78,7 @@ export default async function PlayPage({
     <PlayClient
       key={code}
       gameId={code}
-      userId={data.game.viewerId ?? session.user.id}
+      userId={session.user.id}
       gameType={data.game.gameType}
       initialGame={data.game}
       initialMoves={data.moves}

@@ -216,14 +216,23 @@ try {
   const chat = (await chatResponse.json()) as { messages: unknown[] };
   if (chat.messages.length !== 1)
     throw new Error("Match chat did not synchronize");
+  const peerOf = (view: GameJson | undefined) =>
+    view?.players.find((player) => player.userId !== view.viewerId)?.userId;
+  const hostPeer = peerOf(snapshots[0]?.game);
+  const opponentPeer = peerOf(snapshots[1]?.game);
+  if (!hostPeer || !opponentPeer)
+    throw new Error("Public player aliases could not be resolved");
   const firstChoice = await host
     .timeout(8000)
-    .emitWithAck("match:friend", { gameId: publicCode });
+    .emitWithAck("match:friend", { gameId: publicCode, playerId: hostPeer });
   if (!firstChoice.ok || firstChoice.mutual)
     throw new Error("One-sided consent created a friendship");
   const secondChoice = await opponent
     .timeout(8000)
-    .emitWithAck("match:friend", { gameId: publicCode });
+    .emitWithAck("match:friend", {
+      gameId: publicCode,
+      playerId: opponentPeer,
+    });
   if (!secondChoice.ok || !secondChoice.mutual)
     throw new Error("Mutual consent did not create friendship");
   const xIndex = snapshots.findIndex(

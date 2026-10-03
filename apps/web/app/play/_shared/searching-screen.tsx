@@ -10,6 +10,7 @@ export function SearchingScreen({
   spinning = true,
   onCancel,
   cancelLabel = "Cancel",
+  children,
 }: {
   title: string;
   subtitle?: ReactNode;
@@ -17,6 +18,7 @@ export function SearchingScreen({
   spinning?: boolean;
   onCancel?: () => void;
   cancelLabel?: string;
+  children?: ReactNode;
 }) {
   return (
     <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-6 px-6 text-center">
@@ -48,6 +50,8 @@ export function SearchingScreen({
           <p className="text-muted-foreground text-sm">{subtitle}</p>
         ) : null}
       </div>
+
+      {children}
 
       {onCancel ? (
         <button

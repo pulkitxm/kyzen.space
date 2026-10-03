@@ -1,30 +1,50 @@
 "use client";
 
 import {
+  type GameClientProps,
   getGameClient,
   getGameSkeleton,
   useGameSession,
 } from "@kyzen/games-client";
-import type {
-  ConversationJson,
-  GameJson,
-  GameType,
-  MessageJson,
-  MoveJson,
+import { getDefinition, hasEngine } from "@kyzen/games-core";
+import {
+  type ConversationJson,
+  type GameJson,
+  type GameType,
+  isBotId,
+  type MessageJson,
+  type MoveJson,
 } from "@kyzen/shared/types";
 import { useAtomValue } from "jotai";
-import { Suspense, useMemo } from "react";
+import { Suspense, useCallback, useMemo } from "react";
 import { ConversationView } from "@/app/chat/[handle]/conversation-view";
 import { useProfilePopup } from "@/components/ui";
 import { gameMusicSource } from "@/lib/audio/music-sources";
 import { useGameAudioBridge } from "@/lib/audio/use-audio-bridge";
 import type { ChatLayout } from "@/lib/chat-layout";
+import { chatPanelMode } from "@/lib/games/match-chat";
 import { socketStatusAtom, useSocket } from "@/lib/socket/socket-context";
+import { cn } from "@/lib/utils";
 import { GameChatSplit } from "./game-chat-split";
 import { GameOverOverlay } from "./game-over-overlay";
 import { GameSettingsGear } from "./game-settings-gear";
-import { PublicMatchPanel } from "./public-match-panel";
+import type { LobbySettings } from "./lobby-panel";
+import { MatchChatPanel } from "./match-chat-panel";
 import { WaitingForOpponentOverlay } from "./waiting-overlay";
+
+type ProfileUser = Parameters<NonNullable<GameClientProps["onViewProfile"]>>[0];
+
+function lobbySettings(gameType: GameType): LobbySettings | null {
+  if (!hasEngine(gameType)) return null;
+  const { engine } = getDefinition(gameType);
+  return engine.lobby
+    ? {
+        ...engine.lobby,
+        minPlayers: engine.minPlayers,
+        maxPlayers: engine.maxPlayers,
+      }
+    : null;
+}
 
 export function PlayClient({
   gameId,
@@ -51,6 +71,7 @@ export function PlayClient({
 }) {
   const GameClient = getGameClient(gameType);
   const GameSkeleton = getGameSkeleton(gameType);
+  const wide = hasEngine(gameType) && getDefinition(gameType).layout === "wide";
   const { socket } = useSocket();
   const status = useAtomValue(socketStatusAtom);
   const openProfile = useProfilePopup();
@@ -60,24 +81,50 @@ export function PlayClient({
     initialGame,
     initialMoves,
   });
+  const viewerId = game.viewerId ?? userId;
+  const players = game.players;
 
   useGameAudioBridge(gameMusicSource(gameType));
+
+  const viewProfile = useCallback(
+    (user: ProfileUser) => {
+      if (
+        players.some(
+          (player) =>
+            isBotId(player.userId) && player.username === user.username,
+        )
+      )
+        return;
+      openProfile(user);
+    },
+    [players, openProfile],
+  );
+  const onViewProfile = game.publicMatch ? undefined : viewProfile;
 
   const connected = status === "connected";
   const gameNode = useMemo(
     () =>
       GameClient ? (
-        <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
-          <Suspense fallback={<GameSkeleton />}>
-            <GameClient
-              userId={userId}
-              connected={connected}
-              game={game}
-              moves={moves}
-              makeMove={makeMove}
-              onViewProfile={game.publicMatch ? undefined : openProfile}
-            />
-          </Suspense>
+        <div
+          className={cn(
+            "flex h-full min-h-0 w-full flex-col",
+            wide ? "p-2 md:p-3" : "mx-auto max-w-2xl p-4",
+          )}
+        >
+          {game.gameState == null ? (
+            <GameSkeleton />
+          ) : (
+            <Suspense fallback={<GameSkeleton />}>
+              <GameClient
+                userId={viewerId}
+                connected={connected}
+                game={game}
+                moves={moves}
+                makeMove={makeMove}
+                onViewProfile={onViewProfile}
+              />
+            </Suspense>
+          )}
         </div>
       ) : (
         <div className="p-6 text-center text-muted-foreground text-sm">
@@ -87,12 +134,13 @@ export function PlayClient({
     [
       GameClient,
       GameSkeleton,
-      userId,
+      wide,
+      viewerId,
       connected,
       game,
       moves,
       makeMove,
-      openProfile,
+      onViewProfile,
     ],
   );
 
@@ -106,17 +154,24 @@ export function PlayClient({
           {error}
         </p>
       ) : null}
-      <WaitingForOpponentOverlay gameId={gameId} game={game} />
+      <WaitingForOpponentOverlay
+        gameId={gameId}
+        game={game}
+        userId={viewerId}
+        lobby={lobbySettings(gameType)}
+      />
       <GameOverOverlay
         gameId={gameId}
-        userId={userId}
+        userId={viewerId}
         game={game}
         conversation={conversation}
       />
     </>
   );
 
-  if (game.publicMatch) {
+  const chatMode = chatPanelMode(game, Boolean(conversation), viewerId);
+
+  if (chatMode === "match") {
     return (
       <>
         <GameChatSplit
@@ -124,14 +179,20 @@ export function PlayClient({
           initialLayout={initialLayout}
           layoutTrusted={layoutTrusted}
           game={gameNode}
-          chat={() => <PublicMatchPanel game={game} userId={userId} />}
+          chat={() => (
+            <MatchChatPanel
+              game={game}
+              userId={viewerId}
+              onViewProfile={onViewProfile}
+            />
+          )}
         />
         {overlay}
       </>
     );
   }
 
-  if (!conversation) {
+  if (chatMode === "none" || !conversation) {
     return (
       <div className="relative h-full min-h-0">
         {gameNode}

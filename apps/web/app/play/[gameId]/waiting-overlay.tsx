@@ -3,14 +3,21 @@
 import type { GameJson } from "@kyzen/shared/types";
 import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
 import { useEffect, useState } from "react";
-import { FaCheck, FaRegCopy, FaUserCheck } from "react-icons/fa6";
+import { FaUserCheck } from "react-icons/fa6";
+import { cn } from "@/lib/utils";
+import { InviteCode } from "./invite-code";
+import { LobbyPanel, type LobbySettings } from "./lobby-panel";
 
 export function WaitingForOpponentOverlay({
   gameId,
   game,
+  userId,
+  lobby,
 }: {
   gameId: string;
   game: GameJson;
+  userId: string;
+  lobby: LobbySettings | null;
 }) {
   const [previousStatus, setPreviousStatus] = useState(game.status);
   const [justJoined, setJustJoined] = useState(false);
@@ -42,7 +49,12 @@ export function WaitingForOpponentOverlay({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.97 }}
               transition={{ ease: [0.16, 1, 0.3, 1], duration: 0.2 }}
-              className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border bg-surface-raised p-6 text-center shadow-xl"
+              className={cn(
+                "pointer-events-auto w-full rounded-2xl border border-border bg-surface-raised text-center shadow-xl",
+                lobby && !justJoined
+                  ? "max-h-full max-w-md overflow-y-auto p-5"
+                  : "max-w-sm p-6",
+              )}
             >
               {justJoined ? (
                 <div className="flex flex-col items-center gap-3 py-2">
@@ -55,6 +67,13 @@ export function WaitingForOpponentOverlay({
                     Game ready!
                   </p>
                 </div>
+              ) : lobby ? (
+                <LobbyPanel
+                  gameId={gameId}
+                  game={game}
+                  userId={userId}
+                  lobby={lobby}
+                />
               ) : (
                 <WaitingRoomInvite gameId={gameId} />
               )}
@@ -67,21 +86,6 @@ export function WaitingForOpponentOverlay({
 }
 
 function WaitingRoomInvite({ gameId }: { gameId: string }) {
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
-  const copy = async (kind: "code" | "link") => {
-    const value =
-      kind === "code"
-        ? gameId
-        : typeof window !== "undefined"
-          ? window.location.href
-          : gameId;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(kind);
-      setTimeout(() => setCopied(null), 1800);
-    } catch {}
-  };
-
   return (
     <>
       <div className="mx-auto mb-4 flex size-14 items-center justify-center">
@@ -112,35 +116,7 @@ function WaitingRoomInvite({ gameId }: { gameId: string }) {
       <p className="mt-1 text-muted-foreground text-sm">
         Share this code so a friend can join.
       </p>
-      <div className="mt-4 rounded-xl border border-border bg-background py-3 font-mono text-3xl text-foreground tracking-[0.4em]">
-        {gameId}
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={() => copy("code")}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 font-medium text-card-foreground text-sm outline-none transition hover:bg-surface-overlay"
-        >
-          {copied === "code" ? (
-            <FaCheck size={14} aria-hidden="true" />
-          ) : (
-            <FaRegCopy size={14} aria-hidden="true" />
-          )}
-          {copied === "code" ? "Copied" : "Copy code"}
-        </button>
-        <button
-          type="button"
-          onClick={() => copy("link")}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 font-medium text-card-foreground text-sm outline-none transition hover:bg-surface-overlay"
-        >
-          {copied === "link" ? (
-            <FaCheck size={14} aria-hidden="true" />
-          ) : (
-            <FaRegCopy size={14} aria-hidden="true" />
-          )}
-          {copied === "link" ? "Copied" : "Copy link"}
-        </button>
-      </div>
+      <InviteCode gameId={gameId} />
     </>
   );
 }
