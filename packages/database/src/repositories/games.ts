@@ -458,7 +458,6 @@ export async function joinMatchmaking(input: {
       )
       .limit(1);
     if (active) return { code: active.code, userIds: [input.userId] };
-    const expiresAt = new Date(Date.now() + 45000);
     const [ticket] = await tx
       .select({
         joinedAt: matchmakingTicket.joinedAt,
@@ -471,7 +470,7 @@ export async function joinMatchmaking(input: {
       owner: input.owner,
       gameType: input.gameType,
       config: input.config,
-      expiresAt,
+      expiresAt: sql`now() + interval '45 seconds'`,
     };
     await tx
       .insert(matchmakingTicket)
@@ -480,7 +479,7 @@ export async function joinMatchmaking(input: {
         target: matchmakingTicket.userId,
         set: {
           ...ticketValues,
-          joinedAt: ticket?.samePool ? ticket.joinedAt : new Date(),
+          joinedAt: ticket?.samePool ? ticket.joinedAt : sql`now()`,
         },
       });
     const opponentCount = input.seats.length - 1;
@@ -492,7 +491,7 @@ export async function joinMatchmaking(input: {
         and(
           eq(matchmakingTicket.gameType, input.gameType),
           ne(matchmakingTicket.userId, input.userId),
-          gt(matchmakingTicket.expiresAt, new Date()),
+          gt(matchmakingTicket.expiresAt, sql`now()`),
           sql`${matchmakingTicket.config} = ${JSON.stringify(input.config)}::jsonb`,
         ),
       )

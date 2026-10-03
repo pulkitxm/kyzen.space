@@ -52,20 +52,20 @@ export const user = pgTable("user", {
     .notNull(),
   image: text("image"),
   isAnonymous: boolean("is_anonymous").notNull().default(false),
-  createdAt: timestamp("created_at")
+  createdAt: timestamp("created_at", { withTimezone: true })
     .$defaultFn(() => new Date())
     .notNull(),
-  updatedAt: timestamp("updated_at")
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .$defaultFn(() => new Date())
     .notNull(),
 });
 
 export const session = pgTable("session", {
   id: text("id").primaryKey(),
-  expiresAt: timestamp("expires_at").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   token: text("token").notNull().unique(),
-  createdAt: timestamp("created_at").notNull(),
-  updatedAt: timestamp("updated_at").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   userId: text("user_id")
@@ -83,21 +83,29 @@ export const account = pgTable("account", {
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
   idToken: text("id_token"),
-  accessTokenExpiresAt: timestamp("access_token_expires_at"),
-  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", {
+    withTimezone: true,
+  }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+    withTimezone: true,
+  }),
   scope: text("scope"),
   password: text("password"),
-  createdAt: timestamp("created_at").notNull(),
-  updatedAt: timestamp("updated_at").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
 });
 
 export const verification = pgTable("verification", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").$defaultFn(() => new Date()),
-  updatedAt: timestamp("updated_at").$defaultFn(() => new Date()),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(
+    () => new Date(),
+  ),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(
+    () => new Date(),
+  ),
 });
 
 export const game = pgTable(
@@ -126,10 +134,14 @@ export const game = pgTable(
     seriesId: uuid("series_id").references((): AnyPgColumn => game.id, {
       onDelete: "set null",
     }),
-    startedAt: timestamp("started_at"),
-    completedAt: timestamp("completed_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("game_conversation_idx").on(t.conversationId),
@@ -147,7 +159,9 @@ export const move = pgTable(
     moveNumber: integer("move_number").notNull(),
     playerId: text("player_id").notNull(),
     moveData: jsonb("move_data").$type<unknown>().notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [unique("move_game_number_uq").on(t.gameId, t.moveNumber)],
 );
@@ -163,7 +177,9 @@ export const gamePlayer = pgTable(
     username: text("username").notNull(),
     role: text("role").notNull(),
     seatOrder: integer("seat_order").notNull(),
-    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+    joinedAt: timestamp("joined_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     unique("game_player_uq").on(t.gameId, t.userId),
@@ -185,10 +201,14 @@ export const userProfile = pgTable("user_profile", {
   pattern: patternEnum("pattern").notNull().default(DEFAULT_PATTERN),
   glass: glassEnum("glass").notNull().default(DEFAULT_GLASS_MODE),
   chatLayout: jsonb("chat_layout").$type<{ mode: ChatMode } | null>(),
-  usernameChangedAt: timestamp("username_changed_at"),
-  lastSeenAt: timestamp("last_seen_at"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  usernameChangedAt: timestamp("username_changed_at", { withTimezone: true }),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const friendship = pgTable(
@@ -203,9 +223,13 @@ export const friendship = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     pairKey: text("pair_key").notNull(),
     status: text("status").$type<FriendStatus>().notNull().default("pending"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    respondedAt: timestamp("responded_at"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
   },
   (t) => [
     unique("friendship_pair_uq").on(t.pairKey),
@@ -226,9 +250,13 @@ export const conversation = pgTable(
     }),
     dmKey: text("dm_key").unique(),
     lastMessageId: uuid("last_message_id"),
-    lastMessageAt: timestamp("last_message_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [index("conversation_last_message_at_idx").on(t.lastMessageAt)],
 );
@@ -245,10 +273,12 @@ export const conversationMember = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     role: text("role").$type<MemberRole>().notNull().default("member"),
     lastReadMessageId: uuid("last_read_message_id"),
-    lastReadAt: timestamp("last_read_at"),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true }),
     muted: boolean("muted").notNull().default(false),
-    joinedAt: timestamp("joined_at").defaultNow().notNull(),
-    leftAt: timestamp("left_at"),
+    joinedAt: timestamp("joined_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    leftAt: timestamp("left_at", { withTimezone: true }),
   },
   (t) => [
     unique("conversation_member_uq").on(t.conversationId, t.userId),
@@ -270,9 +300,11 @@ export const message = pgTable(
     body: text("body"),
     metadata: jsonb("metadata").$type<MessageMetadata>(),
     gameId: uuid("game_id").references(() => game.id, { onDelete: "set null" }),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    editedAt: timestamp("edited_at"),
-    deletedAt: timestamp("deleted_at"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => [
     index("message_conv_created_idx").on(t.conversationId, t.createdAt),
@@ -295,9 +327,11 @@ export const notification = pgTable(
       .$type<NotificationPayload>()
       .notNull()
       .default({}),
-    readAt: timestamp("read_at"),
-    resolvedAt: timestamp("resolved_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("notification_user_created_idx").on(t.userId, t.createdAt),
@@ -315,8 +349,10 @@ export const accountMerge = pgTable(
       .$type<AccountMergeStatus>()
       .notNull()
       .default("pending"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    resolvedAt: timestamp("resolved_at"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   },
   (t) => [
     index("account_merge_target_status_idx").on(t.targetUserId, t.status),
@@ -332,8 +368,10 @@ export const matchmakingTicket = pgTable(
     owner: text("owner").notNull(),
     gameType: text("game_type").notNull(),
     config: jsonb("config").$type<unknown>().notNull(),
-    joinedAt: timestamp("joined_at").defaultNow().notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
+    joinedAt: timestamp("joined_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
   (t) => [index("matchmaking_ticket_pool_idx").on(t.gameType, t.joinedAt)],
 );
@@ -350,8 +388,10 @@ export const matchMessage = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     clientId: uuid("client_id").notNull(),
     body: text("body").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
   (t) => [
     unique("match_message_client_uq").on(t.gameId, t.senderId, t.clientId),
@@ -372,7 +412,9 @@ export const matchFriendChoice = pgTable(
     targetUserId: text("target_user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     unique("match_friend_choice_uq").on(t.gameId, t.userId, t.targetUserId),

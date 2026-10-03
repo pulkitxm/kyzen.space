@@ -82,7 +82,7 @@ export async function readMatchChat(code: string, userId: string) {
           .where(
             and(
               eq(matchMessage.gameId, row.id),
-              gt(matchMessage.expiresAt, new Date()),
+              gt(matchMessage.expiresAt, sql`now()`),
             ),
           )
           .orderBy(desc(matchMessage.createdAt), desc(matchMessage.id))
@@ -156,19 +156,18 @@ export async function sendMatchMessage(input: {
       );
     let message = existing;
     if (!message) {
-      const [last] = await tx
-        .select()
+      const [recent] = await tx
+        .select({ id: matchMessage.id })
         .from(matchMessage)
         .where(
           and(
             eq(matchMessage.gameId, row.id),
             eq(matchMessage.senderId, input.userId),
+            gt(matchMessage.createdAt, sql`now() - interval '1 second'`),
           ),
         )
-        .orderBy(desc(matchMessage.createdAt))
         .limit(1);
-      if (last && Date.now() - last.createdAt.getTime() < 1000)
-        throw new Error("Please wait before sending another message");
+      if (recent) throw new Error("Please wait before sending another message");
       const [total] = await tx
         .select({ value: count() })
         .from(matchMessage)
@@ -182,7 +181,7 @@ export async function sendMatchMessage(input: {
           senderId: input.userId,
           clientId: input.clientId,
           body: input.body,
-          expiresAt: new Date(Date.now() + 7 * 86400000),
+          expiresAt: sql`now() + interval '7 days'`,
         })
         .returning();
     }
@@ -281,13 +280,11 @@ export async function chooseMatchFriend(
 }
 
 export async function purgeExpiredMatchData(): Promise<void> {
-  await db.delete(matchMessage).where(lt(matchMessage.expiresAt, new Date()));
+  await db.delete(matchMessage).where(lt(matchMessage.expiresAt, sql`now()`));
   await db
     .delete(matchmakingTicket)
-    .where(lt(matchmakingTicket.expiresAt, new Date()));
+    .where(lt(matchmakingTicket.expiresAt, sql`now()`));
   await db
     .delete(matchFriendChoice)
-    .where(
-      lt(matchFriendChoice.createdAt, new Date(Date.now() - 7 * 86400000)),
-    );
+    .where(lt(matchFriendChoice.createdAt, sql`now() - interval '7 days'`));
 }
