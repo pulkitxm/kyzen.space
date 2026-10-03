@@ -59,6 +59,8 @@ Use one realtime instance for now: turn timers are process-local. Redis shares r
 
 The root `vercel.json` deploys two services in one Vercel project. Set the project's Root Directory to the repository root so Vercel can read that configuration and build the Bun workspaces.
 
+Use `kyzen-space` as the Vercel project name. The container registry rejects project names containing periods: `kyzen.space` fails while uploading the backend image with `NAME_INVALID: invalid project slug`, even though the container builds successfully. The GitHub repository can keep its existing name. Renaming the Vercel project preserves its project ID, Git connection, and the assigned `kyzenspace.vercel.app` domain, but changes generated preview hostnames. Redeploy failed builds after renaming, and update preview auth origins to the new hostnames.
+
 | Service | Build and runtime | Public paths |
 | --- | --- | --- |
 | `app` | Backend-only Bun container from `Dockerfile.vercel`, running `apps/server/src/index.ts` | `/api`, `/api/*`, `/socket.io`, `/socket.io/*`, `/health` |
@@ -81,6 +83,8 @@ Browser API, Better Auth, and Socket.IO calls use the shared public origin. Leav
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional OAuth credentials |
 
 Use origins that match the production or preview domain, never the internal binding URL. Configure Google OAuth callbacks as `<BETTER_AUTH_URL>/api/auth/callback/google`. Run `bun run db:migrate` separately against the intended database before serving traffic; the container does not migrate or seed on startup. The container listens on `0.0.0.0:80` by default and honors an injected `PORT`.
+
+Configure preview credentials separately from production, using an isolated Postgres database with synthetic data. A ready deployment only confirms that the build and upload succeeded. Check `/health`, guest sign-in, and a complete authenticated two-player game before considering the app operational. Missing `DATABASE_URL` or `BETTER_AUTH_SECRET` prevents the backend from starting.
 
 For local services development, start the local databases and apply the schema as described above, then run from the repository root:
 
