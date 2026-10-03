@@ -35,6 +35,7 @@ const profiles = {
 mock.module("@kyzen/database", () => ({
   games,
   profiles,
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},
@@ -89,7 +90,7 @@ describe("room:create", () => {
   test("acks the new room code on success", async () => {
     const { socket, handlers } = fakeSocket("u1");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = await invoke(handlers.get("room:create"), {
       gameType: TIC_TAC_TOE,
     });
@@ -100,7 +101,7 @@ describe("room:create", () => {
   test("acks an error for an invalid payload without creating a game", async () => {
     const { socket, handlers } = fakeSocket("u1");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = (await invoke(handlers.get("room:create"), {})) as {
       ok: boolean;
     };
@@ -112,7 +113,7 @@ describe("room:create", () => {
     profile = null;
     const { socket, handlers } = fakeSocket("u1");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = (await invoke(handlers.get("room:create"), {
       gameType: TIC_TAC_TOE,
     })) as { ok: boolean };
@@ -125,7 +126,7 @@ describe("room:join", () => {
     current = room();
     const { socket, handlers } = fakeSocket("u2");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = await invoke(handlers.get("room:join"), { code: CODE });
     expect(res).toEqual({ ok: true, code: CODE });
   });
@@ -133,7 +134,7 @@ describe("room:join", () => {
   test("acks not_found for an unparseable code", async () => {
     const { socket, handlers } = fakeSocket("u2");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = await invoke(handlers.get("room:join"), { code: "bad" });
     expect(res).toEqual({ ok: false, error: "not_found" });
   });
@@ -147,7 +148,7 @@ describe("room:join", () => {
     });
     const { socket, handlers } = fakeSocket("u2");
     // biome-ignore lint/suspicious/noExplicitAny: fake socket
-    attachRoomHandlers(socket as any);
+    attachRoomHandlers({} as any, socket as any);
     const res = await invoke(handlers.get("room:join"), { code: CODE });
     expect(res).toEqual({ ok: false, error: "full" });
   });

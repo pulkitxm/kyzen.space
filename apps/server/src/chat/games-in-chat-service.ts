@@ -6,14 +6,16 @@ import {
   type SeatingMode,
 } from "@kyzen/database";
 import { getDefinition, hasEngine } from "@kyzen/games-core";
-import type {
-  GameCardMeta,
-  GameJson,
-  GameType,
-  MessageJson,
+import {
+  type GameCardMeta,
+  type GameJson,
+  type GameType,
+  isBotId,
+  type MessageJson,
 } from "@kyzen/shared/types";
 import { serializeGame } from "../api/serialize";
 import { notify } from "../realtime/notify";
+import { initialState, plainSeats } from "../realtime/setup";
 import { sendMessage } from "./messages-service";
 import { computeRematchSeating } from "./rematch-seating";
 import { fail, ok, type ServiceResult } from "./result";
@@ -114,20 +116,18 @@ export async function createGameInConversation(input: {
     }
   }
 
-  const { engine } = definition;
-  const [firstRole] = engine.roles;
-  if (!firstRole) return fail("Game has no roles", 400);
+  const host = {
+    userId: input.userId,
+    username: profile.username,
+    role: definition.engine.roleForSeat(0),
+  };
   const created = await games.createGame({
     gameType: input.gameType,
     status: "waiting",
-    players: [
-      {
-        userId: input.userId,
-        username: profile.username,
-        role: firstRole,
-      },
-    ],
-    gameState: engine.createInitialState([{ role: firstRole }]),
+    players: [host],
+    gameState: definition.engine.lobby
+      ? null
+      : initialState(definition, plainSeats([host]), parsedConfig.data),
     config: parsedConfig.data,
     conversationId: input.conversationId,
     creatorUserId: input.userId,
@@ -166,27 +166,33 @@ export async function rematchGame(input: {
   );
   if (existingLive) return ok({ game: serializeGame(existingLive) });
 
-  const { engine } = getDefinition(prev.gameType);
-  const orderedUserIds = computeRematchSeating(prev);
+  const definition = getDefinition(prev.gameType);
+  const { engine } = definition;
+  const orderedUserIds = engine.lobby
+    ? prev.players.map((p) => p.userId).filter((id) => !isBotId(id))
+    : computeRematchSeating(prev);
   const players: { userId: string; username: string; role: string }[] = [];
   for (let i = 0; i < orderedUserIds.length; i++) {
     const uid = orderedUserIds[i];
     const seat = prev.players.find((p) => p.userId === uid);
-    const role = engine.roles[i];
-    if (!uid || !seat || !role) {
+    if (!uid || !seat) {
       return fail("Cannot rematch: invalid game seating", 409);
     }
-    players.push({ userId: uid, username: seat.username, role });
+    players.push({
+      userId: uid,
+      username: seat.username,
+      role: engine.roleForSeat(i),
+    });
   }
-  const becomesActive = players.length >= engine.minPlayers;
+  const becomesActive = !engine.lobby && players.length >= engine.minPlayers;
 
   const created = await games.createGame({
     gameType: prev.gameType,
     status: becomesActive ? "active" : "waiting",
     players,
-    gameState: engine.createInitialState(
-      players.map((p) => ({ role: p.role })),
-    ),
+    gameState: engine.lobby
+      ? null
+      : initialState(definition, plainSeats(players), prev.config),
     config: prev.config,
     conversationId: prev.conversationId,
     creatorUserId: input.userId,

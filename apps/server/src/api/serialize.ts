@@ -8,6 +8,7 @@ import type {
   NotificationRow,
   PublicUserRow,
 } from "@kyzen/database";
+import { getDefinition, hasEngine } from "@kyzen/games-core";
 import {
   type ConversationJson,
   type FriendshipJson,
@@ -57,6 +58,27 @@ export function publicPlayerId(
   return player ? `${row.code}:${player.role}` : null;
 }
 
+function publicGameState(row: GameRecord): unknown {
+  if (row.gameState == null) return null;
+  if (!hasEngine(row.gameType)) return row.gameState;
+  const { engine, stateSchema } = getDefinition(row.gameType);
+  if (!engine.publicState) return row.gameState;
+  const parsed = stateSchema.safeParse(row.gameState);
+  return parsed.success ? engine.publicState(parsed.data) : null;
+}
+
+function moveRedactor(game: GameRecord): (moveData: unknown) => unknown {
+  if (!hasEngine(game.gameType)) return (moveData) => moveData;
+  const { engine, stateSchema, moveSchema } = getDefinition(game.gameType);
+  if (!engine.publicMove) return (moveData) => moveData;
+  const state = stateSchema.safeParse(game.gameState);
+  if (!state.success) return () => null;
+  return (moveData) => {
+    const move = moveSchema.safeParse(moveData);
+    return move.success ? engine.publicMove?.(state.data, move.data) : null;
+  };
+}
+
 export function serializeGame(row: GameRecord, viewerId?: string): GameJson {
   return {
     publicMatch: row.publicMatch ?? false,
@@ -65,6 +87,8 @@ export function serializeGame(row: GameRecord, viewerId?: string): GameJson {
     gameType: row.gameType,
     status: row.status,
     winner: publicPlayerId(row, row.winner),
+    winners: (row.winners ?? []).map((id) => publicPlayerId(row, id) ?? ""),
+    config: row.config ?? null,
     players: row.publicMatch
       ? row.players.map((player, index) => ({
           userId: publicPlayerId(row, player.userId) ?? "",
@@ -73,7 +97,7 @@ export function serializeGame(row: GameRecord, viewerId?: string): GameJson {
           avatar: null,
         }))
       : row.players,
-    gameState: row.gameState ?? null,
+    gameState: publicGameState(row),
     conversationId: row.conversationId,
     creatorUserId: row.publicMatch ? null : row.creatorUserId,
     seatingMode: row.seatingMode,
@@ -85,19 +109,20 @@ export function serializeGame(row: GameRecord, viewerId?: string): GameJson {
   };
 }
 
-export function serializeMove(
-  row: MoveRow,
-  gameCode: string,
-  game?: GameRecord,
-): MoveJson {
-  return {
+export function serializeMoves(rows: MoveRow[], game: GameRecord): MoveJson[] {
+  const redact = moveRedactor(game);
+  return rows.map((row) => ({
     id: row.id,
-    gameId: gameCode,
+    gameId: game.code,
     moveNumber: row.moveNumber,
-    playerId: game ? (publicPlayerId(game, row.playerId) ?? "") : row.playerId,
-    moveData: row.moveData,
+    playerId: publicPlayerId(game, row.playerId) ?? "",
+    moveData: redact(row.moveData),
     createdAt: iso(row.createdAt),
-  };
+  }));
+}
+
+export function serializeMove(row: MoveRow, game: GameRecord): MoveJson {
+  return serializeMoves([row], game)[0] as MoveJson;
 }
 
 export function serializePublicUser(row: PublicUserRow): PublicUser {

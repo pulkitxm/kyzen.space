@@ -340,8 +340,18 @@ describe.skipIf(!DB_UP)("account merge", () => {
         creatorUserId: anon.id,
         challengedUserId: anon.id,
         winner: anon.id,
+        winners: [anon.id],
       })
       .returning();
+    const [team] = await db
+      .insert(schema.game)
+      .values({
+        gameType: "tic-tac-toe",
+        status: "completed",
+        winners: ["someone-else", anon.id, "bot:1"],
+      })
+      .returning();
+    h.trackGame(team?.id ?? "");
     const gameId = g?.id ?? "";
     h.trackGame(gameId);
     await accountMerge.mergeAccounts(anon.id, target.id);
@@ -352,6 +362,12 @@ describe.skipIf(!DB_UP)("account merge", () => {
     expect(row?.creatorUserId).toBe(target.id);
     expect(row?.challengedUserId).toBe(target.id);
     expect(row?.winner).toBe(target.id);
+    expect(row?.winners).toEqual([target.id]);
+    const [teamRow] = await db
+      .select()
+      .from(schema.game)
+      .where(eq(schema.game.id, team?.id ?? ""));
+    expect(teamRow?.winners).toEqual(["someone-else", target.id, "bot:1"]);
   });
 
   it("discard removes a solo anon game but preserves a game shared with a real opponent", async () => {

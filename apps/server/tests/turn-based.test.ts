@@ -58,8 +58,8 @@ const games = {
         completedAt: new Date(),
         winner: outcome.draw
           ? "draw"
-          : (current.players.find(
-              (player) => player.role === outcome.winnerRole,
+          : (current.players.find((player) =>
+              outcome.winnerRoles.includes(player.role),
             )?.userId ?? null),
       };
       for (const player of current.players)
@@ -110,6 +110,7 @@ const profiles = {
 mock.module("@kyzen/database", () => ({
   games,
   profiles,
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},

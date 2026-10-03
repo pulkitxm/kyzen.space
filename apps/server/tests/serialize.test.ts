@@ -33,6 +33,7 @@ const baseRow: GameRecord = {
   gameType: TIC_TAC_TOE,
   status: "active",
   winner: null,
+  winners: [],
   gameState: { board: Array(9).fill(null), currentTurn: "X" },
   config: null,
   conversationId: null,
@@ -85,7 +86,7 @@ describe("serializeMove", () => {
         moveData: { row: 0, col: 0 },
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
       },
-      "K7P2QX",
+      baseRow,
     );
     expect(m).toEqual({
       id: "m1",
@@ -523,7 +524,7 @@ describe("serialize → wire schema round-trips", () => {
         moveData: { row: 1, col: 2 },
         createdAt: T0,
       },
-      "K7P2QX",
+      baseRow,
     );
     expect(moveJsonSchema.safeParse(json).success).toBe(true);
   });

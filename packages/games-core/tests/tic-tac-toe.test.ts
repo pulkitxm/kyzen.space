@@ -11,7 +11,10 @@ import {
   ticTacToeEngine,
 } from "../src/index";
 
-const SEATS = [{ role: "X" }, { role: "O" }];
+const SEATS = [
+  { role: "X", team: "X", bot: null },
+  { role: "O", team: "O", bot: null },
+];
 
 if (!ticTacToeEngine.reduce) {
   throw new Error("tic-tac-toe engine must define reduce");
@@ -20,7 +23,7 @@ const reduce: NonNullable<typeof ticTacToeEngine.reduce> =
   ticTacToeEngine.reduce;
 
 function initial(): TicTacToeState {
-  return ticTacToeEngine.createInitialState(SEATS);
+  return ticTacToeEngine.createInitialState(SEATS, { config: {}, seed: 1 });
 }
 
 function play(
@@ -148,7 +151,7 @@ describe("tic-tac-toe: win detection (all 8 lines)", () => {
     }
     expect(outcome).toEqual({
       status: "completed",
-      winnerRole: "X",
+      winnerRoles: ["X"],
       draw: false,
     });
     expect(lineWinner(state.board)).toBe("X");
@@ -167,7 +170,7 @@ describe("tic-tac-toe: win detection (all 8 lines)", () => {
     if (!res.ok) throw new Error(res.error);
     expect(res.outcome).toEqual({
       status: "completed",
-      winnerRole: "O",
+      winnerRoles: ["O"],
       draw: false,
     });
   });
@@ -199,7 +202,7 @@ describe("tic-tac-toe: draw", () => {
     expect(isBoardFull(res.state.board)).toBe(true);
     expect(res.outcome).toEqual({
       status: "completed",
-      winnerRole: null,
+      winnerRoles: [],
       draw: true,
     });
   });
@@ -224,7 +227,7 @@ describe("tic-tac-toe: winner takes priority over a full board", () => {
     expect(lineWinner(res.state.board)).toBe("X");
     expect(res.outcome).toEqual({
       status: "completed",
-      winnerRole: "X",
+      winnerRoles: ["X"],
       draw: false,
     });
   });
@@ -309,7 +312,7 @@ describe("tic-tac-toe: full playthroughs", () => {
     }
     expect(outcome).toEqual({
       status: "completed",
-      winnerRole: "X",
+      winnerRoles: ["X"],
       draw: false,
     });
   });

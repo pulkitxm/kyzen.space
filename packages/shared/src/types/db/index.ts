@@ -102,6 +102,7 @@ export type GameRow = {
   gameType: string;
   status: GameStatus;
   winner: string | null;
+  winners: string[];
   gameState: unknown;
   config: unknown;
   conversationId: string | null;

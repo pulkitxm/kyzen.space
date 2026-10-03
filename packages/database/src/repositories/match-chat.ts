@@ -1,6 +1,17 @@
 import { ANON_MAX_FRIENDS } from "@kyzen/shared/constants";
-import type { MatchMessage } from "@kyzen/shared/types";
-import { and, count, desc, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
+import { isBotId, type MatchMessage } from "@kyzen/shared/types";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "../client";
 import {
   friendship,
@@ -15,22 +26,46 @@ import {
 import { pairKey } from "./friends";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type MatchRow = typeof game.$inferSelect;
+type Seat = { userId: string; role: string };
+
+const FRIEND_WINDOW_MS = 15 * 60000;
 
 async function participant(tx: Transaction, code: string, userId: string) {
   const [row] = await tx
     .select()
     .from(game)
-    .where(and(eq(game.code, code), eq(game.publicMatch, true)))
+    .where(and(eq(game.code, code), isNull(game.conversationId)))
     .for("update");
   if (!row) throw new Error("Match not found");
   const players = await tx
-    .select()
+    .select({ userId: gamePlayer.userId, role: gamePlayer.role })
     .from(gamePlayer)
     .where(eq(gamePlayer.gameId, row.id))
     .orderBy(gamePlayer.seatOrder);
   if (!players.some((player) => player.userId === userId))
     throw new Error("Match not found");
   return { row, players };
+}
+
+function playerIdOf(row: MatchRow, players: Seat[], userId: string): string {
+  if (!row.publicMatch) return userId;
+  const seat = players.find((player) => player.userId === userId);
+  return seat ? `${row.code}:${seat.role}` : "";
+}
+
+function toMatchMessage(
+  row: MatchRow,
+  players: Seat[],
+  message: typeof matchMessage.$inferSelect,
+): MatchMessage {
+  return {
+    id: message.id,
+    gameId: row.code,
+    authorId: playerIdOf(row, players, message.senderId),
+    body: message.body,
+    createdAt: message.createdAt.toISOString(),
+  };
 }
 
 export async function readMatchChat(code: string, userId: string) {
@@ -54,35 +89,49 @@ export async function readMatchChat(code: string, userId: string) {
             .orderBy(desc(matchMessage.createdAt), desc(matchMessage.id))
             .limit(100)
         : [];
-    const peer = players.find((player) => player.userId !== userId);
-    const [connection] = peer
-      ? await tx
-          .select()
-          .from(friendship)
-          .where(eq(friendship.pairKey, pairKey(userId, peer.userId)))
-      : [];
-    const mutual =
-      choices.length === players.length && connection?.status === "accepted";
-    const [profile] =
-      mutual && peer
-        ? await tx
-            .select({ username: userProfile.username })
-            .from(userProfile)
-            .where(eq(userProfile.userId, peer.userId))
-        : [];
-    return {
-      chosen: choices.some((choice) => choice.userId === userId),
-      mutual,
-      peerUsername: profile?.username ?? null,
-      messages: rows.reverse().map(
-        (message): MatchMessage => ({
-          id: message.id,
-          gameId: code,
-          authorId: `${code}:${players.find((player) => player.userId === message.senderId)?.role}`,
-          body: message.body,
-          createdAt: message.createdAt.toISOString(),
-        }),
+    const chosen = choices
+      .filter((choice) => choice.userId === userId)
+      .map((choice) => choice.targetUserId);
+    const mutualIds = chosen.filter((target) =>
+      choices.some(
+        (choice) => choice.userId === target && choice.targetUserId === userId,
       ),
+    );
+    const accepted = mutualIds.length
+      ? await tx
+          .select({ pairKey: friendship.pairKey })
+          .from(friendship)
+          .where(
+            and(
+              inArray(
+                friendship.pairKey,
+                mutualIds.map((target) => pairKey(userId, target)),
+              ),
+              eq(friendship.status, "accepted"),
+            ),
+          )
+      : [];
+    const friendIds = mutualIds.filter((target) =>
+      accepted.some((row) => row.pairKey === pairKey(userId, target)),
+    );
+    const profiles = friendIds.length
+      ? await tx
+          .select({
+            userId: userProfile.userId,
+            username: userProfile.username,
+          })
+          .from(userProfile)
+          .where(inArray(userProfile.userId, friendIds))
+      : [];
+    return {
+      choices: chosen.map((target) => playerIdOf(row, players, target)),
+      friends: profiles.map((profile) => ({
+        playerId: playerIdOf(row, players, profile.userId),
+        username: profile.username,
+      })),
+      messages: rows
+        .reverse()
+        .map((message) => toMatchMessage(row, players, message)),
     };
   });
 }
@@ -139,46 +188,54 @@ export async function sendMatchMessage(input: {
         .returning();
     }
     if (!message) throw new Error("Message could not be saved");
-    return {
-      id: message.id,
-      gameId: input.code,
-      authorId: `${input.code}:${players.find((player) => player.userId === input.userId)?.role}`,
-      body: message.body,
-      createdAt: message.createdAt.toISOString(),
-    };
+    return toMatchMessage(row, players, message);
   });
 }
 
-export async function chooseMatchFriend(code: string, userId: string) {
+export async function chooseMatchFriend(
+  code: string,
+  userId: string,
+  playerId: string,
+): Promise<{ mutual: boolean; targetUserId: string }> {
   return db.transaction(async (tx) => {
     const { row, players } = await participant(tx, code, userId);
+    if (!row.publicMatch) throw new Error("Match not found");
     if (
-      players.length !== 2 ||
-      (row.status !== "active" &&
-        (!row.completedAt ||
-          Date.now() - row.completedAt.getTime() > 15 * 60000))
+      row.status !== "active" &&
+      (!row.completedAt ||
+        Date.now() - row.completedAt.getTime() > FRIEND_WINDOW_MS)
     )
       throw new Error("The connection window has ended");
-    const userIds = players.map((player) => player.userId);
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${pairKey(userIds[0] ?? "", userIds[1] ?? "")}))`,
+    const target = players.find(
+      (player) => playerIdOf(row, players, player.userId) === playerId,
     );
+    if (!target || target.userId === userId || isBotId(target.userId))
+      throw new Error("Player not found");
+    const targetUserId = target.userId;
+    const key = pairKey(userId, targetUserId);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
     await tx
       .insert(matchFriendChoice)
-      .values({ gameId: row.id, userId })
+      .values({ gameId: row.id, userId, targetUserId })
       .onConflictDoNothing();
-    const choices = await tx
+    const [reverse] = await tx
       .select()
       .from(matchFriendChoice)
-      .where(eq(matchFriendChoice.gameId, row.id));
-    if (choices.length < 2) return { mutual: false, userIds };
-    const key = pairKey(userIds[0] ?? "", userIds[1] ?? "");
+      .where(
+        and(
+          eq(matchFriendChoice.gameId, row.id),
+          eq(matchFriendChoice.userId, targetUserId),
+          eq(matchFriendChoice.targetUserId, userId),
+        ),
+      );
+    if (!reverse) return { mutual: false, targetUserId };
+    const pair = [userId, targetUserId].sort();
     const [existing] = await tx
       .select()
       .from(friendship)
       .where(eq(friendship.pairKey, key));
     if (existing?.status !== "accepted") {
-      for (const id of [...userIds].sort()) {
+      for (const id of pair) {
         const [account] = await tx
           .select()
           .from(user)
@@ -205,8 +262,8 @@ export async function chooseMatchFriend(code: string, userId: string) {
       await tx
         .insert(friendship)
         .values({
-          requesterId: userIds[0] ?? "",
-          addresseeId: userIds[1] ?? "",
+          requesterId: pair[0] ?? "",
+          addresseeId: pair[1] ?? "",
           pairKey: key,
           status: "accepted",
           respondedAt: new Date(),
@@ -220,7 +277,7 @@ export async function chooseMatchFriend(code: string, userId: string) {
           },
         });
     }
-    return { mutual: true, userIds };
+    return { mutual: true, targetUserId };
   });
 }
 

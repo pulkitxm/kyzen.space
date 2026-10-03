@@ -3,6 +3,7 @@ import { conversations, db, games, schema } from "@kyzen/database";
 import { getDefinition } from "@kyzen/games-core";
 import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { eq } from "drizzle-orm";
+import { initialState, publicSeats } from "../src/realtime/setup";
 import { createHarness, DB_UP } from "./harness";
 
 const h = createHarness("publicmatch");
@@ -13,10 +14,8 @@ async function join(userId: string, config: unknown = {}, owner = userId) {
     owner,
     gameType: TIC_TAC_TOE,
     config,
-    roles: definition.engine.roles,
-    gameState: definition.engine.createInitialState(
-      definition.engine.roles.map((role) => ({ role })),
-    ),
+    seats: publicSeats(definition.engine, 2, config),
+    createState: (seats) => initialState(definition, seats, config),
   });
   if (result) h.trackGame(result.code);
   return result;

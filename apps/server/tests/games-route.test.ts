@@ -27,6 +27,7 @@ mock.module("@kyzen/database", () => ({
     },
   },
   profiles: {},
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},

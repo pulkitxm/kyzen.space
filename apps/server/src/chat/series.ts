@@ -23,8 +23,11 @@ export function computeSeriesScore(seriesGames: GameRecord[]): SeriesScore {
     completedGames += 1;
     if (g.winner === "draw") {
       draws += 1;
-    } else if (g.winner) {
-      const entry = byUser.get(g.winner);
+      continue;
+    }
+    const winners = g.winners?.length ? g.winners : g.winner ? [g.winner] : [];
+    for (const winner of winners) {
+      const entry = byUser.get(winner);
       if (entry) entry.wins += 1;
     }
   }

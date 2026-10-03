@@ -21,10 +21,15 @@ export function decideTimeout(p: { strikes: number }): TimeoutDecision {
   return { kind: "auto-move", nextStrikes: next };
 }
 
-export function abortOutcome(p: { opponentStrikes: number }): {
-  winner: "opponent" | null;
-} {
-  return p.opponentStrikes === 0 ? { winner: "opponent" } : { winner: null };
+export function abortWinners(
+  players: { userId: string; role: string }[],
+  absentRole: string,
+  strikesOf: (role: string) => number,
+): string[] {
+  return players
+    .filter((player) => player.role !== absentRole)
+    .filter((player) => strikesOf(player.role) === 0)
+    .map((player) => player.userId);
 }
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -34,6 +39,7 @@ type SeatState = { strikes: number; started: boolean };
 type GameTimer = {
   handle: TimerHandle | null;
   deadline: number | null;
+  key: string | null;
   seats: Map<string, SeatState>;
 };
 
@@ -64,7 +70,7 @@ export class TurnTimerManager {
   private game(gameId: string): GameTimer {
     let timer = this.games.get(gameId);
     if (!timer) {
-      timer = { handle: null, deadline: null, seats: new Map() };
+      timer = { handle: null, deadline: null, key: null, seats: new Map() };
       this.games.set(gameId, timer);
     }
     return timer;
@@ -100,10 +106,21 @@ export class TurnTimerManager {
     return this.games.get(gameId)?.deadline ?? null;
   }
 
-  arm(gameId: string, role: string, limitMs: number, onFire: () => void): void {
+  armedKey(gameId: string): string | null {
+    return this.games.get(gameId)?.key ?? null;
+  }
+
+  arm(
+    gameId: string,
+    key: string,
+    limitMs: number,
+    onFire: () => void,
+    role?: string,
+  ): void {
     const timer = this.game(gameId);
+    if (role) this.seat(gameId, role).started = true;
     if (timer.handle) this.deps.clearTimer(timer.handle);
-    this.seat(gameId, role).started = true;
+    timer.key = key;
     timer.deadline = this.deps.now() + limitMs;
     timer.handle = this.deps.setTimer(onFire, limitMs);
   }

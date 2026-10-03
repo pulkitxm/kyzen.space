@@ -75,7 +75,7 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
     attachGameChatHandlers(io, socket);
     attachMatchmakingHandlers(io, socket);
     attachMatchChatHandlers(io, socket);
-    attachRoomHandlers(socket);
+    attachRoomHandlers(io, socket);
     void handlePresenceConnect(io, socket);
 
     registerGameEvent(socket, slog, "join_room", clientJoinRoomSchema, (data) =>

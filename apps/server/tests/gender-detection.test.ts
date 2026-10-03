@@ -40,6 +40,7 @@ mock.module("@kyzen/database", () => ({
       return createProfileImpl(input);
     },
   },
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},

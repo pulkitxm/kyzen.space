@@ -112,6 +112,7 @@ export const game = pgTable(
     gameType: text("game_type").notNull(),
     status: text("status").$type<GameStatus>().notNull().default("waiting"),
     winner: text("winner"),
+    winners: jsonb("winners").$type<string[]>().notNull().default([]),
     gameState: jsonb("game_state").$type<unknown>(),
     config: jsonb("config").$type<unknown>(),
     conversationId: uuid("conversation_id").references(() => conversation.id, {
@@ -368,7 +369,12 @@ export const matchFriendChoice = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    targetUserId: text("target_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [unique("match_friend_choice_uq").on(t.gameId, t.userId)],
+  (t) => [
+    unique("match_friend_choice_uq").on(t.gameId, t.userId, t.targetUserId),
+  ],
 );

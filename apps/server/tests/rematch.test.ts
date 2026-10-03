@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import { FAKE_ROUNDS } from "./support/fake-rounds";
+import { installFakeRegistry } from "./support/runtime";
 
 type AnyGame = {
   id: string;
@@ -27,6 +29,7 @@ let createInput: {
   players: { userId: string; username: string; role: string }[];
   status?: string;
   seriesId?: string | null;
+  gameState?: unknown;
 } | null;
 let createdConfig: unknown = null;
 const notifyCalls: { userId: string; type: string }[] = [];
@@ -47,6 +50,7 @@ mock.module("@kyzen/database", () => ({
         players: input.players,
         status: input.status,
         seriesId: input.seriesId,
+        gameState: input.gameState,
       };
       createdConfig = input.config;
       return {
@@ -62,6 +66,7 @@ mock.module("@kyzen/database", () => ({
     },
   },
   messages: {},
+  matchChat: {},
   accountMerge: {},
   friends: {},
   notifications: {},
@@ -83,7 +88,12 @@ mock.module("../src/chat/messages-service", () => ({
     sentCards.push({ gameId: input.gameId });
     return { ok: true, value: { id: "msg1" } };
   },
+  sendSystemMessage: async () => ({ ok: true, value: null }),
+  deleteMessage: async () => ({ ok: true, value: null }),
+  markRead: async () => ({ ok: true, value: null }),
 }));
+
+installFakeRegistry();
 
 const { rematchGame } = await import("../src/chat/games-in-chat-service");
 
@@ -194,5 +204,31 @@ describe("rematchGame", () => {
     expect(createInput?.status).toBe("active");
     expect(createInput?.players).toHaveLength(2);
     expect(createdConfig).toEqual({ firstPlayer: "O" });
+  });
+
+  test("a lobby rematch opens a waiting lobby with the same config and every prior human", async () => {
+    const config = {
+      mode: "teams",
+      teams: { u1: "A", u2: "B" },
+      bots: [{ id: "bot:1", difficulty: "hard", team: "A" }],
+    };
+    prev = freshPrev({
+      gameType: FAKE_ROUNDS,
+      config,
+      players: [
+        { userId: "u1", username: "aman", role: "P1" },
+        { userId: "u2", username: "riya", role: "P2" },
+        { userId: "bot:1", username: "Hard Bot", role: "P3" },
+      ],
+    });
+    const res = await rematchGame({ userId: "u2", gameId: "OLDGM1" });
+    expect(res.ok).toBe(true);
+    expect(createInput?.status).toBe("waiting");
+    expect(createInput?.gameState).toBeNull();
+    expect(createInput?.players).toEqual([
+      { userId: "u1", username: "aman", role: "P1" },
+      { userId: "u2", username: "riya", role: "P2" },
+    ]);
+    expect(createdConfig).toEqual(config);
   });
 });

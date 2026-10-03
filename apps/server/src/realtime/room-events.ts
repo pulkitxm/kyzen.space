@@ -1,9 +1,12 @@
 import {
   clientCreateRoomSchema,
   clientJoinByCodeSchema,
+  clientRoomConfigureSchema,
+  clientRoomStartSchema,
 } from "@kyzen/shared/types";
-import type { Socket } from "socket.io";
+import type { Server as IOServer, Socket } from "socket.io";
 import { childLogger } from "../logger";
+import { configureRoom, startRoom } from "./lobby";
 import { createStandaloneGame, validateJoinByCode } from "./rooms-service";
 import { rateLimiter } from "./socket-util";
 
@@ -11,9 +14,10 @@ const log = childLogger({ mod: "realtime:rooms" });
 
 type AckFn = (res: unknown) => void;
 
-export function attachRoomHandlers(socket: Socket): void {
+export function attachRoomHandlers(io: IOServer, socket: Socket): void {
   const createAllowed = rateLimiter(10, 60_000);
   const joinAllowed = rateLimiter(30, 60_000);
+  const lobbyAllowed = rateLimiter(60, 60_000);
 
   socket.on("room:create", (payload: unknown, cb?: AckFn) => {
     void (async () => {
@@ -57,6 +61,49 @@ export function attachRoomHandlers(socket: Socket): void {
       } catch (err) {
         log.error({ err, userId: socket.data.userId }, "room:join failed");
         cb?.({ ok: false, error: "not_found" });
+      }
+    })();
+  });
+
+  socket.on("room:configure", (payload: unknown, cb?: AckFn) => {
+    void (async () => {
+      const parsed = clientRoomConfigureSchema.safeParse(payload);
+      if (!parsed.success) {
+        cb?.({ ok: false, error: "Invalid payload" });
+        return;
+      }
+      if (!lobbyAllowed()) {
+        cb?.({ ok: false, error: "Too many changes, slow down" });
+        return;
+      }
+      try {
+        cb?.(
+          await configureRoom(
+            io,
+            socket.data.userId,
+            parsed.data.gameId,
+            parsed.data.config,
+          ),
+        );
+      } catch (err) {
+        log.error({ err, userId: socket.data.userId }, "room:configure failed");
+        cb?.({ ok: false, error: "Could not update the lobby" });
+      }
+    })();
+  });
+
+  socket.on("room:start", (payload: unknown, cb?: AckFn) => {
+    void (async () => {
+      const parsed = clientRoomStartSchema.safeParse(payload);
+      if (!parsed.success) {
+        cb?.({ ok: false, error: "Invalid payload" });
+        return;
+      }
+      try {
+        cb?.(await startRoom(io, socket.data.userId, parsed.data.gameId));
+      } catch (err) {
+        log.error({ err, userId: socket.data.userId }, "room:start failed");
+        cb?.({ ok: false, error: "Could not start the game" });
       }
     })();
   });

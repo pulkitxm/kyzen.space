@@ -45,6 +45,7 @@ mock.module("@kyzen/database", () => ({
     getPublicUsers: async () => [],
   },
   messages: { getGameCardByGameId: async () => null },
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},

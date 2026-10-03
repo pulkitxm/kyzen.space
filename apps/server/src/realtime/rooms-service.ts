@@ -6,6 +6,7 @@ import {
   type ServerJoinByCodeResult,
 } from "@kyzen/shared/types";
 import { fail, ok, type ServiceResult } from "../chat/result";
+import { initialState, lobbySettings, plainSeats } from "./setup";
 
 export async function createStandaloneGame(input: {
   userId: string;
@@ -21,17 +22,18 @@ export async function createStandaloneGame(input: {
   const profile = await profiles.getProfileByUserId(input.userId);
   if (!profile) return fail("Profile not found", 400);
 
-  const { engine } = definition;
-  const [firstRole] = engine.roles;
-  if (!firstRole) return fail("Game has no roles", 400);
-
+  const host = {
+    userId: input.userId,
+    username: profile.username,
+    role: definition.engine.roleForSeat(0),
+  };
   const created = await games.createGame({
     gameType: input.gameType,
     status: "waiting",
-    players: [
-      { userId: input.userId, username: profile.username, role: firstRole },
-    ],
-    gameState: engine.createInitialState([{ role: firstRole }]),
+    players: [host],
+    gameState: definition.engine.lobby
+      ? null
+      : initialState(definition, plainSeats([host]), parsedConfig.data),
     config: parsedConfig.data,
     conversationId: null,
     creatorUserId: input.userId,
@@ -68,7 +70,8 @@ export async function validateJoinByCode(input: {
     input.userId !== gameRow.challengedUserId;
   if (challengeReserved) return { ok: false, error: "full" };
 
-  if (gameRow.players.length >= engine.maxPlayers) {
+  const reserved = engine.lobby ? lobbySettings(gameRow.config).bots.length : 0;
+  if (gameRow.players.length + reserved >= engine.maxPlayers) {
     return { ok: false, error: "full" };
   }
 

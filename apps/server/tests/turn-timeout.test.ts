@@ -13,18 +13,19 @@ let moves: any[] = [];
 const bumpCalls: { userId: string; outcome: string }[] = [];
 
 const games = {
-  abortActiveGame: async (_previous: GameRecord, winner: string | null) => {
+  abortActiveGame: async (_previous: GameRecord, winners: string[]) => {
     current = {
       ...current,
       status: "aborted",
-      winner,
+      winner: winners.length === 1 ? winners[0] : null,
+      winners,
       completedAt: new Date(),
     };
-    if (winner)
+    if (winners.length)
       for (const player of current.players)
         bumpCalls.push({
           userId: player.userId,
-          outcome: player.userId === winner ? "won" : "lost",
+          outcome: winners.includes(player.userId) ? "won" : "lost",
         });
     return current;
   },
@@ -75,6 +76,7 @@ const profiles = {
 mock.module("@kyzen/database", () => ({
   games,
   profiles,
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},
@@ -85,10 +87,21 @@ mock.module("@kyzen/database", () => ({
   createDb: () => ({ db: {}, client: {} }),
 }));
 
-const { handleMakeMove, __timerInternals } = await import(
-  "../src/realtime/turn-based"
+const { handleMakeMove } = await import("../src/realtime/turn-based");
+const { __timerInternals, ensureClock } = await import(
+  "../src/realtime/game-runner"
 );
 const { turnTimers } = await import("../src/realtime/turn-timer");
+
+async function fireTurnTimeout(
+  // biome-ignore lint/suspicious/noExplicitAny: fake io
+  io: any,
+): Promise<void> {
+  await ensureClock(io, CODE);
+  const key = turnTimers.armedKey(UUID);
+  if (!key) throw new Error("turn clock was not armed");
+  await __timerInternals.onTurnTimeout(io, UUID, key);
+}
 
 type Emit = { room?: string; event: string; payload: unknown };
 function fakeIo() {
@@ -146,7 +159,7 @@ describe("onTurnTimeout - auto-move", () => {
   test("a timeout plays a flagged auto-move, advances the turn, and adds a strike", async () => {
     current = activeGame(Array(9).fill(null), "X");
     const { io, emits } = fakeIo();
-    await __timerInternals.onTurnTimeout(io, UUID);
+    await fireTurnTimeout(io);
 
     expect(moves).toHaveLength(1);
     expect(current.gameState.currentTurn).toBe("O");
@@ -158,34 +171,12 @@ describe("onTurnTimeout - auto-move", () => {
   });
 });
 
-describe("onTurnTimeout - stale callbacks", () => {
-  test("a timeout armed for an earlier turn does nothing after a move lands", async () => {
-    current = activeGame(Array(9).fill(null), "X");
-    const armedForX = JSON.stringify(current.gameState);
-    turnTimers.setStrikes(UUID, "O", 2);
-    const { io } = fakeIo();
-    const { socket } = fakeSocket("u1");
-    // biome-ignore lint/suspicious/noExplicitAny: fake io/socket
-    await handleMakeMove(io as any, socket as any, {
-      gameId: CODE,
-      moveData: { row: 0, col: 0 },
-    });
-    await __timerInternals.onTurnTimeout(io, UUID, armedForX);
-
-    expect(moves).toHaveLength(1);
-    expect(current.status).toBe("active");
-    expect(current.gameState.currentTurn).toBe("O");
-    expect(turnTimers.strikes(UUID, "O")).toBe(2);
-    expect(turnTimers.strikes(UUID, "X")).toBe(0);
-  });
-});
-
 describe("onTurnTimeout - abort", () => {
   test("a third consecutive timeout aborts and the responding opponent wins", async () => {
     current = activeGame(Array(9).fill(null), "X");
     turnTimers.setStrikes(UUID, "X", 2);
     const { io, emits } = fakeIo();
-    await __timerInternals.onTurnTimeout(io, UUID);
+    await fireTurnTimeout(io);
 
     expect(current.status).toBe("aborted");
     expect(current.winner).toBe("u2");
@@ -204,7 +195,7 @@ describe("onTurnTimeout - abort", () => {
     turnTimers.setStrikes(UUID, "X", 2);
     turnTimers.setStrikes(UUID, "O", 1);
     const { io, emits } = fakeIo();
-    await __timerInternals.onTurnTimeout(io, UUID);
+    await fireTurnTimeout(io);
 
     expect(current.status).toBe("aborted");
     expect(current.winner).toBeNull();
@@ -214,6 +205,28 @@ describe("onTurnTimeout - abort", () => {
       payload: { winner: null },
     });
     expect(bumpCalls).toHaveLength(0);
+  });
+});
+
+describe("stale turn timeouts", () => {
+  test("a timeout armed for an earlier state never punishes the next player", async () => {
+    current = activeGame(Array(9).fill(null), "X");
+    const { io, emits } = fakeIo();
+    await ensureClock(io, CODE);
+    const staleKey = turnTimers.armedKey(UUID);
+    if (!staleKey) throw new Error("turn clock was not armed");
+    const { socket } = fakeSocket("u1");
+    // biome-ignore lint/suspicious/noExplicitAny: fake io/socket
+    await handleMakeMove(io as any, socket as any, {
+      gameId: CODE,
+      moveData: { row: 0, col: 0 },
+    });
+    expect(moves).toHaveLength(1);
+    await __timerInternals.onTurnTimeout(io, UUID, staleKey);
+    expect(moves).toHaveLength(1);
+    expect(turnTimers.strikes(UUID, "O")).toBe(0);
+    expect(current.status).toBe("active");
+    expect(emits.filter((e) => e.event === "game_over")).toHaveLength(0);
   });
 });
 

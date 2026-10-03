@@ -1,13 +1,15 @@
-import { friends, matchChat, profiles } from "@kyzen/database";
+import { friends, games, matchChat, profiles } from "@kyzen/database";
 import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
-  clientJoinRoomSchema,
+  clientMatchFriendSchema,
   clientMatchMessageSchema,
+  isBotId,
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
+import { publicPlayerId } from "../api/serialize";
 import { assembleFriendship } from "../chat/assemble";
 import { createDm } from "../chat/conversations-service";
-import { emitToGame, emitToUser } from "./rooms";
+import { emitToUser } from "./rooms";
 import { register } from "./socket-util";
 
 export function attachMatchChatHandlers(io: IOServer, socket: Socket): void {
@@ -23,53 +25,54 @@ export function attachMatchChatHandlers(io: IOServer, socket: Socket): void {
       body: parsed.data.body,
       clientId: parsed.data.clientId,
     });
-    emitToGame(io, parsed.data.gameId, "match:message", message);
+    const game = await games.getGameByCode(parsed.data.gameId);
+    for (const player of game?.players ?? [])
+      if (!isBotId(player.userId))
+        emitToUser(io, player.userId, "match:message", message);
     cb?.({ ok: true, message });
   });
   register(socket, "match:friend", async (payload, cb) => {
-    const parsed = clientJoinRoomSchema.safeParse(payload);
+    const parsed = clientMatchFriendSchema.safeParse(payload);
     if (!parsed.success) {
       cb?.({ ok: false, error: "Invalid match" });
       return;
     }
+    const userId = socket.data.userId;
     const result = await matchChat.chooseMatchFriend(
       parsed.data.gameId,
-      socket.data.userId,
+      userId,
+      parsed.data.playerId,
     );
+    let peerUsername: string | null = null;
     if (result.mutual) {
-      const other = result.userIds.find((id) => id !== socket.data.userId);
-      if (other) {
-        const dm = await createDm(socket.data.userId, other);
-        if (!dm.ok) throw new Error(dm.error);
-      }
-      const connection = await friends.getFriendshipBetween(
-        result.userIds[0] ?? "",
-        result.userIds[1] ?? "",
-      );
-      for (const id of result.userIds) {
-        const peerId = result.userIds.find((candidate) => candidate !== id);
-        const peerProfile = peerId
-          ? await profiles.getProfileByUserId(peerId)
-          : null;
-        emitToUser(io, id, "match:friends", {
+      const peerId = result.targetUserId;
+      const dm = await createDm(userId, peerId);
+      if (!dm.ok) throw new Error(dm.error);
+      const game = await games.getGameByCode(parsed.data.gameId);
+      const connection = await friends.getFriendshipBetween(userId, peerId);
+      for (const [recipient, peer] of [
+        [userId, peerId],
+        [peerId, userId],
+      ] as const) {
+        const peerProfile = await profiles.getProfileByUserId(peer);
+        if (recipient === userId) peerUsername = peerProfile?.username ?? null;
+        emitToUser(io, recipient, "match:friends", {
           gameId: parsed.data.gameId,
+          playerId: game ? publicPlayerId(game, peer) : null,
           peerUsername: peerProfile?.username ?? null,
         });
         const friendship = connection
-          ? await assembleFriendship(connection, id)
+          ? await assembleFriendship(connection, recipient)
           : null;
         if (friendship)
-          emitToUser(io, id, CHAT_EVENTS.friendAccepted, { friendship });
+          emitToUser(io, recipient, CHAT_EVENTS.friendAccepted, { friendship });
       }
     }
-    const peer = result.mutual
-      ? result.userIds.find((id) => id !== socket.data.userId)
-      : null;
-    const profile = peer ? await profiles.getProfileByUserId(peer) : null;
     cb?.({
       ok: true,
       mutual: result.mutual,
-      peerUsername: profile?.username ?? null,
+      playerId: parsed.data.playerId,
+      peerUsername,
     });
   });
 }

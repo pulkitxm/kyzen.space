@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { getAuth } from "../../auth";
 import { computeSeriesScore } from "../../chat/series";
 import type { LoggerEnv } from "../middleware/logger";
-import { serializeGame, serializeMove, serializeSeries } from "../serialize";
+import { serializeGame, serializeMoves, serializeSeries } from "../serialize";
 
 export const gamesRouter = new Hono<LoggerEnv>()
   .get("/:gameId/series", async (c) => {
@@ -39,6 +39,6 @@ export const gamesRouter = new Hono<LoggerEnv>()
     const moves = await games.listMoves(found.id);
     return c.json({
       game: serializeGame(found, viewerId),
-      moves: moves.map((m) => serializeMove(m, found.code, found)),
+      moves: serializeMoves(moves, found),
     });
   });

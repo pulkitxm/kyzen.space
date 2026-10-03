@@ -29,6 +29,7 @@ mock.module("@kyzen/database", () => ({
     },
   },
   profiles: { getPublicUser: async () => null },
+  matchChat: {},
   accountMerge: {},
   conversations: {},
   friends: {},

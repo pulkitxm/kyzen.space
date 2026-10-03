@@ -69,6 +69,29 @@ export const clientCreateRoomSchema = z
   .strict();
 export type ClientCreateRoom = z.infer<typeof clientCreateRoomSchema>;
 
+export const clientRoomConfigureSchema = z
+  .object({
+    gameId: gameCodeSchema,
+    config: z.unknown(),
+  })
+  .strict();
+export type ClientRoomConfigure = z.infer<typeof clientRoomConfigureSchema>;
+
+export const clientRoomStartSchema = z
+  .object({
+    gameId: gameCodeSchema,
+  })
+  .strict();
+export type ClientRoomStart = z.infer<typeof clientRoomStartSchema>;
+
+export const clientMatchFriendSchema = z
+  .object({
+    gameId: gameCodeSchema,
+    playerId: z.string().min(1),
+  })
+  .strict();
+export type ClientMatchFriend = z.infer<typeof clientMatchFriendSchema>;
+
 export const clientJoinByCodeSchema = z
   .object({
     code: gameCodeSchema,
@@ -92,6 +115,8 @@ export type ServerJoinByCodeResult =
 export const gameJsonSchema = z.object({
   publicMatch: z.boolean().optional(),
   viewerId: z.string().nullable().optional(),
+  config: z.unknown().optional(),
+  winners: z.array(z.string()).optional(),
   id: z.string(),
   gameType: gameTypeSchema,
   status: gameStatusSchema,
