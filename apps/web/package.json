@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "bun run --bun nodemon server.ts",
+    "dev": "bun scripts/dev.ts",
     "build": "next build",
     "start": "NODE_ENV=production bun --env-file=../../.env server.ts",
     "test": "bun test tests",
@@ -42,22 +42,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "nodemon": "^3.1.14",
     "tailwindcss": "^4",
     "typescript": "^5"
-  },
-  "nodemonConfig": {
-    "watch": [
-      "server.ts",
-      "../server/src",
-      "../../packages/database/src",
-      "../../packages/games-core/src",
-      "../../packages/shared/src",
-      "../../packages/avatar/src",
-      "../../.env"
-    ],
-    "ext": "ts,json,env",
-    "exec": "bun --env-file=../../.env",
-    "signal": "SIGTERM"
   }
 }
