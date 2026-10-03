@@ -478,9 +478,7 @@ export function ReplayBar({
           Live
         </span>
       </div>
-      <p className="font-bold text-sm">
-        Round <span className="tabular-nums">{round}</span> in motion
-      </p>
+      <p className="font-bold text-sm tabular-nums">Round {round} in motion</p>
       <button
         type="button"
         onClick={onSkip}
@@ -546,29 +544,6 @@ export function RoundBanner({
           {displayRound}
         </span>
       </div>
-    </div>
-  );
-}
-
-export function EventToast({
-  message,
-  color,
-  icon,
-}: {
-  message: string;
-  color: string;
-  icon?: ReactNode;
-}) {
-  return (
-    <div
-      className="flex animate-[toastIn_0.3s_ease-out,toastOut_0.4s_ease-in_2s_forwards] items-center gap-2 rounded-lg px-3 py-2 font-semibold text-sm shadow-lg"
-      style={{
-        backgroundColor: color,
-        boxShadow: `0 4px 20px ${color}40`,
-      }}
-    >
-      {icon}
-      {message}
     </div>
   );
 }
