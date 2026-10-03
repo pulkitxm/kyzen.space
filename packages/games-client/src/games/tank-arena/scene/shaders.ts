@@ -348,7 +348,7 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   float depth = -mv.z;
   gl_PointSize = aSize * uScale / max(depth, 0.001);
-  vAlpha = smoothstep(80.0, 20.0, depth) * 0.7;
+  vAlpha = (1.0 - smoothstep(20.0, 80.0, depth)) * 0.7;
   gl_Position = projectionMatrix * mv;
 }
 `,
@@ -356,7 +356,7 @@ void main() {
 varying float vAlpha;
 void main() {
   float d = length(gl_PointCoord - vec2(0.5));
-  float soft = smoothstep(0.5, 0.1, d);
+  float soft = 1.0 - smoothstep(0.1, 0.5, d);
   if (vAlpha <= 0.001 || soft <= 0.001) discard;
   gl_FragColor = vec4(vec3(0.95, 0.98, 1.0), soft * vAlpha);
 }

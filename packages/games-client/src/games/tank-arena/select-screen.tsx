@@ -91,8 +91,8 @@ function TankCard({
       className={[
         "flex flex-col gap-3 rounded-2xl border-2 p-4 text-left outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-default",
         focused
-          ? "scale-[1.02] border-sky-400 bg-gradient-to-br from-sky-500/20 to-sky-900/30 shadow-[0_0_30px_rgba(56,189,248,0.25)]"
-          : "border-white/10 bg-gradient-to-br from-white/8 to-white/2 enabled:hover:scale-[1.01] enabled:hover:border-white/20 enabled:hover:bg-white/10",
+          ? "scale-[1.02] border-sky-400 bg-linear-to-br from-sky-500/20 to-sky-900/30 shadow-[0_0_30px_rgba(56,189,248,0.25)]"
+          : "border-white/10 bg-linear-to-br from-white/8 to-white/2 enabled:hover:scale-[1.01] enabled:hover:border-white/20 enabled:hover:bg-white/10",
       ].join(" ")}
     >
       <TankPreview kind={kind} color={color} />
@@ -138,7 +138,7 @@ function TankCard({
           return (
             <div
               key={slot}
-              className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-800/60 to-slate-900/40 p-3"
+              className="rounded-xl border border-white/10 bg-linear-to-br from-slate-800/60 to-slate-900/40 p-3"
             >
               <p className="flex items-center gap-2 font-bold text-sm">
                 <span className="flex size-7 items-center justify-center rounded-lg bg-sky-500/20 text-sky-300">
@@ -310,8 +310,8 @@ function ConfirmButton({
       className={[
         "flex h-14 shrink-0 items-center justify-center gap-2 rounded-2xl border-2 px-8 font-black text-base uppercase tracking-wider outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white",
         done
-          ? "border-emerald-300/40 bg-gradient-to-b from-emerald-400 to-emerald-600 text-emerald-950 shadow-[0_4px_20px_rgba(52,211,153,0.35)]"
-          : "border-sky-300/40 bg-gradient-to-b from-sky-400 to-sky-600 text-sky-950 shadow-[0_4px_20px_rgba(56,189,248,0.35)] enabled:hover:scale-105 enabled:hover:shadow-[0_6px_28px_rgba(56,189,248,0.45)] disabled:opacity-60",
+          ? "border-emerald-300/40 bg-linear-to-b from-emerald-400 to-emerald-600 text-emerald-950 shadow-[0_4px_20px_rgba(52,211,153,0.35)]"
+          : "border-sky-300/40 bg-linear-to-b from-sky-400 to-sky-600 text-sky-950 shadow-[0_4px_20px_rgba(56,189,248,0.35)] enabled:hover:scale-105 enabled:hover:shadow-[0_6px_28px_rgba(56,189,248,0.45)] disabled:opacity-60",
       ].join(" ")}
     >
       <Icon aria-hidden="true" />{" "}

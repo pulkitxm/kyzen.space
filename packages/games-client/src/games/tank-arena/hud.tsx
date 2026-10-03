@@ -355,8 +355,8 @@ export function ActionBar({
                   className={[
                     "flex h-18 w-full min-w-16 flex-col items-center justify-center gap-1 rounded-xl border-2 text-xl outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-40 md:w-22",
                     isSelected
-                      ? "scale-105 border-sky-300 bg-gradient-to-b from-white/25 to-white/10 shadow-[0_0_20px_rgba(125,211,252,0.5),inset_0_1px_0_rgba(255,255,255,0.3)]"
-                      : "border-white/20 bg-gradient-to-b from-white/8 to-white/3 enabled:hover:scale-102 enabled:hover:border-white/30 enabled:hover:bg-white/12",
+                      ? "scale-105 border-sky-300 bg-linear-to-b from-white/25 to-white/10 shadow-[0_0_20px_rgba(125,211,252,0.5),inset_0_1px_0_rgba(255,255,255,0.3)]"
+                      : "border-white/20 bg-linear-to-b from-white/8 to-white/3 enabled:hover:scale-102 enabled:hover:border-white/30 enabled:hover:bg-white/12",
                   ].join(" ")}
                 >
                   <ActionIcon kind={kind} action={slot.action} />
@@ -396,8 +396,8 @@ export function ActionBar({
         className={[
           "flex h-16 items-center justify-center gap-2 rounded-2xl border-2 px-8 font-black text-lg uppercase tracking-wider outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-sky-300 md:h-20",
           locked
-            ? "border-emerald-300/50 bg-gradient-to-b from-emerald-400 to-emerald-600 text-emerald-950 shadow-[0_4px_20px_rgba(52,211,153,0.4)]"
-            : "border-rose-400/50 bg-gradient-to-b from-rose-500 to-rose-700 text-white shadow-[0_4px_20px_rgba(244,63,94,0.4)] enabled:hover:scale-105 enabled:hover:shadow-[0_6px_28px_rgba(244,63,94,0.5)] disabled:opacity-60",
+            ? "border-emerald-300/50 bg-linear-to-b from-emerald-400 to-emerald-600 text-emerald-950 shadow-[0_4px_20px_rgba(52,211,153,0.4)]"
+            : "border-rose-400/50 bg-linear-to-b from-rose-500 to-rose-700 text-white shadow-[0_4px_20px_rgba(244,63,94,0.4)] enabled:hover:scale-105 enabled:hover:shadow-[0_6px_28px_rgba(244,63,94,0.5)] disabled:opacity-60",
         ].join(" ")}
       >
         {locked ? (
@@ -508,19 +508,7 @@ export function RoundBanner({
   round: number;
   visible: boolean;
 }) {
-  const [show, setShow] = useState(false);
-  const [displayRound, setDisplayRound] = useState(round);
-
-  useEffect(() => {
-    if (visible && round > 0) {
-      setDisplayRound(round);
-      setShow(true);
-      const timer = setTimeout(() => setShow(false), 2200);
-      return () => clearTimeout(timer);
-    }
-  }, [visible, round]);
-
-  if (!show) return null;
+  if (!visible || round <= 0) return null;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
@@ -541,7 +529,7 @@ export function RoundBanner({
               "0 0 40px rgba(100,200,255,0.6), 0 8px 32px rgba(0,0,0,0.7)",
           }}
         >
-          {displayRound}
+          {round}
         </span>
       </div>
     </div>
@@ -557,15 +545,7 @@ export function ResultBanner({
   result: MatchResult;
   visible: boolean;
 }) {
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    if (visible && result) {
-      setShow(true);
-    }
-  }, [visible, result]);
-
-  if (!show || !result) return null;
+  if (!visible || !result) return null;
 
   const config = {
     victory: {
@@ -606,7 +586,7 @@ export function ResultBanner({
   return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className={`flex animate-[resultIn_0.6s_ease-out] flex-col items-center rounded-3xl border-2 ${border} bg-gradient-to-b ${bgFrom} ${bgTo} px-12 py-8 backdrop-blur-md sm:px-20 sm:py-12`}
+        className={`flex animate-[resultIn_0.6s_ease-out] flex-col items-center rounded-3xl border-2 ${border} bg-linear-to-b ${bgFrom} ${bgTo} px-12 py-8 backdrop-blur-md sm:px-20 sm:py-12`}
         style={{
           boxShadow: `0 0 60px ${glow}, 0 20px 40px rgba(0,0,0,0.5)`,
         }}
