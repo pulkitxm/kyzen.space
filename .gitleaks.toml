@@ -2,5 +2,9 @@
 useDefault = true
 
 [allowlist]
-description = "Files that only ever contain placeholder values"
-paths = ['''\.env\.example$''']
+description = "Files that only ever contain placeholder values or test fixtures"
+paths = [
+  '''\.env\.example$''',
+  '''packages/physics/tests/.*\.test\.ts$''',
+  '''packages/physics/scripts/verify-determinism\.ts$''',
+]
