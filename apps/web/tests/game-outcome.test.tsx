@@ -1,4 +1,13 @@
-import { describe, expect, it, mock } from "bun:test";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  jest,
+  mock,
+  setSystemTime,
+} from "bun:test";
+import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import type { GameJson } from "@kyzen/shared/types";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -6,15 +15,23 @@ mock.module("next/navigation", () => ({
   useRouter: () => ({ push: () => {}, replace: () => {} }),
 }));
 
+const pendingEvents = new Map<string, unknown>();
+
 mock.module("@/lib/socket/socket-context", () => ({
   socketStatusAtom: { debugLabel: "socketStatus" },
   SocketProvider: ({ children }: { children: unknown }) => children,
   useSocket: () => ({ socket: null }),
-  useSocketEvent: () => {},
+  useSocketEvent: (event: string, handler: (payload: unknown) => void) => {
+    if (!pendingEvents.has(event)) return;
+    const payload = pendingEvents.get(event);
+    pendingEvents.delete(event);
+    handler(payload);
+  },
   emitAck: async () => ({ ok: true, code: "A2K9P7" }),
 }));
 
-const { gameWinners, outcomeLabel } = await import("@/lib/games/outcome");
+const { gameWinners, outcomeLabel, resultDelayMs, resultRevealDelay } =
+  await import("@/lib/games/outcome");
 const { GameOverOverlay } = await import(
   "@/app/play/[gameId]/game-over-overlay"
 );
@@ -79,6 +96,100 @@ describe("game outcome labels", () => {
   });
 });
 
+describe("partial draws", () => {
+  const draw = game({ winner: "draw", winners: ["u1", "bot:1"] });
+
+  it("shows a draw only to the co-drawers", () => {
+    expect(outcomeLabel(draw, "u1")).toBe("It's a draw");
+    expect(outcomeLabel(draw, "u2")).toBe("You lost");
+    expect(outcomeLabel(draw, "u3")).toBe("You lost");
+  });
+
+  it("treats a draw without co-drawers as a draw for everyone", () => {
+    const everyone = game({ winner: "draw", winners: [] });
+    expect(outcomeLabel(everyone, "u1")).toBe("It's a draw");
+    expect(outcomeLabel(everyone, "u3")).toBe("It's a draw");
+    expect(outcomeLabel(everyone, "x")).toBe("It's a draw");
+  });
+
+  it("uses neutral wording for spectators", () => {
+    expect(outcomeLabel(draw, "x")).toBe("Draw between alice and Hard Bot");
+    expect(
+      outcomeLabel(
+        game({ winner: "draw", winners: ["u1", "u2", "bot:1", "u3"] }),
+        "x",
+      ),
+    ).toBe("Draw between 4 players");
+  });
+});
+
+const completedAt = "2026-01-01T00:00:00.000Z";
+const completedMs = Date.parse(completedAt);
+
+describe("result reveal delay", () => {
+  it("waits only for the presentation time left after the server completion", () => {
+    expect(resultRevealDelay(completedAt, 5000, completedMs + 2000)).toBe(3000);
+    expect(resultRevealDelay(completedAt, 5000, completedMs + 60_000)).toBe(0);
+  });
+
+  it("never waits longer than the presentation time on a skewed clock", () => {
+    expect(resultRevealDelay(completedAt, 5000, completedMs - 30_000)).toBe(
+      5000,
+    );
+  });
+
+  it("opens immediately without a delay or a completion time", () => {
+    expect(resultRevealDelay(completedAt, 0, completedMs)).toBe(0);
+    expect(resultRevealDelay(null, 5000, completedMs)).toBe(0);
+  });
+
+  it("only delays completed games of engines that ask for it", () => {
+    expect(resultDelayMs(game({}))).toBe(0);
+    const arena = {
+      gameType: "tank-arena" as const,
+      gameState: { resolution: { steps: 120 } },
+    };
+    expect(resultDelayMs({ ...arena, status: "completed" })).toBeGreaterThan(0);
+    expect(resultDelayMs({ ...arena, status: "abandoned" })).toBe(0);
+  });
+});
+
+describe("GameOverOverlay result timing", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    setSystemTime();
+  });
+
+  function overlayAt(now: number, delayMs: number) {
+    jest.useFakeTimers();
+    setSystemTime(new Date(now));
+    return renderToStaticMarkup(
+      <GameOverOverlay
+        gameId="A2K9P7"
+        userId="u1"
+        game={game({ winner: "u1", winners: ["u1"], completedAt })}
+        conversation={null}
+        resultDelayMs={delayMs}
+      />,
+    );
+  }
+
+  it("keeps the results closed while the final replay plays", () => {
+    const html = overlayAt(completedMs + 1000, 5000);
+    expect(html).not.toContain("You won!");
+    expect(html).not.toContain("Close");
+  });
+
+  it("opens immediately when the presentation time already passed", () => {
+    expect(overlayAt(completedMs + 5000, 5000)).toContain("You won!");
+    expect(overlayAt(completedMs + 3_600_000, 5000)).toContain("You won!");
+  });
+
+  it("opens immediately for engines without a result delay", () => {
+    expect(overlayAt(completedMs, 0)).toContain("You won!");
+  });
+});
+
 describe("GameOverOverlay", () => {
   it("highlights every winner and shows bots without an avatar", () => {
     const html = renderToStaticMarkup(
@@ -87,6 +198,7 @@ describe("GameOverOverlay", () => {
         userId="u2"
         game={game({ winners: ["u2", "bot:1"] })}
         conversation={null}
+        resultDelayMs={0}
       />,
     );
     expect(html).toContain("Your team won!");
@@ -111,9 +223,112 @@ describe("GameOverOverlay", () => {
           ],
         })}
         conversation={null}
+        resultDelayMs={0}
       />,
     );
     expect(html).toContain("It&#x27;s a draw");
     expect(html).toContain("Play again");
+    expect(html).not.toContain("Rematch");
+  });
+
+  it("tells players outside a partial draw that they lost", () => {
+    const html = renderToStaticMarkup(
+      <GameOverOverlay
+        gameId="A2K9P7"
+        userId="u2"
+        game={game({ winner: "draw", winners: ["u1", "bot:1"] })}
+        conversation={null}
+        resultDelayMs={0}
+      />,
+    );
+    expect(html).toContain("You lost");
+  });
+
+  it("offers play again for completed private rooms", () => {
+    const html = renderToStaticMarkup(
+      <GameOverOverlay
+        gameId="A2K9P7"
+        userId="u1"
+        game={game({ winner: "u1", winners: ["u1"], conversationId: null })}
+        conversation={null}
+        resultDelayMs={0}
+      />,
+    );
+    expect(html).toContain("Play again");
+    expect(html).not.toContain("Rematch");
+  });
+
+  it("sends private room players to a rematch someone else created", () => {
+    pendingEvents.set(CHAT_EVENTS.rematchCreated, {
+      newGameId: "B3L8Q2",
+      previousGameId: "A2K9P7",
+    });
+    const html = renderToStaticMarkup(
+      <GameOverOverlay
+        gameId="A2K9P7"
+        userId="u2"
+        game={game({ winner: "u1", winners: ["u1"] })}
+        conversation={null}
+        resultDelayMs={0}
+      />,
+    );
+    expect(html).toContain("Go to rematch");
+    expect(html).not.toContain("Play again");
+  });
+
+  it("ignores rematches created from another game", () => {
+    pendingEvents.set(CHAT_EVENTS.rematchCreated, {
+      newGameId: "B3L8Q2",
+      previousGameId: "Z9Z9Z9",
+    });
+    const html = renderToStaticMarkup(
+      <GameOverOverlay
+        gameId="A2K9P7"
+        userId="u2"
+        game={game({ winner: "u1", winners: ["u1"] })}
+        conversation={null}
+        resultDelayMs={0}
+      />,
+    );
+    expect(html).toContain("Play again");
+    expect(html).not.toContain("Go to rematch");
+  });
+
+  it("keeps the conversation rematch for chat games", () => {
+    const html = renderToStaticMarkup(
+      <GameOverOverlay
+        gameId="A2K9P7"
+        userId="u1"
+        game={game({ winner: "u1", winners: ["u1"], conversationId: "c1" })}
+        conversation={null}
+        resultDelayMs={0}
+      />,
+    );
+    expect(html).toContain("Rematch");
+    expect(html).not.toContain("Play again");
+  });
+
+  it("offers no rematch to spectators or after an abandoned game", () => {
+    const spectator = renderToStaticMarkup(
+      <GameOverOverlay
+        gameId="A2K9P7"
+        userId="x"
+        game={game({ winner: "u1", winners: ["u1"] })}
+        conversation={null}
+        resultDelayMs={0}
+      />,
+    );
+    expect(spectator).not.toContain("Play again");
+    const abandoned = renderToStaticMarkup(
+      <GameOverOverlay
+        gameId="A2K9P7"
+        userId="u1"
+        game={game({ status: "abandoned" })}
+        conversation={null}
+        resultDelayMs={0}
+      />,
+    );
+    expect(abandoned).not.toContain("Play again");
+    expect(abandoned).not.toContain("Rematch");
   });
 });

@@ -3,6 +3,7 @@ import { type LobbyConfig, lobbyConfigSchema } from "@kyzen/shared/types";
 import {
   addBot,
   assignTeam,
+  botName,
   lobbyConfigPayload,
   lobbyTeams,
   readLobbyConfig,
@@ -19,6 +20,11 @@ const humans = ["u1", "u2", "u3"];
 const limits = { minPlayers: 2, maxPlayers: 4 };
 
 describe("lobby config helpers", () => {
+  it("names bots by their one based position and difficulty", () => {
+    expect(botName(0, "hard")).toBe("Bot 1 (Hard)");
+    expect(botName(63, "easy")).toBe("Bot 64 (Easy)");
+  });
+
   it("reads defaults from missing or invalid configs", () => {
     expect(readLobbyConfig(null)).toEqual(empty);
     expect(readLobbyConfig({ mode: "chaos" })).toEqual(empty);
@@ -30,19 +36,38 @@ describe("lobby config helpers", () => {
 
   it("keeps engine specific keys when building the payload", () => {
     const next = addBot(empty, "easy", "A");
-    expect(lobbyConfigPayload({ map: "dunes", mode: "ffa" }, next)).toEqual({
+    expect(
+      lobbyConfigPayload({ map: "dunes", mode: "ffa" }, next, humans),
+    ).toEqual({
       map: "dunes",
       ...next,
     });
     expect(() =>
-      lobbyConfigPayload(null, {
-        ...empty,
-        bots: [
-          { id: "bot:1", difficulty: "easy", team: "A" },
-          { id: "bot:1", difficulty: "hard", team: "B" },
-        ],
-      }),
+      lobbyConfigPayload(
+        null,
+        {
+          ...empty,
+          bots: [
+            { id: "bot:1", difficulty: "easy", team: "A" },
+            { id: "bot:1", difficulty: "hard", team: "B" },
+          ],
+        },
+        humans,
+      ),
     ).toThrow();
+  });
+
+  it("drops team entries for players who are no longer seated", () => {
+    const carried: LobbyConfig = {
+      mode: "teams",
+      teams: { u1: "A", gone: "B", u2: "B" },
+      bots: [],
+    };
+    expect(lobbyConfigPayload(null, carried, ["u1", "u2"])).toEqual({
+      mode: "teams",
+      teams: { u1: "A", u2: "B" },
+      bots: [],
+    });
   });
 
   it("offers enough team letters for every participant", () => {

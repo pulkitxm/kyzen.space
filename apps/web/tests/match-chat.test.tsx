@@ -133,7 +133,7 @@ describe("MatchChatPanel", () => {
     expect(html).toContain("Player 2, Player 3");
     expect(html).toContain('aria-label="Add friends"');
     expect(html).toContain('aria-expanded="false"');
-    expect(html).toContain("Chat with the other players");
+    expect(html).toContain("Message the players in this match.");
   });
 
   it("uses real names without friend actions in private rooms", () => {
@@ -146,9 +146,58 @@ describe("MatchChatPanel", () => {
     expect(html).toContain('aria-label="Match message"');
   });
 
-  it("waits for the game to start before opening chat", () => {
+  it("opens chat for seated players while a private lobby waits", () => {
     const html = renderToStaticMarkup(
       <MatchChatPanel game={game({ status: "waiting" })} userId="u1" />,
+    );
+    expect(html).toContain('aria-label="Match message"');
+    expect(html).toContain("Message the players in this match.");
+  });
+
+  it("explains an empty private lobby without promising players", () => {
+    const html = renderToStaticMarkup(
+      <MatchChatPanel
+        game={game({
+          status: "waiting",
+          players: [{ userId: "u1", username: "alice", role: "X" }],
+        })}
+        userId="u1"
+      />,
+    );
+    expect(html).toContain("Chat opens when another player joins this room.");
+    expect(html).not.toContain('aria-label="Match message"');
+    expect(html).not.toContain("Waiting for players");
+  });
+
+  it("hides the input when only bots share the match", () => {
+    const html = renderToStaticMarkup(
+      <MatchChatPanel
+        game={game({
+          players: [
+            { userId: "u1", username: "alice", role: "X" },
+            { userId: "bot:1", username: "Bot 1 (Hard)", role: "O" },
+          ],
+        })}
+        userId="u1"
+      />,
+    );
+    expect(html).toContain("Only bots are in this match");
+    expect(html).toContain("No other players");
+    expect(html).not.toContain('aria-label="Match message"');
+    expect(html).not.toContain("Waiting for players");
+    expect(html).not.toContain("opponent");
+  });
+
+  it("waits for public matches to start before opening chat", () => {
+    const html = renderToStaticMarkup(
+      <MatchChatPanel
+        game={game({
+          status: "waiting",
+          publicMatch: true,
+          players: publicPlayers.slice(0, 2),
+        })}
+        userId="A2K9P7:red"
+      />,
     );
     expect(html).toContain("Match chat opens when the game starts.");
     expect(html).not.toContain('aria-label="Match message"');

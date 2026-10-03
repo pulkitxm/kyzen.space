@@ -23,6 +23,7 @@ import { gameMusicSource } from "@/lib/audio/music-sources";
 import { useGameAudioBridge } from "@/lib/audio/use-audio-bridge";
 import type { ChatLayout } from "@/lib/chat-layout";
 import { chatPanelMode } from "@/lib/games/match-chat";
+import { resultDelayMs } from "@/lib/games/outcome";
 import { socketStatusAtom, useSocket } from "@/lib/socket/socket-context";
 import { cn } from "@/lib/utils";
 import { GameChatSplit } from "./game-chat-split";
@@ -102,7 +103,7 @@ export function PlayClient({
   const onViewProfile = game.publicMatch ? undefined : viewProfile;
 
   const connected = status === "connected";
-  const gameNode = useMemo(
+  const board = useMemo(
     () =>
       GameClient ? (
         <div
@@ -144,6 +145,18 @@ export function PlayClient({
     ],
   );
 
+  const gameNode = (
+    <div className="relative h-full min-h-0 w-full">
+      {board}
+      <WaitingForOpponentOverlay
+        gameId={gameId}
+        game={game}
+        userId={viewerId}
+        lobby={lobbySettings(gameType)}
+      />
+    </div>
+  );
+
   const overlay = (
     <>
       {error ? (
@@ -154,17 +167,12 @@ export function PlayClient({
           {error}
         </p>
       ) : null}
-      <WaitingForOpponentOverlay
-        gameId={gameId}
-        game={game}
-        userId={viewerId}
-        lobby={lobbySettings(gameType)}
-      />
       <GameOverOverlay
         gameId={gameId}
         userId={viewerId}
         game={game}
         conversation={conversation}
+        resultDelayMs={resultDelayMs(game)}
       />
     </>
   );

@@ -25,6 +25,10 @@ export function difficultyLabel(difficulty: BotDifficulty): string {
   return DIFFICULTY_LABELS[difficulty];
 }
 
+export function botName(index: number, difficulty: BotDifficulty): string {
+  return `Bot ${index + 1} (${difficultyLabel(difficulty)})`;
+}
+
 export function readLobbyConfig(config: unknown): LobbyConfig {
   const { mode, teams, bots } = (config ?? {}) as Partial<LobbyConfig>;
   const parsed = lobbyConfigSchema.safeParse({ mode, teams, bots });
@@ -34,12 +38,17 @@ export function readLobbyConfig(config: unknown): LobbyConfig {
 export function lobbyConfigPayload(
   current: unknown,
   next: LobbyConfig,
+  humanIds: readonly string[],
 ): Record<string, unknown> {
   const base =
     current && typeof current === "object" && !Array.isArray(current)
       ? current
       : {};
-  return { ...base, ...lobbyConfigSchema.parse(next) };
+  const seated = new Set(humanIds);
+  const teams = Object.fromEntries(
+    Object.entries(next.teams).filter(([id]) => seated.has(id)),
+  );
+  return { ...base, ...lobbyConfigSchema.parse({ ...next, teams }) };
 }
 
 export function teamLetters(participants: number): TeamId[] {

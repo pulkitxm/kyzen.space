@@ -7,6 +7,7 @@ import {
   isBotId,
   isGameOver,
   type SeriesDetail,
+  type ServerRematchCreated,
 } from "@kyzen/shared/types";
 import { AnimatePresence, domAnimation, LazyMotion } from "motion/react";
 import { useRouter } from "next/navigation";
@@ -18,7 +19,11 @@ import { GlassMotionPane } from "@/components/glass/glass-pane";
 import { Button, Character } from "@/components/ui";
 import { clientFetchJson } from "@/lib/api-client";
 import { conversationHref } from "@/lib/chat/conversation-href";
-import { gameWinners, outcomeLabel } from "@/lib/games/outcome";
+import {
+  gameWinners,
+  outcomeLabel,
+  resultRevealDelay,
+} from "@/lib/games/outcome";
 import { findMatchHref } from "@/lib/games/queues";
 import { useLayeredPopup } from "@/lib/popups/use-layered-popup";
 import {
@@ -78,20 +83,47 @@ function PlayersRow({ game }: { game: GameJson }) {
   );
 }
 
+function useResultsReady(
+  completedAt: string | null | undefined,
+  delayMs: number,
+): boolean {
+  const key = delayMs > 0 ? `${completedAt ?? ""}:${delayMs}` : null;
+  const [revealed, setRevealed] = useState(() =>
+    key !== null && resultRevealDelay(completedAt, delayMs, Date.now()) === 0
+      ? key
+      : null,
+  );
+
+  useEffect(() => {
+    if (key === null || revealed === key) return;
+    const timer = setTimeout(
+      () => setRevealed(key),
+      resultRevealDelay(completedAt, delayMs, Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [key, revealed, completedAt, delayMs]);
+
+  return key === null || revealed === key;
+}
+
 export function GameOverOverlay({
   gameId,
   userId,
   game,
   conversation,
+  resultDelayMs,
 }: {
   gameId: string;
   userId: string;
   game: GameJson;
   conversation: ConversationJson | null;
+  resultDelayMs: number;
 }) {
   const { layers } = useLayeredPopup();
   const cardRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(() => isGameOver(game.status));
+  const ready = useResultsReady(game.completedAt, resultDelayMs);
+  const visible = open && ready && isGameOver(game.status);
   const [detail, setDetail] = useState<SeriesDetail | null>(null);
   const [rematch, setRematch] = useState<{
     busy: boolean;
@@ -105,9 +137,10 @@ export function GameOverOverlay({
     if (isGameOver(game.status)) setOpen(true);
   }
 
-  useSocketEvent<{ newGameId: string }>(
+  useSocketEvent<ServerRematchCreated>(
     CHAT_EVENTS.rematchCreated,
     (payload) => {
+      if (payload.previousGameId && payload.previousGameId !== gameId) return;
       setRematch((r) => ({ ...r, code: payload.newGameId }));
     },
   );
@@ -127,7 +160,7 @@ export function GameOverOverlay({
 
   const layerCount = layers.length;
   useEffect(() => {
-    if (!open) return;
+    if (!visible) return;
     function onPointerDown(e: MouseEvent) {
       if (layerCount > 0) return;
       const card = cardRef.current;
@@ -135,7 +168,7 @@ export function GameOverOverlay({
     }
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [open, layerCount]);
+  }, [visible, layerCount]);
 
   const showSeries = (detail?.score.totalGames ?? 0) >= 2;
 
@@ -143,7 +176,7 @@ export function GameOverOverlay({
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
       <LazyMotion features={domAnimation}>
         <AnimatePresence>
-          {open && isGameOver(game.status) ? (
+          {visible ? (
             <GlassMotionPane
               ref={cardRef}
               className={cn(
@@ -217,8 +250,9 @@ function GameOverActions({
   const { socket } = useSocket();
   const { openLayer } = useLayeredPopup();
   const isPlayer = game.players.some((p) => p.userId === userId);
+  const privateRoom = !game.publicMatch && !game.conversationId;
   const canRematch =
-    isPlayer && game.status === "completed" && !!game.conversationId;
+    isPlayer && game.status === "completed" && !game.publicMatch;
 
   const onRematch = useCallback(async () => {
     if (rematch.code) {
@@ -251,7 +285,11 @@ function GameOverActions({
       ) : null}
       {canRematch ? (
         <Button onClick={onRematch} disabled={rematch.busy}>
-          {rematch.code ? "Go to rematch" : "Rematch"}
+          {rematch.code
+            ? "Go to rematch"
+            : privateRoom
+              ? "Play again"
+              : "Rematch"}
         </Button>
       ) : null}
       {conversation ? (
