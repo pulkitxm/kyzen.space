@@ -18,6 +18,7 @@ import {
 import * as THREE from "three";
 import { useGameAudio } from "../../audio/use-game-audio";
 import type { GameClientProps } from "../../types";
+import { addStadium } from "./stadium";
 
 const COLORS = {
   blue: 0x38bdf8,
@@ -95,12 +96,35 @@ function addLine(
 }
 
 function addArena(scene: THREE.Scene) {
-  scene.background = new THREE.Color(0x071727);
-  scene.fog = new THREE.Fog(0x071727, 65, 125);
+  scene.background = new THREE.Color(0x14283e);
+  scene.fog = new THREE.Fog(0x14283e, 90, 190);
+  addStadium(scene);
+  const turfCanvas = document.createElement("canvas");
+  turfCanvas.width = 256;
+  turfCanvas.height = 256;
+  const turfContext = turfCanvas.getContext("2d");
+  if (turfContext) {
+    const pixels = turfContext.createImageData(256, 256);
+    for (let i = 0; i < pixels.data.length; i += 4) {
+      const shade = 130 + ((i * 16807) % 71);
+      pixels.data[i] = shade;
+      pixels.data[i + 1] = shade;
+      pixels.data[i + 2] = shade;
+      pixels.data[i + 3] = 255;
+    }
+    turfContext.putImageData(pixels, 0, 0);
+  }
+  const turf = new THREE.CanvasTexture(turfCanvas);
+  turf.wrapS = turf.wrapT = THREE.RepeatWrapping;
+  turf.repeat.set(20, 12);
+  turf.anisotropy = 4;
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(80, 50),
     new THREE.MeshStandardMaterial({
-      color: 0x123d49,
+      color: 0x28753e,
+      map: turf,
+      bumpMap: turf,
+      bumpScale: 0.08,
       roughness: 0.9,
       metalness: 0.05,
     }),
@@ -112,7 +136,11 @@ function addArena(scene: THREE.Scene) {
   for (let x = -35; x < 40; x += 10) {
     const strip = new THREE.Mesh(
       new THREE.PlaneGeometry(5, 50),
-      new THREE.MeshStandardMaterial({ color: 0x164c58, roughness: 0.95 }),
+      new THREE.MeshStandardMaterial({
+        color: 0x348749,
+        map: turf,
+        roughness: 0.95,
+      }),
     );
     strip.rotation.x = -Math.PI / 2;
     strip.position.set(x, 0.012, 0);
@@ -164,15 +192,30 @@ function addArena(scene: THREE.Scene) {
     bar.position.set(side * 40, 7, 0);
     bar.userData.goalSide = side;
     scene.add(bar);
-    const net = new THREE.Mesh(
-      new THREE.BoxGeometry(3, 7, 16),
-      new THREE.MeshStandardMaterial({
-        color: side < 0 ? 0x175775 : 0x70442a,
+    const netPoints: THREE.Vector3[] = [];
+    const segment = (a: number[], b: number[]) => {
+      netPoints.push(new THREE.Vector3(...a), new THREE.Vector3(...b));
+    };
+    for (let z = -8; z <= 8; z += 0.5) {
+      segment([side * 43, 0, z], [side * 43, 7, z]);
+      segment([side * 40, 7, z], [side * 43, 7, z]);
+    }
+    for (let y = 0; y <= 7; y += 0.5) {
+      segment([side * 43, y, -8], [side * 43, y, 8]);
+      for (const z of [-8, 8]) segment([side * 40, y, z], [side * 43, y, z]);
+    }
+    for (let x = 40; x <= 43; x += 0.5) {
+      segment([side * x, 7, -8], [side * x, 7, 8]);
+      for (const z of [-8, 8]) segment([side * x, 0, z], [side * x, 7, z]);
+    }
+    const net = new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints(netPoints),
+      new THREE.LineBasicMaterial({
+        color: 0xe3ecec,
         transparent: true,
-        opacity: 0.17,
+        opacity: 0.55,
       }),
     );
-    net.position.set(side * 41.5, 3.5, 0);
     net.userData.goalSide = side;
     scene.add(net);
   }
@@ -180,7 +223,7 @@ function addArena(scene: THREE.Scene) {
   const wallMaterial = new THREE.MeshStandardMaterial({
     color: 0x307184,
     transparent: true,
-    opacity: 0.32,
+    opacity: 0.1,
   });
   for (const z of [-25, 25]) {
     const wall = new THREE.Mesh(
@@ -214,7 +257,7 @@ function addArena(scene: THREE.Scene) {
 function makeBall() {
   const group = new THREE.Group();
   const ball = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(1.8, 2),
+    new THREE.SphereGeometry(1.8, 40, 24),
     new THREE.MeshStandardMaterial({
       color: 0xf4f7ef,
       metalness: 0.16,
@@ -223,15 +266,37 @@ function makeBall() {
   );
   ball.castShadow = true;
   group.add(ball);
-  const seams = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(1.81, 1)),
-    new THREE.LineBasicMaterial({
-      color: 0x31525a,
-      transparent: true,
-      opacity: 0.45,
-    }),
-  );
-  group.add(seams);
+  const vertices = new THREE.IcosahedronGeometry(1, 0);
+  const points = vertices.getAttribute("position");
+  const seen = new Set<string>();
+  const dark = new THREE.MeshStandardMaterial({
+    color: 0x13202b,
+    roughness: 0.7,
+  });
+  for (let i = 0; i < points.count; i++) {
+    const normal = new THREE.Vector3()
+      .fromBufferAttribute(points, i)
+      .normalize();
+    const key = normal
+      .toArray()
+      .map((value) => value.toFixed(3))
+      .join(",");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const patchGeometry = new THREE.CircleGeometry(0.58, 5);
+    const positions = patchGeometry.getAttribute("position");
+    for (let j = 0; j < positions.count; j++) {
+      const x = positions.getX(j);
+      const y = positions.getY(j);
+      positions.setZ(j, Math.sqrt(1.85 ** 2 - x * x - y * y) - 1.85);
+    }
+    patchGeometry.computeVertexNormals();
+    const patch = new THREE.Mesh(patchGeometry, dark);
+    patch.position.copy(normal).multiplyScalar(1.85);
+    patch.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    group.add(patch);
+  }
+  vertices.dispose();
   return group;
 }
 
@@ -332,6 +397,8 @@ export function CarFootballGameClient({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
     host.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     addArena(scene);
@@ -447,6 +514,12 @@ export function CarFootballGameClient({
           camera.lookAt(0, 0, 0);
         }
       }
+      for (const object of scene.children) {
+        if (object.userData.roofZ)
+          object.visible = camera.position.z * object.userData.roofZ < 28;
+        if (object.userData.roofX)
+          object.visible = camera.position.x * object.userData.roofX < 43;
+      }
       renderer.render(scene, camera);
       frame = requestAnimationFrame(tick);
     };
@@ -464,7 +537,12 @@ export function CarFootballGameClient({
           const materials = Array.isArray(object.material)
             ? object.material
             : [object.material];
-          for (const material of materials) material.dispose();
+          for (const material of materials) {
+            if ("map" in material && material.map instanceof THREE.Texture)
+              material.map.dispose();
+            material.dispose();
+          }
+          if (object instanceof THREE.InstancedMesh) object.dispose();
         }
       });
       renderer.dispose();

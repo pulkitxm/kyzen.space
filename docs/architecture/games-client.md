@@ -50,3 +50,5 @@ Game sound effects use `src/audio/use-game-audio.ts`. The web audio bridge suppl
 `tests/session.test.ts` covers room isolation, reconnect joins, cleanup that preserves chat listeners, and move-history resynchronization. Registry tests check board/engine parity and unknown-key handling. Engine conformance and game rules are tested in games-core.
 
 See [adding a game](../adding-a-game.md), [realtime](realtime.md), [audio](audio.md), and the [architecture map](README.md).
+
+Turbo Pitch builds its original stadium procedurally in `car-football/stadium.ts`: instanced seating, covered stands, floodlight towers and canvas-textured advertising surround the pitch. The board owns turf textures, net geometry, tone mapping and GPU resource cleanup. Stadium decoration does not change authoritative collision bounds.
