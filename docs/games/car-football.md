@@ -25,3 +25,7 @@ If both members of a team stop sending controls for 45 seconds, that team forfei
 The engine state holds the phase, match clock, score, last scorer, ball position and velocity, and the position, velocity, heading, boost, and jump state of each car. Each player sends bounded throttle and steer values plus jump, boost, and handbrake flags. The server applies all latest controls in a fixed-tick loop. Game clients receive authoritative snapshots.
 
 The game runs through the platform realtime runner described in [the architecture guide](../architecture/realtime.md). A private room admits four players by code and includes participant-only room chat. Players can open roster profiles to use the existing friend request controls. A group conversation can also launch an open Turbo Pitch game, keeping the group's chat alongside the arena. Play now waits for four compatible players and assigns two teams. Public match chat keeps names anonymous until players mutually choose Connect.
+
+## Runtime verification
+
+With the local synthetic database and combined app running, use `bun run --cwd apps/server smoke:car-football`. The script signs in four independent guests, matches them through the public queue, seeds a short match with a ball approaching the goal, sends driving controls, checks temporary chat and mutual connection privacy, reconnects a player, and verifies scoring, completion, and both teammates' stats. It refuses remote app or database hosts. Set `SMOKE_ORIGIN` when the local app URL differs from `http://127.0.0.1:3000`.
