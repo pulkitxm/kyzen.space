@@ -1,6 +1,6 @@
 # Running and deploying Kyzen
 
-The default runtime is one Bun process serving Next.js, the API, and Socket.IO on port 3000. Both Docker and host development use `apps/web/server.ts`, which mounts the shared server from `apps/server/src/http.ts`. Next.js handles frontend hot reload; Nodemon restarts the process only for backend source or environment changes. Generated `.next` files never trigger a server restart.
+The default runtime is one Bun process serving Next.js, the API, and Socket.IO on port 3000. Both Docker and host development use `apps/web/server.ts`, which mounts the shared server from `apps/server/src/http.ts`. Next.js handles frontend hot reload; `apps/web/scripts/dev.ts` restarts the process only for backend source or environment changes. Generated `.next` files never trigger a server restart.
 
 ## Local Compose
 

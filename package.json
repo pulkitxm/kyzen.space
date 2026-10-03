@@ -24,8 +24,8 @@
     "test": "turbo run test",
     "type-check": "turbo run type-check",
     "fix": "biome check --write --unsafe --only=correctness/noUnusedImports --only=nursery/useSortedClasses . && biome check --write . && bun run fix:tw",
-    "fix:tw": "cd apps/web && tailwind-suggest-canonical-classes \"app/**/*.{tsx,jsx,ts,js}\" \"components/**/*.{tsx,jsx,ts,js}\" \"lib/**/*.{tsx,jsx,ts,js}\" \"../../packages/games-client/src/**/*.{tsx,jsx,ts,js}\" --css app/globals.css",
-    "fix:tw:check": "cd apps/web && tailwind-suggest-canonical-classes \"app/**/*.{tsx,jsx,ts,js}\" \"components/**/*.{tsx,jsx,ts,js}\" \"lib/**/*.{tsx,jsx,ts,js}\" \"../../packages/games-client/src/**/*.{tsx,jsx,ts,js}\" --css app/globals.css --check",
+    "fix:tw": "cd apps/web && bun scripts/tailwind-canonical.ts --css app/globals.css \"app/**/*.{tsx,jsx,ts,js}\" \"components/**/*.{tsx,jsx,ts,js}\" \"lib/**/*.{tsx,jsx,ts,js}\" \"../../packages/games-client/src/**/*.{tsx,jsx,ts,js}\"",
+    "fix:tw:check": "cd apps/web && bun scripts/tailwind-canonical.ts --css app/globals.css \"app/**/*.{tsx,jsx,ts,js}\" \"components/**/*.{tsx,jsx,ts,js}\" \"lib/**/*.{tsx,jsx,ts,js}\" \"../../packages/games-client/src/**/*.{tsx,jsx,ts,js}\" --check",
     "check": "biome ci --error-on-warnings .",
     "dead-code": "knip",
     "dead-code:fix": "knip --fix",
@@ -50,7 +50,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.16",
-    "@laststance/tailwind-suggest-canonical-classes": "^0.1.2",
     "drizzle-kit": "^0.30.6",
     "knip": "^6.39.0",
     "turbo": "^2.11.6",

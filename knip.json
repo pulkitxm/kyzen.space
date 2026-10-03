@@ -11,8 +11,7 @@
       "ignoreDependencies": ["pino-pretty"]
     },
     "apps/web": {
-      "entry": ["scripts/*.ts"],
-      "ignoreDependencies": ["nodemon"]
+      "entry": ["scripts/*.ts"]
     },
     "packages/database": {
       "ignore": ["src/drift-guard.ts"]
