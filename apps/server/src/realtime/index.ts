@@ -16,6 +16,7 @@ import { attachMatchChatHandlers } from "./match-chat";
 import { attachMatchmakingHandlers } from "./matchmaking";
 import { handlePresenceConnect, handlePresenceDisconnect } from "./presence";
 import { startPresenceHeartbeats } from "./presence-heartbeat";
+import { stopRealtimeGames } from "./realtime-game";
 import { attachRedisAdapter } from "./redis";
 import { attachRoomHandlers } from "./room-events";
 import { leaveGameRoom } from "./rooms";
@@ -43,7 +44,10 @@ export function attachRealtime(httpServer: HTTPServer): IOServer {
   purge();
   const cleanupTimer = setInterval(purge, 3600000);
   cleanupTimer.unref();
-  io.engine.on("close", () => clearInterval(cleanupTimer));
+  io.engine.on("close", () => {
+    clearInterval(cleanupTimer);
+    stopRealtimeGames();
+  });
 
   io.use(async (socket, next) => {
     try {

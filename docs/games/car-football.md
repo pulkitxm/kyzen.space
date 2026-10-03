@@ -18,4 +18,4 @@ The four roles are `blue-1`, `orange-1`, `blue-2`, and `orange-2`. Room seats ar
 
 The engine state holds the phase, match clock, score, last scorer, ball position and velocity, and the position, velocity, heading, boost, and jump state of each car. Each player sends bounded throttle and steer values plus jump, boost, and handbrake flags. The server applies all latest controls in a fixed-tick loop. Game clients receive authoritative snapshots.
 
-The game runs as a realtime engine. It requires the platform realtime runner described in [the architecture guide](../architecture/realtime.md); registering the engine alone does not make the game playable.
+The game runs through the platform realtime runner described in [the architecture guide](../architecture/realtime.md). The current room flow admits four players by code. The two-player public matchmaking queue does not serve this game.

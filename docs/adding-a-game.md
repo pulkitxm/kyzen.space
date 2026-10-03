@@ -37,7 +37,7 @@ Public matchmaking automatically supports registered engines with `minPlayers = 
 
 The current queue serves the oldest compatible opponent and randomly assigns seats. A game requiring larger groups or rating-based pools needs an explicit matchmaking extension. See [public matchmaking](architecture/matchmaking.md).
 
-The deployed runner supports turn-based games. The type contract also describes realtime engines, but no server loop currently runs `step`. A realtime game needs platform work before it can be registered as playable.
+The deployed platform supports turn-based games and a process-local realtime runner in `apps/server/src/realtime/realtime-game.ts`. Realtime games need explicit review of tick rate, stale input handling, persistence, completion, and deployment ownership. The default public queue and temporary match friendship flow are designed for two participants; a larger public match needs a separate queue and social-flow extension.
 
 ## Board contract
 

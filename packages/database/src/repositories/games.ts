@@ -446,7 +446,9 @@ async function updateMatchStats(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   record: GameRecord,
   winner: string | null,
+  winningRoles?: readonly string[],
 ) {
+  const winningRoleSet = winningRoles ? new Set(winningRoles) : null;
   for (const player of [...record.players].sort((a, b) =>
     a.userId.localeCompare(b.userId),
   )) {
@@ -465,9 +467,19 @@ async function updateMatchStats(
     };
     stats[record.gameType] = {
       played: current.played + 1,
-      won: current.won + (winner === player.userId ? 1 : 0),
+      won:
+        current.won +
+        (winningRoleSet
+          ? Number(winningRoleSet.has(player.role))
+          : Number(winner === player.userId)),
       lost:
-        current.lost + (winner !== "draw" && winner !== player.userId ? 1 : 0),
+        current.lost +
+        (winner !== "draw" &&
+        (winningRoleSet
+          ? !winningRoleSet.has(player.role)
+          : winner !== player.userId)
+          ? 1
+          : 0),
       drawn: current.drawn + (winner === "draw" ? 1 : 0),
     };
     await tx
@@ -475,6 +487,41 @@ async function updateMatchStats(
       .set({ stats, updatedAt: new Date() })
       .where(eq(userProfile.userId, player.userId));
   }
+}
+
+export async function completeRealtimeGame(input: {
+  previous: GameRecord;
+  gameState: unknown;
+  winnerRole: string | null;
+  winningRoles: readonly string[];
+}): Promise<GameRecord | null> {
+  return db.transaction(async (tx) => {
+    const [locked] = await tx
+      .select()
+      .from(game)
+      .where(and(eq(game.id, input.previous.id), eq(game.status, "active")))
+      .for("update");
+    if (!locked) return null;
+    const winner = input.winnerRole
+      ? (input.previous.players.find(
+          (player) => player.role === input.winnerRole,
+        )?.userId ?? null)
+      : "draw";
+    const [updated] = await tx
+      .update(game)
+      .set({
+        gameState: input.gameState,
+        status: "completed",
+        winner,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(game.id, locked.id))
+      .returning();
+    if (!updated) throw new Error("Realtime game could not be completed");
+    await updateMatchStats(tx, input.previous, winner, input.winningRoles);
+    return toGameRecord(updated, input.previous.players);
+  });
 }
 
 export async function abortActiveGame(

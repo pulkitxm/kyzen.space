@@ -15,6 +15,11 @@ import {
 import type { Server as IOServer, Socket } from "socket.io";
 import { publicPlayerId, serializeGame, serializeMove } from "../api/serialize";
 import { broadcastGameCard } from "../chat/game-card-broadcast";
+import {
+  realtimeStateFor,
+  receiveRealtimeInput,
+  startRealtimeGame,
+} from "./realtime-game";
 import { emitToGame, joinGameRoom } from "./rooms";
 import {
   abortOutcome,
@@ -69,7 +74,13 @@ function scheduleNext(io: IOServer, gameRow: GameRecord): void {
 async function emitFullState(io: IOServer, gameRow: GameRecord) {
   const moves = await games.listMoves(gameRow.id);
   const payload: ServerGameStatePayload = {
-    game: withTimerFields(serializeGame(gameRow), gameRow.id),
+    game: withTimerFields(
+      {
+        ...serializeGame(gameRow),
+        gameState: realtimeStateFor(gameRow.code) ?? gameRow.gameState,
+      },
+      gameRow.id,
+    ),
     moves: moves.map((m) => serializeMove(m, gameRow.code, gameRow)),
   };
   emitToGame(io, gameRow.code, "game_state", payload);
@@ -265,6 +276,7 @@ export async function handleJoinRoom(
   );
 
   joinGameRoom(socket, game.code);
+  startRealtimeGame(io, game);
   if (
     game.status === "active" &&
     (changed || turnTimers.deadline(game.id) === null)
@@ -281,6 +293,7 @@ export async function handleMakeMove(
 ): Promise<void> {
   const userId = socket.data.userId;
   if (!isGameCode(payload.gameId)) return err(socket, "Invalid game id");
+  if (receiveRealtimeInput(socket, payload)) return;
 
   const gameRow = await games.getGameByCode(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
