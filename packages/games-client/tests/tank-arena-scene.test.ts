@@ -1,8 +1,9 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { buildArena } from "@kyzen/games-core";
 import {
   BoxGeometry,
   type BufferGeometry,
+  CylinderGeometry,
   InstancedMesh,
   type Material,
   Mesh,
@@ -15,10 +16,12 @@ import {
   collectResources,
   disposeTree,
 } from "../src/games/tank-arena/scene/dispose";
+import { mergeNonIndexed } from "../src/games/tank-arena/scene/merge";
 import {
   pixelRatioCap,
   type SceneDeps,
 } from "../src/games/tank-arena/scene/renderer";
+import { createTerrain } from "../src/games/tank-arena/scene/terrain";
 import type {
   SceneEvent,
   SceneFrame,
@@ -192,8 +195,26 @@ function spyDisposals(root: Object3D) {
   return tracked;
 }
 
+afterEach(() => {
+  mock.restore();
+});
+
+function silenceConsole() {
+  const error = spyOn(console, "error").mockImplementation(() => {});
+  const warn = spyOn(console, "warn").mockImplementation(() => {});
+  return () => {
+    expect(error.mock.calls).toEqual([]);
+    expect(warn.mock.calls).toEqual([]);
+  };
+}
+
+function attributeLayout(geometry: BufferGeometry) {
+  return Object.keys(geometry.attributes).sort();
+}
+
 describe("arena scene lifecycle", () => {
   test("renders frames, plays every effect, and tears everything down", () => {
+    const expectQuiet = silenceConsole();
     const calls: Calls = {};
     const { deps, step, frames } = fakeDeps(calls);
     const handle = mountArena(
@@ -260,6 +281,7 @@ describe("arena scene lifecycle", () => {
     expect(handle.scene.children.length).toBe(0);
     handle.dispose();
     expect(calls.rendererDispose).toBe(1);
+    expectQuiet();
   });
 
   test("reports WebGL failure instead of throwing", () => {
@@ -348,6 +370,41 @@ describe("arena scene lifecycle", () => {
     expect(calls.forceContextLoss).toBe(1);
     expect(calls.cancelFrame).toBe(1);
     expect(calls.disconnect).toBe(1);
+  });
+});
+
+describe("geometry merging", () => {
+  test("flattens indexed parts so mixed inputs share one layout", () => {
+    const expectQuiet = silenceConsole();
+    const indexed = new CylinderGeometry(0.3, 0.3, 1, 8);
+    const flat = new BoxGeometry(1, 1, 1).toNonIndexed();
+    const expected =
+      (indexed.index?.count ?? 0) + flat.getAttribute("position").count;
+    const merged = mergeNonIndexed([flat, indexed]);
+    expect(merged.index).toBeNull();
+    expect(merged.getAttribute("position").count).toBe(expected);
+    expect(attributeLayout(merged)).toEqual(["normal", "position", "uv"]);
+    expectQuiet();
+  });
+
+  test("builds every terrain bucket as one non-indexed mesh", () => {
+    const expectQuiet = silenceConsole();
+    const terrain = createTerrain(buildArena(4).boxes);
+    const meshes = terrain.children.filter(
+      (child): child is Mesh => child instanceof Mesh,
+    );
+    expect(meshes.length).toBe(9);
+    for (const mesh of meshes) {
+      expect(mesh.geometry.index).toBeNull();
+      expect(attributeLayout(mesh.geometry)).toEqual([
+        "normal",
+        "position",
+        "uv",
+      ]);
+      expect(mesh.geometry.getAttribute("position").count).toBeGreaterThan(0);
+    }
+    disposeTree(terrain);
+    expectQuiet();
   });
 });
 

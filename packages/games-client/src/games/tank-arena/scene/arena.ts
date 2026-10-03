@@ -240,7 +240,16 @@ export function mountArena(
         break;
       case "damage": {
         const tank = tankAt(event.role);
-        if (tank) overlay.damage(tank, event.amount, event.color);
+        const model = models.get(event.role);
+        model?.hit();
+        if (tank) {
+          overlay.damage(tank, event.amount, event.color);
+          effects.burst(tank.x, tank.y + tank.height / 2, 8, 4, event.color, {
+            gravity: 6,
+            life: 0.28,
+            size: 0.35,
+          });
+        }
         break;
       }
       case "jump":
@@ -390,20 +399,38 @@ export function mountArena(
       if (!model) continue;
       model.setVisible(tank.alive);
       if (!tank.alive) continue;
+      const hpRatio = tank.hp / Math.max(1, tank.maxHp);
+      model.setDamage(1 - hpRatio);
       model.update(tank, dt, time, scale(tank));
-      if (tank.hp / Math.max(1, tank.maxHp) < 0.3 && Math.random() < dt * 14) {
-        effects.smoke.spawn({
-          x: tank.x + (Math.random() - 0.5) * tank.halfWidth,
-          y: tank.y + tank.height,
-          z: (Math.random() - 0.5) * 0.6,
-          vx: (Math.random() - 0.5) * 0.6,
-          vy: 1.4 + Math.random(),
-          life: 1.4,
-          size: 0.45,
-          color: 0x2a2d33,
-          grow: 1.1,
-          alpha: 0.6,
-        });
+      if (hpRatio < 0.5) {
+        const dmgRate = (0.5 - hpRatio) * 2;
+        if (Math.random() < dt * 14 * dmgRate) {
+          effects.smoke.spawn({
+            x: tank.x + (Math.random() - 0.5) * tank.halfWidth,
+            y: tank.y + tank.height * 0.7,
+            z: (Math.random() - 0.5) * 0.6,
+            vx: (Math.random() - 0.5) * 0.6,
+            vy: 1.4 + Math.random(),
+            life: 1.4,
+            size: 0.45,
+            color: 0x2a2d33,
+            grow: 1.1,
+            alpha: 0.5 + dmgRate * 0.3,
+          });
+        }
+        if (Math.random() < dt * 8 * dmgRate) {
+          effects.sparks.spawn({
+            x: tank.x + (Math.random() - 0.5) * tank.halfWidth * 0.8,
+            y: tank.y + tank.height * (0.4 + Math.random() * 0.4),
+            z: (Math.random() - 0.5) * 0.4,
+            vx: (Math.random() - 0.5) * 2,
+            vy: 2 + Math.random() * 3,
+            life: 0.3 + Math.random() * 0.3,
+            size: 0.25,
+            color: 0xffa030,
+            gravity: 8,
+          });
+        }
       }
     }
     projectiles.update(frame.projectiles, effects.sparks, dt);
