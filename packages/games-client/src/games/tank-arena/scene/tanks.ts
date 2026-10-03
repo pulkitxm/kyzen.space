@@ -20,8 +20,8 @@ import {
   Shape,
   SphereGeometry,
 } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { SceneTank, TankModelKind } from "../view";
+import { mergeNonIndexed } from "./merge";
 
 export const MODEL_SIZE: Record<
   TankModelKind,
@@ -82,20 +82,6 @@ function placed(geometry: BufferGeometry, x: number, y: number, z: number) {
   return geometry;
 }
 
-function nonIndexed(geometry: BufferGeometry) {
-  const result = geometry.index ? geometry.toNonIndexed() : geometry;
-  if (result !== geometry) geometry.dispose();
-  return result;
-}
-
-function mergeParts(parts: BufferGeometry[]) {
-  const ready = parts.map(nonIndexed);
-  const result = mergeGeometries(ready, false);
-  for (const part of ready) part.dispose();
-  if (!result) throw new Error("tank geometry merge failed");
-  return result;
-}
-
 type PartName =
   | "bastionHull"
   | "bastionTurret"
@@ -153,7 +139,7 @@ export function createTankKit(): TankKit {
   }
   const skirt = placed(new BoxGeometry(2.6, 0.14, 1.78), 0, 0.84, 0);
   const plate = placed(new BoxGeometry(1.1, 0.42, 0.06), -0.3, 1.06, 0.8);
-  const bastionHullGeometry = mergeParts([
+  const bastionHullGeometry = mergeNonIndexed([
     bastionHull,
     skirt,
     plate,
@@ -180,7 +166,7 @@ export function createTankKit(): TankKit {
   brake.translate(1.62, 0, 0);
   const mantlet = new BoxGeometry(0.42, 0.42, 0.56);
   mantlet.translate(0.12, 0, 0);
-  const bastionBarrel = mergeParts([heavyBarrel, brake, mantlet]);
+  const bastionBarrel = mergeNonIndexed([heavyBarrel, brake, mantlet]);
   const tread = extrude(treadShape(), 0.48, 0.035);
   const wheel = new CylinderGeometry(0.27, 0.27, 0.36, 16);
   wheel.rotateX(Math.PI / 2);
@@ -221,7 +207,7 @@ export function createTankKit(): TankKit {
   strutA.translate(-0.5, 0.32, 0);
   const strutB = new BoxGeometry(0.07, 0.4, 0.07);
   strutB.translate(0.5, 0.32, 0);
-  const skidGeometry = mergeParts([skid, strutA, strutB]);
+  const skidGeometry = mergeNonIndexed([skid, strutA, strutB]);
   const fin = extrude(
     profile([
       [0, 0],
@@ -240,7 +226,7 @@ export function createTankKit(): TankKit {
   tipRing.translate(1.98, 0, 0);
   const collar = new CylinderGeometry(0.18, 0.18, 0.3, 14);
   collar.rotateX(Math.PI / 2);
-  const kestrelBarrel = mergeParts([slimBarrel, tipRing, collar]);
+  const kestrelBarrel = mergeNonIndexed([slimBarrel, tipRing, collar]);
   const nozzle = new ConeGeometry(0.18, 0.36, 12, 1, true);
   nozzle.rotateZ(Math.PI / 2);
   const flame = new ConeGeometry(0.14, 1.0, 10, 1, true);

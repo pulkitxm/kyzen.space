@@ -10,8 +10,8 @@ import {
   SphereGeometry,
   TorusGeometry,
 } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { ArenaBox } from "../view";
+import { mergeNonIndexed } from "./merge";
 
 const BEVEL = 0.16;
 
@@ -59,7 +59,7 @@ function slab(
   z: number,
   depth: number,
 ) {
-  const geometry = new BoxGeometry(x1 - x0, y1 - y0, depth).toNonIndexed();
+  const geometry = new BoxGeometry(x1 - x0, y1 - y0, depth);
   geometry.translate((x0 + x1) / 2, (y0 + y1) / 2, z);
   return geometry;
 }
@@ -92,13 +92,13 @@ function pipeElbow(x: number, y: number, z: number, radius = 0.12) {
 }
 
 function warningStripe(x0: number, x1: number, y: number, z: number) {
-  const geometry = new BoxGeometry(x1 - x0, 0.16, 0.04).toNonIndexed();
+  const geometry = new BoxGeometry(x1 - x0, 0.16, 0.04);
   geometry.translate((x0 + x1) / 2, y, z);
   return geometry;
 }
 
 function crate(x: number, y: number, z: number, size = 0.8) {
-  const geometry = new BoxGeometry(size, size, size).toNonIndexed();
+  const geometry = new BoxGeometry(size, size, size);
   geometry.translate(x, y + size / 2, z);
   return geometry;
 }
@@ -110,22 +110,19 @@ function barrel(x: number, y: number, z: number) {
 }
 
 function lamp(x: number, y: number, z: number) {
-  const geometry = new BoxGeometry(0.14, 0.2, 0.4).toNonIndexed();
+  const geometry = new BoxGeometry(0.14, 0.2, 0.4);
   geometry.translate(x, y, z);
   return geometry;
 }
 
 function ventGrate(x: number, y: number, z: number) {
-  const geometry = new BoxGeometry(0.8, 0.5, 0.06).toNonIndexed();
+  const geometry = new BoxGeometry(0.8, 0.5, 0.06);
   geometry.translate(x, y, z);
   return geometry;
 }
 
 function merged(parts: BufferGeometry[]) {
-  if (parts.length === 0) return null;
-  const result = mergeGeometries(parts, false);
-  for (const part of parts) part.dispose();
-  return result;
+  return parts.length === 0 ? null : mergeNonIndexed(parts);
 }
 
 function seeded(seed: number) {

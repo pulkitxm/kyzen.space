@@ -18,7 +18,6 @@ import {
   TorusGeometry,
   Vector3,
 } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type {
   AimPreview,
   PickupModelKind,
@@ -29,6 +28,7 @@ import type {
   SceneWall,
 } from "../view";
 import type { ParticleField } from "./effects";
+import { mergeNonIndexed } from "./merge";
 import {
   hazardMaterial,
   hologramMaterial,
@@ -61,18 +61,6 @@ const TRAIL_COLORS: Record<SceneProjectile["kind"], number> = {
   bomb: 0xff6a3a,
 };
 
-function mergeIndexed(parts: BufferGeometry[]) {
-  const ready = parts.map((part) => {
-    const next = part.index ? part.toNonIndexed() : part;
-    if (next !== part) part.dispose();
-    return next;
-  });
-  const result = mergeGeometries(ready, false);
-  for (const part of ready) part.dispose();
-  if (!result) throw new Error("prop geometry merge failed");
-  return result;
-}
-
 export class Projectiles {
   readonly root = new Group();
   private readonly shells: InstancedMesh;
@@ -104,7 +92,7 @@ export class Projectiles {
     fins.translate(-0.55, 0, 0);
     const fins2 = new BoxGeometry(0.3, 0.06, 0.6);
     fins2.translate(-0.55, 0, 0);
-    this.bombGeometry = mergeIndexed([body, fins, fins2]);
+    this.bombGeometry = mergeNonIndexed([body, fins, fins2]);
     this.shells = new InstancedMesh(
       this.shellGeometry,
       this.shellMaterial,
@@ -299,7 +287,7 @@ export class Mines {
       spike.translate(dx * 0.48, dy * 0.48, 0);
       parts.push(spike);
     }
-    this.body = mergeIndexed(parts);
+    this.body = mergeNonIndexed(parts);
   }
 
   update(mines: SceneMine[], time: number) {
@@ -347,7 +335,7 @@ export class Pickups {
   private readonly entries = new Map<string, Group>();
 
   constructor() {
-    const plus = mergeIndexed([
+    const plus = mergeNonIndexed([
       new BoxGeometry(0.62, 0.2, 0.2),
       new BoxGeometry(0.2, 0.62, 0.2),
     ]);
@@ -355,7 +343,7 @@ export class Pickups {
     bolt.scale(0.7, 1.2, 0.7);
     const plate = new CylinderGeometry(0.38, 0.38, 0.12, 6);
     plate.rotateX(Math.PI / 2);
-    const crystal = mergeIndexed([
+    const crystal = mergeNonIndexed([
       new BoxGeometry(0.12, 0.7, 0.12),
       new BoxGeometry(0.7, 0.12, 0.12),
       (() => {
