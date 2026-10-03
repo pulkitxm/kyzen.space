@@ -7,6 +7,8 @@ export const carFootballMeta: GameMeta = {
   description:
     "Drive, jump, boost, and score in a four-player car football arena.",
   categoryId: GAME_CATEGORIES.ARENA.id,
+  coverImage: "/games/car-football-cover.svg",
+  backgroundMusic: "/sounds/car-football-bg.wav",
   howToPlay: [
     "Four players join a room, two on blue and two on orange.",
     "Drive with W and S, steer with A and D, jump with Space, and boost with Shift.",

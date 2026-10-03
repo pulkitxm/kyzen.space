@@ -5,6 +5,7 @@ import {
   getGameSkeleton,
   useGameSession,
 } from "@kyzen/games-client";
+import { CAR_FOOTBALL } from "@kyzen/shared/constants";
 import type {
   ConversationJson,
   GameJson,
@@ -61,13 +62,15 @@ export function PlayClient({
     initialMoves,
   });
 
-  useGameAudioBridge(gameMusicSource(gameType));
+  useGameAudioBridge(gameMusicSource(gameType), gameType);
 
   const connected = status === "connected";
   const gameNode = useMemo(
     () =>
       GameClient ? (
-        <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
+        <div
+          className={`mx-auto flex h-full w-full flex-col p-4 ${gameType === CAR_FOOTBALL ? "max-w-none" : "max-w-2xl"}`}
+        >
           <Suspense fallback={<GameSkeleton />}>
             <GameClient
               userId={userId}
@@ -87,6 +90,7 @@ export function PlayClient({
     [
       GameClient,
       GameSkeleton,
+      gameType,
       userId,
       connected,
       game,

@@ -1,6 +1,6 @@
 "use client";
 
-import { CHAT_EVENTS } from "@kyzen/shared/constants";
+import { CAR_FOOTBALL, CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
   type ConversationJson,
   type GameJson,
@@ -29,6 +29,16 @@ function outcomeLabel(game: GameJson, userId: string): string {
   if (game.status === "abandoned") return "Game abandoned";
   if (game.winner === "draw") return "It's a draw";
   if (!game.winner) return "Game over";
+  if (game.gameType === CAR_FOOTBALL) {
+    const winningTeam = game.players
+      .find((player) => player.userId === game.winner)
+      ?.role.split("-")[0];
+    const myTeam = game.players
+      .find((player) => player.userId === userId)
+      ?.role.split("-")[0];
+    if (winningTeam && myTeam)
+      return winningTeam === myTeam ? "Your team won!" : "Your team lost";
+  }
   return game.winner === userId ? "You won! 🎉" : "You lost";
 }
 
@@ -36,7 +46,13 @@ function PlayersRow({ game }: { game: GameJson }) {
   return (
     <div className="flex items-start justify-center gap-8">
       {game.players.map((p) => {
-        const won = game.winner === p.userId;
+        const winningTeam = game.players
+          .find((player) => player.userId === game.winner)
+          ?.role.split("-")[0];
+        const won =
+          game.winner === p.userId ||
+          (game.gameType === CAR_FOOTBALL &&
+            Boolean(winningTeam && p.role.startsWith(`${winningTeam}-`)));
         return (
           <div key={p.userId} className="flex flex-col items-center gap-1">
             <div

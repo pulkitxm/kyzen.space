@@ -4,10 +4,10 @@
 
 Games on the play screen have sound: short **effect** sounds (hover, touch, win,
 draw) and **background music**. Everything is an audio **file** played through the
-Web Audio API - there is no runtime tone synthesis. All assets are **Opus** in
-`.ogg` (the best-compressing widely-supported web codec). SFX are tiny clips
-decoded into buffers; the background music is a per-game streamed track
-(tic-tac-toe ships a jazz `.ogg`). Two user preferences (a *game-sound* channel
+Web Audio API - there is no runtime tone synthesis. Tic-tac-toe ships Opus
+`.ogg` assets. Turbo Pitch ships original synthesized `.wav` assets. SFX are
+tiny clips decoded into buffers; the background music is a per-game streamed
+track. Two user preferences (a *game-sound* channel
 and a *background-music* channel, each with a volume and a mute) drive everything;
 they are **client-only** and persist in `localStorage`. Nothing here touches the
 game DB, the game Zod schemas, or the wire/socket contract - audio is a pure
@@ -26,6 +26,8 @@ The design splits cleanly across the package boundary:
 Because jotai is a singleton across the workspace (`transpilePackages`, see
 [web.md](./web.md)), the `apps/web` bridge and the `games-client` board call the
 **same** engine instance - the board never needs to read an atom.
+
+The audio bridge selects Turbo Pitch's goal and jump cues by game type. Its music comes from game metadata, and the same channel volume and mute settings apply.
 
 ## Files at a glance
 

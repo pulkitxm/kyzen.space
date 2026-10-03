@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="Turbo Pitch car football arena">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#071424"/><stop offset="1" stop-color="#124353"/></linearGradient>
+    <linearGradient id="field" x2="0" y2="1"><stop stop-color="#235d62"/><stop offset="1" stop-color="#0a3542"/></linearGradient>
+    <linearGradient id="blue" x2="0" y2="1"><stop stop-color="#96ecff"/><stop offset=".45" stop-color="#2aaef2"/><stop offset="1" stop-color="#0e4974"/></linearGradient>
+    <linearGradient id="orange" x2="0" y2="1"><stop stop-color="#ffe3a3"/><stop offset=".45" stop-color="#ff934a"/><stop offset="1" stop-color="#963f28"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fffbdf" stop-opacity=".85"/><stop offset="1" stop-color="#fffbdf" stop-opacity="0"/></radialGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="40"/></filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <ellipse cx="800" cy="290" rx="700" ry="170" fill="#3c8996" opacity=".17" filter="url(#blur)"/>
+  <path d="M0 570 810 325 1600 570v330H0Z" fill="url(#field)"/>
+  <path d="M0 570 810 325 1600 570M800 325v575M0 570h1600" fill="none" stroke="#a7f8e7" stroke-width="7" opacity=".35"/>
+  <path d="M470 685c125-57 535-58 666 0M235 802c268-141 884-145 1133 0" fill="none" stroke="#c5fff0" stroke-width="6" opacity=".26"/>
+  <path d="M73 505h260v-166H73M1267 339h260v166h-260" fill="none" stroke="#55cffe" stroke-width="15" opacity=".6"/>
+  <path d="M1270 505h257V339h-257" fill="none" stroke="#ffaf68" stroke-width="15" opacity=".72"/>
+  <circle cx="795" cy="475" r="210" fill="url(#glow)"/>
+  <ellipse cx="792" cy="659" rx="125" ry="33" fill="#021922" opacity=".5"/>
+  <circle cx="792" cy="497" r="116" fill="#e8f7f5" stroke="#79bdc6" stroke-width="13"/>
+  <path d="m792 390 76 54-29 88h-94l-29-88ZM716 444l-59 36 27 80 61-28m123-88 59 36-27 80-61-28m-94 0-44 66m138-66 44 66" fill="none" stroke="#285463" stroke-width="15" stroke-linejoin="round"/>
+  <g transform="translate(130 475) rotate(-10)">
+    <ellipse cx="250" cy="254" rx="285" ry="55" fill="#051b29" opacity=".5"/>
+    <path d="M25 119h355l73 53 39 55H14l-22-41Z" fill="url(#blue)" stroke="#98f5ff" stroke-width="10"/>
+    <path d="m121 119 47-79h141l78 79Z" fill="#4babc5" stroke="#b5f5ff" stroke-width="9"/>
+    <path d="m183 54 90 3 37 55H151Z" fill="#b5f5ff" opacity=".65"/>
+    <circle cx="102" cy="229" r="47" fill="#09202c" stroke="#8edfed" stroke-width="13"/><circle cx="387" cy="229" r="47" fill="#09202c" stroke="#8edfed" stroke-width="13"/>
+    <path d="M15 178h76m328 0h64" stroke="#e6fdff" stroke-width="15" stroke-linecap="round"/>
+    <path d="m-56 160-123-20m118 42-151 5" stroke="#3ccbf7" stroke-width="20" stroke-linecap="round" opacity=".65"/>
+  </g>
+  <g transform="translate(1170 435) rotate(12)">
+    <ellipse cx="190" cy="228" rx="226" ry="46" fill="#051b29" opacity=".48"/>
+    <path d="M8 113h325l51 44 12 53H0l-15-38Z" fill="url(#orange)" stroke="#ffd29a" stroke-width="9"/>
+    <path d="m87 112 57-70h137l59 70Z" fill="#b46943" stroke="#ffe2ad" stroke-width="8"/>
+    <path d="m157 50 90 3 39 55H117Z" fill="#ffe3b5" opacity=".62"/>
+    <circle cx="73" cy="209" r="40" fill="#261e24" stroke="#ffbd88" stroke-width="11"/><circle cx="322" cy="209" r="40" fill="#261e24" stroke="#ffbd88" stroke-width="11"/>
+    <path d="M7 165h58m261 0h64" stroke="#fff0d1" stroke-width="13" stroke-linecap="round"/>
+  </g>
+  <text x="800" y="166" text-anchor="middle" fill="#f5ffff" font-family="Arial,sans-serif" font-size="98" font-weight="900" letter-spacing="9">TURBO PITCH</text>
+  <text x="800" y="224" text-anchor="middle" fill="#a9dfe3" font-family="Arial,sans-serif" font-size="31" font-weight="700" letter-spacing="11">DRIVE THE GAME</text>
+</svg>

@@ -1,5 +1,5 @@
 import { getDefinition, hasEngine } from "@kyzen/games-core";
-import { GAME_CATEGORIES } from "@kyzen/shared/constants";
+import { CAR_FOOTBALL, GAME_CATEGORIES } from "@kyzen/shared/constants";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -37,7 +37,10 @@ export default async function GamePage({
         {meta.name}
       </h1>
       <p className="mt-4 max-w-xl text-base text-muted-foreground">
-        {meta.description} Play a quick match or set up a room with friends.
+        {meta.description}{" "}
+        {gameType === CAR_FOOTBALL
+          ? "Create a room and invite three players."
+          : "Play a quick match or set up a room with friends."}
       </p>
 
       <div className="mt-10 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">

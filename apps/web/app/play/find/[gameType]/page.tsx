@@ -1,4 +1,5 @@
 import { getDefinition, hasEngine } from "@kyzen/games-core";
+import { CAR_FOOTBALL } from "@kyzen/shared/constants";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { FindClient } from "./find-client";
@@ -16,7 +17,7 @@ export default async function FindMatchPage({
   params: Promise<{ gameType: string }>;
 }) {
   const { gameType } = await params;
-  if (!hasEngine(gameType)) notFound();
+  if (!hasEngine(gameType) || gameType === CAR_FOOTBALL) notFound();
   const { meta } = getDefinition(gameType);
   return <FindClient gameType={meta.type} gameName={meta.name} />;
 }

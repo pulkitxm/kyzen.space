@@ -9,9 +9,9 @@ import type {
 } from "@kyzen/shared/types";
 
 export const FIELD_HALF_LENGTH = 40;
-export const FIELD_HALF_WIDTH = 25;
-export const GOAL_HALF_WIDTH = 8;
-export const GOAL_HEIGHT = 7;
+const FIELD_HALF_WIDTH = 25;
+const GOAL_HALF_WIDTH = 8;
+const GOAL_HEIGHT = 7;
 export const BALL_RADIUS = 1.8;
 export const MATCH_SECONDS = 180;
 
@@ -21,14 +21,14 @@ const CEILING = 18;
 const MAX_CAR_SPEED = 28;
 const MAX_BALL_SPEED = 42;
 
-export const CAR_FOOTBALL_ROLES = [
+const CAR_FOOTBALL_ROLES = [
   "blue-1",
   "orange-1",
   "blue-2",
   "orange-2",
 ] as const;
 
-export function teamForRole(role: string): CarFootballTeam {
+function teamForRole(role: string): CarFootballTeam {
   return role.startsWith("orange") ? "orange" : "blue";
 }
 

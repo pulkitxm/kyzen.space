@@ -6,7 +6,7 @@ const vectorSchema = z
 const teamSchema = z.enum(["blue", "orange"]);
 const phaseSchema = z.enum(["kickoff", "play", "goal", "overtime", "finished"]);
 
-export const carFootballCarSchema = z
+const carFootballCarSchema = z
   .object({
     role: z.string(),
     team: teamSchema,

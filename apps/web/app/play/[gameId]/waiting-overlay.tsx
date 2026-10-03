@@ -1,5 +1,6 @@
 "use client";
 
+import { CAR_FOOTBALL } from "@kyzen/shared/constants";
 import type { GameJson } from "@kyzen/shared/types";
 import { AnimatePresence, domAnimation, LazyMotion, m } from "motion/react";
 import { useEffect, useState } from "react";
@@ -56,7 +57,7 @@ export function WaitingForOpponentOverlay({
                   </p>
                 </div>
               ) : (
-                <WaitingRoomInvite gameId={gameId} />
+                <WaitingRoomInvite gameId={gameId} game={game} />
               )}
             </m.div>
           ) : null}
@@ -66,7 +67,13 @@ export function WaitingForOpponentOverlay({
   );
 }
 
-function WaitingRoomInvite({ gameId }: { gameId: string }) {
+function WaitingRoomInvite({
+  gameId,
+  game,
+}: {
+  gameId: string;
+  game: GameJson;
+}) {
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const copy = async (kind: "code" | "link") => {
     const value =
@@ -107,10 +114,14 @@ function WaitingRoomInvite({ gameId }: { gameId: string }) {
         />
       </div>
       <h2 className="font-bold text-foreground text-xl">
-        Waiting for players...
+        {game.gameType === CAR_FOOTBALL
+          ? `Waiting for players (${game.players.length}/4)`
+          : "Waiting for players..."}
       </h2>
       <p className="mt-1 text-muted-foreground text-sm">
-        Share this code so a friend can join.
+        {game.gameType === CAR_FOOTBALL
+          ? "Share this code with three friends to fill both teams."
+          : "Share this code so a friend can join."}
       </p>
       <div className="mt-4 rounded-xl border border-border bg-background py-3 font-mono text-3xl text-foreground tracking-[0.4em]">
         {gameId}

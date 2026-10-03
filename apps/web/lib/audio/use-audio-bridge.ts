@@ -1,6 +1,7 @@
 "use client";
 
 import { getGameAudioEngine, type SfxSources } from "@kyzen/games-client";
+import { CAR_FOOTBALL } from "@kyzen/shared/constants";
 import { useAtomValue } from "jotai";
 import { useEffect } from "react";
 import { gameMusicAtom, gameSfxAtom } from "./atoms";
@@ -12,15 +13,26 @@ const SFX_SOURCES: SfxSources = {
   draw: "/sounds/draw.ogg",
 };
 
-export function useGameAudioBridge(musicUrl?: string | null) {
+const CAR_FOOTBALL_SFX_SOURCES: SfxSources = {
+  ...SFX_SOURCES,
+  touch: "/sounds/car-football-jump.wav",
+  win: "/sounds/car-football-goal.wav",
+};
+
+export function useGameAudioBridge(
+  musicUrl?: string | null,
+  gameType?: string,
+) {
   const sfx = useAtomValue(gameSfxAtom);
   const music = useAtomValue(gameMusicAtom);
 
   useEffect(() => {
     const engine = getGameAudioEngine();
     if (!engine) return;
-    engine.setSfxSources(SFX_SOURCES);
-  }, []);
+    engine.setSfxSources(
+      gameType === CAR_FOOTBALL ? CAR_FOOTBALL_SFX_SOURCES : SFX_SOURCES,
+    );
+  }, [gameType]);
 
   useEffect(() => {
     const engine = getGameAudioEngine();

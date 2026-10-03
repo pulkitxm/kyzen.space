@@ -1,6 +1,7 @@
-import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import { CAR_FOOTBALL, TIC_TAC_TOE } from "@kyzen/shared/constants";
 import type { GameType } from "@kyzen/shared/types";
 import type { ComponentType } from "react";
+import { CarFootballGameClient } from "./games/car-football/client";
 import { TicTacToeGameClient } from "./games/tic-tac-toe/client";
 import { TicTacToeSkeleton } from "./games/tic-tac-toe/skeleton";
 import { DefaultGameSkeleton } from "./skeletons";
@@ -11,6 +12,7 @@ const REGISTRY: Record<
   { Board: ComponentType<GameClientProps>; Skeleton?: ComponentType }
 > = {
   [TIC_TAC_TOE]: { Board: TicTacToeGameClient, Skeleton: TicTacToeSkeleton },
+  [CAR_FOOTBALL]: { Board: CarFootballGameClient },
 };
 
 function getEntry(gameType: string) {
