@@ -121,7 +121,7 @@ export function createPreviewStudio(renderer: StudioRenderer, aspect: number) {
   };
 }
 
-export type PreviewSurface = StudioRenderer & {
+type PreviewSurface = StudioRenderer & {
   settled: () => boolean;
   capture: () => Promise<ImageBitmap>;
   dispose: () => void;
