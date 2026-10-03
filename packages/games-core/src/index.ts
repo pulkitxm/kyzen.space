@@ -1,4 +1,6 @@
 export { GAMES } from "./games";
+export { carFootballDefinition } from "./games/car-football";
+export { carFootballEngine } from "./games/car-football/engine";
 export { ticTacToeDefinition } from "./games/tic-tac-toe";
 export {
   emptyBoard,

@@ -1,3 +1,12 @@
+export {
+  type CarFootballConfig,
+  type CarFootballMove,
+  type CarFootballState,
+  type CarFootballTeam,
+  carFootballConfigSchema,
+  carFootballMoveSchema,
+  carFootballStateSchema,
+} from "./car-football/schemas";
 export type {
   default as GameCategoryDef,
   GameCategoryId,
