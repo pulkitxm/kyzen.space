@@ -1,129 +1,103 @@
-export type Vec2 = { x: number; y: number };
+export type Aabb = { minX: number; minY: number; maxX: number; maxY: number };
 
-export type AABB = { minX: number; minY: number; maxX: number; maxY: number };
+export type BoxShape = { type: "box"; halfWidth: number; halfHeight: number };
 
-export type BodyType = "dynamic" | "static" | "kinematic";
+export type CircleShape = { type: "circle"; radius: number };
 
-export type ShapeType = "box" | "circle" | "segment";
-
-export interface BoxShape {
-  type: "box";
-  halfWidth: number;
-  halfHeight: number;
-}
-
-export interface CircleShape {
-  type: "circle";
-  radius: number;
-}
-
-export interface SegmentShape {
+export type SegmentShape = {
   type: "segment";
   x0: number;
   y0: number;
   x1: number;
   y1: number;
-}
+};
 
-export type Shape = BoxShape | CircleShape | SegmentShape;
+export type PointShape = { type: "point" };
 
-export interface BodyDef {
-  id: string;
-  type: BodyType;
-  shape: Shape;
-  x: number;
-  y: number;
+export type StaticShape = BoxShape | CircleShape | SegmentShape;
+
+export type Shape = StaticShape | PointShape;
+
+export type BodyKind = "dynamic" | "bullet" | "static";
+
+export type Filter = { layer?: number; mask?: number; group?: number };
+
+type CommonDef<T> = Filter & { x: number; y: number; data: T };
+
+export type DynamicDef<T> = CommonDef<T> & {
+  kind: "dynamic";
+  shape: BoxShape;
+  mass: number;
   vx?: number;
   vy?: number;
-  mass?: number;
-  restitution?: number;
   friction?: number;
+  restitution?: number;
   gravityScale?: number;
-  linearDamping?: number;
-  layer?: number;
-  mask?: number;
-  isSensor?: boolean;
-  data?: unknown;
-}
+};
 
-export interface Body {
-  id: string;
-  type: BodyType;
-  shape: Shape;
+export type BulletDef<T> = CommonDef<T> & {
+  kind: "bullet";
+  vx: number;
+  vy: number;
+  mass?: number;
+  gravityScale?: number;
+};
+
+export type StaticDef<T> = CommonDef<T> & {
+  kind: "static";
+  shape: StaticShape;
+  sensor?: boolean;
+  follow?: Body<T>;
+};
+
+export type BodyDef<T> = DynamicDef<T> | BulletDef<T> | StaticDef<T>;
+
+export type Body<T> = {
+  readonly id: number;
+  readonly kind: BodyKind;
+  readonly shape: Shape;
+  readonly mass: number;
+  readonly invMass: number;
+  readonly sensor: boolean;
+  readonly follow: Body<T> | null;
   x: number;
   y: number;
   vx: number;
   vy: number;
-  mass: number;
-  invMass: number;
-  restitution: number;
   friction: number;
+  restitution: number;
   gravityScale: number;
-  linearDamping: number;
   layer: number;
   mask: number;
-  isSensor: boolean;
+  group: number;
   supported: boolean;
+  restSteps: number;
   sleeping: boolean;
-  restFrames: number;
-  data: unknown;
-}
+  removed: boolean;
+  cell: number;
+  data: T;
+};
 
-export type ContactType = "begin" | "end" | "preSolve" | "postSolve";
+export type PhysicsEvent<T> =
+  | { type: "land"; body: Body<T> }
+  | { type: "wrap"; body: Body<T>; fromX: number; toX: number }
+  | { type: "fall"; body: Body<T> }
+  | {
+      type: "hit";
+      body: Body<T>;
+      other: Body<T> | null;
+      x: number;
+      y: number;
+      normalX: number;
+      normalY: number;
+    }
+  | { type: "sensor"; body: Body<T>; sensor: Body<T> };
 
-export interface Contact {
-  bodyA: Body;
-  bodyB: Body;
-  normalX: number;
-  normalY: number;
-  depth: number;
-  pointX: number;
-  pointY: number;
-}
-
-export type PhysicsEventType =
-  | "contactBegin"
-  | "contactEnd"
-  | "land"
-  | "sensorEnter"
-  | "sensorExit"
-  | "wrap"
-  | "sleep"
-  | "wake";
-
-export interface PhysicsEvent {
-  type: PhysicsEventType;
-  bodyA: Body;
-  bodyB?: Body;
-  data?: unknown;
-}
-
-export interface WorldConfig {
-  gravity: number;
-  dt: number;
-  width?: number;
-  wrapX?: boolean;
-  friction?: number;
-  restitution?: number;
-  restSpeed?: number;
-  restFrames?: number;
-  waterY?: number;
-  bucketSize?: number;
-}
-
-export interface SweepResult {
-  t: number;
-  normalX: number;
-  normalY: number;
-  body?: Body;
-}
-
-export interface RaycastResult {
-  hit: boolean;
+export type RayHit<T> = {
   t: number;
   x: number;
   y: number;
   normalX: number;
   normalY: number;
-  body?: Body;
-}
+  body: Body<T> | null;
+};

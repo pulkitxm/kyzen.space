@@ -1,4 +1,4 @@
-import { ceilDiv, sweepPointVsBox } from "@kyzen/physics";
+import { ceilDiv, sweepPointBox } from "@kyzen/physics";
 import { MINE_LIFT, MODULE_WIDTH, WATER_Y } from "./constants";
 
 export type Box = { x0: number; y0: number; x1: number; y1: number };
@@ -89,7 +89,7 @@ export function buildArena(modules: number): Arena {
   };
 }
 
-export const sweepBox = sweepPointVsBox;
+export const sweepBox = sweepPointBox;
 
 export function sweepTerrain(
   x0: number,

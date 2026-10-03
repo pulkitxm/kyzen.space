@@ -8,6 +8,7 @@ import {
   dsin,
   secretWord,
 } from "../src/math";
+import { Terrain } from "../src/terrain";
 import { World } from "../src/world";
 
 export const GOLDEN: Record<string, number> = {
@@ -15,7 +16,8 @@ export const GOLDEN: Record<string, number> = {
   rng: 1566185810,
   chacha: 1146357952,
   secret: 3928243935,
-  world: 3095166529,
+  wrapped: 1001211173,
+  bounded: 2514445523,
 };
 
 function trig(): number {
@@ -47,41 +49,71 @@ function secret(): number {
   return checksum([1, 2, 3, 4, 5].map((n) => secretWord(words, n, "round")));
 }
 
-function world(): number {
-  const sim = new World({
+function world(wrap: boolean): number {
+  const terrain = new Terrain({
+    boxes: [
+      { minX: 0, minY: -3, maxX: 26, maxY: 0 },
+      { minX: 34, minY: -3, maxX: 64, maxY: 0 },
+      { minX: 8, minY: 6, maxX: 18, maxY: 7 },
+      { minX: 44, minY: 0, maxX: 45, maxY: 4 },
+    ],
+    width: 64,
+    wrap,
+  });
+  const sim = new World<number>({
+    terrain,
     gravity: 30,
     dt: 1 / 60,
-    width: 200,
-    wrapX: true,
-    friction: 300,
-    restitution: 0.3,
+    killY: -6,
   });
-  sim.setStaticBoxes([
-    { x: 50, y: 0, hw: 100, hh: 2 },
-    { x: 150, y: 10, hw: 20, hh: 2 },
-  ]);
-  const box = sim.addBody({
-    id: "a",
-    type: "dynamic",
-    shape: { type: "box", halfWidth: 1.5, halfHeight: 2 },
-    x: 10,
-    y: 50,
-    vx: 5,
-    vy: 10,
-  });
-  const ball = sim.addBody({
-    id: "b",
-    type: "dynamic",
-    shape: { type: "circle", radius: 1 },
-    x: 180,
-    y: 30,
-    vx: -3,
-    vy: 0,
+  const random = deriveRng(2026, wrap ? "wrap" : "flat");
+  const bodies = Array.from({ length: 8 }, (_, i) =>
+    sim.createBody({
+      kind: "dynamic",
+      shape: { type: "box", halfWidth: 0.8 + random(), halfHeight: 0.6 },
+      x: random() * 64,
+      y: 1 + random() * 12,
+      vx: random() * 16 - 8,
+      vy: random() * 12,
+      mass: 0.5 + random() * 2,
+      friction: 0.45,
+      restitution: 0.15,
+      group: i + 1,
+      data: i,
+    }),
+  );
+  sim.createBody({
+    kind: "static",
+    shape: { type: "circle", radius: 0.9 },
+    x: 20,
+    y: 0.3,
+    sensor: true,
+    data: 100,
   });
   const values: number[] = [];
-  for (let i = 0; i < 120; i++) {
-    sim.step();
-    values.push(box.x, box.y, box.vx, box.vy, ball.x, ball.y, ball.vx, ball.vy);
+  for (let step = 0; step < 360; step++) {
+    if (step % 30 === 0) {
+      const angle = random() * 180;
+      sim.createBody({
+        kind: "bullet",
+        x: random() * 64,
+        y: 2 + random() * 6,
+        vx: dcos(angle) * 30,
+        vy: dsin(angle) * 30,
+        data: 200 + step,
+      });
+    }
+    for (const event of sim.step()) {
+      values.push(event.body.data, event.type.length);
+      if (event.type === "hit") {
+        values.push(event.x, event.y, event.normalX, event.normalY);
+        sim.destroyBody(event.body);
+        for (const body of bodies)
+          if (!body.removed && Math.abs(sim.delta(event.x, body.x)) < 4)
+            sim.applyImpulse(body, sim.delta(event.x, body.x), 3);
+      }
+    }
+    for (const body of bodies) values.push(body.x, body.y, body.vx, body.vy);
   }
   return checksum(values);
 }
@@ -92,6 +124,7 @@ export function measure(): Record<string, number> {
     rng: rng(),
     chacha: chacha(),
     secret: secret(),
-    world: world(),
+    wrapped: world(true),
+    bounded: world(false),
   };
 }

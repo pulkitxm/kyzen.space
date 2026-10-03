@@ -1,8 +1,8 @@
 import {
   boxDistance,
   boxTouchesCircle,
-  sweepCircleVsCircle,
-  sweepPointVsSegment,
+  sweepPointCircle,
+  sweepPointSegment,
 } from "@kyzen/physics";
 import type {
   TankArenaAirstrike,
@@ -316,10 +316,10 @@ function sweepCircle(
   r: number,
   insideHits: boolean,
 ): number {
-  return sweepCircleVsCircle(x0, y0, dx, dy, 0, cx, cy, r, insideHits);
+  return sweepPointCircle(x0, y0, dx, dy, cx, cy, r, insideHits);
 }
 
-const sweepSegment = sweepPointVsSegment;
+const sweepSegment = sweepPointSegment;
 
 export type BodyStep = { landed: boolean; wrappedFrom: number | null };
 

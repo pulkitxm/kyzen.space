@@ -1,668 +1,619 @@
-import { createBody, shapeHalfHeight, shapeHalfWidth } from "./body";
 import {
-  bodyAABB,
+  boxesOverlap,
   boxTouchesCircle,
-  circlesTouching,
-  sweepBoxVsBox,
-  sweepCircleVsBox,
-  sweepCircleVsCircle,
-  sweepPointVsBox,
-  sweepPointVsSegment,
+  sweepPointBox,
+  sweepPointCircle,
+  sweepPointSegment,
   wrapDelta,
   wrapX,
 } from "./geometry";
+import { CONTACT_EPSILON, type Terrain } from "./terrain";
 import type {
-  AABB,
   Body,
   BodyDef,
   BoxShape,
-  CircleShape,
+  Filter,
   PhysicsEvent,
-  RaycastResult,
-  SegmentShape,
-  SweepResult,
-  WorldConfig,
+  RayHit,
+  Shape,
 } from "./types";
 
-const DEFAULT_GRAVITY = 30;
-const DEFAULT_DT = 1 / 60;
-const DEFAULT_FRICTION = 14;
-const DEFAULT_RESTITUTION = 0.15;
+const ALL_BITS = 0xffffffff;
 const DEFAULT_REST_SPEED = 0.05;
-const DEFAULT_REST_FRAMES = 20;
-const DEFAULT_BUCKET_SIZE = 8;
+const DEFAULT_REST_STEPS = 20;
+const POINT: Shape = { type: "point" };
+const NO_BODIES: readonly never[] = [];
 
-export interface StaticBox {
-  x: number;
-  y: number;
-  hw: number;
-  hh: number;
-  module?: number;
+export type WorldConfig = {
+  terrain: Terrain;
+  gravity: number;
+  dt: number;
+  killY?: number;
+  restSpeed?: number;
+  restSteps?: number;
+};
+
+function accepts<T>(
+  layer: number,
+  mask: number,
+  group: number,
+  other: Body<T>,
+): boolean {
+  return (
+    (layer & other.mask) !== 0 &&
+    (other.layer & mask) !== 0 &&
+    (group === 0 || group !== other.group)
+  );
 }
 
-export class World {
+function reachOf(shape: Shape): number {
+  if (shape.type === "box") return shape.halfWidth;
+  if (shape.type === "circle") return shape.radius;
+  if (shape.type === "segment")
+    return Math.max(Math.abs(shape.x0), Math.abs(shape.x1));
+  return 0;
+}
+
+export class World<T> {
+  readonly terrain: Terrain;
   readonly gravity: number;
   readonly dt: number;
-  readonly width: number;
-  readonly wrapX: boolean;
-  readonly friction: number;
-  readonly restitution: number;
+  readonly killY: number;
   readonly restSpeed: number;
-  readonly restFrames: number;
-  readonly waterY: number | null;
-  readonly bucketSize: number;
-
-  private bodies: Map<string, Body> = new Map();
-  private staticBoxes: StaticBox[] = [];
-  private staticModuleBoxes: StaticBox[][] = [];
-  private moduleWidth: number = 32;
-  private moduleCount: number = 0;
-  private events: PhysicsEvent[] = [];
+  readonly restSteps: number;
+  private readonly all: Body<T>[] = [];
+  private readonly dynamics: Body<T>[] = [];
+  private readonly bullets: Body<T>[] = [];
+  private readonly statics: Body<T>[] = [];
+  private readonly grid: Body<T>[][];
+  private gridDirty = false;
+  private reach = 0;
+  private sensors = 0;
+  private nextId = 1;
+  private hitBody: Body<T> | null = null;
+  private hitImageX = 0;
+  private normalX = 0;
+  private normalY = 0;
 
   constructor(config: WorldConfig) {
-    this.gravity = config.gravity ?? DEFAULT_GRAVITY;
-    this.dt = config.dt ?? DEFAULT_DT;
-    this.width = config.width ?? 0;
-    this.wrapX = config.wrapX ?? false;
-    this.friction = config.friction ?? DEFAULT_FRICTION;
-    this.restitution = config.restitution ?? DEFAULT_RESTITUTION;
+    this.terrain = config.terrain;
+    this.gravity = config.gravity;
+    this.dt = config.dt;
+    this.killY = config.killY ?? Number.NEGATIVE_INFINITY;
     this.restSpeed = config.restSpeed ?? DEFAULT_REST_SPEED;
-    this.restFrames = config.restFrames ?? DEFAULT_REST_FRAMES;
-    this.waterY = config.waterY ?? null;
-    this.bucketSize = config.bucketSize ?? DEFAULT_BUCKET_SIZE;
+    this.restSteps = config.restSteps ?? DEFAULT_REST_STEPS;
+    this.grid = Array.from({ length: this.terrain.cellCount }, () => []);
   }
 
-  addBody(def: BodyDef): Body {
-    const body = createBody(def);
-    this.bodies.set(body.id, body);
+  get bodies(): readonly Body<T>[] {
+    return this.all;
+  }
+
+  get bulletCount(): number {
+    return this.bullets.length;
+  }
+
+  createBody(def: BodyDef<T>): Body<T> {
+    const mass = def.kind === "static" ? 0 : (def.mass ?? 1);
+    if (def.kind !== "static" && !(mass > 0))
+      throw new Error("Moving bodies need a positive mass");
+    const follow = def.kind === "static" ? (def.follow ?? null) : null;
+    const body: Body<T> = {
+      id: this.nextId++,
+      kind: def.kind,
+      shape: def.kind === "bullet" ? POINT : def.shape,
+      mass,
+      invMass: mass > 0 ? 1 / mass : 0,
+      sensor: def.kind === "static" && (def.sensor ?? false),
+      follow,
+      x: this.wrapPosition(follow ? follow.x : def.x),
+      y: follow ? follow.y : def.y,
+      vx: def.kind === "static" ? 0 : (def.vx ?? 0),
+      vy: def.kind === "static" ? 0 : (def.vy ?? 0),
+      friction: def.kind === "dynamic" ? (def.friction ?? 0) : 0,
+      restitution: def.kind === "dynamic" ? (def.restitution ?? 0) : 0,
+      gravityScale: def.kind === "static" ? 0 : (def.gravityScale ?? 1),
+      layer: def.layer ?? 1,
+      mask: def.mask ?? ALL_BITS,
+      group: def.group ?? 0,
+      supported: false,
+      restSteps: 0,
+      sleeping: false,
+      removed: false,
+      cell: -1,
+      data: def.data,
+    };
+    this.all.push(body);
+    if (def.kind === "bullet") {
+      this.bullets.push(body);
+      return body;
+    }
+    if (def.kind === "dynamic") {
+      this.dynamics.push(body);
+      body.supported = this.isSupported(body);
+    } else {
+      this.statics.push(body);
+      if (body.sensor) this.sensors += 1;
+    }
+    body.cell = this.terrain.cellIndex(body.x);
+    this.reach = Math.max(this.reach, reachOf(body.shape));
+    this.gridDirty = true;
     return body;
   }
 
-  removeBody(id: string): void {
-    this.bodies.delete(id);
-  }
-
-  getBody(id: string): Body | undefined {
-    return this.bodies.get(id);
-  }
-
-  getAllBodies(): Body[] {
-    return Array.from(this.bodies.values());
-  }
-
-  clearBodies(): void {
-    this.bodies.clear();
-  }
-
-  setStaticBoxes(boxes: StaticBox[], moduleWidth: number = 32): void {
-    this.staticBoxes = boxes;
-    this.moduleWidth = moduleWidth;
-    this.moduleCount = this.width > 0 ? Math.ceil(this.width / moduleWidth) : 0;
-
-    this.staticModuleBoxes = [];
-    for (let m = 0; m < this.moduleCount; m++) {
-      this.staticModuleBoxes.push([]);
+  destroyBody(body: Body<T>): void {
+    if (body.removed) return;
+    body.removed = true;
+    remove(this.all, body);
+    if (body.kind === "bullet") {
+      remove(this.bullets, body);
+      return;
     }
-
-    for (const box of boxes) {
-      if (box.module !== undefined && box.module < this.moduleCount) {
-        this.staticModuleBoxes[box.module]?.push(box);
-      } else {
-        const m = Math.floor(box.x / moduleWidth);
-        if (m >= 0 && m < this.moduleCount) {
-          this.staticModuleBoxes[m]?.push(box);
-        }
-      }
+    if (body.kind === "dynamic") remove(this.dynamics, body);
+    else {
+      remove(this.statics, body);
+      if (body.sensor) this.sensors -= 1;
     }
+    this.gridDirty = true;
+    for (const other of this.statics.filter((item) => item.follow === body))
+      this.destroyBody(other);
   }
 
-  step(): PhysicsEvent[] {
-    this.events = [];
-
-    for (const body of this.bodies.values()) {
-      if (body.type !== "dynamic" || body.sleeping) continue;
-      this.integrateBody(body);
-    }
-
-    return this.events;
+  step(): PhysicsEvent<T>[] {
+    const events: PhysicsEvent<T>[] = [];
+    const sunk: Body<T>[] = [];
+    for (const body of this.dynamics)
+      if (!body.sleeping && this.integrate(body, events)) sunk.push(body);
+    for (const body of sunk) this.destroyBody(body);
+    this.syncGrid();
+    const lost: Body<T>[] = [];
+    for (const bullet of this.bullets)
+      if (this.moveBullet(bullet, events)) lost.push(bullet);
+    for (const body of lost) this.destroyBody(body);
+    if (this.sensors > 0)
+      for (const body of this.dynamics) this.senseOverlaps(body, events);
+    return events;
   }
 
-  private integrateBody(body: Body): void {
-    const wasAirborne = !body.supported;
+  applyImpulse(body: Body<T>, ix: number, iy: number): void {
+    if (body.invMass === 0) return;
+    body.vx += ix * body.invMass;
+    body.vy += iy * body.invMass;
+    if (iy > 0) body.supported = false;
+    this.wake(body);
+  }
 
-    if (body.supported) {
-      const slow = this.friction * this.dt;
-      if (body.vx > slow) body.vx -= slow;
-      else if (body.vx < -slow) body.vx += slow;
-      else body.vx = 0;
-    }
-
-    body.vy -= this.gravity * body.gravityScale * this.dt;
-
-    if (body.linearDamping > 0) {
-      const factor = 1 - body.linearDamping * this.dt;
-      body.vx *= factor;
-      body.vy *= factor;
-    }
-
-    const dx = body.vx * this.dt;
-    if (dx !== 0) this.moveBodyX(body, dx);
-
+  launch(body: Body<T>, vx: number, vy: number): void {
+    body.vx = vx;
+    body.vy = vy;
     body.supported = false;
-    const dy = body.vy * this.dt;
-    if (dy !== 0) this.moveBodyY(body, dy);
-
-    if (this.wrapX && this.width > 0) {
-      const oldX = body.x;
-      body.x = wrapX(body.x, this.width);
-      if (Math.abs(body.x - oldX) > this.width / 2) {
-        this.events.push({
-          type: "wrap",
-          bodyA: body,
-          data: { fromX: oldX, toX: body.x },
-        });
-      }
-    }
-
-    if (this.waterY !== null && body.y < this.waterY) {
-      this.events.push({
-        type: "contactBegin",
-        bodyA: body,
-        data: { cause: "water" },
-      });
-    }
-
-    if (wasAirborne && body.supported) {
-      this.events.push({ type: "land", bodyA: body });
-    }
-
-    this.updateRest(body);
+    this.wake(body);
   }
 
-  private moveBodyX(body: Body, dx: number): void {
-    const shape = body.shape;
-    if (shape.type === "segment") {
-      body.x += dx;
-      return;
-    }
-
-    const hw = shapeHalfWidth(shape);
-    const hh = shapeHalfHeight(shape);
-    const bottom = body.y - hh + 1e-6;
-    const top = body.y + hh - 1e-6;
-    const lead = dx > 0 ? body.x + hw : body.x - hw;
-    const target = lead + dx;
-    let limit = target;
-
-    for (const box of this.getRelevantBoxes(
-      Math.min(lead, target),
-      Math.max(lead, target),
-    )) {
-      if (box.y + box.hh <= bottom || box.y - box.hh >= top) continue;
-      if (dx > 0) {
-        const face = box.x - box.hw;
-        if (face >= lead - 1e-6 && face < limit) limit = face;
-      } else {
-        const face = box.x + box.hw;
-        if (face <= lead + 1e-6 && face > limit) limit = face;
-      }
-    }
-
-    if (limit === target) {
-      body.x += dx;
-      return;
-    }
-
-    body.x = dx > 0 ? limit - hw : limit + hw;
-    body.vx = -body.vx * this.restitution;
-  }
-
-  private moveBodyY(body: Body, dy: number): void {
-    const shape = body.shape;
-    if (shape.type === "segment") {
-      body.y += dy;
-      return;
-    }
-
-    const hw = shapeHalfWidth(shape);
-    const hh = shapeHalfHeight(shape);
-    const left = body.x - hw + 1e-6;
-    const right = body.x + hw - 1e-6;
-    const lead = dy > 0 ? body.y + hh : body.y - hh;
-    const target = lead + dy;
-    let limit = target;
-
-    for (const box of this.getRelevantBoxes(left, right)) {
-      if (box.x + box.hw <= left || box.x - box.hw >= right) continue;
-      if (dy > 0) {
-        if (box.y - box.hh >= lead - 1e-6 && box.y - box.hh < limit)
-          limit = box.y - box.hh;
-      } else if (box.y + box.hh <= lead + 1e-6 && box.y + box.hh > limit)
-        limit = box.y + box.hh;
-    }
-
-    if (limit === target) {
-      body.y += dy;
-      return;
-    }
-
-    if (dy > 0) {
-      body.y = limit - hh;
-      body.vy = -body.vy * this.restitution;
-    } else {
-      body.y = limit + hh;
-      body.vy = 0;
-      body.supported = true;
-    }
-  }
-
-  private getRelevantBoxes(xMin: number, xMax: number): StaticBox[] {
-    if (this.moduleCount === 0) return this.staticBoxes;
-
-    const boxes: StaticBox[] = [];
-    const first = Math.floor(xMin / this.moduleWidth);
-    const last = Math.floor(xMax / this.moduleWidth);
-
-    for (let k = first; k <= last; k++) {
-      let m = k % this.moduleCount;
-      if (m < 0) m += this.moduleCount;
-      const moduleBoxes = this.staticModuleBoxes[m];
-      if (!moduleBoxes) continue;
-
-      const shift = k * this.moduleWidth;
-      for (const box of moduleBoxes) {
-        boxes.push({
-          x: box.x + shift - (box.module ?? 0) * this.moduleWidth,
-          y: box.y,
-          hw: box.hw,
-          hh: box.hh,
-        });
-      }
-    }
-
-    return boxes;
-  }
-
-  private updateRest(body: Body): void {
-    const speedSq = body.vx * body.vx + body.vy * body.vy;
-    const limitSq = this.restSpeed * this.restSpeed;
-
-    if (body.supported && speedSq < limitSq) {
-      body.restFrames += 1;
-      if (body.restFrames >= this.restFrames && !body.sleeping) {
-        body.sleeping = true;
-        this.events.push({ type: "sleep", bodyA: body });
-      }
-    } else {
-      if (body.sleeping) {
-        this.events.push({ type: "wake", bodyA: body });
-      }
-      body.sleeping = false;
-      body.restFrames = 0;
-    }
-  }
-
-  isSupported(body: Body): boolean {
-    const shape = body.shape;
-    if (shape.type === "segment") return false;
-
-    const hw = shapeHalfWidth(shape);
-    const hh = shapeHalfHeight(shape);
-    const left = body.x - hw;
-    const right = body.x + hw;
-    const bottom = body.y - hh;
-
-    for (const box of this.getRelevantBoxes(left, right)) {
-      if (
-        box.x + box.hw > left + 1e-6 &&
-        box.x - box.hw < right - 1e-6 &&
-        Math.abs(bottom - (box.y + box.hh)) <= 1e-3
-      )
-        return true;
-    }
-
-    return false;
-  }
-
-  sweepBody(
-    startX: number,
-    startY: number,
-    dx: number,
-    dy: number,
-    shape: BoxShape | CircleShape,
-    excludeIds?: Set<string>,
-  ): SweepResult {
-    let best: SweepResult = { t: 1, normalX: 0, normalY: 0 };
-
-    const isBox = shape.type === "box";
-    const hw = isBox ? shape.halfWidth : 0;
-    const hh = isBox ? shape.halfHeight : 0;
-    const r = isBox ? 0 : shape.radius;
-
-    for (const box of this.getRelevantBoxes(
-      Math.min(startX, startX + dx) - (hw + r) - 1,
-      Math.max(startX, startX + dx) + (hw + r) + 1,
-    )) {
-      let t: number;
-      if (isBox) {
-        t = sweepBoxVsBox(
-          startX,
-          startY,
-          dx,
-          dy,
-          hw,
-          hh,
-          box.x,
-          box.y,
-          box.hw,
-          box.hh,
-        );
-      } else {
-        t = sweepCircleVsBox(
-          startX,
-          startY,
-          dx,
-          dy,
-          r,
-          box.x,
-          box.y,
-          box.hw,
-          box.hh,
-        );
-      }
-      if (t >= 0 && t < best.t) {
-        const hitX = startX + dx * t;
-        const hitY = startY + dy * t;
-        let nx = 0;
-        let ny = 0;
-        if (hitX < box.x - box.hw + 0.01) nx = -1;
-        else if (hitX > box.x + box.hw - 0.01) nx = 1;
-        else if (hitY < box.y - box.hh + 0.01) ny = -1;
-        else if (hitY > box.y + box.hh - 0.01) ny = 1;
-        best = { t, normalX: nx, normalY: ny };
-      }
-    }
-
-    for (const body of this.bodies.values()) {
-      if (excludeIds?.has(body.id)) continue;
-      if (body.shape.type === "segment") continue;
-
-      const bhw = shapeHalfWidth(body.shape);
-      const bhh = shapeHalfHeight(body.shape);
-
-      let t: number;
-      if (isBox) {
-        t = sweepBoxVsBox(
-          startX,
-          startY,
-          dx,
-          dy,
-          hw,
-          hh,
-          body.x,
-          body.y,
-          bhw,
-          bhh,
-        );
-      } else if (body.shape.type === "circle") {
-        t = sweepCircleVsCircle(
-          startX,
-          startY,
-          dx,
-          dy,
-          r,
-          body.x,
-          body.y,
-          body.shape.radius,
-          false,
-        );
-      } else {
-        t = sweepCircleVsBox(
-          startX,
-          startY,
-          dx,
-          dy,
-          r,
-          body.x,
-          body.y,
-          bhw,
-          bhh,
-        );
-      }
-
-      if (t >= 0 && t < best.t) {
-        const hitX = startX + dx * t;
-        const hitY = startY + dy * t;
-        const ddx = hitX - body.x;
-        const ddy = hitY - body.y;
-        const len = Math.sqrt(ddx * ddx + ddy * ddy);
-        best = {
-          t,
-          normalX: len > 1e-6 ? ddx / len : 0,
-          normalY: len > 1e-6 ? ddy / len : 1,
-          body,
-        };
-      }
-    }
-
-    return best;
-  }
-
-  sweepTerrain(x0: number, y0: number, dx: number, dy: number): number {
-    let best = -1;
-
-    for (const box of this.getRelevantBoxes(
-      Math.min(x0, x0 + dx) - 1,
-      Math.max(x0, x0 + dx) + 1,
-    )) {
-      const t = sweepPointVsBox(
-        x0,
-        y0,
-        dx,
-        dy,
-        box.x - box.hw,
-        box.y - box.hh,
-        box.x + box.hw,
-        box.y + box.hh,
-      );
-      if (t >= 0 && (best < 0 || t < best)) best = t;
-    }
-
-    return best;
-  }
-
-  sweepSegment(
-    x0: number,
-    y0: number,
-    dx: number,
-    dy: number,
-    segment: SegmentShape,
-    segmentX: number,
-  ): number {
-    let ax = segment.x0 + segmentX;
-    let bx = segment.x1 + segmentX;
-
-    if (this.wrapX && this.width > 0) {
-      const shift =
-        wrapDelta(x0, (ax + bx) / 2, this.width) - ((ax + bx) / 2 - x0);
-      ax += shift;
-      bx += shift;
-    }
-
-    return sweepPointVsSegment(x0, y0, dx, dy, ax, segment.y0, bx, segment.y1);
+  settled(): boolean {
+    if (this.bullets.length > 0) return false;
+    for (const body of this.dynamics) if (!body.sleeping) return false;
+    return true;
   }
 
   raycast(
     x0: number,
     y0: number,
-    dirX: number,
-    dirY: number,
-    maxDistance: number,
-    layerMask: number = 0xffffffff,
-  ): RaycastResult {
-    const dx = dirX * maxDistance;
-    const dy = dirY * maxDistance;
-    let best: RaycastResult = {
-      hit: false,
-      t: 1,
-      x: x0 + dx,
-      y: y0 + dy,
-      normalX: 0,
-      normalY: 0,
+    dx: number,
+    dy: number,
+    filter: Filter = {},
+  ): RayHit<T> | null {
+    this.syncGrid();
+    const t = this.cast(
+      x0,
+      y0,
+      dx,
+      dy,
+      filter.layer ?? ALL_BITS,
+      filter.mask ?? ALL_BITS,
+      filter.group ?? 0,
+    );
+    if (t < 0) return null;
+    const x = x0 + dx * t;
+    const y = y0 + dy * t;
+    this.normalAt(x, y, dx, dy);
+    return {
+      t,
+      x: this.wrapPosition(x),
+      y,
+      normalX: this.normalX,
+      normalY: this.normalY,
+      body: this.hitBody,
     };
-
-    const terrainT = this.sweepTerrain(x0, y0, dx, dy);
-    if (terrainT >= 0 && terrainT < best.t) {
-      best = {
-        hit: true,
-        t: terrainT,
-        x: x0 + dx * terrainT,
-        y: y0 + dy * terrainT,
-        normalX: 0,
-        normalY: -1,
-      };
-    }
-
-    for (const body of this.bodies.values()) {
-      if ((body.layer & layerMask) === 0) continue;
-
-      const shape = body.shape;
-      let t = -1;
-
-      if (shape.type === "box") {
-        t = sweepPointVsBox(
-          x0,
-          y0,
-          dx,
-          dy,
-          body.x - shape.halfWidth,
-          body.y - shape.halfHeight,
-          body.x + shape.halfWidth,
-          body.y + shape.halfHeight,
-        );
-      } else if (shape.type === "circle") {
-        t = sweepCircleVsCircle(
-          x0,
-          y0,
-          dx,
-          dy,
-          0,
-          body.x,
-          body.y,
-          shape.radius,
-          false,
-        );
-      }
-
-      if (t >= 0 && t < best.t) {
-        const hitX = x0 + dx * t;
-        const hitY = y0 + dy * t;
-        const ddx = hitX - body.x;
-        const ddy = hitY - body.y;
-        const len = Math.sqrt(ddx * ddx + ddy * ddy);
-        best = {
-          hit: true,
-          t,
-          x: hitX,
-          y: hitY,
-          normalX: len > 1e-6 ? ddx / len : 0,
-          normalY: len > 1e-6 ? ddy / len : 1,
-          body,
-        };
-      }
-    }
-
-    return best;
   }
 
-  queryCircle(
-    cx: number,
-    cy: number,
-    radius: number,
-    layerMask: number = 0xffffffff,
-  ): Body[] {
-    const results: Body[] = [];
-
-    for (const body of this.bodies.values()) {
-      if ((body.layer & layerMask) === 0) continue;
-
-      const shape = body.shape;
-      let touching = false;
-
-      if (shape.type === "box") {
-        let bx = body.x;
-        if (this.wrapX && this.width > 0) {
-          bx = cx + wrapDelta(cx, body.x, this.width);
-        }
-        touching = boxTouchesCircle(
-          bx,
-          body.y,
-          shape.halfWidth,
-          shape.halfHeight,
-          cx,
-          cy,
-          radius,
-        );
-      } else if (shape.type === "circle") {
-        let bx = body.x;
-        if (this.wrapX && this.width > 0) {
-          bx = cx + wrapDelta(cx, body.x, this.width);
-        }
-        touching = circlesTouching(bx, body.y, shape.radius, cx, cy, radius);
-      }
-
-      if (touching) results.push(body);
-    }
-
-    return results;
+  lineOfSight(x0: number, y0: number, x1: number, y1: number, inset = 0) {
+    return !this.terrain.blocked(x0, y0, x1, y1, inset);
   }
 
-  queryAABB(aabb: AABB, layerMask: number = 0xffffffff): Body[] {
-    const results: Body[] = [];
-
-    for (const body of this.bodies.values()) {
-      if ((body.layer & layerMask) === 0) continue;
-
-      const bodyBox = bodyAABB(body);
-      if (
-        bodyBox.minX < aabb.maxX &&
-        bodyBox.maxX > aabb.minX &&
-        bodyBox.minY < aabb.maxY &&
-        bodyBox.maxY > aabb.minY
-      ) {
-        results.push(body);
-      }
-    }
-
-    return results;
+  delta(from: number, to: number): number {
+    return this.terrain.wrap
+      ? wrapDelta(from, to, this.terrain.width)
+      : to - from;
   }
 
   wrapPosition(x: number): number {
-    if (!this.wrapX || this.width <= 0) return x;
-    return wrapX(x, this.width);
+    return this.terrain.wrap ? wrapX(x, this.terrain.width) : x;
   }
 
-  wrappedDelta(from: number, to: number): number {
-    if (!this.wrapX || this.width <= 0) return to - from;
-    return wrapDelta(from, to, this.width);
+  private wake(body: Body<T>): void {
+    body.sleeping = false;
+    body.restSteps = 0;
   }
 
-  boxDistanceWrapped(
-    px: number,
-    py: number,
-    bx: number,
-    by: number,
-    hw: number,
-    hh: number,
-  ): number {
-    let dx: number;
-    if (this.wrapX && this.width > 0) {
-      dx = Math.abs(wrapDelta(px, bx, this.width));
-    } else {
-      dx = Math.abs(px - bx);
+  private isSupported(body: Body<T>): boolean {
+    const shape = body.shape as BoxShape;
+    return this.terrain.supports(
+      body.x - shape.halfWidth,
+      body.x + shape.halfWidth,
+      body.y - shape.halfHeight,
+    );
+  }
+
+  private integrate(body: Body<T>, events: PhysicsEvent<T>[]): boolean {
+    const shape = body.shape as BoxShape;
+    const airborne = !body.supported;
+    const gravity = this.gravity * body.gravityScale;
+    if (body.supported && body.friction > 0) {
+      const slow = body.friction * gravity * this.dt;
+      if (body.vx > slow) body.vx -= slow;
+      else if (body.vx < -slow) body.vx += slow;
+      else body.vx = 0;
     }
-    const clampedDx = Math.max(dx - hw, 0);
-    const clampedDy = Math.max(Math.abs(py - by) - hh, 0);
-    return Math.sqrt(clampedDx * clampedDx + clampedDy * clampedDy);
+    body.vy -= gravity * this.dt;
+    const dx = body.vx * this.dt;
+    if (dx !== 0) this.moveX(body, shape, dx);
+    body.supported = false;
+    const dy = body.vy * this.dt;
+    if (dy !== 0) this.moveY(body, shape, dy);
+    this.wrapBody(body, events);
+    if (body.y < this.killY) {
+      events.push({ type: "fall", body });
+      return true;
+    }
+    if (airborne && body.supported) events.push({ type: "land", body });
+    if (
+      body.supported &&
+      body.vx * body.vx + body.vy * body.vy < this.restSpeed * this.restSpeed
+    ) {
+      body.restSteps += 1;
+      if (body.restSteps >= this.restSteps) body.sleeping = true;
+    } else body.restSteps = 0;
+    return false;
   }
+
+  private moveX(body: Body<T>, shape: BoxShape, dx: number): void {
+    const lead = dx > 0 ? body.x + shape.halfWidth : body.x - shape.halfWidth;
+    const target = lead + dx;
+    const limit = this.terrain.wallLimit(
+      lead,
+      target,
+      body.y - shape.halfHeight + CONTACT_EPSILON,
+      body.y + shape.halfHeight - CONTACT_EPSILON,
+    );
+    if (limit === target) {
+      body.x += dx;
+      return;
+    }
+    body.x = dx > 0 ? limit - shape.halfWidth : limit + shape.halfWidth;
+    body.vx = -body.vx * body.restitution;
+  }
+
+  private moveY(body: Body<T>, shape: BoxShape, dy: number): void {
+    const lead = dy > 0 ? body.y + shape.halfHeight : body.y - shape.halfHeight;
+    const target = lead + dy;
+    const limit = this.terrain.floorLimit(
+      lead,
+      target,
+      body.x - shape.halfWidth + CONTACT_EPSILON,
+      body.x + shape.halfWidth - CONTACT_EPSILON,
+    );
+    if (limit === target) {
+      body.y += dy;
+      return;
+    }
+    if (dy > 0) {
+      body.y = limit - shape.halfHeight;
+      body.vy = -body.vy * body.restitution;
+    } else {
+      body.y = limit + shape.halfHeight;
+      body.vy = 0;
+      body.supported = true;
+    }
+  }
+
+  private wrapBody(body: Body<T>, events: PhysicsEvent<T>[]): void {
+    if (!this.terrain.wrap) return;
+    if (body.x >= 0 && body.x < this.terrain.width) return;
+    const fromX = body.x;
+    body.x = wrapX(body.x, this.terrain.width);
+    events.push({ type: "wrap", body, fromX, toX: body.x });
+  }
+
+  private moveBullet(body: Body<T>, events: PhysicsEvent<T>[]): boolean {
+    body.vy -= this.gravity * body.gravityScale * this.dt;
+    const dx = body.vx * this.dt;
+    const dy = body.vy * this.dt;
+    const t = this.cast(
+      body.x,
+      body.y,
+      dx,
+      dy,
+      body.layer,
+      body.mask,
+      body.group,
+    );
+    if (t >= 0) {
+      const x = body.x + dx * t;
+      const y = body.y + dy * t;
+      this.normalAt(x, y, dx, dy);
+      body.x = this.wrapPosition(x);
+      body.y = y;
+      events.push({
+        type: "hit",
+        body,
+        other: this.hitBody,
+        x: body.x,
+        y,
+        normalX: this.normalX,
+        normalY: this.normalY,
+      });
+      return false;
+    }
+    body.x += dx;
+    body.y += dy;
+    this.wrapBody(body, events);
+    if (body.y < this.killY) {
+      events.push({ type: "fall", body });
+      return true;
+    }
+    return false;
+  }
+
+  private syncGrid(): void {
+    for (const body of this.dynamics) {
+      if (body.sleeping) continue;
+      const cell = this.terrain.cellIndex(body.x);
+      if (cell === body.cell) continue;
+      body.cell = cell;
+      this.gridDirty = true;
+    }
+    for (const body of this.statics) {
+      if (!body.follow) continue;
+      body.x = body.follow.x;
+      body.y = body.follow.y;
+      const cell = this.terrain.cellIndex(body.x);
+      if (cell === body.cell) continue;
+      body.cell = cell;
+      this.gridDirty = true;
+    }
+    if (!this.gridDirty) return;
+    for (const cell of this.grid) cell.length = 0;
+    for (const body of this.dynamics) this.grid[body.cell]?.push(body);
+    for (const body of this.statics) this.grid[body.cell]?.push(body);
+    this.gridDirty = false;
+  }
+
+  private firstCell(lo: number, hi: number): number {
+    const terrain = this.terrain;
+    const first = Math.floor(lo / terrain.cellWidth);
+    if (!terrain.wrap) return terrain.cellIndex(lo);
+    return Math.floor(hi / terrain.cellWidth) - first + 1 >= terrain.cellCount
+      ? 0
+      : first;
+  }
+
+  private lastCell(lo: number, hi: number): number {
+    const terrain = this.terrain;
+    const last = Math.floor(hi / terrain.cellWidth);
+    if (!terrain.wrap) return terrain.cellIndex(hi);
+    return last - Math.floor(lo / terrain.cellWidth) + 1 >= terrain.cellCount
+      ? terrain.cellCount - 1
+      : last;
+  }
+
+  private cellAt(k: number): readonly Body<T>[] {
+    const n = this.terrain.cellCount;
+    return this.grid[k - n * Math.floor(k / n)] ?? NO_BODIES;
+  }
+
+  private cast(
+    x0: number,
+    y0: number,
+    dx: number,
+    dy: number,
+    layer: number,
+    mask: number,
+    group: number,
+  ): number {
+    let best = this.terrain.cast(x0, y0, dx, dy);
+    this.hitBody = null;
+    if (this.all.length === this.bullets.length) return best;
+    const lo = Math.min(x0, x0 + dx) - this.reach;
+    const hi = Math.max(x0, x0 + dx) + this.reach;
+    const last = this.lastCell(lo, hi);
+    for (let k = this.firstCell(lo, hi); k <= last; k++) {
+      for (const body of this.cellAt(k)) {
+        if (!accepts(layer, mask, group, body)) continue;
+        const bx = this.terrain.wrap ? x0 + this.delta(x0, body.x) : body.x;
+        const t = this.sweepBody(body, bx, x0, y0, dx, dy);
+        if (t >= 0 && (best < 0 || t < best)) {
+          best = t;
+          this.hitBody = body;
+          this.hitImageX = bx;
+        }
+      }
+    }
+    return best;
+  }
+
+  private sweepBody(
+    body: Body<T>,
+    bx: number,
+    x0: number,
+    y0: number,
+    dx: number,
+    dy: number,
+  ): number {
+    const shape = body.shape;
+    if (shape.type === "box")
+      return sweepPointBox(
+        x0,
+        y0,
+        dx,
+        dy,
+        bx - shape.halfWidth,
+        body.y - shape.halfHeight,
+        bx + shape.halfWidth,
+        body.y + shape.halfHeight,
+      );
+    if (shape.type === "circle")
+      return sweepPointCircle(
+        x0,
+        y0,
+        dx,
+        dy,
+        bx,
+        body.y,
+        shape.radius,
+        body.sensor,
+      );
+    if (shape.type === "segment")
+      return sweepPointSegment(
+        x0,
+        y0,
+        dx,
+        dy,
+        bx + shape.x0,
+        body.y + shape.y0,
+        bx + shape.x1,
+        body.y + shape.y1,
+      );
+    return -1;
+  }
+
+  private normalAt(x: number, y: number, dx: number, dy: number): void {
+    const body = this.hitBody;
+    if (!body) {
+      const box = this.terrain.hitBox;
+      if (box)
+        this.faceNormal(
+          x,
+          y,
+          box.minX + this.terrain.hitShift,
+          box.minY,
+          box.maxX + this.terrain.hitShift,
+          box.maxY,
+        );
+      return;
+    }
+    const shape = body.shape;
+    const bx = this.hitImageX;
+    if (shape.type === "box") {
+      this.faceNormal(
+        x,
+        y,
+        bx - shape.halfWidth,
+        body.y - shape.halfHeight,
+        bx + shape.halfWidth,
+        body.y + shape.halfHeight,
+      );
+      return;
+    }
+    let nx = 0;
+    let ny = 0;
+    if (shape.type === "circle") {
+      nx = x - bx;
+      ny = y - body.y;
+    } else if (shape.type === "segment") {
+      nx = shape.y0 - shape.y1;
+      ny = shape.x1 - shape.x0;
+      if (nx * dx + ny * dy > 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+    }
+    const length = Math.sqrt(nx * nx + ny * ny);
+    if (length > 0) {
+      this.normalX = nx / length + 0;
+      this.normalY = ny / length + 0;
+      return;
+    }
+    const speed = Math.sqrt(dx * dx + dy * dy);
+    this.normalX = speed > 0 ? -dx / speed + 0 : 0;
+    this.normalY = speed > 0 ? -dy / speed + 0 : 0;
+  }
+
+  private faceNormal(
+    x: number,
+    y: number,
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+  ): void {
+    const left = Math.abs(x - minX);
+    const right = Math.abs(x - maxX);
+    const bottom = Math.abs(y - minY);
+    const top = Math.abs(y - maxY);
+    const nearest = Math.min(left, right, bottom, top);
+    this.normalX = nearest === left ? -1 : nearest === right ? 1 : 0;
+    this.normalY =
+      this.normalX !== 0
+        ? 0
+        : nearest === bottom
+          ? -1
+          : nearest === top
+            ? 1
+            : 0;
+  }
+
+  private senseOverlaps(body: Body<T>, events: PhysicsEvent<T>[]): void {
+    const shape = body.shape as BoxShape;
+    const lo = body.x - shape.halfWidth - this.reach;
+    const hi = body.x + shape.halfWidth + this.reach;
+    const last = this.lastCell(lo, hi);
+    for (let k = this.firstCell(lo, hi); k <= last; k++) {
+      for (const other of this.cellAt(k)) {
+        if (!other.sensor || !accepts(body.layer, body.mask, body.group, other))
+          continue;
+        const ox = this.terrain.wrap
+          ? body.x + this.delta(body.x, other.x)
+          : other.x;
+        const touching =
+          other.shape.type === "circle"
+            ? boxTouchesCircle(
+                body.x,
+                body.y,
+                shape.halfWidth,
+                shape.halfHeight,
+                ox,
+                other.y,
+                other.shape.radius,
+              )
+            : other.shape.type === "box" &&
+              boxesOverlap(
+                body.x,
+                body.y,
+                shape.halfWidth,
+                shape.halfHeight,
+                ox,
+                other.y,
+                other.shape.halfWidth,
+                other.shape.halfHeight,
+              );
+        if (touching) events.push({ type: "sensor", body, sensor: other });
+      }
+    }
+  }
+}
+
+function remove<T>(list: T[], item: T): void {
+  const index = list.indexOf(item);
+  if (index >= 0) list.splice(index, 1);
 }

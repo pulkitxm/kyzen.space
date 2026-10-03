@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   chachaBlock,
   clamp,
@@ -170,26 +172,25 @@ describe("secretRng", () => {
 });
 
 describe("cross-engine determinism", () => {
-  test("math operations use only allowed functions", () => {
-    const forbidden = [
-      "sin",
-      "cos",
-      "tan",
-      "atan",
-      "exp",
-      "log",
-      "pow",
-      "random",
-    ];
-    const mathSrc = Bun.file(
-      new URL("../src/math.ts", import.meta.url).pathname,
-    );
-    const text = mathSrc.text();
-    return text.then((content) => {
-      for (const fn of forbidden) {
-        const pattern = new RegExp(`Math\\.${fn}\\b`);
-        expect(pattern.test(content)).toBe(false);
-      }
-    });
+  test("package sources use only exactly specified math", () => {
+    const folder = join(import.meta.dir, "..", "src");
+    const allowed = new Set([
+      "sqrt",
+      "floor",
+      "ceil",
+      "round",
+      "abs",
+      "min",
+      "max",
+      "imul",
+      "PI",
+    ]);
+    for (const file of readdirSync(folder)) {
+      const text = readFileSync(join(folder, file), "utf8");
+      for (const match of text.matchAll(/Math\.([A-Za-z0-9]+)/g))
+        expect(allowed.has(match[1] ?? "")).toBe(true);
+      expect(text.includes("**")).toBe(false);
+      expect(/\bDate\b|performance\.|crypto/.test(text)).toBe(false);
+    }
   });
 });
