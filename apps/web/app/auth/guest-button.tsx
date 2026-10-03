@@ -1,12 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { FaUser } from "react-icons/fa6";
 import { ensureIdentity } from "@/lib/auth/ensure-identity";
 
 export function GuestButton() {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,15 +13,14 @@ export function GuestButton() {
     setBusy(true);
     try {
       await ensureIdentity();
-      router.push("/");
-      router.refresh();
+      window.location.assign("/");
     } catch (e: unknown) {
       setError(
         e instanceof Error ? e.message : "Could not start a guest session",
       );
       setBusy(false);
     }
-  }, [router]);
+  }, []);
 
   return (
     <>
