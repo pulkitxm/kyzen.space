@@ -172,7 +172,7 @@ export function PublicMatchPanel({
   return (
     <aside
       className="flex h-full min-h-0 flex-col bg-background text-foreground"
-      aria-label="Public match chat"
+      aria-label={game.publicMatch ? "Public match chat" : "Room chat"}
     >
       <header className="flex shrink-0 items-center gap-3 border-border border-b py-3 pr-16 pl-4 md:pr-24">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-primary">
@@ -186,7 +186,7 @@ export function PublicMatchPanel({
               : (opponent?.username ?? "Opponent")}
           </p>
         </div>
-        {social.mutual ? (
+        {!game.publicMatch ? null : social.mutual ? (
           <Link
             href={chatHref}
             aria-label="Message friend"
@@ -217,7 +217,7 @@ export function PublicMatchPanel({
           </Button>
         )}
       </header>
-      {game.players.length > 2 ? (
+      {game.publicMatch && game.players.length > 2 ? (
         <div className="space-y-2 border-border border-b px-4 py-3 text-xs">
           <p className="text-muted-foreground">
             Connect shares your profile and adds every player who also chooses
@@ -319,7 +319,11 @@ export function PublicMatchPanel({
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
           <p className="text-muted-foreground text-sm">Match ended</p>
           <Link
-            href={`/play/find/${game.gameType}`}
+            href={
+              game.publicMatch
+                ? `/play/find/${game.gameType}`
+                : `/play/new/${game.gameType}`
+            }
             className="inline-flex h-9 items-center justify-center rounded-xl bg-primary px-5 font-medium text-primary-foreground text-sm transition hover:bg-primary-hover"
           >
             Play again
@@ -338,8 +342,10 @@ export function PublicMatchPanel({
           </summary>
           <p className="mt-2">
             Chat disappears when the match ends. Messages are kept for safety
-            for 7 days, then deleted. Profiles are shared only between players
-            who both choose Connect.
+            for 7 days, then deleted.{" "}
+            {game.publicMatch
+              ? "Profiles are shared only between players who both choose Connect."
+              : "Only seated players can use this room chat."}
           </p>
         </details>
         {error ? (

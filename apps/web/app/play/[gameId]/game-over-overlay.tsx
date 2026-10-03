@@ -252,6 +252,11 @@ function GameOverActions({
           Play again
         </Button>
       ) : null}
+      {!game.publicMatch && !game.conversationId && isPlayer ? (
+        <Button onClick={() => router.push(`/play/new/${game.gameType}`)}>
+          New room
+        </Button>
+      ) : null}
       {canRematch ? (
         <Button onClick={onRematch} disabled={rematch.busy}>
           {rematch.code ? "Go to rematch" : "Rematch"}

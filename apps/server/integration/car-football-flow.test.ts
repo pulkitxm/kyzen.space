@@ -1,7 +1,12 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import { games, profiles } from "@kyzen/database";
+import { games, matchChat, profiles } from "@kyzen/database";
 import { CAR_FOOTBALL } from "@kyzen/shared/constants";
 import type { CarFootballState } from "@kyzen/shared/types";
+import {
+  createGameInConversation,
+  rematchGame,
+} from "../src/chat/games-in-chat-service";
+import { sendMessage } from "../src/chat/messages-service";
 import {
   realtimeStateFor,
   stopRealtimeGames,
@@ -52,6 +57,86 @@ async function waitFor(check: () => Promise<boolean>, timeoutMs = 2000) {
 }
 
 describe.skipIf(!DB_UP)("Turbo Pitch four-player flow", () => {
+  it("keeps group chat and all four seats through a rematch", async () => {
+    const users = await Promise.all(
+      [0, 1, 2, 3].map((index) => h.makeUser(`group${index}`)),
+    );
+    const host = users[0];
+    if (!host) throw new Error("Missing host");
+    const conversationId = await h.makeGroup(
+      host,
+      "Synthetic football team",
+      users.slice(1).map((user) => user.id),
+    );
+    const created = await createGameInConversation({
+      userId: host.id,
+      conversationId,
+      gameType: CAR_FOOTBALL,
+      seatingMode: "open",
+    });
+    if (!created.ok) throw new Error(created.error);
+    h.trackGame(created.value.game.id);
+    const io = makeIo([]);
+    for (const user of users)
+      await handleJoinRoom(io as never, makeSocket(user.id) as never, {
+        gameId: created.value.game.id,
+      });
+    const game = await games.getGameByCode(created.value.game.id);
+    if (!game) throw new Error("Missing game");
+    expect(game.players).toHaveLength(4);
+    const sent = await sendMessage({
+      conversationId,
+      senderId: host.id,
+      kind: "text",
+      body: "Synthetic team ready",
+    });
+    expect(sent.ok).toBe(true);
+    stopRealtimeGames();
+    await games.completeRealtimeGame({
+      previous: game,
+      gameState: { ...(game.gameState as CarFootballState), phase: "finished" },
+      winnerRole: "blue-1",
+      winningRoles: ["blue-1", "blue-2"],
+    });
+    const rematch = await rematchGame({ userId: host.id, gameId: game.code });
+    if (!rematch.ok) throw new Error(rematch.error);
+    h.trackGame(rematch.value.game.id);
+    expect(rematch.value.game.conversationId).toBe(conversationId);
+    expect(rematch.value.game.players).toHaveLength(4);
+    expect(rematch.value.game.status).toBe("active");
+  });
+
+  it("gives seated private-room players chat without exposing it to outsiders", async () => {
+    const users = await Promise.all(
+      [0, 1, 2, 3, 4].map((index) => h.makeUser(`roomchat${index}`)),
+    );
+    const created = await createStandaloneGame({
+      userId: users[0]?.id ?? "",
+      gameType: CAR_FOOTBALL,
+    });
+    if (!created.ok) throw new Error(created.error);
+    h.trackGame(created.value.code);
+    const io = makeIo([]);
+    for (const user of users.slice(0, 4))
+      await handleJoinRoom(io as never, makeSocket(user.id) as never, {
+        gameId: created.value.code,
+      });
+    const sent = await matchChat.sendMatchMessage({
+      code: created.value.code,
+      userId: users[0]?.id ?? "",
+      body: "Synthetic room hello",
+      clientId: crypto.randomUUID(),
+    });
+    expect(sent.authorId).toBe(users[0]?.id ?? "");
+    expect(
+      (await matchChat.readMatchChat(created.value.code, users[1]?.id ?? ""))
+        .messages,
+    ).toHaveLength(1);
+    await expect(
+      matchChat.readMatchChat(created.value.code, users[4]?.id ?? ""),
+    ).rejects.toThrow("Match not found");
+  });
+
   it("seats four players, validates controls, and advances an authoritative state", async () => {
     const users = await Promise.all(
       [0, 1, 2, 3].map((index) => h.makeUser(`drive${index}`)),

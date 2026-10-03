@@ -10,7 +10,7 @@ Everything live in this app - chat messages, typing dots, presence, friend reque
 
 ## Team matchmaking
 
-The public queue uses the engine seat count and assigns all required roles atomically. Turbo Pitch waits for four tickets; two-player games keep their existing matching behavior. Match chat labels every sender by their public seat. Choosing Connect opts into connections with other consenting participants; identities are revealed only for accepted pairs.
+The public queue uses the engine seat count and assigns all required roles atomically. Turbo Pitch waits for four tickets; two-player games keep their existing matching behavior. Match chat labels every public sender by their public seat. Private standalone Turbo Pitch rooms reuse the same temporary message store with ordinary player identities. Messages are delivered only to seated users, so spectators do not receive participant chat. Choosing Connect opts into connections with other consenting participants; identities are revealed only for accepted pairs.
 
 ## Realtime game loop
 

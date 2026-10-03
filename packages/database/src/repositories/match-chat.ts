@@ -20,7 +20,7 @@ async function participant(tx: Transaction, code: string, userId: string) {
   const [row] = await tx
     .select()
     .from(game)
-    .where(and(eq(game.code, code), eq(game.publicMatch, true)))
+    .where(eq(game.code, code))
     .for("update");
   if (!row) throw new Error("Match not found");
   const players = await tx
@@ -84,7 +84,9 @@ export async function readMatchChat(code: string, userId: string) {
         (message): MatchMessage => ({
           id: message.id,
           gameId: code,
-          authorId: `${code}:${players.find((player) => player.userId === message.senderId)?.role}`,
+          authorId: row.publicMatch
+            ? `${code}:${players.find((player) => player.userId === message.senderId)?.role}`
+            : message.senderId,
           body: message.body,
           createdAt: message.createdAt.toISOString(),
         }),
@@ -148,7 +150,9 @@ export async function sendMatchMessage(input: {
     return {
       id: message.id,
       gameId: input.code,
-      authorId: `${input.code}:${players.find((player) => player.userId === input.userId)?.role}`,
+      authorId: row.publicMatch
+        ? `${input.code}:${players.find((player) => player.userId === input.userId)?.role}`
+        : input.userId,
       body: message.body,
       createdAt: message.createdAt.toISOString(),
     };

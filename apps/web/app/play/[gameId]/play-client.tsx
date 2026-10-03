@@ -120,7 +120,12 @@ export function PlayClient({
     </>
   );
 
-  if (game.publicMatch) {
+  if (
+    game.publicMatch ||
+    (!conversation &&
+      gameType === CAR_FOOTBALL &&
+      game.players.some((player) => player.userId === userId))
+  ) {
     return (
       <>
         <GameChatSplit

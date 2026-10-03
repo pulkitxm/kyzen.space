@@ -1,4 +1,4 @@
-import { friends, matchChat } from "@kyzen/database";
+import { friends, games, matchChat } from "@kyzen/database";
 import { CHAT_EVENTS } from "@kyzen/shared/constants";
 import {
   clientJoinRoomSchema,
@@ -7,7 +7,7 @@ import {
 import type { Server as IOServer, Socket } from "socket.io";
 import { assembleFriendship } from "../chat/assemble";
 import { createDm } from "../chat/conversations-service";
-import { emitToGame, emitToUser } from "./rooms";
+import { emitToUser } from "./rooms";
 import { register } from "./socket-util";
 
 export function attachMatchChatHandlers(io: IOServer, socket: Socket): void {
@@ -23,7 +23,9 @@ export function attachMatchChatHandlers(io: IOServer, socket: Socket): void {
       body: parsed.data.body,
       clientId: parsed.data.clientId,
     });
-    emitToGame(io, parsed.data.gameId, "match:message", message);
+    const game = await games.getGameByCode(parsed.data.gameId);
+    for (const player of game?.players ?? [])
+      emitToUser(io, player.userId, "match:message", message);
     cb?.({ ok: true, message });
   });
   register(socket, "match:friend", async (payload, cb) => {
