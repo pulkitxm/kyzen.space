@@ -1,6 +1,6 @@
-const FIRST_TURN_MS = 15_000;
-const BASE_MS = 5_000;
-const MIN_MS = 1_000;
+const FIRST_TURN_MS = 30_000;
+const BASE_MS = 30_000;
+const MIN_MS = 10_000;
 const ABORT_AT_STRIKES = 3;
 
 export function turnLimitMs(p: {
@@ -8,7 +8,7 @@ export function turnLimitMs(p: {
   strikes: number;
 }): number {
   if (p.isFirstTurn) return FIRST_TURN_MS;
-  return Math.max(BASE_MS - p.strikes * 1000, MIN_MS);
+  return Math.max(BASE_MS - p.strikes * 5000, MIN_MS);
 }
 
 export type TimeoutDecision =

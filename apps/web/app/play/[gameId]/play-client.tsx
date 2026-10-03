@@ -23,6 +23,7 @@ import { socketStatusAtom, useSocket } from "@/lib/socket/socket-context";
 import { GameChatSplit } from "./game-chat-split";
 import { GameOverOverlay } from "./game-over-overlay";
 import { GameSettingsGear } from "./game-settings-gear";
+import { PublicMatchPanel } from "./public-match-panel";
 import { WaitingForOpponentOverlay } from "./waiting-overlay";
 
 export function PlayClient({
@@ -74,7 +75,7 @@ export function PlayClient({
               game={game}
               moves={moves}
               makeMove={makeMove}
-              onViewProfile={openProfile}
+              onViewProfile={game.publicMatch ? undefined : openProfile}
             />
           </Suspense>
         </div>
@@ -114,6 +115,21 @@ export function PlayClient({
       />
     </>
   );
+
+  if (game.publicMatch) {
+    return (
+      <>
+        <GameChatSplit
+          conversationId={game.id}
+          initialLayout={initialLayout}
+          layoutTrusted={layoutTrusted}
+          game={gameNode}
+          chat={() => <PublicMatchPanel game={game} userId={userId} />}
+        />
+        {overlay}
+      </>
+    );
+  }
 
   if (!conversation) {
     return (

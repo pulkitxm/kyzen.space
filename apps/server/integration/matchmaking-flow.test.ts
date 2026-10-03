@@ -1,118 +1,114 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { conversations, db, games, schema } from "@kyzen/database";
+import { getDefinition } from "@kyzen/games-core";
 import { TIC_TAC_TOE } from "@kyzen/shared/constants";
 import { eq } from "drizzle-orm";
-import { createGameInConversation } from "../src/chat/games-in-chat-service";
-import { runPairing } from "../src/realtime/matchmaking";
-import { InMemoryMatchmakingStore } from "../src/realtime/matchmaking-store";
 import { createHarness, DB_UP } from "./harness";
 
-const h = createHarness("mmflow");
-const createdConvIds: string[] = [];
+const h = createHarness("publicmatch");
+const definition = getDefinition(TIC_TAC_TOE);
+async function join(userId: string, config: unknown = {}, owner = userId) {
+  const result = await games.joinMatchmaking({
+    userId,
+    owner,
+    gameType: TIC_TAC_TOE,
+    config,
+    roles: definition.engine.roles,
+    gameState: definition.engine.createInitialState(
+      definition.engine.roles.map((role) => ({ role })),
+    ),
+  });
+  if (result) h.trackGame(result.code);
+  return result;
+}
+afterAll(() => h.cleanup());
 
-afterAll(async () => {
-  if (DB_UP) {
-    for (const id of createdConvIds) {
-      await db
-        .delete(schema.conversation)
-        .where(eq(schema.conversation.id, id))
-        .catch(() => {});
-    }
-  }
-  await h.cleanup();
-});
-
-describe.skipIf(!DB_UP)("matchmaking flow (DB-backed)", () => {
-  it("pairs two enqueued users into one open game with both seatable", async () => {
+describe.skipIf(!DB_UP)("transactional public matchmaking", () => {
+  it("seats strangers atomically without creating a DM and resumes the same match", async () => {
     const a = await h.makeUser("a");
     const b = await h.makeUser("b");
-
-    const store = new InMemoryMatchmakingStore();
-    await store.enqueue(TIC_TAC_TOE, a.id, 1);
-    await store.enqueue(TIC_TAC_TOE, b.id, 2);
-
-    const pair = await store.pairAndPop(TIC_TAC_TOE);
-    expect(pair).toEqual([a.id, b.id]);
-
-    const matched: Array<{ userId: string; gameId: string }> = [];
-    await runPairing(TIC_TAC_TOE, pair as [string, string], undefined, {
-      onlineAmong: async (ids) => new Set(ids),
-      createMatchGame: async (input) => {
-        const { conversation } = await conversations.getOrCreateDm(
-          input.a,
-          input.b,
-        );
-        const created = await createGameInConversation({
-          userId: input.a,
-          conversationId: conversation.id,
-          gameType: input.gameType,
-          seatingMode: "challenge",
-          challengedUserId: input.b,
-          config: input.config,
-        });
-        return created.ok
-          ? { ok: true, gameId: created.value.game.id }
-          : { ok: false };
-      },
-      emitMatch: (userId, gameId) => matched.push({ userId, gameId }),
-      requeue: async () => {},
-    });
-
-    expect(matched.map((m) => m.userId).sort()).toEqual([a.id, b.id].sort());
-    const gameId = matched[0]?.gameId;
-    expect(gameId).toBeTruthy();
-
-    const dm = await conversations.findDm(a.id, b.id);
-    expect(dm).not.toBeNull();
-    if (dm) createdConvIds.push(dm.id);
-
-    const record = await games.getGameByCode(gameId as string);
-    expect(record).not.toBeNull();
-    if (record) h.trackGame(record.id);
-    expect(record?.gameType).toBe(TIC_TAC_TOE);
-    expect(record?.seatingMode).toBe("open");
-    expect(record?.challengedUserId).toBeNull();
-    expect(record?.players.map((p) => p.userId)).toEqual([a.id]);
-
-    const seated = await games.seatPlayer(
-      record?.id as string,
-      { userId: b.id, username: b.username, role: "O" },
-      1,
-    );
-    expect(seated).toBe(true);
-    const loaded = await games.getGameById(record?.id as string);
-    expect(loaded?.players.map((p) => p.userId).sort()).toEqual(
-      [a.id, b.id].sort(),
+    expect(await join(a.id)).toBeNull();
+    const matched = await join(b.id);
+    expect(matched?.userIds.sort()).toEqual([a.id, b.id].sort());
+    const record = await games.getGameByCode(matched?.code ?? "");
+    expect(record?.publicMatch).toBe(true);
+    expect(record?.status).toBe("active");
+    expect(record?.players.map((player) => player.role).sort()).toEqual([
+      "O",
+      "X",
+    ]);
+    expect(record?.conversationId).toBeNull();
+    expect(await conversations.findDm(a.id, b.id)).toBeNull();
+    expect((await join(a.id))?.code).toBe(matched?.code);
+    expect(await games.leaveMatchmaking(a.id, a.id, TIC_TAC_TOE)).toBe(
+      matched?.code ?? null,
     );
   });
 
-  it("creates exactly one game per DM even if pairAndPop is attempted twice", async () => {
-    const a = await h.makeUser("c");
-    const b = await h.makeUser("d");
+  it("isolates config pools and expired tickets", async () => {
+    const a = await h.makeUser("configA");
+    const b = await h.makeUser("configB");
+    expect(await join(a.id, { speed: "fast" })).toBeNull();
+    expect(await join(b.id, { speed: "slow" })).toBeNull();
+    await games.leaveMatchmaking(b.id, b.id, TIC_TAC_TOE);
+    await db
+      .update(schema.matchmakingTicket)
+      .set({ expiresAt: new Date(0) })
+      .where(eq(schema.matchmakingTicket.userId, a.id));
+    expect(await join(b.id, { speed: "fast" })).toBeNull();
+    await games.leaveMatchmaking(a.id, a.id, TIC_TAC_TOE);
+    await games.leaveMatchmaking(b.id, b.id, TIC_TAC_TOE);
+  });
 
-    const store = new InMemoryMatchmakingStore();
-    await store.enqueue(TIC_TAC_TOE, a.id, 1);
-    await store.enqueue(TIC_TAC_TOE, b.id, 2);
+  it("releases a disconnected owner's tickets so nobody is matched against a closed tab", async () => {
+    const a = await h.makeUser("closedTab");
+    const b = await h.makeUser("survivor");
+    const c = await h.makeUser("latecomer");
+    expect(await join(a.id, { pool: "release" }, "socket-a")).toBeNull();
+    expect(await join(b.id, { pool: "other" }, "socket-b")).toBeNull();
+    await games.releaseMatchmakingOwner("socket-a");
+    expect(await join(c.id, { pool: "release" }, "socket-c")).toBeNull();
+    const remaining = await db
+      .select({ userId: schema.matchmakingTicket.userId })
+      .from(schema.matchmakingTicket)
+      .where(eq(schema.matchmakingTicket.userId, b.id));
+    expect(remaining).toHaveLength(1);
+    await games.leaveMatchmaking(b.id, "socket-b", TIC_TAC_TOE);
+    await games.leaveMatchmaking(c.id, "socket-c", TIC_TAC_TOE);
+  });
 
-    const first = await store.pairAndPop(TIC_TAC_TOE);
-    const second = await store.pairAndPop(TIC_TAC_TOE);
-    expect(first).toEqual([a.id, b.id]);
-    expect(second).toBeNull();
+  it("cancels only the current owner's ticket", async () => {
+    const a = await h.makeUser("tabs");
+    await join(a.id, {}, "old-tab");
+    await join(a.id, {}, "new-tab");
+    await games.leaveMatchmaking(a.id, "old-tab", TIC_TAC_TOE);
+    const remaining = await db
+      .select()
+      .from(schema.matchmakingTicket)
+      .where(eq(schema.matchmakingTicket.userId, a.id));
+    expect(remaining).toHaveLength(1);
+    await games.leaveMatchmaking(a.id, "new-tab", TIC_TAC_TOE);
+    expect(
+      await db
+        .select()
+        .from(schema.matchmakingTicket)
+        .where(eq(schema.matchmakingTicket.userId, a.id)),
+    ).toHaveLength(0);
+  });
 
-    const { conversation } = await conversations.getOrCreateDm(a.id, b.id);
-    createdConvIds.push(conversation.id);
-
-    const created = await createGameInConversation({
-      userId: a.id,
-      conversationId: conversation.id,
-      gameType: TIC_TAC_TOE,
-      seatingMode: "challenge",
-      challengedUserId: b.id,
-    });
-    expect(created.ok).toBe(true);
-    if (created.ok) {
-      const record = await games.getGameByCode(created.value.game.id);
-      if (record) h.trackGame(record.id);
+  it("concurrent joins and retries give every player exactly one match", async () => {
+    const users = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => h.makeUser(`race${i}`)),
+    );
+    await Promise.all(users.flatMap((user) => [join(user.id), join(user.id)]));
+    const results = await Promise.all(users.map((user) => join(user.id)));
+    expect(new Set(results.map((result) => result?.code)).size).toBe(5);
+    for (const user of users) {
+      expect(
+        (await games.gamesForUser(user.id, { includePublic: true })).filter(
+          (game) => game.status === "active",
+        ),
+      ).toHaveLength(1);
     }
   });
 });

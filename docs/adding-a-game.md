@@ -33,7 +33,9 @@ The engine owns game rules. Its initial state comes from seats. Its `reduce(stat
 
 Optional `currentRole` and `autoMove` hooks enable the platform's turn clock. `currentRole` returns the current role or null when the game ends. `autoMove` returns a legal move for that role.
 
-Current matchmaking pairs two players. A game requiring larger match groups needs an explicit matchmaking extension and verification of its seating and timeout outcomes.
+Public matchmaking automatically supports registered engines with `minPlayers = maxPlayers = 2` and `reduce`. Configs are validated by `configSchema` and matched by canonical JSONB equality. Provide exactly two distinct roles and keep state and moves role-based: never embed account IDs, usernames, avatars, or profile data in engine state. Public wire snapshots replace account IDs with match-scoped role aliases, including `userId` supplied to the board. The shared shell supplies temporary chat and disables profile popups.
+
+The current queue serves the oldest compatible opponent and randomly assigns seats. A game requiring larger groups or rating-based pools needs an explicit matchmaking extension. See [public matchmaking](architecture/matchmaking.md).
 
 The deployed runner supports turn-based games. The type contract also describes realtime engines, but no server loop currently runs `step`. A realtime game needs platform work before it can be registered as playable.
 
@@ -73,6 +75,6 @@ bun run check
 bun run strip-comments -- --check
 ```
 
-Add focused tests for legal turns, each terminal outcome, invalid moves, and schema strictness. Existing conformance, registry, and game-document tests automatically cover the newly registered game. Then run local development, use two authenticated browser sessions, create a room, join, finish a game, and reconnect one player. If the game was started in a conversation, also verify docked, floating, and minimized chat.
+Add focused tests for legal turns, each terminal outcome, invalid moves, and schema strictness. Existing conformance, registry, and game-document tests automatically cover the newly registered game. Then run local development, use two authenticated browser sessions, create a room, join, finish a game, and reconnect one player. Also test the shared Play now flow, temporary match chat, mutual friendship, and docked, floating, minimized, and mobile chat. Conversation-backed games retain permanent chat.
 
 No game-specific database migration is needed. The existing JSONB state/config/move columns store the game's validated shapes. Tutorials are optional and follow [video-tutorials.md](video-tutorials.md).

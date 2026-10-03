@@ -13,6 +13,7 @@ import { colorModeSchema, themeIdSchema } from "../theme";
 export const messageKindSchema = z.enum(["text", "gif", "game_card", "system"]);
 
 export const createGameInputSchema = z.object({
+  publicMatch: z.boolean().optional(),
   gameType: gameTypeSchema,
   players: z.array(gamePlayerSchema),
   gameState: z.unknown(),

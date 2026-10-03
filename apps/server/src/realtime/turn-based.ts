@@ -10,11 +10,10 @@ import {
   type ClientMakeMove,
   type GameJson,
   isGameCode,
-  type Outcome,
   type ServerGameStatePayload,
 } from "@kyzen/shared/types";
 import type { Server as IOServer, Socket } from "socket.io";
-import { serializeGame, serializeMove } from "../api/serialize";
+import { publicPlayerId, serializeGame, serializeMove } from "../api/serialize";
 import { broadcastGameCard } from "../chat/game-card-broadcast";
 import { emitToGame, joinGameRoom } from "./rooms";
 import {
@@ -61,8 +60,9 @@ function scheduleNext(io: IOServer, gameRow: GameRecord): void {
     isFirstTurn: turnTimers.isFirstTurn(gameRow.id, role),
     strikes: turnTimers.strikes(gameRow.id, role),
   });
+  const armedState = JSON.stringify(gameRow.gameState);
   turnTimers.arm(gameRow.id, role, limit, () => {
-    void onTurnTimeout(io, gameRow.id);
+    void onTurnTimeout(io, gameRow.id, armedState);
   });
 }
 
@@ -70,7 +70,7 @@ async function emitFullState(io: IOServer, gameRow: GameRecord) {
   const moves = await games.listMoves(gameRow.id);
   const payload: ServerGameStatePayload = {
     game: withTimerFields(serializeGame(gameRow), gameRow.id),
-    moves: moves.map((m) => serializeMove(m, gameRow.code)),
+    moves: moves.map((m) => serializeMove(m, gameRow.code, gameRow)),
   };
   emitToGame(io, gameRow.code, "game_state", payload);
 }
@@ -120,35 +120,6 @@ async function ensureSeated(
   return { game, changed: true };
 }
 
-async function finalize(
-  gameRow: GameRecord,
-  outcome: Outcome,
-): Promise<GameRecord> {
-  if (outcome.status !== "completed") return gameRow;
-
-  const players = gameRow.players;
-  let winnerUserId: string | null = null;
-  if (!outcome.draw && outcome.winnerRole) {
-    winnerUserId =
-      players.find((p) => p.role === outcome.winnerRole)?.userId ?? null;
-  }
-
-  const updated = await games.updateGame(gameRow.id, {
-    status: "completed",
-    completedAt: new Date(),
-    winner: outcome.draw ? "draw" : winnerUserId,
-  });
-
-  for (const p of players) {
-    if (outcome.draw)
-      await profiles.bumpStats(p.userId, gameRow.gameType, "drawn");
-    else if (p.userId === winnerUserId)
-      await profiles.bumpStats(p.userId, gameRow.gameType, "won");
-    else await profiles.bumpStats(p.userId, gameRow.gameType, "lost");
-  }
-  return updated;
-}
-
 async function applyMove(
   io: IOServer,
   gameRow: GameRecord,
@@ -171,21 +142,20 @@ async function applyMove(
   );
   if (!result.ok) return;
 
-  const moveNumber = await games.nextMoveNumber(gameRow.id);
-  const moveRow = await games.addMove({
-    gameId: gameRow.id,
-    moveNumber,
+  const persisted = await games.persistGameMove({
+    previous: gameRow,
     playerId: player.userId,
     moveData: parsedMove.data,
+    gameState: result.state,
+    outcome: result.outcome,
   });
-
-  let updated = await games.updateGame(gameRow.id, { gameState: result.state });
-  updated = await finalize(updated, result.outcome);
+  if (!persisted) return;
+  const { game: updated, move: moveRow } = persisted;
 
   if (!opts.auto) turnTimers.resetStrikes(gameRow.id, player.role);
   scheduleNext(io, updated);
 
-  const move = serializeMove(moveRow, gameRow.code);
+  const move = serializeMove(moveRow, gameRow.code, gameRow);
   const statePayload: ServerGameStatePayload = {
     game: withTimerFields(serializeGame(updated), updated.id),
     move: opts.auto ? { ...move, auto: true } : move,
@@ -194,7 +164,9 @@ async function applyMove(
 
   if (updated.status === "completed") {
     turnTimers.dispose(updated.id);
-    emitToGame(io, gameRow.code, "game_over", { winner: updated.winner });
+    emitToGame(io, gameRow.code, "game_over", {
+      winner: publicPlayerId(updated, updated.winner),
+    });
     await broadcastGameCard(io, updated.id);
   }
 }
@@ -204,36 +176,34 @@ async function abortGame(
   gameRow: GameRecord,
   winner: GamePlayer | null,
 ): Promise<void> {
-  const updated = await games.updateGame(gameRow.id, {
-    status: "aborted",
-    completedAt: new Date(),
-    winner: winner ? winner.userId : null,
-  });
-
-  if (winner) {
-    for (const p of gameRow.players) {
-      await profiles.bumpStats(
-        p.userId,
-        gameRow.gameType,
-        p.userId === winner.userId ? "won" : "lost",
-      );
-    }
-  }
+  const updated = await games.abortActiveGame(gameRow, winner?.userId ?? null);
+  if (!updated) return;
 
   turnTimers.dispose(updated.id);
   emitToGame(io, gameRow.code, "game_state", {
     game: withTimerFields(serializeGame(updated), updated.id),
   });
-  emitToGame(io, gameRow.code, "game_over", { winner: updated.winner });
+  emitToGame(io, gameRow.code, "game_over", {
+    winner: publicPlayerId(updated, updated.winner),
+  });
   await broadcastGameCard(io, updated.id);
 }
 
-async function onTurnTimeout(io: IOServer, gameId: string): Promise<void> {
+async function onTurnTimeout(
+  io: IOServer,
+  gameId: string,
+  armedState?: string,
+): Promise<void> {
   const gameRow = await games.getGameById(gameId);
   if (gameRow?.status !== "active") {
     turnTimers.clear(gameId);
     return;
   }
+  if (
+    armedState !== undefined &&
+    JSON.stringify(gameRow.gameState) !== armedState
+  )
+    return;
   const role = currentRoleOf(gameRow);
   if (!role) {
     turnTimers.clear(gameId);
@@ -282,6 +252,12 @@ export async function handleJoinRoom(
   const gameRow = await games.getGameByCode(payload.gameId);
   if (!gameRow) return err(socket, "Game not found");
 
+  if (
+    gameRow.publicMatch &&
+    !gameRow.players.some((player) => player.userId === userId)
+  )
+    return err(socket, "Game not found");
+
   const { game, changed } = await ensureSeated(
     gameRow,
     userId,
@@ -289,7 +265,11 @@ export async function handleJoinRoom(
   );
 
   joinGameRoom(socket, game.code);
-  if (changed && game.status === "active") scheduleNext(io, game);
+  if (
+    game.status === "active" &&
+    (changed || turnTimers.deadline(game.id) === null)
+  )
+    scheduleNext(io, game);
   await emitFullState(io, game);
   if (changed) await broadcastGameCard(io, game.id);
 }
@@ -328,3 +308,12 @@ export async function handleMakeMove(
 }
 
 export const __timerInternals = { onTurnTimeout };
+
+export async function ensureMatchClock(
+  io: IOServer,
+  code: string,
+): Promise<void> {
+  const record = await games.getGameByCode(code);
+  if (record?.status === "active" && turnTimers.deadline(record.id) === null)
+    scheduleNext(io, record);
+}

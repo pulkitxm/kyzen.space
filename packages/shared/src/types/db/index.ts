@@ -96,6 +96,7 @@ export type VerificationRow = {
 };
 
 export type GameRow = {
+  publicMatch: boolean;
   id: string;
   code: string;
   gameType: string;
@@ -216,6 +217,7 @@ export type GameRecord = Omit<GameRow, "gameType"> & {
 };
 
 export type CreateGameInput = {
+  publicMatch?: boolean;
   gameType: GameType;
   players: GamePlayer[];
   gameState: unknown;

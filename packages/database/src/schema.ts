@@ -108,6 +108,7 @@ export const game = pgTable(
       .notNull()
       .unique("game_code_uq")
       .$defaultFn(() => generateGameCode()),
+    publicMatch: boolean("public_match").notNull().default(false),
     gameType: text("game_type").notNull(),
     status: text("status").$type<GameStatus>().notNull().default("waiting"),
     winner: text("winner"),
@@ -319,4 +320,55 @@ export const accountMerge = pgTable(
   (t) => [
     index("account_merge_target_status_idx").on(t.targetUserId, t.status),
   ],
+);
+
+export const matchmakingTicket = pgTable(
+  "matchmaking_ticket",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    owner: text("owner").notNull(),
+    gameType: text("game_type").notNull(),
+    config: jsonb("config").$type<unknown>().notNull(),
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (t) => [index("matchmaking_ticket_pool_idx").on(t.gameType, t.joinedAt)],
+);
+
+export const matchMessage = pgTable(
+  "match_message",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => game.id, { onDelete: "cascade" }),
+    senderId: text("sender_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (t) => [
+    unique("match_message_client_uq").on(t.gameId, t.senderId, t.clientId),
+    index("match_message_game_idx").on(t.gameId, t.createdAt),
+    index("match_message_expiry_idx").on(t.expiresAt),
+  ],
+);
+
+export const matchFriendChoice = pgTable(
+  "match_friend_choice",
+  {
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => game.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique("match_friend_choice_uq").on(t.gameId, t.userId)],
 );

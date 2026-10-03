@@ -139,3 +139,9 @@ The remaining tables are conventional relational shapes - one line each:
 - [`./auth.md`](./auth.md) - Better Auth and the `user` / `session` / `account` / `verification` tables.
 - [`./chat-core.md`](./chat-core.md) - the DTOs and socket contract behind the `conversation` / `message` / `friendship` / `notification` tables.
 - [`./README.md`](./README.md) - the architecture index.
+
+## Public match storage
+
+`game.publicMatch` identifies participant-only anonymous games. `matchmaking_ticket` stores one leased ticket per account, with socket ownership, registered game type, canonical config, queue age, and expiry. Match creation and both seats are committed with ticket removal.
+
+`match_message` is separate from permanent conversations. It stores sender IDs privately, deduplicates client UUIDs per match/sender, and expires messages after seven days. APIs hide all messages after game completion. `match_friend_choice` records each participant's independent consent; an accepted friendship requires both choices. All three tables cascade on account or game deletion where applicable. See [public matchmaking](matchmaking.md).

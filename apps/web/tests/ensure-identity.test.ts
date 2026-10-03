@@ -6,6 +6,7 @@ let getSessionResult: { data: SessionData } = { data: null };
 let anonCalls = 0;
 const callOrder: string[] = [];
 let anonShouldThrow = false;
+let anonError = false;
 
 mock.module("@/lib/auth-client", () => ({
   authClient: {
@@ -18,6 +19,7 @@ mock.module("@/lib/auth-client", () => ({
         callOrder.push("anonymous");
         anonCalls += 1;
         if (anonShouldThrow) throw new Error("anon failed");
+        if (anonError) return { error: { message: "Guest unavailable" } };
         const session = { session: { id: "anon-session" } };
         getSessionResult = { data: session };
         return { data: session };
@@ -32,19 +34,24 @@ beforeEach(() => {
   getSessionResult = { data: null };
   anonCalls = 0;
   anonShouldThrow = false;
+  anonError = false;
   callOrder.length = 0;
 });
 
 describe("ensureIdentity", () => {
+  it("rejects a returned anonymous sign-in error", async () => {
+    anonError = true;
+    await expect(ensureIdentity()).rejects.toThrow("Guest unavailable");
+  });
   it("mints an anonymous session when there is none", async () => {
     getSessionResult = { data: null };
-    await ensureIdentity();
+    expect(await ensureIdentity()).toBe(true);
     expect(anonCalls).toBe(1);
   });
 
   it("does nothing when a session already exists", async () => {
     getSessionResult = { data: { session: { id: "existing" } } };
-    await ensureIdentity();
+    expect(await ensureIdentity()).toBe(false);
     expect(anonCalls).toBe(0);
   });
 

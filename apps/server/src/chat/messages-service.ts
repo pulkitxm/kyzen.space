@@ -101,6 +101,9 @@ export async function markRead(
 ): Promise<ServiceResult<null>> {
   const member = await conversations.isMember(conversationId, userId);
   if (!member) return fail("Not a member of this conversation", 403);
+  const message = await messages.getById(messageId);
+  if (!message || message.conversationId !== conversationId)
+    return fail("Message not found in this conversation", 404);
   await conversations.markRead(conversationId, userId, messageId);
   const io = getIO();
   if (io) {

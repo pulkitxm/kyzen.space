@@ -35,8 +35,9 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
   const play = useCallback(async () => {
     setBusy("play");
     try {
-      await ensureIdentity();
-      router.push(`/play/find/${meta.type}`);
+      const created = await ensureIdentity();
+      if (created) window.location.assign(`/play/find/${meta.type}`);
+      else router.push(`/play/find/${meta.type}`);
     } catch {
       setBusy(null);
     }
@@ -45,8 +46,9 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
   const create = useCallback(async () => {
     setBusy("create");
     try {
-      await ensureIdentity();
-      router.push(`/play/new/${meta.type}`);
+      const created = await ensureIdentity();
+      if (created) window.location.assign(`/play/new/${meta.type}`);
+      else router.push(`/play/new/${meta.type}`);
     } catch {
       setBusy(null);
     }
@@ -61,8 +63,12 @@ export function RoomActions({ meta }: { meta: GameMeta }) {
     }
     setBusy("join");
     try {
-      await ensureIdentity();
-      if (socket) {
+      const created = await ensureIdentity();
+      if (created) {
+        window.location.assign(`/play/${normalized}`);
+        return;
+      }
+      if (socket?.connected) {
         try {
           const res = await emitAck<{ ok: true; code: string }>(
             socket,

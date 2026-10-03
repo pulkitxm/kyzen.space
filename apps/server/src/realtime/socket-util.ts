@@ -81,3 +81,14 @@ export function registerGameEvent<T extends { gameId: string }>(
     })();
   });
 }
+
+export function rateLimiter(max: number, windowMs: number): () => boolean {
+  const hits: number[] = [];
+  return () => {
+    const now = Date.now();
+    while (hits.length > 0 && now - (hits[0] ?? 0) > windowMs) hits.shift();
+    if (hits.length >= max) return false;
+    hits.push(now);
+    return true;
+  };
+}

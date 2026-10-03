@@ -7,21 +7,21 @@ import {
 } from "../src/realtime/turn-timer";
 
 describe("turnLimitMs", () => {
-  test("first turn is 15s regardless of strikes", () => {
-    expect(turnLimitMs({ isFirstTurn: true, strikes: 0 })).toBe(15_000);
-    expect(turnLimitMs({ isFirstTurn: true, strikes: 2 })).toBe(15_000);
+  test("first turn is 30s regardless of strikes", () => {
+    expect(turnLimitMs({ isFirstTurn: true, strikes: 0 })).toBe(30_000);
+    expect(turnLimitMs({ isFirstTurn: true, strikes: 2 })).toBe(30_000);
   });
 
-  test("later turns are 5s minus 1s per strike, floored at 1s", () => {
-    expect(turnLimitMs({ isFirstTurn: false, strikes: 0 })).toBe(5_000);
-    expect(turnLimitMs({ isFirstTurn: false, strikes: 1 })).toBe(4_000);
-    expect(turnLimitMs({ isFirstTurn: false, strikes: 2 })).toBe(3_000);
-    expect(turnLimitMs({ isFirstTurn: false, strikes: 9 })).toBe(1_000);
+  test("later turns are 30s minus 5s per strike, floored at 10s", () => {
+    expect(turnLimitMs({ isFirstTurn: false, strikes: 0 })).toBe(30_000);
+    expect(turnLimitMs({ isFirstTurn: false, strikes: 1 })).toBe(25_000);
+    expect(turnLimitMs({ isFirstTurn: false, strikes: 2 })).toBe(20_000);
+    expect(turnLimitMs({ isFirstTurn: false, strikes: 9 })).toBe(10_000);
   });
 });
 
 describe("decideTimeout", () => {
-  test("escalates 15 -> 4 -> 3 -> abort across consecutive timeouts", () => {
+  test("escalates 30 -> 25 -> 20 -> abort across consecutive timeouts", () => {
     expect(decideTimeout({ strikes: 0 })).toEqual({
       kind: "auto-move",
       nextStrikes: 1,
@@ -73,7 +73,7 @@ describe("TurnTimerManager", () => {
     expect(m.isFirstTurn("g1", "X")).toBe(true);
     m.arm("g1", "X", turnLimitMs({ isFirstTurn: true, strikes: 0 }), () => {});
     expect(m.isFirstTurn("g1", "X")).toBe(false);
-    expect(m.deadline("g1")).toBe(1_000_000 + 15_000);
+    expect(m.deadline("g1")).toBe(1_000_000 + 30_000);
   });
 
   test("strikes accumulate and reset", () => {
@@ -89,7 +89,7 @@ describe("TurnTimerManager", () => {
     const { deps } = fakeDeps();
     const m = new TurnTimerManager(deps);
     let fires = 0;
-    m.arm("g1", "X", 15_000, () => {
+    m.arm("g1", "X", 30_000, () => {
       fires++;
     });
     m.clear("g1");

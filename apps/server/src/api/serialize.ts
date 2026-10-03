@@ -48,18 +48,36 @@ export function serializeSeries(
   };
 }
 
-export function serializeGame(row: GameRecord): GameJson {
+export function publicPlayerId(
+  row: GameRecord,
+  userId: string | null,
+): string | null {
+  if (!row.publicMatch || !userId || userId === "draw") return userId;
+  const player = row.players.find((player) => player.userId === userId);
+  return player ? `${row.code}:${player.role}` : null;
+}
+
+export function serializeGame(row: GameRecord, viewerId?: string): GameJson {
   return {
+    publicMatch: row.publicMatch ?? false,
+    ...(viewerId ? { viewerId: publicPlayerId(row, viewerId) } : {}),
     id: row.code,
     gameType: row.gameType,
     status: row.status,
-    winner: row.winner,
-    players: row.players,
+    winner: publicPlayerId(row, row.winner),
+    players: row.publicMatch
+      ? row.players.map((player, index) => ({
+          userId: publicPlayerId(row, player.userId) ?? "",
+          username: `Player ${index + 1}`,
+          role: player.role,
+          avatar: null,
+        }))
+      : row.players,
     gameState: row.gameState ?? null,
     conversationId: row.conversationId,
-    creatorUserId: row.creatorUserId,
+    creatorUserId: row.publicMatch ? null : row.creatorUserId,
     seatingMode: row.seatingMode,
-    challengedUserId: row.challengedUserId,
+    challengedUserId: row.publicMatch ? null : row.challengedUserId,
     startedAt: iso(row.startedAt),
     completedAt: iso(row.completedAt),
     createdAt: iso(row.createdAt),
@@ -67,12 +85,16 @@ export function serializeGame(row: GameRecord): GameJson {
   };
 }
 
-export function serializeMove(row: MoveRow, gameCode: string): MoveJson {
+export function serializeMove(
+  row: MoveRow,
+  gameCode: string,
+  game?: GameRecord,
+): MoveJson {
   return {
     id: row.id,
     gameId: gameCode,
     moveNumber: row.moveNumber,
-    playerId: row.playerId,
+    playerId: game ? (publicPlayerId(game, row.playerId) ?? "") : row.playerId,
     moveData: row.moveData,
     createdAt: iso(row.createdAt),
   };

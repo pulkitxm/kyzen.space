@@ -35,7 +35,7 @@ Start with [adding a game](../adding-a-game.md). The server imports engines and 
 5. The server persists the result and broadcasts state with a move delta.
 6. The shared session filters by room, deduplicates and orders moves, and updates the board and overlays together.
 
-A conversation-backed game also mounts the existing chat view through `GameChatSplit`: docked at the side, floating, or minimized. Public rooms without a conversation currently render only the board. Profiles open through the shell callback; audio sources come from game metadata.
+A conversation-backed game also mounts the existing chat view through `GameChatSplit`: docked at the side, floating, or minimized. Public matches mount temporary participant-only chat through the same layout. Private standalone rooms render the board. Public players use match-scoped aliases and have no profile callback; audio sources come from game metadata.
 
 ## Reference docs
 
@@ -48,6 +48,7 @@ A conversation-backed game also mounts the existing chat view through `GameChatS
 | [database.md](database.md) | Repositories and data access |
 | [database-schema.md](database-schema.md) | Tables and migrations |
 | [generic-game-schema.md](generic-game-schema.md) | JSONB game storage |
+| [matchmaking.md](matchmaking.md) | Public matching, anonymity, temporary chat, mutual friendship |
 | [realtime.md](realtime.md) | Authentication, rooms, chat, moves, timers |
 | [server-api.md](server-api.md) | HTTP mount, services, serializers |
 | [auth.md](auth.md) | Sessions, guests, OAuth, account merging |

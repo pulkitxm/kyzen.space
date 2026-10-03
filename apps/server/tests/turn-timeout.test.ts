@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { TIC_TAC_TOE } from "@kyzen/shared/constants";
+import type { GameRecord, Outcome } from "@kyzen/shared/types";
 
 const UUID = "11111111-1111-1111-1111-111111111111";
 const CODE = "K7P2QX";
@@ -12,6 +13,40 @@ let moves: any[] = [];
 const bumpCalls: { userId: string; outcome: string }[] = [];
 
 const games = {
+  abortActiveGame: async (_previous: GameRecord, winner: string | null) => {
+    current = {
+      ...current,
+      status: "aborted",
+      winner,
+      completedAt: new Date(),
+    };
+    if (winner)
+      for (const player of current.players)
+        bumpCalls.push({
+          userId: player.userId,
+          outcome: player.userId === winner ? "won" : "lost",
+        });
+    return current;
+  },
+  persistGameMove: async (input: {
+    previous: GameRecord;
+    playerId: string;
+    moveData: unknown;
+    gameState: unknown;
+    outcome: Outcome;
+  }) => {
+    const row = {
+      id: `m${moves.length + 1}`,
+      gameId: current.id,
+      playerId: input.playerId,
+      moveData: input.moveData,
+      moveNumber: moves.length + 1,
+      createdAt: new Date(),
+    };
+    moves.push(row);
+    current = { ...current, gameState: input.gameState };
+    return { game: current, move: row };
+  },
   getGameById: async () => current,
   getGameByCode: async () => current,
   listMoves: async () => moves,
@@ -120,6 +155,28 @@ describe("onTurnTimeout - auto-move", () => {
     expect(
       (stateEmit?.payload as { move?: { auto?: boolean } }).move?.auto,
     ).toBe(true);
+  });
+});
+
+describe("onTurnTimeout - stale callbacks", () => {
+  test("a timeout armed for an earlier turn does nothing after a move lands", async () => {
+    current = activeGame(Array(9).fill(null), "X");
+    const armedForX = JSON.stringify(current.gameState);
+    turnTimers.setStrikes(UUID, "O", 2);
+    const { io } = fakeIo();
+    const { socket } = fakeSocket("u1");
+    // biome-ignore lint/suspicious/noExplicitAny: fake io/socket
+    await handleMakeMove(io as any, socket as any, {
+      gameId: CODE,
+      moveData: { row: 0, col: 0 },
+    });
+    await __timerInternals.onTurnTimeout(io, UUID, armedForX);
+
+    expect(moves).toHaveLength(1);
+    expect(current.status).toBe("active");
+    expect(current.gameState.currentTurn).toBe("O");
+    expect(turnTimers.strikes(UUID, "O")).toBe(2);
+    expect(turnTimers.strikes(UUID, "X")).toBe(0);
   });
 });
 

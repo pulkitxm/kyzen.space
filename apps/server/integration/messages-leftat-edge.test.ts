@@ -9,7 +9,7 @@ const h = createHarness("mle");
 afterAll(h.cleanup);
 
 describe.skipIf(!DB_UP)("unreadCount and a member who has left", () => {
-  it("still counts messages for a member after they leave the group (documents a leftAt-filter gap)", async () => {
+  it("does not count messages for a member who left the group", async () => {
     const owner = await h.makeUser("ulo");
     const leaver = await h.makeUser("ull");
     const gid = await h.makeGroup(owner, "LeftUnread", [leaver.id]);
@@ -25,14 +25,14 @@ describe.skipIf(!DB_UP)("unreadCount and a member who has left", () => {
       }),
     );
 
-    expect(await conversations.unreadCount(gid, leaver.id)).toBe(1);
+    expect(await conversations.unreadCount(gid, leaver.id)).toBe(0);
   });
 });
 
 describe.skipIf(!DB_UP)(
   "markRead with a messageId from another conversation",
   () => {
-    it("accepts a foreign messageId and records it as lastReadMessageId (documents a missing same-conversation check)", async () => {
+    it("rejects a foreign messageId without changing the read cursor", async () => {
       const a = await h.makeUser("mfa");
       const b = await h.makeUser("mfb");
       const dmId = await h.makeDm(a, b);
@@ -48,11 +48,13 @@ describe.skipIf(!DB_UP)(
         }),
       );
 
-      unwrap(await messagesService.markRead(b.id, dmId, foreign.id));
+      const result = await messagesService.markRead(b.id, dmId, foreign.id);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.status).toBe(404);
 
       const rows = await conversations.getMemberRows(dmId);
       const bRow = rows.find((r) => r.userId === b.id);
-      expect(bRow?.lastReadMessageId).toBe(foreign.id);
+      expect(bRow?.lastReadMessageId).toBeNull();
 
       const stored = await messages.getById(foreign.id);
       expect(stored?.conversationId).toBe(otherDm);

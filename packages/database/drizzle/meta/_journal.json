@@ -64,6 +64,20 @@
       "when": 1781075576184,
       "tag": "0008_liquid_glass",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790959869174,
+      "tag": "0009_public_matchmaking",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790960229272,
+      "tag": "0010_match_chat",
+      "breakpoints": true
     }
   ]
 }
