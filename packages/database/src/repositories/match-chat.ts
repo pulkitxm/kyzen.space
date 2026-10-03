@@ -41,7 +41,7 @@ export async function readMatchChat(code: string, userId: string) {
       .from(matchFriendChoice)
       .where(eq(matchFriendChoice.gameId, row.id));
     const rows =
-      row.status === "active"
+      row.status === "active" || row.status === "waiting"
         ? await tx
             .select()
             .from(matchMessage)
@@ -103,7 +103,8 @@ export async function sendMatchMessage(input: {
 }): Promise<MatchMessage> {
   return db.transaction(async (tx) => {
     const { row, players } = await participant(tx, input.code, input.userId);
-    if (row.status !== "active") throw new Error("Match chat has ended");
+    if (row.status !== "active" && row.status !== "waiting")
+      throw new Error("Match chat has ended");
     const [existing] = await tx
       .select()
       .from(matchMessage)

@@ -42,7 +42,7 @@ export function serializeSeries(
       gameNumber: i + 1,
       status: g.status,
       winner: g.winner,
-      winnerUsername: resolveWinnerUsername(g.winner, g.players),
+      winnerUsername: resolveWinnerUsername(g.winner, g.players, g.gameType),
       completedAt: iso(g.completedAt),
     })),
   };

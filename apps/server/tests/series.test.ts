@@ -25,6 +25,18 @@ function game(
 }
 
 describe("computeSeriesScore", () => {
+  test("credits both teammates for a Turbo Pitch series win", () => {
+    const match = game("completed", "blue1", [
+      { userId: "blue1", username: "one", role: "blue-1" },
+      { userId: "orange1", username: "two", role: "orange-1" },
+      { userId: "blue2", username: "three", role: "blue-2" },
+      { userId: "orange2", username: "four", role: "orange-2" },
+    ]);
+    match.gameType = "car-football";
+    expect(
+      computeSeriesScore([match]).entries.map((entry) => entry.wins),
+    ).toEqual([1, 0, 1, 0]);
+  });
   test("tallies wins, draws, and totals", () => {
     const score = computeSeriesScore([
       game("completed", "u1"),

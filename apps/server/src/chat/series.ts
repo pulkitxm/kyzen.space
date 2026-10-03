@@ -1,4 +1,5 @@
 import type { GameRecord } from "@kyzen/database";
+import { CAR_FOOTBALL } from "@kyzen/shared/constants";
 import type { SeriesScore, SeriesScoreEntry } from "@kyzen/shared/types";
 
 export function computeSeriesScore(seriesGames: GameRecord[]): SeriesScore {
@@ -24,8 +25,17 @@ export function computeSeriesScore(seriesGames: GameRecord[]): SeriesScore {
     if (g.winner === "draw") {
       draws += 1;
     } else if (g.winner) {
-      const entry = byUser.get(g.winner);
-      if (entry) entry.wins += 1;
+      const winner = g.players.find((player) => player.userId === g.winner);
+      const winningTeam = winner?.role.split("-")[0];
+      for (const player of g.players) {
+        const won =
+          player.userId === g.winner ||
+          (g.gameType === CAR_FOOTBALL &&
+            winningTeam &&
+            player.role.startsWith(`${winningTeam}-`));
+        const entry = byUser.get(player.userId);
+        if (entry && won) entry.wins += 1;
+      }
     }
   }
 

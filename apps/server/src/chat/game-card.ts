@@ -17,7 +17,11 @@ export function enrichGameCardMeta(
   game: GameCardSnapshot | null,
 ): GameCardMeta {
   if (!game) return base;
-  const winnerUsername = resolveWinnerUsername(game.winner, game.players);
+  const winnerUsername = resolveWinnerUsername(
+    game.winner,
+    game.players,
+    base.gameType,
+  );
   return {
     ...base,
     status: game.status,

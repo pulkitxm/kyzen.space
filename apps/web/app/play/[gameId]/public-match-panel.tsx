@@ -53,7 +53,7 @@ export function PublicMatchPanel({
   const [busy, setBusy] = useState(false);
   const sending = useRef(false);
   const pendingClientId = useRef<string | null>(null);
-  const active = game.status === "active";
+  const active = game.status === "active" || game.status === "waiting";
 
   useSocketEvent<MatchMessage>("match:message", (message) => {
     if (message.gameId === game.id && active)
@@ -179,11 +179,15 @@ export function PublicMatchPanel({
           <FaRegComments size={16} aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-sm">Match chat</h2>
+          <h2 className="font-semibold text-sm">
+            {game.publicMatch ? "Match chat" : "Room chat"}
+          </h2>
           <p className="mt-0.5 flex items-center gap-1.5 text-muted-foreground text-xs">
-            {game.players.length > 2
-              ? "All four players"
-              : (opponent?.username ?? "Opponent")}
+            {!game.publicMatch
+              ? `${game.players.length} players in room`
+              : game.players.length > 2
+                ? "All four players"
+                : (opponent?.username ?? "Opponent")}
           </p>
         </div>
         {!game.publicMatch ? null : social.mutual ? (

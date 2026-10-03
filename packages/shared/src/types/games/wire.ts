@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CAR_FOOTBALL } from "../../constants/games";
 import { avatarConfigSchema } from "../avatar";
 import { gameCodeSchema } from "./code";
 import { gameTypeSchema } from "./core";
@@ -147,11 +148,14 @@ export function isGameLive(status: string): boolean {
 
 export function resolveWinnerUsername(
   winner: string | null,
-  players: ReadonlyArray<{ userId: string; username: string }>,
+  players: ReadonlyArray<{ userId: string; username: string; role?: string }>,
+  gameType?: string,
 ): string | null {
-  return winner && winner !== "draw"
-    ? (players.find((p) => p.userId === winner)?.username ?? null)
-    : null;
+  if (!winner || winner === "draw") return null;
+  const player = players.find((candidate) => candidate.userId === winner);
+  if (gameType === CAR_FOOTBALL && player?.role)
+    return player.role.startsWith("blue") ? "Blue team" : "Orange team";
+  return player?.username ?? null;
 }
 
 const matchMessageSchema = z.object({

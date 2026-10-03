@@ -153,6 +153,7 @@ function addArena(scene: THREE.Scene) {
     for (const z of [-8, 8]) {
       const post = new THREE.Mesh(postGeometry, goalMaterial);
       post.position.set(side * 40, 3.5, z);
+      post.userData.goalSide = side;
       scene.add(post);
     }
     const bar = new THREE.Mesh(
@@ -161,6 +162,7 @@ function addArena(scene: THREE.Scene) {
     );
     bar.rotation.x = Math.PI / 2;
     bar.position.set(side * 40, 7, 0);
+    bar.userData.goalSide = side;
     scene.add(bar);
     const net = new THREE.Mesh(
       new THREE.BoxGeometry(3, 7, 16),
@@ -171,6 +173,7 @@ function addArena(scene: THREE.Scene) {
       }),
     );
     net.position.set(side * 41.5, 3.5, 0);
+    net.userData.goalSide = side;
     scene.add(net);
   }
 
@@ -261,7 +264,7 @@ function TouchButton({
     <button
       type="button"
       aria-label={label}
-      className="flex size-14 touch-none items-center justify-center rounded-2xl border border-white/35 bg-[#071727]/75 text-white text-xl shadow-lg backdrop-blur-md active:bg-white/25"
+      className="flex size-12 touch-none items-center justify-center rounded-2xl border border-white/35 bg-[#071727]/75 text-white text-xl shadow-lg backdrop-blur-md active:bg-white/25"
       onPointerDown={(event) => {
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -415,11 +418,19 @@ export function CarFootballGameClient({
           const directionX = Math.cos(cameraAngle);
           const directionZ = Math.sin(cameraAngle);
           target.set(
-            THREE.MathUtils.clamp(own.position.x - directionX * 13, -36, 36),
+            own.position.x - directionX * 13,
             own.position.z + 8,
-            THREE.MathUtils.clamp(own.position.y - directionZ * 13, -22, 22),
+            own.position.y - directionZ * 13,
           );
           camera.position.lerp(target, 0.08);
+          for (const object of scene.children) {
+            const side = object.userData.goalSide as number | undefined;
+            if (side)
+              object.visible = !(
+                own.position.x * side > 28 &&
+                camera.position.x * side > own.position.x * side
+              );
+          }
           camera.lookAt(
             ballCameraRef.current
               ? current.ball.position.x

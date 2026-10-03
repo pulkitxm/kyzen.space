@@ -43,9 +43,19 @@ function outcomeLabel(game: GameJson, userId: string): string {
 }
 
 function PlayersRow({ game }: { game: GameJson }) {
+  const players =
+    game.gameType === CAR_FOOTBALL
+      ? [...game.players].sort((a, b) => a.role.localeCompare(b.role))
+      : game.players;
   return (
-    <div className="flex items-start justify-center gap-8">
-      {game.players.map((p) => {
+    <div
+      className={
+        players.length > 2
+          ? "grid grid-cols-2 gap-4"
+          : "flex items-start justify-center gap-8"
+      }
+    >
+      {players.map((p) => {
         const winningTeam = game.players
           .find((player) => player.userId === game.winner)
           ?.role.split("-")[0];
@@ -70,6 +80,17 @@ function PlayersRow({ game }: { game: GameJson }) {
               />
             </div>
             <span className="max-w-24 truncate text-sm">{p.username}</span>
+            {game.gameType === CAR_FOOTBALL ? (
+              <span
+                className={
+                  p.role.startsWith("blue")
+                    ? "text-sky-300 text-xs"
+                    : "text-orange-300 text-xs"
+                }
+              >
+                {p.role.startsWith("blue") ? "Blue team" : "Orange team"}
+              </span>
+            ) : null}
             {won ? (
               <FaTrophy
                 className="text-amber-500"

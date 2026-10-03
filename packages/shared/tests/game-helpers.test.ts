@@ -53,6 +53,15 @@ describe("isGameLive", () => {
 });
 
 describe("resolveWinnerUsername", () => {
+  test("labels a car football result with the winning team", () => {
+    expect(
+      resolveWinnerUsername(
+        "one",
+        [{ userId: "one", username: "host", role: "blue-1" }],
+        "car-football",
+      ),
+    ).toBe("Blue team");
+  });
   const players = [
     { userId: "u1", username: "aman" },
     { userId: "u2", username: "bina" },

@@ -116,22 +116,26 @@ describe.skipIf(!DB_UP)("Turbo Pitch four-player flow", () => {
     });
     if (!created.ok) throw new Error(created.error);
     h.trackGame(created.value.code);
+    await matchChat.sendMatchMessage({
+      code: created.value.code,
+      userId: users[0]?.id ?? "",
+      body: "Waiting room hello",
+      clientId: crypto.randomUUID(),
+    });
+    expect(
+      (await matchChat.readMatchChat(created.value.code, users[0]?.id ?? ""))
+        .messages,
+    ).toHaveLength(1);
     const io = makeIo([]);
     for (const user of users.slice(0, 4))
       await handleJoinRoom(io as never, makeSocket(user.id) as never, {
         gameId: created.value.code,
       });
-    const sent = await matchChat.sendMatchMessage({
-      code: created.value.code,
-      userId: users[0]?.id ?? "",
-      body: "Synthetic room hello",
-      clientId: crypto.randomUUID(),
-    });
-    expect(sent.authorId).toBe(users[0]?.id ?? "");
-    expect(
-      (await matchChat.readMatchChat(created.value.code, users[1]?.id ?? ""))
-        .messages,
-    ).toHaveLength(1);
+    const messages = (
+      await matchChat.readMatchChat(created.value.code, users[1]?.id ?? "")
+    ).messages;
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.authorId).toBe(users[0]?.id ?? "");
     await expect(
       matchChat.readMatchChat(created.value.code, users[4]?.id ?? ""),
     ).rejects.toThrow("Match not found");
